@@ -994,7 +994,6 @@
     <string name="file_share_chooser_title">Datei teilen</string>
     <string name="file_share_failed_toast">Teilen fehlgeschlagen: %1$s</string>
     <string name="file_print_failed_toast">Drucken fehlgeschlagen: %1$s</string>
-    <string name="debug_trigger_crash_menu">Absturz auslösen (Debug)</string>
     <string name="filebrowser_copy_abs_path">Absoluten Pfad kopieren</string>
     <string name="filebrowser_copy_abs_path_toast">Pfad kopiert</string>
     <!-- [T-mcp-i18n-android] MCP Integrations UI -->

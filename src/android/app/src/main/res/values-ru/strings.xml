@@ -1231,7 +1231,6 @@
     <string name="file_share_chooser_title">Поделиться файлом</string>
     <string name="file_share_failed_toast">Не удалось поделиться: %1$s</string>
     <string name="file_print_failed_toast">Не удалось напечатать: %1$s</string>
-    <string name="debug_trigger_crash_menu">Вызвать сбой (Отладка)</string>
     <!-- [T-mcp-i18n-android] MCP Integrations UI -->
     <string name="settings_mcp">Интеграции MCP</string>
     <string name="settings_mcp_subtitle">Подключение серверов Model Context Protocol</string>

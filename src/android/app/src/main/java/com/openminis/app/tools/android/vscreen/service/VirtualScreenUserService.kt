@@ -15,6 +15,7 @@ import com.openminis.app.tools.android.vscreen.VirtualScreenPolicy
 import com.openminis.app.tools.android.vscreen.VirtualScreenProbeFailure
 import com.openminis.app.tools.android.vscreen.VirtualScreenProbeRecorder
 import com.openminis.app.tools.android.vscreen.service.internal.DisplaySpec
+import com.openminis.app.tools.android.vscreen.service.internal.FocusBridge
 import com.openminis.app.tools.android.vscreen.service.internal.InputBridge
 import com.openminis.app.tools.android.vscreen.service.internal.ScreenCapture
 import com.openminis.app.tools.android.vscreen.service.internal.ShellContext
@@ -215,26 +216,26 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
     override fun tap(displayId: Int, x: Int, y: Int): Boolean = synchronized(lock) {
         val active = checkDisplay(displayId)
         checkCoordinates(active, x, y)
-        InputBridge().tap(displayId, x, y)
+        InputBridge().tap(displayId, x, y).also { FocusBridge.restorePhysicalFocusSoon() }
     }
 
     override fun swipe(displayId: Int, startX: Int, startY: Int, endX: Int, endY: Int, durationMs: Int): Boolean = synchronized(lock) {
         val active = checkDisplay(displayId)
         checkCoordinates(active, startX, startY)
         checkCoordinates(active, endX, endY)
-        InputBridge().swipe(displayId, startX, startY, endX, endY, durationMs)
+        InputBridge().swipe(displayId, startX, startY, endX, endY, durationMs).also { FocusBridge.restorePhysicalFocusSoon() }
     }
 
     override fun longPress(displayId: Int, x: Int, y: Int, durationMs: Int): Boolean = synchronized(lock) {
         val active = checkDisplay(displayId)
         checkCoordinates(active, x, y)
-        InputBridge().longPress(displayId, x, y, durationMs)
+        InputBridge().longPress(displayId, x, y, durationMs).also { FocusBridge.restorePhysicalFocusSoon() }
     }
 
     override fun key(displayId: Int, keyCode: Int): Boolean = synchronized(lock) {
         checkDisplay(displayId)
         if (keyCode !in 0..KeyEvent.getMaxKeyCode()) fail("invalid_key_code", "keyCode is outside Android's key range")
-        InputBridge().key(displayId, keyCode)
+        InputBridge().key(displayId, keyCode).also { FocusBridge.restorePhysicalFocusSoon() }
     }
 
     override fun inputText(displayId: Int, text: String): Boolean = synchronized(lock) {
@@ -289,7 +290,12 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
             active = checkDisplay(displayId)
             checkCoordinates(active, x, y)
         }
-        return touchBridge.touch(displayId, action, x, y, downTimeMs)
+        val ok = touchBridge.touch(displayId, action, x, y, downTimeMs)
+        // A finger going down on the virtual display focuses it; hand focus back once the gesture is over.
+        if (action == android.view.MotionEvent.ACTION_DOWN || action == android.view.MotionEvent.ACTION_UP) {
+            FocusBridge.restorePhysicalFocusSoon()
+        }
+        return ok
     }
 
     override fun back(displayId: Int): Boolean = key(displayId, KeyEvent.KEYCODE_BACK)
@@ -390,6 +396,9 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         if (process.exitValue() != 0 || output.contains("Error", ignoreCase = true)) {
             fail("app_launch_failed", output.trim().take(300).ifEmpty { "Launch request was rejected" })
         }
+        // The new window takes the system's top focus; give it back to the physical screen.
+        Thread.sleep(250)
+        FocusBridge.restorePhysicalFocusSoon()
         return true
     }
 

@@ -993,7 +993,6 @@
     <string name="file_share_chooser_title">파일 공유</string>
     <string name="file_share_failed_toast">공유 실패: %1$s</string>
     <string name="file_print_failed_toast">인쇄 실패: %1$s</string>
-    <string name="debug_trigger_crash_menu">크래시 트리거 (Debug)</string>
     <string name="filebrowser_copy_abs_path">절대 경로 복사</string>
     <string name="filebrowser_copy_abs_path_toast">경로가 복사됨</string>
     <!-- [T-mcp-i18n-android] MCP Integrations UI -->

@@ -264,6 +264,45 @@ object MinisIcons {
         }
     }
 
+    val Globe: ImageVector by lazy {
+        line("globe") {
+            circle(12f, 12f, 9f)
+            moveTo(3f, 12f)
+            horizontalLineTo(21f)
+            moveTo(12f, 3f)
+            arcTo(4.6f, 9f, 0f, false, true, 12f, 21f)
+            arcTo(4.6f, 9f, 0f, false, true, 12f, 3f)
+        }
+    }
+
+    val Folder: ImageVector by lazy {
+        line("folder") {
+            moveTo(3.5f, 7.5f)
+            arcTo(2.5f, 2.5f, 0f, false, true, 6f, 5f)
+            horizontalLineTo(9.2f)
+            lineTo(11.2f, 7.5f)
+            horizontalLineTo(18f)
+            arcTo(2.5f, 2.5f, 0f, false, true, 20.5f, 10f)
+            verticalLineTo(17.5f)
+            arcTo(2.5f, 2.5f, 0f, false, true, 18f, 20f)
+            horizontalLineTo(6f)
+            arcTo(2.5f, 2.5f, 0f, false, true, 3.5f, 17.5f)
+            close()
+        }
+    }
+
+    val Eye: ImageVector by lazy {
+        line("eye") {
+            moveTo(2.5f, 12f)
+            curveTo(4.5f, 8f, 8f, 6f, 12f, 6f)
+            curveTo(16f, 6f, 19.5f, 8f, 21.5f, 12f)
+            curveTo(19.5f, 16f, 16f, 18f, 12f, 18f)
+            curveTo(8f, 18f, 4.5f, 16f, 2.5f, 12f)
+            close()
+            circle(12f, 12f, 2.8f)
+        }
+    }
+
     val Close: ImageVector by lazy {
         line("close") {
             moveTo(6f, 6f)

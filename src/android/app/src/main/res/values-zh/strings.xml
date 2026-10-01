@@ -1342,7 +1342,6 @@
     <string name="file_share_chooser_title">分享文件</string>
     <string name="file_share_failed_toast">分享失败：%1$s</string>
     <string name="file_print_failed_toast">打印失败：%1$s</string>
-    <string name="debug_trigger_crash_menu">触发闪退 (Debug)</string>
     <string name="filebrowser_copy_abs_path">复制绝对路径</string>
     <string name="filebrowser_copy_abs_path_toast">路径已复制</string>
     <!-- [T-mcp-i18n-android] MCP Integrations UI -->

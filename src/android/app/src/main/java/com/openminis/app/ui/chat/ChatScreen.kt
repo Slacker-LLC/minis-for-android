@@ -2488,7 +2488,7 @@ fun ChatScreen(
                                     showChatMenu = false
                                     viewModel.toggleBrowserSheet()
                                 },
-                                trailingIcon = { Icon(Icons.Default.Language, contentDescription = null) },
+                                trailingIcon = { Icon(com.openminis.app.ui.components.MinisIcons.Globe, contentDescription = null, modifier = Modifier.size(22.dp)) },
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.chat_menu_browse_chat_files)) },
@@ -2496,7 +2496,7 @@ fun ChatScreen(
                                     showChatMenu = false
                                     onBrowseChatFiles()
                                 },
-                                trailingIcon = { Icon(Icons.Outlined.Folder, contentDescription = null) },
+                                trailingIcon = { Icon(com.openminis.app.ui.components.MinisIcons.Folder, contentDescription = null, modifier = Modifier.size(22.dp)) },
                             )
                             if (VirtualScreenClientProvider.get(context).isEnabled()) {
                                 DropdownMenuItem(
@@ -2505,7 +2505,7 @@ fun ChatScreen(
                                         showChatMenu = false
                                         showVirtualScreenViewer = true
                                     },
-                                    trailingIcon = { Icon(Icons.Outlined.Visibility, contentDescription = null) },
+                                    trailingIcon = { Icon(com.openminis.app.ui.components.MinisIcons.Eye, contentDescription = null, modifier = Modifier.size(22.dp)) },
                                 )
                             }
                             MinisMenuDivider()
@@ -2517,34 +2517,9 @@ fun ChatScreen(
                                     showClearChatDialog = true
                                 },
                                 trailingIcon = {
-                                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                    Icon(com.openminis.app.ui.components.MinisIcons.Trash, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(22.dp))
                                 },
                             )
-                            // T287: debug-only crash trigger
-                            if (BuildConfig.DEBUG) {
-                                MinisMenuDivider()
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            stringResource(R.string.debug_trigger_crash_menu),
-                                            color = MaterialTheme.colorScheme.error,
-                                        )
-                                    },
-                                    onClick = {
-                                        showChatMenu = false
-                                        throw RuntimeException(
-                                            "Debug crash triggered by user (T287)",
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.BugReport,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.error,
-                                        )
-                                    },
-                                )
-                            }
                         }
                     }
                 },
@@ -2715,7 +2690,7 @@ fun ChatScreen(
                 // already reserves visualOverlayHeight (65dp) + buffer and
                 // was not part of the report; keep its +14 buffer.
                 val bottomReserve =
-                    if (hasFloatingTools) visualOverlayHeight + 14.dp else 20.dp
+                    if (hasFloatingTools) visualOverlayHeight + 34.dp else 20.dp
                 // T174: when bottomReserve changes (toolbar appearing /
                 // disappearing or thumbnail height shift), re-pin to bottom
                 // if we are currently following. Without this, the new
@@ -6375,10 +6350,9 @@ fun ChatScreen(
                 .height(6.dp)
                 .background(
                     androidx.compose.ui.graphics.Brush.verticalGradient(
-                        colors = listOf(
-                            ChatColors.background,
-                            ChatColors.background.copy(alpha = 0f),
-                        ),
+                        colors = chatPagePalette().background.let { page ->
+                            listOf(page, page.copy(alpha = 0f))
+                        },
                     )
                 )
         )

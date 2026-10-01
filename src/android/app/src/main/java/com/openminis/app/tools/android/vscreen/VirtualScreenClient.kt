@@ -405,8 +405,8 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
 
     companion object {
         // Bumped whenever the UserService code or its AIDL changes: a daemon service outlives the app, so
-        // Shizuku only replaces it when this number differs. 2 = frame stream, raw touch, display info; 3 = Home starts Minis's own desktop; 4 = UiAutomation keeps other accessibility services, launches never move a task.
-        private const val USER_SERVICE_VERSION = 4
+        // Shizuku only replaces it when this number differs. 2 = frame stream, raw touch, display info; 3 = Home starts Minis's own desktop; 4 = UiAutomation keeps other accessibility services, launches never move a task; 5 = focus is handed back to the physical screen (and again a moment later); 7 = UiAutomation really connects with DONT_SUPPRESS.
+        private const val USER_SERVICE_VERSION = 7
         private const val DEFAULT_TIMEOUT_MS = 8_000L
         private const val SCREENSHOT_TIMEOUT_MS = 15_000L
         private const val DEFAULT_WIDTH = 720

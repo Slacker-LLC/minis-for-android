@@ -856,7 +856,6 @@
     <string name="action_print">Imprimer</string>
     <string name="file_share_failed_toast">Échec du partage : %1$s</string>
     <string name="file_print_failed_toast">Échec de l\'impression : %1$s</string>
-    <string name="debug_trigger_crash_menu">Déclencher un crash (Debug)</string>
     <string name="filebrowser_copy_abs_path">Copier le chemin absolu</string>
     <string name="filebrowser_copy_abs_path_toast">Chemin copié</string>
     <!-- [T-mcp-i18n-android] MCP Integrations UI -->

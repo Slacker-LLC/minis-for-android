@@ -11,8 +11,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,7 +45,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.openminis.app.R
 import com.openminis.app.ui.theme.ChatColors
 
@@ -110,84 +107,51 @@ internal fun WorkProcessRowView(
     }
 
     val failed = summary.failureReason != null
-    val title = workProcessTitle(summary)
-    val duration: String? = when {
-        summary.isRunning -> elapsedSec.takeIf { it > 0L }?.let { formatStepDuration(it, stillRunning = false) }
-        summary.durationMs != null -> formatStepDuration(summary.durationMs / 1000L, stillRunning = false)
-        else -> null
+    val accent = when {
+        failed -> ToolErrorColor
+        summary.isRunning -> MaterialTheme.colorScheme.primary
+        else -> ChatColors.secondaryText
     }
+    val runningTool = process.runningTool
+    val headerIcon = runningTool?.let { toolIconFor(it.toolName) } ?: Icons.Default.Build
+    val headerText = workProcessHeaderText(summary, elapsedSec.takeIf { summary.isRunning })
 
-    // The board's summary row: a rounded bar with the state glyph, one bold line, the time in mono and a
-    // chevron that points down when folded and up when open. Same bar for a run in progress, a finished
-    // one and a failed one; only the glyph and the wording change.
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    // [T-android-turn-work] Codex's turn row, not a card: one line of text, a chevron that points
+    // right when the row is folded and down when it is open, and a hairline under it - spanning the
+    // same width as the answer text beside it. The rounded box this used to be was narrower than
+    // the message (the extra horizontal padding lived inside it) and read as a second, competing
+    // surface next to the reply.
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(ChatColors.secondaryBg)
                 .clickable {
                     userToggled = true
                     expanded = !expanded
                 }
-                .heightIn(min = 48.dp)
-                .padding(horizontal = 14.dp),
+                .heightIn(min = 40.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            when {
-                summary.isRunning -> androidx.compose.material3.CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    strokeWidth = 2.dp,
-                )
-                failed -> Icon(
-                    com.openminis.app.ui.components.MinisIcons.Close,
-                    contentDescription = null,
-                    tint = ToolErrorColor,
-                    modifier = Modifier.size(18.dp),
-                )
-                else -> Icon(
-                    com.openminis.app.ui.components.MinisIcons.Check,
-                    contentDescription = null,
-                    tint = ChatColors.ok,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            Spacer(Modifier.width(12.dp))
             Text(
-                text = title,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = if (failed) ToolErrorColor else ChatColors.primaryText,
+                text = headerText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (summary.isRunning || failed) ChatColors.primaryText else ChatColors.secondaryText,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (duration != null) {
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = duration,
-                    fontSize = 13.sp,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    color = ChatColors.tertiaryText,
-                    softWrap = false,
-                )
-            }
             Spacer(Modifier.width(6.dp))
-            val angle by androidx.compose.animation.core.animateFloatAsState(
-                targetValue = if (expanded) 180f else 0f,
-                animationSpec = androidx.compose.animation.core.tween(durationMillis = 180),
-                label = "workChevron",
-            )
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
+            StepChevron(
+                expanded = expanded,
                 contentDescription = stringResource(
                     if (expanded) R.string.work_process_collapse else R.string.work_process_expand,
                 ),
-                tint = ChatColors.secondaryText,
-                modifier = Modifier.size(20.dp).rotate(angle),
             )
         }
+        HorizontalDivider(
+            color = ChatColors.separator.copy(alpha = 0.55f),
+            thickness = 0.5.dp,
+        )
 
         AnimatedVisibility(
             visible = expanded,
@@ -306,17 +270,39 @@ internal fun WorkProcessRowView(
 }
 
 /**
- * The bar's one line: what the run is doing, or how it ended. The time is shown beside it, not in it.
- * Pulled out of the composable so the wording rules stay in one place.
+ * Collapsed-row / header text for [summary]. Pulled out of the composable so
+ * the wording rules (which state wins, what the count means) are pure and
+ * unit-testable — see `WorkProcessHeaderTextTest`.
  */
 @Composable
-internal fun workProcessTitle(summary: WorkProcessSummary): String = when {
+internal fun workProcessHeaderText(
+    summary: WorkProcessSummary,
+    runningElapsedSec: Long? = null,
+): String = when {
+    // [T-android-turn-work] A live turn counts up ("已处理 6分钟35秒"), a finished one reports the
+    // total ("用时 20分钟30秒") - the same single header, the way Codex's turn row reads.
+    summary.isRunning && runningElapsedSec != null -> stringResource(
+        R.string.work_process_elapsed,
+        formatStepDuration(runningElapsedSec, stillRunning = false),
+    )
     summary.isRunning && summary.runningStepNumber != null -> stringResource(
         R.string.work_process_running_step,
         summary.runningStepNumber,
         summary.runningToolName.orEmpty(),
     )
     summary.isRunning -> stringResource(R.string.work_process_running_thinking)
+    // [T-android-work-items] A finished run leads with how long it took, the way Codex's turn
+    // header does; a failure is appended rather than replacing it, so the collapsed row still
+    // answers "how long" and the panel keeps the reason.
+    summary.durationMs != null && summary.failureReason != null -> stringResource(
+        R.string.work_process_duration_failed,
+        formatStepDuration(summary.durationMs / 1000L, stillRunning = false),
+        summary.failedStepNumber ?: 0,
+    )
+    summary.durationMs != null -> stringResource(
+        R.string.work_process_duration,
+        formatStepDuration(summary.durationMs / 1000L, stillRunning = false),
+    )
     summary.failureReason != null -> stringResource(
         R.string.work_process_failed_step,
         summary.failedStepNumber ?: 0,

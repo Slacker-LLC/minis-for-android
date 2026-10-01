@@ -67,7 +67,22 @@ class VirtualScreenHomeActivity : ComponentActivity() {
         setContent { Desktop(displayId) { launch(it, displayId) } }
     }
 
+    /**
+     * Started through the Shizuku service, like every other launch on the virtual display: an app starting
+     * another app from its own process is stopped by MIUI's "associated start" prompt, which would pop up
+     * on the virtual screen for every icon.
+     */
     private fun launch(packageName: String, displayId: Int) {
+        Thread {
+            val viaService = runCatching {
+                com.openminis.app.tools.android.vscreen.VirtualScreenClientProvider.get(applicationContext)
+                    .launch(displayId, packageName)
+            }.getOrDefault(false)
+            if (!viaService) runOnUiThread { launchDirect(packageName, displayId) }
+        }.start()
+    }
+
+    private fun launchDirect(packageName: String, displayId: Int) {
         val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val options = ActivityOptions.makeBasic().apply { launchDisplayId = displayId }

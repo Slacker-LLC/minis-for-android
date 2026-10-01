@@ -1652,7 +1652,6 @@
     <string name="file_share_chooser_title">Share file</string>
     <string name="file_share_failed_toast">Share failed: %1$s</string>
     <string name="file_print_failed_toast">Print failed: %1$s</string>
-    <string name="debug_trigger_crash_menu">Trigger crash (Debug)</string>
     <!-- [T-android-larky-longsession-followup] Tappable header at the top of the chat list, shown only when more older messages exist behind the windowed slice. -->
     <string name="chat_load_older_messages">↑ Load older messages</string>
     <!-- [T-error-persist-android] Shown when the model returns an empty reply (no text, no tools). -->

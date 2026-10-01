@@ -1109,7 +1109,8 @@ fun AssistantMessageActionBar(
     Row(
         // [T-android-action-bar-left] The row starts at the message's own left edge; the first glyph
         // sits one glyph-inset in (each action is a 42dp touch box around a 20dp icon).
-        modifier = modifier.padding(start = 0.dp, top = 4.dp, bottom = 8.dp),
+        // Pulled left by the inset inside each 42dp box so the first glyph's edge lines up with the reply text.
+        modifier = modifier.offset(x = (-10.5).dp).padding(top = 4.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

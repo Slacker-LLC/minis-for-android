@@ -1001,7 +1001,6 @@
     <string name="file_share_chooser_title">ファイルを共有</string>
     <string name="file_share_failed_toast">共有に失敗しました: %1$s</string>
     <string name="file_print_failed_toast">印刷に失敗しました: %1$s</string>
-    <string name="debug_trigger_crash_menu">クラッシュを発生 (Debug)</string>
     <string name="filebrowser_copy_abs_path">絶対パスをコピー</string>
     <string name="filebrowser_copy_abs_path_toast">パスをコピーしました</string>
     <!-- [T-mcp-i18n-android] MCP Integrations UI -->
