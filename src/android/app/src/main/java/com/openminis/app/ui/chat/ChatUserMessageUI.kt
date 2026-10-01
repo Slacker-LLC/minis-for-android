@@ -304,12 +304,12 @@ internal fun UserMessageBubble(
             // together with the assistant trailing-block bottom + LazyColumn
             // spacedBy(2). Bottom stays 4dp: the User→Assistant boundary is
             // user.bottom(4) + spacedBy(2) + AssistantHeader.top(10) = 16.
-            .padding(top = if (precededByUser) 14.dp else 10.dp, bottom = 4.dp),
+            .padding(top = if (precededByUser) 0.dp else 18.dp, bottom = 24.dp),
     ) {
         // Cap the bubble at 80% of the LazyColumn's available width (mirrors iOS
         // proportional sizing; prevents single-line messages from spanning the
         // full row and losing their "trailing bubble" shape).
-        val bubbleMaxWidth = this.maxWidth * 0.8f
+        val bubbleMaxWidth = this.maxWidth - 56.dp
     Row(
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -370,7 +370,7 @@ internal fun UserMessageBubble(
                     ) {
                         val textColor = if (isQueued) secondaryTextColor else MaterialTheme.colorScheme.onSurface
                         val bubbleBg = if (isQueued) Color.Transparent else userBubbleColor
-                        val shape = RoundedCornerShape(18.dp)
+                        val shape = RoundedCornerShape(20.dp)
                         val dashedStroke = if (isQueued) {
                             Modifier.drawBehind {
                                 val stroke = androidx.compose.ui.graphics.drawscope.Stroke(
@@ -379,7 +379,7 @@ internal fun UserMessageBubble(
                                         floatArrayOf(6.dp.toPx(), 4.dp.toPx()), 0f
                                     ),
                                 )
-                                val r = 18.dp.toPx()
+                                val r = 20.dp.toPx()
                                 drawRoundRect(
                                     color = secondaryTextColor.copy(alpha = 0.5f),
                                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r),
@@ -417,15 +417,20 @@ internal fun UserMessageBubble(
                                 isStreaming = false,
                                 stableKey = "user:${message.id}",
                             ) {
+                                // 17 / 25.5 on a 14 x 9 padded pill, as long as its longest line: a wrapped message used to
+                                // fill the whole maximum width however short its last line was.
+                                val bubbleTextStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 17.sp, lineHeight = 25.5.sp)
+                                val shrink = shrinkWrappedWidth(message.content, bubbleTextStyle, bubbleMaxWidth - 28.dp)
                                 Text(
                                     text = message.content,
                                     color = textColor,
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.5.sp),
+                                    style = bubbleTextStyle,
                                     modifier = bubbleModifier
                                         .background(bubbleBg, shape)
                                         .clip(shape)
                                         .then(dashedStroke)
-                                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                                        .padding(horizontal = 14.dp, vertical = 9.dp)
+                                        .then(if (shrink != null) Modifier.width(shrink) else Modifier),
                                 )
                             }
                         }
@@ -721,3 +726,26 @@ private fun ImageGalleryDialog(
 // LazyListState anchors on a stable per-item key, so only the trailing streaming item
 // changes height while earlier items remain frozen and their scroll positions
 // untouched.
+
+
+/**
+ * The width a text needs when wrapped at [maxWidth]: the widest of its lines. Null when it fits on one line
+ * (the pill then wraps it exactly already) or nothing to measure.
+ */
+@Composable
+private fun shrinkWrappedWidth(text: String, style: androidx.compose.ui.text.TextStyle, maxWidth: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp? {
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    return remember(text, style, maxWidth, density) {
+        if (text.isEmpty()) return@remember null
+        val result = measurer.measure(
+            text = androidx.compose.ui.text.AnnotatedString(text),
+            style = style,
+            constraints = androidx.compose.ui.unit.Constraints(maxWidth = with(density) { maxWidth.roundToPx() }),
+        )
+        if (result.lineCount <= 1) return@remember null
+        var widest = 0f
+        for (line in 0 until result.lineCount) widest = maxOf(widest, result.getLineRight(line) - result.getLineLeft(line))
+        with(density) { widest.toDp() } + 0.5.dp
+    }
+}

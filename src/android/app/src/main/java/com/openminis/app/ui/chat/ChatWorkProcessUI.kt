@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,6 +47,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.openminis.app.R
 import com.openminis.app.ui.theme.ChatColors
 
@@ -107,51 +110,45 @@ internal fun WorkProcessRowView(
     }
 
     val failed = summary.failureReason != null
-    val accent = when {
-        failed -> ToolErrorColor
-        summary.isRunning -> MaterialTheme.colorScheme.primary
-        else -> ChatColors.secondaryText
-    }
-    val runningTool = process.runningTool
-    val headerIcon = runningTool?.let { toolIconFor(it.toolName) } ?: Icons.Default.Build
-    val headerText = workProcessHeaderText(summary, elapsedSec.takeIf { summary.isRunning })
+    val statusText = workStatusText(summary, elapsedSec.takeIf { summary.isRunning })
 
-    // [T-android-turn-work] Codex's turn row, not a card: one line of text, a chevron that points
-    // right when the row is folded and down when it is open, and a hairline under it - spanning the
-    // same width as the answer text beside it. The rounded box this used to be was narrower than
-    // the message (the extra horizontal padding lived inside it) and read as a second, competing
-    // surface next to the reply.
+    // The redesign's status line: one small grey line above the reply, "已完成 · 用时 12s" with a chevron
+    // (right when folded, down when open), or "正在工作 ..." while the turn runs. No bar, no rule under it.
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
                 .clickable {
                     userToggled = true
                     expanded = !expanded
                 }
-                .heightIn(min = 40.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .heightIn(min = 30.dp)
+                .padding(end = 8.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.Top,
         ) {
             Text(
-                text = headerText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (summary.isRunning || failed) ChatColors.primaryText else ChatColors.secondaryText,
+                text = statusText,
+                fontSize = 13.sp,
+                lineHeight = 20.sp,
+                color = if (failed) ToolErrorColor else ChatColors.secondaryText,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f, fill = false),
             )
-            Spacer(Modifier.width(6.dp))
-            StepChevron(
-                expanded = expanded,
-                contentDescription = stringResource(
-                    if (expanded) R.string.work_process_collapse else R.string.work_process_expand,
-                ),
-            )
+            if (summary.isRunning) {
+                Spacer(Modifier.width(6.dp))
+                Box(modifier = Modifier.height(20.dp), contentAlignment = Alignment.Center) { BouncingDots(ChatColors.secondaryText) }
+            }
+            Spacer(Modifier.width(4.dp))
+            Box(modifier = Modifier.height(20.dp), contentAlignment = Alignment.Center) {
+                StepChevron(
+                    expanded = expanded,
+                    contentDescription = stringResource(
+                        if (expanded) R.string.work_process_collapse else R.string.work_process_expand,
+                    ),
+                )
+            }
         }
-        HorizontalDivider(
-            color = ChatColors.separator.copy(alpha = 0.55f),
-            thickness = 0.5.dp,
-        )
 
         AnimatedVisibility(
             visible = expanded,
@@ -192,13 +189,9 @@ internal fun WorkProcessRowView(
                 val trailingBlockId = process.blocks.lastOrNull()?.id
                 process.blocks.forEach { block ->
                     when (block.kind) {
-                        THINKING_KIND -> ThinkingBlock(
+                        THINKING_KIND -> ThinkingNote(
                             block = block,
-                            // Only the still-trailing thinking block of a live
-                            // run behaves like a streaming block (auto-expand);
-                            // every earlier / finished one stays folded.
                             isStreaming = summary.isRunning && block.id == trailingBlockId,
-                            isLast = block.id == trailingBlockId,
                         )
                         // [T-android-turn-work] Text the model wrote between tool calls is part
                         // of the turn's work, not its answer - it belongs in here with the steps.
@@ -270,51 +263,56 @@ internal fun WorkProcessRowView(
 }
 
 /**
- * Collapsed-row / header text for [summary]. Pulled out of the composable so
- * the wording rules (which state wins, what the count means) are pure and
- * unit-testable — see `WorkProcessHeaderTextTest`.
+ * The status line's words: how the turn ended ("已完成 · 用时 12s", "已完成 5 个步骤 · 用时 38s"), where it
+ * failed, or that it is still working. The wording rules live here so they stay in one place.
  */
 @Composable
-internal fun workProcessHeaderText(
-    summary: WorkProcessSummary,
-    runningElapsedSec: Long? = null,
-): String = when {
-    // [T-android-turn-work] A live turn counts up ("已处理 6分钟35秒"), a finished one reports the
-    // total ("用时 20分钟30秒") - the same single header, the way Codex's turn row reads.
-    summary.isRunning && runningElapsedSec != null -> stringResource(
-        R.string.work_process_elapsed,
-        formatStepDuration(runningElapsedSec, stillRunning = false),
-    )
-    summary.isRunning && summary.runningStepNumber != null -> stringResource(
-        R.string.work_process_running_step,
-        summary.runningStepNumber,
-        summary.runningToolName.orEmpty(),
-    )
-    summary.isRunning -> stringResource(R.string.work_process_running_thinking)
-    // [T-android-work-items] A finished run leads with how long it took, the way Codex's turn
-    // header does; a failure is appended rather than replacing it, so the collapsed row still
-    // answers "how long" and the panel keeps the reason.
-    summary.durationMs != null && summary.failureReason != null -> stringResource(
-        R.string.work_process_duration_failed,
-        formatStepDuration(summary.durationMs / 1000L, stillRunning = false),
-        summary.failedStepNumber ?: 0,
-    )
-    summary.durationMs != null -> stringResource(
-        R.string.work_process_duration,
-        formatStepDuration(summary.durationMs / 1000L, stillRunning = false),
-    )
+internal fun workStatusText(summary: WorkProcessSummary, runningElapsedSec: Long? = null): String = when {
+    summary.isRunning -> stringResource(R.string.work_status_running)
     summary.failureReason != null -> stringResource(
         R.string.work_process_failed_step,
         summary.failedStepNumber ?: 0,
         summary.failureReason,
     )
-    summary.toolCount > 0 -> pluralStringResource(
-        R.plurals.work_process_completed_steps,
-        summary.toolCount,
-        summary.toolCount,
-    )
-    else -> stringResource(R.string.work_process_completed_thinking)
+    else -> {
+        val done = if (summary.toolCount > 0) {
+            pluralStringResource(R.plurals.work_process_completed_steps, summary.toolCount, summary.toolCount)
+        } else {
+            stringResource(R.string.work_status_done)
+        }
+        val took = summary.durationMs?.let { stringResource(R.string.work_process_duration, formatStepDuration(it / 1000L, stillRunning = false)) }
+        if (took != null) "$done · $took" else done
+    }
 }
+
+/**
+ * Thinking text inside the expanded status line: a soft grey box (#F5F5F7, 12dp corners, 14/22.4 grey text),
+ * the redesign's note. Long thinking keeps only its tail and scrolls inside the box.
+ */
+@Composable
+internal fun ThinkingNote(block: AssistantBlock, isStreaming: Boolean) {
+    val content = block.content
+    val shown = if (content.length > THINKING_NOTE_TAIL) content.takeLast(THINKING_NOTE_TAIL) else content
+    if (shown.isBlank()) return
+    val scroll = androidx.compose.foundation.rememberScrollState()
+    LaunchedEffect(content.length, isStreaming) {
+        if (isStreaming) scroll.scrollTo(scroll.maxValue)
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (ChatColors.isDark) ChatColors.secondaryBg else Color(0xFFF5F5F7))
+            .heightIn(max = 260.dp)
+            .verticalScroll(scroll)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Text(text = shown, fontSize = 14.sp, lineHeight = 22.4.sp, color = ChatColors.secondaryText)
+    }
+}
+
+private const val THINKING_NOTE_TAIL = 8_000
 
 /** [T-android-work-items] One group of the expanded summary line, e.g. "7 commands". */
 @Composable

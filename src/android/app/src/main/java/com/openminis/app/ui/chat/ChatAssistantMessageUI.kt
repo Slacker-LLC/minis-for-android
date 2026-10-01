@@ -282,157 +282,6 @@ import com.openminis.app.ui.browser.BrowserSheet
 import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.components.MinisTextButton
 
-@Composable
-internal fun AssistantHeader() {
-    // [T-soul-md] Identity header = locked ✨ sparkle gradient icon +
-    // SOUL.md-driven `name`. The emoji-customization field was removed,
-    // so we no longer branch on `SoulMetadata.emoji`; the icon stays the
-    // canonical sparkle (iOS: sparkles SF Symbol + gradient). Only the
-    // `name` field is user-customizable — defaults to "Minis" when
-    // SOUL.md is missing the field or set to the default value.
-    val soulMeta by com.openminis.app.agent.SoulStore.cachedMetadata.collectAsState()
-    val displayName = soulMeta.name.ifBlank { com.openminis.app.agent.SoulMetadata.DEFAULT.name }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            // [T-android-user-assistant-spacing-16] top=10 so the
-            // User→Assistant boundary reads ~16dp: user-bubble bottom(4) +
-            // LazyColumn spacedBy(2) + this top(10) = 16. The header→body gap
-            // inside the turn is unaffected (that's this row's bottom=2).
-            .padding(top = 10.dp, bottom = 2.dp),
-    ) {
-        val sparkleGradient = Brush.linearGradient(
-            colors = listOf(SparkleColor1, SparkleColor2),
-        )
-        Icon(
-            imageVector = Icons.Filled.AutoAwesome,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier
-                .size(18.dp)
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(brush = sparkleGradient, blendMode = BlendMode.SrcIn)
-                },
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = displayName,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-@Composable
-internal fun AssistantMessageView(message: ChatMessage, onRetry: (() -> Unit)? = null) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-    ) {
-        AssistantHeader()
-
-        // Render blocks in original order — text, thinking, and tool calls interleaved
-        // exactly as they arrived in the stream (each assistant turn may contain multiple
-        // text ↔ tool_use transitions, which must be preserved for coherent reading).
-        val toolPillBlocks = message.toolBlocks.filter { it.kind == "tool_use" }
-        val lastThinkingId = message.toolBlocks.lastOrNull { it.kind == "thinking" }?.id
-        // [T-android-thinking-auto-collapse] Mirror the FlatChatItem path's
-        // `isLastBlockOverall` so the legacy renderer's ThinkingBlock also
-        // flips !isStreaming when a sibling block arrives (id of the last
-        // block of ANY kind in the message). See ChatFlatItems builder.
-        val lastBlockIdOverall = message.toolBlocks.lastOrNull()?.id
-        // Backward compat: if there are no text blocks but message.content is non-empty
-        // (e.g. legacy sessions saved before the text-block migration), fall back to
-        // rendering message.content after all tool blocks.
-        val hasAnyTextBlock = message.toolBlocks.any { it.kind == "text" }
-        val lastTextBlockIndex = message.toolBlocks.indexOfLast { it.kind == "text" }
-        message.toolBlocks.forEachIndexed { index, block ->
-            when (block.kind) {
-                "thinking" -> {
-                    // T300: same per-message thinking-level gate as the
-                    // FlatChatItem path. AssistantMessageView is currently
-                    // unreferenced (legacy pre-FlatChatItem code) but the
-                    // gate stays here so any future re-introduction
-                    // doesn't silently bring back the always-render bug.
-                    val effectiveLevel = message.thinkingLevel
-                        ?: com.openminis.app.data.model.ThinkingLevel.MEDIUM
-                    if (effectiveLevel.isEnabled) {
-                        // [T-android-thinking-auto-collapse] Stream signal
-                        // requires THIS block to be the trailing block of
-                        // any kind, not just the last thinking — see
-                        // FlatChatItem path + iOS ThinkingBlockView parity.
-                        val isTrailingThinking = block.id == lastBlockIdOverall
-                        ThinkingBlock(
-                            block,
-                            isStreaming = isTrailingThinking && message.isStreaming,
-                            isLast = block.id == lastThinkingId,
-                        )
-                    }
-                }
-                "info" -> {
-                    FallbackInfoBlock(block)
-                }
-                "text" -> {
-                    if (block.content.isNotEmpty()) {
-                        val isLastTextBlock = index == lastTextBlockIndex
-                        val streaming = message.isStreaming && isLastTextBlock
-                        // T-android-gc-storm-issue17: defensive guard on the legacy
-                        // pre-FlatChatItem path too.
-                        LargeContentGuard(
-                            content = block.content,
-                            isStreaming = streaming,
-                            stableKey = "legacy-text:${message.id}:${block.id}",
-                        ) {
-                            StreamingMarkdownText(
-                                content = block.content,
-                                // Only the trailing text block is "still streaming"; earlier
-                                // text blocks (before a tool call) are frozen.
-                                isStreaming = streaming,
-                            )
-                        }
-                    }
-                }
-                else -> {
-                    // tool_use
-                    ToolCallPill(block, allToolBlocks = toolPillBlocks)
-                }
-            }
-        }
-
-        // Typing indicator when streaming with no content yet (info-only blocks don't count)
-        val hasRealBlocks = message.toolBlocks.any { it.kind != "info" }
-        if (message.isStreaming && message.content.isEmpty() && !hasRealBlocks) {
-            TypingIndicator()
-        }
-
-        // Legacy fallback: render message.content when no text blocks exist (old sessions).
-        if (!hasAnyTextBlock && message.content.isNotEmpty()) {
-            LargeContentGuard(
-                content = message.content,
-                isStreaming = message.isStreaming,
-                stableKey = "legacy-fallback:${message.id}",
-            ) {
-                StreamingMarkdownText(
-                    content = message.content,
-                    isStreaming = message.isStreaming,
-                )
-            }
-        }
-
-        // Inline error banner (iOS: red exclamation + error text + Retry button)
-        if (message.error != null) {
-            InlineErrorBanner(error = message.error, onRetry = onRetry, isRetrying = message.isStreaming)
-        }
-
-        // 👍/👎 feedback (same MessageFeedbackStore as the Web Remote)
-        MessageFeedbackRow(message.id)
-    }
-}
-
 /**
  * Wraps a per-message LazyColumn item, registering its bounds (in window
  * coordinates) into [LocalMessageBoundsRegistry] so the selection toolbar
@@ -1077,8 +926,9 @@ fun AssistantMessageActionBar(
         label = "regenRotation",
     )
 
-    val active = ChatColors.primaryText.copy(alpha = 0.82f)
-    val dim = ChatColors.primaryText.copy(alpha = 0.28f)
+    // The redesign's reply actions: 20dp line glyphs in the secondary grey (#6E6E73) inside 44dp touch boxes.
+    val active = ChatColors.secondaryText
+    val dim = ChatColors.secondaryText.copy(alpha = 0.4f)
     val canCopy = !isStreaming && rawText.isNotEmpty()
 
     @Composable
@@ -1090,7 +940,7 @@ fun AssistantMessageActionBar(
     ) {
         Box(
             modifier = Modifier
-                .size(42.dp)
+                .size(44.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .combinedClickable(
                     enabled = enabled,
@@ -1109,9 +959,10 @@ fun AssistantMessageActionBar(
     Row(
         // [T-android-action-bar-left] The row starts at the message's own left edge; the first glyph
         // sits one glyph-inset in (each action is a 42dp touch box around a 20dp icon).
-        // Pulled left by the inset inside each 42dp box so the first glyph's edge lines up with the reply text.
-        modifier = modifier.offset(x = (-10.5).dp).padding(top = 4.dp, bottom = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        // Pulled left by the 12dp inside each 44dp box so the first glyph's edge lines up with the reply text
+        // (x = 20), and up so the glyphs sit 12dp under the last line.
+        modifier = modifier.offset(x = (-12).dp, y = (-6).dp),
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // 1. Copy: tap = plain text, long press = the other copy modes.
@@ -1127,7 +978,7 @@ fun AssistantMessageActionBar(
                 if (isCopied) com.openminis.app.ui.components.MinisIcons.Check else com.openminis.app.ui.components.MinisIcons.Copy,
                 contentDescription = stringResource(R.string.assistant_action_copy),
                 tint = if (canCopy) active else dim,
-                modifier = Modifier.size(21.dp),
+                modifier = Modifier.size(20.dp),
             )
             MinisMenu(
                 expanded = copyMenuExpanded,
@@ -1169,7 +1020,7 @@ fun AssistantMessageActionBar(
                 com.openminis.app.ui.components.MinisIcons.Refresh,
                 contentDescription = stringResource(R.string.assistant_action_regenerate),
                 tint = if (isStreaming || isGenerating) dim else active,
-                modifier = Modifier.size(21.dp).rotate(regenRotation),
+                modifier = Modifier.size(20.dp).rotate(regenRotation),
             )
         }
 
@@ -1181,7 +1032,7 @@ fun AssistantMessageActionBar(
                     if (isSpeaking) R.string.assistant_action_stop_reading else R.string.assistant_action_read_aloud,
                 ),
                 tint = if (isSpeaking) MaterialTheme.colorScheme.primary else if (canCopy) active else dim,
-                modifier = Modifier.size(21.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
 
@@ -1191,7 +1042,7 @@ fun AssistantMessageActionBar(
                 com.openminis.app.ui.components.MinisIcons.Branch,
                 contentDescription = stringResource(R.string.assistant_action_branch),
                 tint = if (isStreaming) dim else active,
-                modifier = Modifier.size(21.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
 
@@ -1201,7 +1052,7 @@ fun AssistantMessageActionBar(
                 com.openminis.app.ui.components.MinisIcons.More,
                 contentDescription = stringResource(R.string.assistant_action_more),
                 tint = active,
-                modifier = Modifier.size(21.dp),
+                modifier = Modifier.size(20.dp),
             )
             MinisMenu(
                 expanded = moreMenuExpanded,

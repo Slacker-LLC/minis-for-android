@@ -827,7 +827,6 @@
     <string name="voice_panel_no_engine_open_system">Réglages de l\'appareil</string>
     <string name="voice_panel_no_engine_open_providers">Fournisseurs Minis</string>
     <string name="chat_error_stream_dropped_partial">La connexion a été interrompue — cette réponse est peut-être incomplète. Appuyez sur Réessayer pour continuer.</string>
-    <string name="chat_input_placeholder">Message à %1$s (@ pour mentionner des fichiers)</string>
     <!-- T-android-update-check-403-hint — friendly update-check failure hints -->
     <string name="update_error_network_unreachable">Impossible d\'atteindre le serveur de mise à jour. Vérifiez votre réseau et réessayez.</string>
     <string name="update_error_forbidden_with_link">Impossible d\'atteindre le serveur de mise à jour, peut-être bloqué par le réseau. Ouvrir GitHub Releases pour télécharger manuellement.</string>
@@ -1153,7 +1152,6 @@
     <string name="chat_input_placeholder_hint_1">Utilisez @ pour mentionner des fichiers à lire par %1$s</string>
     <string name="chat_input_placeholder_hint_2">Tapez / pour les SKILLs et les commandes rapides</string>
     <string name="chat_input_placeholder_hint_3">Faites glisser du texte dans la conversation pour l’envoyer</string>
-    <string name="chat_input_placeholder_hint_4">Appuyez longuement sur une réponse pour tout sélectionner et copier</string>
     <string name="chat_show_sidebar">Afficher la liste des sessions</string>
     <string name="chat_hide_sidebar">Masquer la liste des sessions</string>
     <string name="split_no_conversation_title">Aucune conversation sélectionnée</string>
@@ -2021,4 +2019,11 @@
     <string name="vscreen_viewer_launch_failed">Impossible de lancer cette app sur l’écran virtuel.</string>
     <string name="vscreen_viewer_open_failed">Impossible d’ouvrir l’écran virtuel : %1$s</string>
     <string name="vscreen_viewer_fps">%1$d i/s</string>
+    <string name="work_status_running">En cours</string>
+    <string name="work_status_done">Terminé</string>
+    <string name="assistant_menu_branch_here">Brancher d’ici</string>
+    <string name="chat_input_placeholder">Écrivez un message, ou / pour les compétences</string>
+    <string name="chat_input_placeholder_hint_4">Appui long sur une réponse pour son menu : copier, sélectionner, lire</string>
+    <string name="chat_time_today">Aujourd’hui %1$s</string>
+    <string name="chat_time_yesterday">Hier %1$s</string>
 </resources>

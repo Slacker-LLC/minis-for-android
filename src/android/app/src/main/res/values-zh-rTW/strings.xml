@@ -236,7 +236,6 @@
     <string name="voice_panel_no_engine_open_system">裝置設定</string>
     <string name="voice_panel_no_engine_open_providers">Minis 服務商</string>
     <string name="chat_error_stream_dropped_partial">連線中斷，此回覆可能不完整。點擊重試以繼續。</string>
-    <string name="chat_input_placeholder">傳訊息給 %1$s（@ 提及檔案）</string>
     <string name="browser_takeover">接管</string>
     <string name="browser_settings_done">完成</string>
     <string name="browser_settings_user_agent">使用者代理</string>
@@ -809,7 +808,6 @@
     <string name="chat_input_placeholder_hint_1">試試用 @ 提及檔案，讓 %1$s 讀取</string>
     <string name="chat_input_placeholder_hint_2">輸入 / 使用技能和快捷指令</string>
     <string name="chat_input_placeholder_hint_3">試試把文字拖進對話即可傳送</string>
-    <string name="chat_input_placeholder_hint_4">長按回覆的任意位置，可全選並複製</string>
     <string name="chat_show_sidebar">顯示工作階段清單</string>
     <string name="chat_hide_sidebar">隱藏工作階段清單</string>
     <string name="split_no_conversation_title">未選擇對話</string>
@@ -2389,4 +2387,11 @@
     <string name="vscreen_viewer_launch_failed">無法在虛擬螢幕上啟動這個應用程式。</string>
     <string name="vscreen_viewer_open_failed">無法開啟虛擬螢幕：%1$s</string>
     <string name="vscreen_viewer_fps">%1$d 幀/秒</string>
+    <string name="work_status_running">正在工作</string>
+    <string name="work_status_done">已完成</string>
+    <string name="assistant_menu_branch_here">從這裡分支</string>
+    <string name="chat_input_placeholder">輸入訊息，或用 / 調用技能</string>
+    <string name="chat_input_placeholder_hint_4">長按回覆的任意位置，開啟操作選單：複製、選擇文字、朗讀</string>
+    <string name="chat_time_today">今天 %1$s</string>
+    <string name="chat_time_yesterday">昨天 %1$s</string>
 </resources>

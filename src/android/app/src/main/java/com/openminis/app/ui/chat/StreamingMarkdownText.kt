@@ -253,8 +253,9 @@ val LocalMarkdownImageTapHandler =
  */
 val LocalMarkdownSessionId = compositionLocalOf<String?> { null }
 
-private val BaseFontSizeDefault = 16.sp
-private val BaseLineHeightDefault = 24.sp
+// The chat redesign's body text: 17 / 27.2.
+private val BaseFontSizeDefault = 17.sp
+private val BaseLineHeightDefault = 27.2.sp
 
 private val BaseFontSize: TextUnit
     @Composable get() = BaseFontSizeDefault * LocalMarkdownFontScale.current

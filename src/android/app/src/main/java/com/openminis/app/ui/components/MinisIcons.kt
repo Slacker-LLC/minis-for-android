@@ -303,6 +303,16 @@ object MinisIcons {
         }
     }
 
+    val ArrowDown: ImageVector by lazy {
+        line("arrow-down") {
+            moveTo(12f, 5f)
+            verticalLineTo(19f)
+            moveTo(6.5f, 13.5f)
+            lineTo(12f, 19f)
+            lineTo(17.5f, 13.5f)
+        }
+    }
+
     val Close: ImageVector by lazy {
         line("close") {
             moveTo(6f, 6f)

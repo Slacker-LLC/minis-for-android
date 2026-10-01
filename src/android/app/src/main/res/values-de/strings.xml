@@ -630,7 +630,6 @@
     <string name="voice_panel_no_engine_open_system">Geräteeinstellungen</string>
     <string name="voice_panel_no_engine_open_providers">Minis-Anbieter</string>
     <string name="chat_error_stream_dropped_partial">Die Verbindung wurde unterbrochen — diese Antwort ist möglicherweise unvollständig. Zum Fortfahren erneut versuchen.</string>
-    <string name="chat_input_placeholder">Nachricht an %1$s (@ um Dateien zu erwähnen)</string>
     <string name="browser_takeover">Übernehmen</string>
     <string name="browser_settings_done">Fertig</string>
     <string name="browser_settings_user_agent">User Agent</string>
@@ -1291,7 +1290,6 @@
     <string name="chat_input_placeholder_hint_1">Mit @ Dateien erwähnen, die %1$s lesen soll</string>
     <string name="chat_input_placeholder_hint_2">/ eingeben für SKILLs und Schnellbefehle</string>
     <string name="chat_input_placeholder_hint_3">Text in den Chat ziehen, um ihn zu senden</string>
-    <string name="chat_input_placeholder_hint_4">Lange auf eine Antwort tippen, um alles auszuwählen und zu kopieren</string>
     <string name="chat_show_sidebar">Sitzungsliste anzeigen</string>
     <string name="chat_hide_sidebar">Sitzungsliste ausblenden</string>
     <string name="split_no_conversation_title">Keine Unterhaltung ausgewählt</string>
@@ -2130,4 +2128,11 @@
     <string name="vscreen_viewer_launch_failed">Die App konnte nicht auf dem virtuellen Bildschirm gestartet werden.</string>
     <string name="vscreen_viewer_open_failed">Virtueller Bildschirm konnte nicht geöffnet werden: %1$s</string>
     <string name="vscreen_viewer_fps">%1$d fps</string>
+    <string name="work_status_running">Arbeitet</string>
+    <string name="work_status_done">Fertig</string>
+    <string name="assistant_menu_branch_here">Von hier verzweigen</string>
+    <string name="chat_input_placeholder">Nachricht eingeben oder / für Skills</string>
+    <string name="chat_input_placeholder_hint_4">Antwort lange drücken für das Menü: Kopieren, Text auswählen, Vorlesen</string>
+    <string name="chat_time_today">Heute %1$s</string>
+    <string name="chat_time_yesterday">Gestern %1$s</string>
 </resources>

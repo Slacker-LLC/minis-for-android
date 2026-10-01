@@ -429,7 +429,6 @@
     <string name="voice_panel_no_engine_open_system">Настройки устройства</string>
     <string name="voice_panel_no_engine_open_providers">Провайдеры Minis</string>
     <string name="chat_error_stream_dropped_partial">Соединение прервано — этот ответ может быть неполным. Нажмите «Повторить», чтобы продолжить.</string>
-    <string name="chat_input_placeholder">Сообщение для %1$s (@ для упоминания файлов)</string>
     <string name="browser_takeover">Перехватить управление</string>
     <string name="browser_settings_done">Готово</string>
     <string name="browser_settings_user_agent">User Agent</string>
@@ -1524,7 +1523,6 @@
     <string name="chat_input_placeholder_hint_1">Используйте @, чтобы упомянуть файлы для чтения %1$s</string>
     <string name="chat_input_placeholder_hint_2">Введите /, чтобы открыть SKILL и быстрые команды</string>
     <string name="chat_input_placeholder_hint_3">Перетащите текст в чат, чтобы отправить его</string>
-    <string name="chat_input_placeholder_hint_4">Удерживайте ответ, чтобы выделить и скопировать его целиком</string>
     <string name="chat_show_sidebar">Показать список сессий</string>
     <string name="chat_hide_sidebar">Скрыть список сессий</string>
     <string name="split_no_conversation_title">Беседа не выбрана</string>
@@ -2384,4 +2382,11 @@
     <string name="vscreen_viewer_launch_failed">Не удалось запустить приложение на виртуальном экране.</string>
     <string name="vscreen_viewer_open_failed">Не удалось открыть виртуальный экран: %1$s</string>
     <string name="vscreen_viewer_fps">%1$d к/с</string>
+    <string name="work_status_running">Работаю</string>
+    <string name="work_status_done">Готово</string>
+    <string name="assistant_menu_branch_here">Ответвить отсюда</string>
+    <string name="chat_input_placeholder">Сообщение или / для навыков</string>
+    <string name="chat_input_placeholder_hint_4">Долгое нажатие на ответ открывает меню: копировать, выделить, озвучить</string>
+    <string name="chat_time_today">Сегодня %1$s</string>
+    <string name="chat_time_yesterday">Вчера %1$s</string>
 </resources>

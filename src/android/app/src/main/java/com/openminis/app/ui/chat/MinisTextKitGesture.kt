@@ -113,9 +113,14 @@ fun Modifier.minisTextKitSelectionGesture(
     /** Set true when the LazyColumn uses `reverseLayout = true` (chat lists). */
     reverseLayout: Boolean = false,
     onLongPressEngaged: () -> Unit = {},
+    /**
+     * A long press that lands on message text. Return true to handle it (the chat opens its message menu)
+     * instead of starting a word selection; "Select text" in that menu starts the selection afterwards.
+     */
+    onLongPressOnText: (TextShardId) -> Boolean = { false },
 ): Modifier = composed {
     val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
-    pointerInput(controller, listState, reverseLayout) {
+    pointerInput(controller, listState, reverseLayout, onLongPressOnText) {
     val longPressTimeoutMs = android.view.ViewConfiguration.getLongPressTimeout().toLong()
     val touchSlopPx = viewConfiguration.touchSlop
     val doubleTapTimeoutMs = android.view.ViewConfiguration.getDoubleTapTimeout().toLong()
@@ -192,6 +197,11 @@ fun Modifier.minisTextKitSelectionGesture(
         // press still flows through to other gesture handlers (e.g. the
         // user bubble's own long-press → action menu).
         val hit = controller.hitTestStrict(lastWindowPoint) ?: return@awaitEachGesture
+        if (onLongPressOnText(hit.shard)) {
+            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+            down.consume()
+            return@awaitEachGesture
+        }
         controller.selectionFromMouse.value = false
         controller.beginSelectionWord(hit)
         // Fired HERE, not at the long-press timeout: the strict hit-test above

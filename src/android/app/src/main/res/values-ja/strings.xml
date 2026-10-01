@@ -630,7 +630,6 @@
     <string name="voice_panel_no_engine_open_system">端末の設定</string>
     <string name="voice_panel_no_engine_open_providers">Minis のプロバイダ</string>
     <string name="chat_error_stream_dropped_partial">接続が切断されました。この返信は不完全な可能性があります。再試行してください。</string>
-    <string name="chat_input_placeholder">%1$s にメッセージ（@ でファイルを参照）</string>
     <string name="browser_takeover">操作引き継ぎ</string>
     <string name="browser_settings_done">完了</string>
     <string name="browser_settings_user_agent">ユーザーエージェント</string>
@@ -1298,7 +1297,6 @@
     <string name="chat_input_placeholder_hint_1">@ でファイルを指定すると %1$s が読み取れます</string>
     <string name="chat_input_placeholder_hint_2">/ を入力すると SKILL とクイックコマンドを使えます</string>
     <string name="chat_input_placeholder_hint_3">テキストをチャットにドラッグして送信できます</string>
-    <string name="chat_input_placeholder_hint_4">返信を長押しすると全体を選択してコピーできます</string>
     <string name="chat_show_sidebar">セッション一覧を表示</string>
     <string name="chat_hide_sidebar">セッション一覧を非表示</string>
     <string name="split_no_conversation_title">会話が選択されていません</string>
@@ -2127,4 +2125,11 @@
     <string name="vscreen_viewer_launch_failed">その仮想スクリーンでアプリを起動できませんでした。</string>
     <string name="vscreen_viewer_open_failed">仮想スクリーンを開けませんでした：%1$s</string>
     <string name="vscreen_viewer_fps">%1$d fps</string>
+    <string name="work_status_running">作業中</string>
+    <string name="work_status_done">完了</string>
+    <string name="assistant_menu_branch_here">ここから分岐</string>
+    <string name="chat_input_placeholder">メッセージを入力、または / でスキルを呼び出し</string>
+    <string name="chat_input_placeholder_hint_4">返信を長押しするとメニューが開きます：コピー、テキスト選択、読み上げ</string>
+    <string name="chat_time_today">今日 %1$s</string>
+    <string name="chat_time_yesterday">昨日 %1$s</string>
 </resources>

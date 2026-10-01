@@ -630,7 +630,6 @@
     <string name="voice_panel_no_engine_open_system">기기 설정</string>
     <string name="voice_panel_no_engine_open_providers">Minis 제공자</string>
     <string name="chat_error_stream_dropped_partial">연결이 끊겼습니다. 이 답변은 불완전할 수 있습니다. 다시 시도해 주세요.</string>
-    <string name="chat_input_placeholder">%1$s에게 메시지 (@로 파일 참조)</string>
     <string name="browser_takeover">제어 인계</string>
     <string name="browser_settings_done">완료</string>
     <string name="browser_settings_user_agent">사용자 에이전트</string>
@@ -1290,7 +1289,6 @@
     <string name="chat_input_placeholder_hint_1">@로 파일을 언급하면 %1$s이(가) 읽을 수 있습니다</string>
     <string name="chat_input_placeholder_hint_2">/를 입력해 SKILL과 빠른 명령을 사용하세요</string>
     <string name="chat_input_placeholder_hint_3">텍스트를 대화로 끌어다 놓아 보내 보세요</string>
-    <string name="chat_input_placeholder_hint_4">답변을 길게 누르면 전체를 선택해 복사할 수 있습니다</string>
     <string name="chat_show_sidebar">세션 목록 표시</string>
     <string name="chat_hide_sidebar">세션 목록 숨기기</string>
     <string name="split_no_conversation_title">선택된 대화가 없습니다</string>
@@ -2119,4 +2117,11 @@
     <string name="vscreen_viewer_launch_failed">가상 화면에서 앱을 실행할 수 없습니다.</string>
     <string name="vscreen_viewer_open_failed">가상 화면을 열 수 없습니다: %1$s</string>
     <string name="vscreen_viewer_fps">%1$d fps</string>
+    <string name="work_status_running">작업 중</string>
+    <string name="work_status_done">완료</string>
+    <string name="assistant_menu_branch_here">여기서 분기</string>
+    <string name="chat_input_placeholder">메시지를 입력하거나 /로 스킬 호출</string>
+    <string name="chat_input_placeholder_hint_4">답변을 길게 누르면 메뉴가 열립니다: 복사, 텍스트 선택, 읽기</string>
+    <string name="chat_time_today">오늘 %1$s</string>
+    <string name="chat_time_yesterday">어제 %1$s</string>
 </resources>

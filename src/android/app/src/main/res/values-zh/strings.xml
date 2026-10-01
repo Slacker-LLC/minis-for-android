@@ -838,11 +838,9 @@
     <string name="voice_panel_no_engine_open_system">设备设置</string>
     <string name="voice_panel_no_engine_open_providers">Minis 服务商</string>
    <string name="chat_error_stream_dropped_partial">连接中断，此回复可能不完整。点击重试以继续。</string>
-   <string name="chat_input_placeholder">发消息给 %1$s（@ 提及文件）</string>
     <string name="chat_input_placeholder_hint_1">试试用 @ 提及文件，让 %1$s 读取</string>
     <string name="chat_input_placeholder_hint_2">输入 / 使用技能和快捷命令</string>
     <string name="chat_input_placeholder_hint_3">试试把文本拖进对话即可发送</string>
-    <string name="chat_input_placeholder_hint_4">长按回复的任意位置，可全选并复制</string>
     <string name="chat_input_placeholder_hint_5">Minis 可以把 ↩︎ 键设为发送或换行</string>
    <string name="browser_takeover">接管</string>
     <string name="browser_settings_done">完成</string>
@@ -2418,4 +2416,11 @@
     <string name="vscreen_viewer_launch_failed">无法在虚拟屏幕上启动这个应用。</string>
     <string name="vscreen_viewer_open_failed">无法开启虚拟屏幕：%1$s</string>
     <string name="vscreen_viewer_fps">%1$d 帧/秒</string>
+    <string name="work_status_running">正在工作</string>
+    <string name="work_status_done">已完成</string>
+    <string name="assistant_menu_branch_here">从这里分支</string>
+    <string name="chat_input_placeholder">输入消息，或用 / 调用技能</string>
+    <string name="chat_input_placeholder_hint_4">长按回复的任意位置，打开操作菜单：复制、选择文字、朗读</string>
+    <string name="chat_time_today">今天 %1$s</string>
+    <string name="chat_time_yesterday">昨天 %1$s</string>
 </resources>
