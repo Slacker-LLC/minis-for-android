@@ -348,7 +348,9 @@
           "kimi-k2",
           "gpt-5.4",
           "gpt-5.4-mini",
-          "gpt-image-2"
+          "gpt-image-2",
+          "gpt-image-2.5-flare",
+          "gpt-image-2.5-sunburst"
         ]
       },
       "set": {
@@ -779,6 +781,30 @@
       {
         "id": "gpt-image-2",
         "displayName": "GPT Image 2",
+        "provider": "OpenAI",
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "image"
+        ]
+      },
+      {
+        "id": "gpt-image-2.5-flare",
+        "displayName": "GPT Image 2.5 Flare",
+        "provider": "OpenAI",
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "image"
+        ]
+      },
+      {
+        "id": "gpt-image-2.5-sunburst",
+        "displayName": "GPT Image 2.5 Sunburst",
         "provider": "OpenAI",
         "inputModalities": [
           "text",

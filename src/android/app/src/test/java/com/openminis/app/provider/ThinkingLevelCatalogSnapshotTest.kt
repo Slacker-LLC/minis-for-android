@@ -41,6 +41,7 @@ class ThinkingLevelCatalogSnapshotTest {
                 "gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-3.5-flash-lite",
                 "grok-4.7", "anthropic/claude-opus-5.5", "anthropic/claude-sonnet-5.5",
                 "google/gemini-3.8-flash", "x-ai/grok-4.7",
+                "gpt-image-2.5-flare", "gpt-image-2.5-sunburst",
             ).forEach { put(it, ThinkingLevel.XHIGH) }
             listOf("claude-opus-4-8", "claude-opus-4-6", "claude-opus-4.7", "gpt-6-astra",
                 "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",

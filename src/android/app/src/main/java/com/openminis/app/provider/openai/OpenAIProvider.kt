@@ -170,8 +170,17 @@ class OpenAIProvider private constructor(
 
         private const val CODEX_BACKEND_BASE = "https://chatgpt.com/backend-api/codex"
 
-        /** The image model the Codex backend serves; there is no client-side choice of a newer one. */
-        private const val CODEX_IMAGE_MODEL = "gpt-image-2"
+        /**
+         * Image models driven through the Codex backend on a ChatGPT login.
+         * gpt-image-2 is what upstream Codex itself calls; the 2.5 variants
+         * (released 2026-09-08) are offered for the user to try — whether a
+         * ChatGPT plan may call them is not established, so a refusal is shown
+         * as it is rather than answered with a different model.
+         */
+        internal val CODEX_IMAGE_MODELS = setOf("gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst")
+
+        /** The only image model the older hosted-tool route can produce. */
+        private const val CODEX_HOSTED_TOOL_IMAGE_MODEL = "gpt-image-2"
 
         /**
          * [T-android-stale-conn-retry-hang] Streaming time-to-first-byte
@@ -387,7 +396,7 @@ class OpenAIProvider private constructor(
      * Only meaningful on the Codex OAuth path; everything else (the GPT-5.x
      * Codex models and their existing OAuth flow) is untouched by this gate.
      */
-    private val isCodexImageModel: Boolean get() = isOAuth && model.id == "gpt-image-2"
+    private val isCodexImageModel: Boolean get() = isOAuth && model.id in CODEX_IMAGE_MODELS
 
     private suspend fun getToken(): String {
         oauthTokenProvider?.let { return it() }
@@ -2698,9 +2707,9 @@ class OpenAIProvider private constructor(
      * client now calls for its image tool: the model is named directly rather
      * than driven through a chat model's hosted tool.
      */
-    internal fun buildCodexDirectImageBody(prompt: String): JSONObject = JSONObject()
+    internal fun buildCodexDirectImageBody(prompt: String, imageModel: String = model.id): JSONObject = JSONObject()
         .put("prompt", prompt)
-        .put("model", CODEX_IMAGE_MODEL)
+        .put("model", imageModel)
         .put("background", "auto")
         .put("quality", "auto")
         .put("size", "auto")
@@ -2717,13 +2726,18 @@ class OpenAIProvider private constructor(
     }
 
     /**
-     * Generates through `POST …/codex/images/generations`. Returns null when this
-     * route is not usable (the backend does not serve it, or answered without an
-     * image) so the caller can fall back to the older hosted-tool route; throws
-     * for failures a second route cannot fix (expired login, rate limit, a
-     * moderation refusal, no network).
+     * Generates through `POST …/codex/images/generations`. For gpt-image-2 it
+     * returns null when this route is not usable (the backend does not serve it,
+     * or answered without an image) so the caller can fall back to the older
+     * hosted-tool route; it throws for failures a second route cannot fix
+     * (expired login, rate limit, a moderation refusal, no network).
+     *
+     * The hosted-tool route can only produce gpt-image-2, so for any other
+     * image model there is no fallback: a refusal is thrown with the backend's
+     * own message instead of being answered by a different model.
      */
     private suspend fun generateCodexImageDirect(prompt: String): ByteArray? = withContext(Dispatchers.IO) {
+        val canFallBack = model.id == CODEX_HOSTED_TOOL_IMAGE_MODEL
         val bodyBytes = buildCodexDirectImageBody(prompt).toString().toByteArray(Charsets.UTF_8)
         // The ChatGPT backend rejects "application/json; charset=utf-8".
         val jsonMediaType = "application/json".toMediaType()
@@ -2736,15 +2750,20 @@ class OpenAIProvider private constructor(
         client.newCall(builder.build()).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (response.isSuccessful) {
-                parseCodexImagesResponse(body).also {
-                    if (it == null) com.openminis.app.logging.AppLogger.warning(
-                        "OpenAIProvider", "[ModelUseRoute] codex images/generations 2xx without an image — falling back",
-                    )
+                val image = parseCodexImagesResponse(body)
+                if (image == null && !canFallBack) {
+                    throw LLMError.ProviderError("${model.id} returned no image through this ChatGPT login.")
                 }
-            } else if (response.code == 401 || response.code == 403 || response.code == 429 ||
+                if (image == null) com.openminis.app.logging.AppLogger.warning(
+                    "OpenAIProvider", "[ModelUseRoute] codex images/generations 2xx without an image — falling back",
+                )
+                image
+            } else if (response.code == 401 || (response.code == 403 && canFallBack) || response.code == 429 ||
                 body.contains("moderation", ignoreCase = true) || body.contains("content_policy", ignoreCase = true)
             ) {
                 throw mapHttpError(response.code, body)
+            } else if (!canFallBack) {
+                throw codexImageUnavailable(response.code, body)
             } else {
                 com.openminis.app.logging.AppLogger.warning(
                     "OpenAIProvider",
@@ -2753,6 +2772,19 @@ class OpenAIProvider private constructor(
                 null
             }
         }
+    }
+
+    private fun codexImageUnavailable(code: Int, body: String): LLMError {
+        val detail = try {
+            val json = JSONObject(body)
+            json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotEmpty() }
+                ?: json.optString("detail").takeIf { it.isNotEmpty() }
+        } catch (_: Exception) {
+            null
+        } ?: body.take(300)
+        return LLMError.ProviderError(
+            "${model.id} is not available through this ChatGPT login ([$code] $detail). Use gpt-image-2 instead.",
+        )
     }
 
     private fun buildCodexImageBody(messages: List<LLMMessage>): JSONObject {

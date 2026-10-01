@@ -42,9 +42,10 @@ class CodexImageRouteTest {
 
     private fun provider(
         requests: MutableList<Request>,
+        model: LLMModel = imageModel,
         direct: () -> Pair<Int, String>,
     ): OpenAIProvider {
-        val provider = OpenAIProvider({ "fixture-token" }, imageModel, "fixture-account")
+        val provider = OpenAIProvider({ "fixture-token" }, model, "fixture-account")
         val field = OpenAIProvider::class.java.getDeclaredField("client").apply { isAccessible = true }
         val client = field.get(provider) as OkHttpClient
         field.set(provider, client.newBuilder().addInterceptor { chain ->
@@ -150,5 +151,71 @@ class CodexImageRouteTest {
         assertNull(p.parseCodexImagesResponse("<html>blocked</html>"))
         assertNull(p.parseCodexImagesResponse("""{"data":[{"url":"https://x"}]}"""))
         assertNull(p.parseCodexImagesResponse("""{"data":[{"b64_json":""}]}"""))
+    }
+
+    // ── GPT Image 2.5 (flare / sunburst) ────────────────────────────────────
+
+    private fun image25(id: String) = imageModel.copy(id = id, displayName = id)
+
+    @Test
+    fun `a 2_5 model is named in the request body`() {
+        for (id in listOf("gpt-image-2.5-flare", "gpt-image-2.5-sunburst")) {
+            val requests = mutableListOf<Request>()
+            val result = generate(provider(requests, image25(id)) { directOk() })
+            val buffer = okio.Buffer().also { requests.single().body!!.writeTo(it) }
+            assertEquals(id, JSONObject(buffer.readUtf8()).getString("model"))
+            assertArrayEquals(png, result.mediaAttachments.single().data)
+        }
+    }
+
+    @Test
+    fun `a refused 2_5 model is reported with the backend message and not answered by gpt-image-2`() {
+        val requests = mutableListOf<Request>()
+        try {
+            generate(provider(requests, image25("gpt-image-2.5-flare")) {
+                403 to """{"error":{"message":"your plan does not include this model"}}"""
+            })
+            fail("expected a provider error")
+        } catch (e: LLMError.ProviderError) {
+            assertTrue(e.message.orEmpty().contains("gpt-image-2.5-flare"))
+            assertTrue(e.message.orEmpty().contains("your plan does not include this model"))
+        }
+        // No second request: the hosted-tool route can only make gpt-image-2.
+        assertEquals(listOf("/backend-api/codex/images/generations"), requests.map { it.url.encodedPath })
+    }
+
+    @Test
+    fun `a 2_5 model that the backend does not serve is not silently replaced`() {
+        val requests = mutableListOf<Request>()
+        try {
+            generate(provider(requests, image25("gpt-image-2.5-sunburst")) { 404 to """{"detail":"Not Found"}""" })
+            fail("expected a provider error")
+        } catch (e: LLMError.ProviderError) {
+            assertTrue(e.message.orEmpty().contains("gpt-image-2.5-sunburst"))
+        }
+        assertEquals(1, requests.size)
+    }
+
+    @Test
+    fun `a 2_5 success answer without an image is an error, not a fallback`() {
+        val requests = mutableListOf<Request>()
+        try {
+            generate(provider(requests, image25("gpt-image-2.5-flare")) { 200 to """{"data":[]}""" })
+            fail("expected a provider error")
+        } catch (e: LLMError.ProviderError) {
+            assertTrue(e.message.orEmpty().contains("no image"))
+        }
+        assertEquals(1, requests.size)
+    }
+
+    @Test
+    fun `the bundled Codex catalog offers both 2_5 models as image-only routes`() {
+        ModelRulesTestFixtures.installBundledCatalog()
+        val catalog = com.openminis.app.provider.rules.ModelRulesProvider.staticModels("codexOAuth")
+        for (id in listOf("gpt-image-2.5-flare", "gpt-image-2.5-sunburst")) {
+            val m = catalog.single { it.id == id }
+            assertEquals(listOf("image"), m.outputModalities)
+            assertTrue(id in OpenAIProvider.CODEX_IMAGE_MODELS)
+        }
     }
 }
