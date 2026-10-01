@@ -2,6 +2,8 @@
 # Pre-flight for cutting a release tag. Read-only: it checks and prints the commands, it never tags or pushes.
 # See docs/development/RELEASING.md.
 #
+# The current version is released from main; a historical version is released from its release/vX.Y branch.
+#
 #   scripts/release-check.sh v1.1-beta.1
 #   scripts/release-check.sh v1.1
 #   scripts/release-check.sh v1.1.1
@@ -28,8 +30,15 @@ gradle_version="$(sed -n 's/^val appVersionName = "\(.*\)"$/\1/p' src/android/ap
 [ -n "$gradle_version" ] || fail "cannot read appVersionName from src/android/app/build.gradle.kts"
 [ "$gradle_version" = "$version" ] || fail "tag is $tag but appVersionName is \"$gradle_version\""
 
+# The current version is released from main. A version that has become history has its own branch
+# (release/vX.Y) and is released from there; main must not tag it.
 branch="$(git rev-parse --abbrev-ref HEAD)"
-[ "$branch" = "release/$line" ] || fail "tag $tag is cut on release/$line, but this is $branch"
+history_branch="release/v$line"
+if [ -n "$(git ls-remote --heads origin "refs/heads/$history_branch")" ]; then
+  [ "$branch" = "$history_branch" ] || fail "$line is a historical version with its own branch: cut $tag on $history_branch (this is $branch)"
+else
+  [ "$branch" = main ] || fail "$tag is cut on main (the current version has no branch of its own), but this is $branch"
+fi
 
 [ -z "$(git status --porcelain)" ] || fail "working tree is not clean"
 

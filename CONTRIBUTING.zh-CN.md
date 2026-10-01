@@ -10,7 +10,7 @@
 
 ## Pull Request
 
-默认基于当前 `main`；stacked PR 必须明确 base/head 与依赖。一次 PR 只解决一个明确问题或一条合同边界。版本分支与发版规则（`release/X.Y`、beta、tag）见 [docs/development/RELEASING.md](docs/development/RELEASING.md)。
+默认基于当前 `main`；stacked PR 必须明确 base/head 与依赖。一次 PR 只解决一个明确问题或一条合同边界。版本分支与发版规则（`main` 是当前版本，历史版本才有 `release/vX.Y`；beta、tag）见 [docs/development/RELEASING.md](docs/development/RELEASING.md)。
 
 必须遵守：
 

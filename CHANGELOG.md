@@ -39,9 +39,11 @@ and keeps your data.
 
 ### Version management — 2026-10-02
 
-- One branch per version: `main` is development (always the highest version, `X.Y-dev`), `release/X.Y` carries
-  that version's betas, final and patches; fixes land on `main` first and are cherry-picked down. Tags are
-  `vX.Y[.Z][-beta.N]`; betas are GitHub prereleases. CI also runs on `release/**` pushes. See
+- `main` is the current version and its betas, finals and patches are tagged there (`vX.Y[.Z][-beta.N]`; betas
+  are GitHub prereleases). Only a version that has become history gets its own branch, one per version, named
+  `release/vX.Y` (so `release/v1.0` appears once the project has moved past 1.0); fixes land on `main` first and
+  are cherry-picked down. The branch is not called plain `vX.Y` because the tag is, and a branch and a tag with
+  one name make git refuse to push or check it out. CI also runs on `release/**` pushes. See
   [docs/development/RELEASING.md](docs/development/RELEASING.md); `scripts/release-check.sh` is the read-only
   pre-flight before tagging.
 - `versionName` is set in one place (`appVersionName` in `app/build.gradle.kts`) and `versionCode` is derived

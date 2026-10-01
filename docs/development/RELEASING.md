@@ -1,18 +1,19 @@
 # 版本与发版
 
-一个版本一个分支。`main` 是开发线，`release/X.Y` 是某个版本的线；beta、正式版和补丁都在这条线上打 tag。
+`main` 就是当前版本，没有单独的分支。**只有历史版本才有自己的分支**：一个版本一个分支，比如当前是 2.0 时，才会有 `release/v1.0`。
 
 ## 版本号
 
 | 种类 | `versionName` | tag | GitHub Release |
 |---|---|---|---|
-| 开发（仅 `main`） | `X.Y-dev` | 不打 tag | 不发 |
 | beta | `X.Y-beta.N`、`X.Y.Z-beta.N` | `vX.Y-beta.N` | **prerelease** |
 | 正式版 | `X.Y` | `vX.Y` | 正式 |
 | 补丁 | `X.Y.Z`（`Z ≥ 1`） | `vX.Y.Z` | 正式 |
+| 开发（可选，不发布） | `X.Y-dev` | 不打 tag | 不发 |
 
 - 不写 `X.Y.0`：第一个版本就叫 `X.Y`。
 - `versionName` 只在 [`src/android/app/build.gradle.kts`](../../src/android/app/build.gradle.kts) 的 `appVersionName` 设置，别处不写。
+  `main` 的 `versionName` 只在发版提交里改；两次发版之间保持上一次发布的版本。
 - `versionCode` 由它推导，不要手填：
 
   ```text
@@ -27,7 +28,6 @@
   |---|---|
   | `1.0` | 1000099 |
   | `1.0.1` | 1000199 |
-  | `1.1-dev` | 1010000 |
   | `1.1-beta.1` | 1010001 |
   | `1.1` | 1010099 |
 
@@ -35,29 +35,33 @@
 
 ## 分支
 
-- **`main`**：开发线，永远是最高版本，`versionName` 为 `X.Y-dev`（`X.Y` 是下一个要发的版本）。所有改动先经 PR 进入 `main`。
-- **`release/X.Y`**：一个版本一个分支，长期保留，不删。该版本的 beta、正式版、补丁（`X.Y.Z`）都在这里打 tag。
-  - 这条线上不做新功能，只收修复。
-  - **修复先进 `main`，再 `git cherry-pick -x` 到 `release/X.Y`**；`release/*` 不合回 `main`。
-  - 对 `release/X.Y` 的改动同样走 PR（base 选该分支），CI 通过后再合并。
-- 当前：`release/1.0`（正式版 `1.0`）。
+- **`main`**：当前版本。它的 beta、正式版和补丁都直接在 `main` 上打 tag。所有改动经 PR 进入 `main`。
+- **`release/vX.Y`**：历史版本 `X.Y` 的分支，长期保留，不删。只在这个版本被新版本取代、`main` 要离开它的时候才创建；之后该版本的补丁（`X.Y.Z`）在这里发。
+  - 分支名带 `release/` 前缀，是因为 tag 也叫 `vX.Y`：分支和 tag 同名时 `git push origin vX.Y`、`git checkout vX.Y` 会报 ambiguous。
+  - 修复先进 `main`，再 `git cherry-pick -x` 到 `release/vX.Y`；`release/*` 不合回 `main`。
+  - 对它的改动同样走 PR（base 选该分支），CI 通过后再合并。
 
-`main` 保持最高版本是有意的：开发者在手机上反复安装 `main` 的构建，如果它的 `versionCode` 低于已装的 beta，就会因降级而装不上。
+没有 `release/v1.0`，直到 `main` 要离开 1.0。
 
 ## 流程
 
-### 开一个新版本（进入 beta）
+### 发 beta、正式版、补丁（当前版本，在 `main` 上）
 
-1. 从 `main` 切分支：`git switch -c release/X.Y main`，推送。
-2. 在 `release/X.Y` 上提交 `chore(release): X.Y-beta.1`：把 `appVersionName` 改为 `X.Y-beta.1`，在 `CHANGELOG.md` 加 `## X.Y-beta.1 — 日期`。走 PR，base 为 `release/X.Y`。
-3. 在 `main` 上提 PR，把 `appVersionName` 改为 `X.(Y+1)-dev`。
-4. 合并后预检、打 tag、发布（见下）。
+1. 提一个发版 PR：`appVersionName` 改为目标版本，`CHANGELOG.md` 加 `## <版本> — 日期`，合并。
+2. 在合并后的 `main` 上预检、构建、打 tag、发布（见下）。
 
-### 下一个 beta、正式版、补丁
+beta 与正式版用同一条流程：`1.1-beta.1 → 1.1-beta.2 → 1.1`。
 
-- 下一个 beta：把修复 cherry-pick 到 `release/X.Y`，`appVersionName` 改为 `X.Y-beta.2`，同上。
-- 正式版：`appVersionName` 改为 `X.Y`，`CHANGELOG.md` 加 `## X.Y — 日期`，tag `vX.Y`，Release 不勾 prerelease。
-- 补丁：在 `release/X.Y` 上 cherry-pick 修复，`appVersionName` 改为 `X.Y.Z`，tag `vX.Y.Z`。
+### 让一个版本成为历史（创建它的分支）
+
+在 `main` 离开 `X.Y` 之前，也就是把 `appVersionName` 改成下一个版本的第一个 beta **之前**，从 `X.Y` 最新的 tag 切出分支：
+
+```bash
+git branch release/vX.Y vX.Y        # 补丁线已有 vX.Y.Z 时，用最新的那个 tag
+git push origin release/vX.Y
+```
+
+之后 `X.Y` 的补丁只在这个分支上发：cherry-pick 修复、`appVersionName` 改为 `X.Y.Z`、同样预检和打 tag。
 
 ### 预检、打 tag、发布
 
@@ -65,9 +69,9 @@
 scripts/release-check.sh vX.Y-beta.1
 ```
 
-脚本只检查、只打印命令，不会打 tag 或推送。它核对：tag 与 `appVersionName` 一致、当前在 `release/X.Y`、工作区干净、`HEAD` 就是 `origin/release/X.Y` 的末端、tag 尚不存在、`CHANGELOG.md` 有对应标题。
+脚本只检查、只打印命令，不会打 tag 或推送。它核对：tag 与 `appVersionName` 一致；当前在对的分支（当前版本在 `main`，已成为历史的版本在它自己的 `release/vX.Y`）；工作区干净；`HEAD` 就是远端同名分支的末端；tag 尚不存在；`CHANGELOG.md` 有对应标题。
 
-然后用生产密钥构建，验证，再打 tag：
+然后用生产密钥构建、验证，再打 tag：
 
 ```bash
 scripts/verify-android-release.sh path/to/app-release.apk
@@ -80,6 +84,7 @@ beta 加 `--prerelease`。
 ## APK 与签名
 
 - 只有用项目生产密钥签名的构建才能作为 APK 附在 Release 上。构建需要环境变量 `RELEASE_KEYSTORE`、`RELEASE_STORE_PASSWORD`、`RELEASE_KEY_ALIAS`、`RELEASE_KEY_PASSWORD`，缺任何一个都会失败，而不是回退到 debug 密钥。
+- 没有可用的生产密钥时，可以先发不带 APK 的 Release，之后用 `gh release upload` 补；应用内更新器看到没有 APK 的版本时只会提示"有新版但未附 APK"。
 - 一个 Release 只附一个 `.apk`（更新器取第一个）。
 - 密钥与 APK 不进 Git。
 
@@ -93,10 +98,7 @@ beta 加 `--prerelease`。
 - 想试 beta 的稳定版用户手动安装 beta 的 APK；之后它按 beta 通道收更新。
 - 已知：发 1.0 之前的 `1.01-beta.*` 构建会把 `1.01` 视为比 `1.0` 新，不会被推送 1.0，手动安装即可（`versionCode` 更高，原地升级并保留数据）。
 
-## CI
+## CI 与分支保护
 
-PR 以及 `main`、`release/**` 的 push 都跑 CI。新建的 release 分支第一次 push 会按全量改动跑完整流水线。
-
-## 建议的仓库设置（未启用）
-
-对 `main` 和 `release/**` 开启分支保护：必须经 PR、必须通过状态检查、禁止强推和删除。这是仓库设置，由仓库所有者决定。
+- PR 以及 `main`、`release/**` 的 push 都跑 CI。
+- `main` 和 `release/**` 由仓库规则保护：必须经 PR、必须通过状态检查、禁止强推和删除。仓库管理员只能通过 PR 绕过检查，不能直接推送。
