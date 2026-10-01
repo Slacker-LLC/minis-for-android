@@ -55,6 +55,21 @@
       }
     },
     {
+      "id": "gpt-6-sol-luna-family",
+      "match": {
+        "idPrefix": [
+          "gpt-6-sol",
+          "gpt-6-luna",
+          "gpt-6.1-sol"
+        ],
+        "stripPath": true
+      },
+      "set": {
+        "maxThinkingLevel": "MAX",
+        "supportsReasoning": true
+      }
+    },
+    {
       "id": "gpt-5.5-family",
       "match": {
         "idPrefix": [
@@ -344,8 +359,40 @@
   "staticModels": {
     "anthropic": [
       {
+        "id": "claude-fable-5-1",
+        "displayName": "Claude Fable 5.1",
+        "provider": "Anthropic",
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000,
+        "supportsReasoning": true
+      },
+      {
+        "id": "claude-opus-5-5",
+        "displayName": "Claude Opus 5.5",
+        "provider": "Anthropic",
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000,
+        "supportsReasoning": true
+      },
+      {
+        "id": "claude-sonnet-5-5",
+        "displayName": "Claude Sonnet 5.5",
+        "provider": "Anthropic",
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000,
+        "supportsReasoning": true
+      },
+      {
         "id": "claude-fable-5",
         "displayName": "Claude Fable 5",
+        "provider": "Anthropic",
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000,
+        "supportsReasoning": true
+      },
+      {
+        "id": "claude-opus-5",
+        "displayName": "Claude Opus 5",
         "provider": "Anthropic",
         "contextWindow": 1000000,
         "maxOutputTokens": 128000,
@@ -394,8 +441,18 @@
     ],
     "gemini": [
       {
-        "id": "gemini-3-pro-preview",
-        "displayName": "Gemini 3 Pro (Preview)",
+        "id": "gemini-3.1-pro-preview",
+        "displayName": "Gemini 3.1 Pro (Preview)",
+        "provider": "Google"
+      },
+      {
+        "id": "gemini-3.8-flash",
+        "displayName": "Gemini 3.8 Flash",
+        "provider": "Google"
+      },
+      {
+        "id": "gemini-3.5-flash-lite",
+        "displayName": "Gemini 3.5 Flash Lite",
         "provider": "Google"
       },
       {
@@ -441,6 +498,24 @@
         "outputModalities": [
           "text"
         ]
+      },
+      {
+        "id": "gpt-6.1-sol",
+        "displayName": "GPT-6.1 Sol",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt-6-sol",
+        "displayName": "GPT-6 Sol",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt-6-luna",
+        "displayName": "GPT-6 Luna",
+        "provider": "OpenAI",
+        "supportsReasoning": true
       },
       {
         "id": "gpt-5.5",
@@ -503,6 +578,31 @@
     ],
     "openRouter": [
       {
+        "id": "openai/gpt-6.1-sol",
+        "displayName": "GPT-6.1 Sol",
+        "provider": "OpenRouter"
+      },
+      {
+        "id": "anthropic/claude-opus-5.5",
+        "displayName": "Claude Opus 5.5",
+        "provider": "OpenRouter"
+      },
+      {
+        "id": "anthropic/claude-sonnet-5.5",
+        "displayName": "Claude Sonnet 5.5",
+        "provider": "OpenRouter"
+      },
+      {
+        "id": "google/gemini-3.8-flash",
+        "displayName": "Gemini 3.8 Flash",
+        "provider": "OpenRouter"
+      },
+      {
+        "id": "x-ai/grok-4.7",
+        "displayName": "Grok 4.7",
+        "provider": "OpenRouter"
+      },
+      {
         "id": "anthropic/claude-sonnet-4",
         "displayName": "Claude Sonnet 4",
         "provider": "OpenRouter"
@@ -524,6 +624,12 @@
       }
     ],
     "xAI": [
+      {
+        "id": "grok-4.7",
+        "displayName": "Grok 4.7",
+        "provider": "xAI",
+        "supportsReasoning": true
+      },
       {
         "id": "grok-4.6",
         "displayName": "Grok 4.6",
