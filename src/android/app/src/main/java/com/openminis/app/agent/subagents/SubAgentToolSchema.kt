@@ -32,10 +32,11 @@ object SubAgentToolSchema {
             "context" to AgentToolParam("string", "action=delegate only. Optional raw material to hand over verbatim (file excerpts, error output, a list of paths). Appended to the task."),
             "max_minutes" to AgentToolParam("integer", "action=delegate only. Wall-clock budget in minutes (default ${SubAgentTask.DEFAULT_MINUTES}, maximum ${SubAgentTask.MAX_MINUTES}). The sub agent is stopped when it runs out and whatever it produced so far is returned with status=timeout."),
             "wait" to AgentToolParam("boolean", "action=delegate only. false (default): return at once with status=running; the result is posted here as a new message when done. true: block until it finishes and return the result here — only when the next step cannot proceed without it. Stopping your turn while it waits stops the sub agent."),
+            "progress_report" to AgentToolParam("string", "action=delegate only. Mid-run [Background task progress …] messages (status, current tool, latest message). \"none\" (default): final result only. \"frequent\": about every 15s when something changed. \"moderate\": about once a minute. Each one costs you a turn — leave it at none unless the user asked to follow along or you must react mid-way. Answer one with at most a short sentence, or just carry on; never re-delegate or poll because of one. Ignored when wait=true.", enumValues = SubAgentTask.PROGRESS_LEVELS),
             "job_id" to AgentToolParam("string", "action=status/steer/cancel/resume. The job_id this tool returned when it started the sub agent (a prefix is accepted). Required for steer and cancel; omit on status to list every sub agent of this conversation."),
             "message" to AgentToolParam("string", "action=steer only, required. The correction, phrased as an instruction to the running sub agent (e.g. 'focus on pricing, skip the migration notes'). Use when new information changes what it should do — it keeps the work already done, unlike cancelling and re-delegating. Read at its next turn, so a running tool call is not interrupted; if the run finishes first the correction is missed."),
         ),
         required = listOf("tool_title"),
-        propertyOrdering = listOf("tool_title", "action", "task", "agent", "model_choice", "context", "max_minutes", "wait", "job_id", "message"),
+        propertyOrdering = listOf("tool_title", "action", "task", "agent", "model_choice", "context", "max_minutes", "wait", "progress_report", "job_id", "message"),
     )
 }

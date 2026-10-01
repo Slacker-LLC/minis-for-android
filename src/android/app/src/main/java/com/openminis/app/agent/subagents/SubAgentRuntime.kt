@@ -14,6 +14,12 @@ import java.util.concurrent.ConcurrentHashMap
 /** The model a delegation runs on: a model entry (null = the child's own default) and where it came from. */
 data class SubAgentModel(val entryId: String?, val label: String, val origin: String)
 
+/** What a running child is doing right now, for a progress report. */
+data class ChildProgress(val currentTool: String?, val lastText: String?) {
+    /** Equal signatures mean nothing changed since the last report. */
+    val signature: String get() = "${currentTool.orEmpty()}|${lastText.orEmpty().takeLast(200)}"
+}
+
 /** What a finished child run reports. */
 data class ChildOutcome(val completed: Boolean, val text: String?, val timedOut: Boolean)
 
@@ -38,6 +44,15 @@ interface SubAgentPort {
     /** Delivers a course-correction to a running child; it is read at the child's next turn. */
     suspend fun steerChild(childSessionId: String, message: String): Boolean
 
+    /** The child's current tool and latest message, or null when it cannot be read. */
+    suspend fun describeChild(childSessionId: String): ChildProgress?
+
+    /**
+     * Stops a child whose time budget ran out and asks it for a final message with what it has, waiting at most
+     * [graceMs]. Null when it produced nothing.
+     */
+    suspend fun wrapUpChild(childSessionId: String, graceMs: Long): String?
+
     /** Posts [text] into the delegating conversation (queued behind a running turn, never interrupting it). */
     suspend fun deliverToParent(parentSessionId: String, text: String)
 }
@@ -58,6 +73,8 @@ class SubAgentRuntime(
     val registry: SubAgentJobRegistry,
     private val scope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** Milliseconds between progress reports for a level, or null for none. */
+    private val progressIntervalMs: (String) -> Long? = ::defaultProgressInterval,
 ) {
     private val cancelRequested = ConcurrentHashMap.newKeySet<String>()
     private val waiters = ConcurrentHashMap<String, CompletableDeferred<SubAgentJob>>()
@@ -108,6 +125,7 @@ class SubAgentRuntime(
             modelEntryId = model.entryId,
             thinking = def.thinkingLevelOverride,
             brief = SubAgentTask.childBrief(def, args.task, args.context),
+            progress = if (args.wait) "none" else args.progressReport,
         )) {
             is SubAgentAdmission.Rejected ->
                 fail("queue_full", "Too many sub agents are waiting (${registry.maxQueued}). Try again after some finish.")
@@ -157,7 +175,12 @@ class SubAgentRuntime(
                 } else {
                     val message = if (existingChild != null) SubAgentTask.resumeNotice()
                         else job.brief ?: error("the delegation has no brief")
-                    val outcome = port.runChild(childId, message, job.thinking, job.maxMinutes * 60_000L)
+                    val ticker = startProgressReports(job, childId)
+                    val outcome = try {
+                        port.runChild(childId, message, job.thinking, job.maxMinutes * 60_000L)
+                    } finally {
+                        ticker?.cancel()
+                    }
                     text = outcome.text?.trim()
                     state = when {
                         job.id in cancelRequested -> SubAgentJobState.CANCELLED
@@ -165,7 +188,12 @@ class SubAgentRuntime(
                         outcome.completed -> SubAgentJobState.DONE
                         else -> SubAgentJobState.FAILED
                     }
-                    if (outcome.timedOut) runCatching { port.cancelChild(childId) }
+                    if (outcome.timedOut) {
+                        // Out of time: stop it, then give it a short grace to hand over what it has.
+                        runCatching { port.cancelChild(childId) }
+                        runCatching { port.wrapUpChild(childId, SubAgentTask.WRAP_UP_GRACE_MS) }
+                            .getOrNull()?.trim()?.takeIf { it.isNotEmpty() }?.let { text = it }
+                    }
                 }
             } catch (e: CancellationException) {
                 // The scope is going away, but the parent still gets told and the next job still starts.
@@ -176,6 +204,23 @@ class SubAgentRuntime(
                 text = "Sub agent failed: ${t.message ?: t.javaClass.simpleName}"
             }
             complete(job.id, state, text)
+        }
+    }
+
+    /** Posts a progress report into the parent every interval while the run changes, for background runs that asked. */
+    private fun startProgressReports(job: SubAgentJob, childId: String): kotlinx.coroutines.Job? {
+        if (job.wait) return null
+        val interval = progressIntervalMs(job.progress) ?: return null
+        return scope.launch {
+            var last: String? = null
+            while (true) {
+                kotlinx.coroutines.delay(interval)
+                if (registry.get(job.id)?.state != SubAgentJobState.RUNNING) return@launch
+                val progress = runCatching { port.describeChild(childId) }.getOrNull() ?: continue
+                if (progress.signature == last) continue
+                last = progress.signature
+                runCatching { port.deliverToParent(job.parentSessionId, SubAgentTask.progressText(job, progress, clock())) }
+            }
         }
     }
 
@@ -288,4 +333,10 @@ class SubAgentRuntime(
 
     private fun fail(code: String, message: String, extra: org.json.JSONObject.() -> Unit = {}) =
         SubAgentReply(SubAgentTask.error(code, message, extra), false)
+}
+
+private fun defaultProgressInterval(level: String): Long? = when (level) {
+    "frequent" -> 15_000L
+    "moderate" -> 60_000L
+    else -> null
 }

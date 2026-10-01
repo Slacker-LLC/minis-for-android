@@ -42,6 +42,8 @@ data class SubAgentTaskArgs(
     val modelChoice: SubAgentModelChoice,
     val maxMinutes: Int,
     val wait: Boolean,
+    /** none | frequent | moderate; background runs only. */
+    val progressReport: String,
     val jobId: String?,
     val message: String?,
 )
@@ -55,6 +57,13 @@ object SubAgentTask {
     const val TOOL_NAME = SubAgentDefinition.TOOL_NAME
     const val DEFAULT_MINUTES = 10
     const val MAX_MINUTES = 60
+    val PROGRESS_LEVELS = listOf("none", "frequent", "moderate")
+
+    /** How long a run gets, after its budget expires, to answer the wrap-up prompt. */
+    const val WRAP_UP_GRACE_MS = 90_000L
+
+    /** The most of the child's latest message a progress report carries. */
+    const val PROGRESS_LAST_MESSAGE_MAX_CHARS = 800
 
     /** A child's answer is capped so an unbounded response cannot flood the parent's context. */
     const val MAX_RESULT_CHARS = 60_000
@@ -102,6 +111,8 @@ object SubAgentTask {
                 modelChoice = SubAgentModelChoice.parse(o.optString("model_choice", "")),
                 maxMinutes = minutes.coerceIn(1, MAX_MINUTES),
                 wait = o.optBoolean("wait", false),
+                progressReport = o.optString("progress_report", "none").trim().lowercase()
+                    .takeIf { it in PROGRESS_LEVELS } ?: "none",
                 jobId = jobId,
                 message = message,
             ),
@@ -182,6 +193,22 @@ object SubAgentTask {
         if (text.length > limit) text.take(limit) + "\n\n[truncated: the sub agent's answer exceeded $limit characters]" else text
 
     // ── Prompts ─────────────────────────────────────────────────────────────
+
+    /** Sent to a child whose time budget ran out, so it hands over what it has instead of nothing. */
+    const val WRAP_UP_PROMPT =
+        "[Time budget reached] Stop working now. Reply with one final message that contains the result so far: what you " +
+            "completed, what you found, and anything left undone. Do not call any more tools."
+
+    /** A mid-run report: status, the tool the child is in, and the tail of its latest message. */
+    fun progressText(job: SubAgentJob, progress: ChildProgress, now: Long): String {
+        val elapsed = job.elapsedMs(now)?.let { " · ${it / 1000}s" }.orEmpty()
+        val lines = mutableListOf("[Background task progress — job_id=${job.id.take(8)} · agent=${job.agentName} · ${job.state.wire}$elapsed]")
+        progress.currentTool?.let { lines.add("Current tool: $it") }
+        progress.lastText?.takeIf { it.isNotBlank() }?.let {
+            lines.add("Latest message: " + it.trim().takeLast(PROGRESS_LAST_MESSAGE_MAX_CHARS))
+        }
+        return lines.joinToString("\n")
+    }
 
     /**
      * What a resumed child is told on its first turn. States plainly what did and did not survive the

@@ -90,6 +90,32 @@ class AppSubAgentPort(private val context: Context) : SubAgentPort {
         )
     }
 
+    override suspend fun describeChild(childSessionId: String): ChildProgress? = withContext(Dispatchers.IO) {
+        val rows = app.chatRepository.dao.loadMessages(childSessionId)
+        if (rows.isEmpty()) return@withContext null
+        val assistants = rows.filter { it.role == "assistant" }
+        val lastText = assistants.asReversed().firstNotNullOfOrNull { textOf(it.partsJson) }
+        // A tool the child started and has not got a result for yet is the one it is in right now.
+        val lastAssistant = assistants.lastOrNull()
+        val resultIds = rows.filter { it.role == "user" }.flatMap { toolResultIds(it.partsJson) }.toSet()
+        val currentTool = lastAssistant?.let { toolUses(it.partsJson) }
+            ?.lastOrNull { it.first !in resultIds }?.second
+        ChildProgress(currentTool, lastText)
+    }
+
+    override suspend fun wrapUpChild(childSessionId: String, graceMs: Long): String? {
+        AgentRunner.cancel(context, childSessionId)
+        val result = AgentRunner.prompt(
+            context = context,
+            sessionId = childSessionId,
+            text = SubAgentTask.WRAP_UP_PROMPT,
+            chatOnly = true,
+            wait = true,
+            timeoutMs = graceMs,
+        )
+        return result.responseText?.takeIf { result.status.equals("Completed", ignoreCase = true) }
+    }
+
     override suspend fun cancelChild(childSessionId: String): Boolean = AgentRunner.cancel(context, childSessionId)
 
     /**
@@ -132,6 +158,36 @@ class AppSubAgentPort(private val context: Context) : SubAgentPort {
         }
         AppLogger.warning(TAG, "callback to ${parentSessionId.take(8)} could not be delivered")
     }
+
+    private fun textOf(partsJson: String): String? = runCatching {
+        val arr = org.json.JSONArray(partsJson)
+        buildString {
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                if (o.optString("type") == "text") append(o.optString("value", ""))
+            }
+        }.trim().ifEmpty { null }
+    }.getOrNull()
+
+    /** (tool use id, tool name) for each tool call in a message. */
+    private fun toolUses(partsJson: String): List<Pair<String, String>> = runCatching {
+        val arr = org.json.JSONArray(partsJson)
+        (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            if (o.optString("type") != "toolUse") return@mapNotNull null
+            val v = o.optJSONObject("value") ?: return@mapNotNull null
+            v.optString("toolUseId") to v.optString("name")
+        }
+    }.getOrDefault(emptyList())
+
+    private fun toolResultIds(partsJson: String): List<String> = runCatching {
+        val arr = org.json.JSONArray(partsJson)
+        (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            if (o.optString("type") != "toolResult") return@mapNotNull null
+            o.optJSONObject("value")?.optString("toolUseId")
+        }
+    }.getOrDefault(emptyList())
 
     companion object {
         private const val TAG = "SubAgents"

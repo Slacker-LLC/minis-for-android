@@ -65,6 +65,8 @@ data class SubAgentJob(
     val brief: String? = null,
     /** True when this run is a resume of one the app lost. */
     val resumed: Boolean = false,
+    /** none | frequent | moderate: how often a background run posts progress into its conversation. */
+    val progress: String = "none",
 ) {
     val isActive: Boolean get() = !state.isTerminal
     fun elapsedMs(now: Long): Long? = startedAtMs?.let { (finishedAtMs ?: now) - it }
@@ -133,6 +135,7 @@ class SubAgentJobRegistry(
         modelEntryId: String? = null,
         thinking: ThinkingLevel? = null,
         brief: String? = null,
+        progress: String = "none",
     ): SubAgentAdmission = synchronized(lock) {
         val running = _jobs.value.values.count { it.state == SubAgentJobState.RUNNING }
         val now = clock()
@@ -149,6 +152,7 @@ class SubAgentJobRegistry(
             modelEntryId = modelEntryId,
             thinking = thinking,
             brief = brief,
+            progress = progress,
             createdAtMs = now,
         )
         when {
