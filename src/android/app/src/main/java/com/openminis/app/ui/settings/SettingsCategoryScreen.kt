@@ -421,7 +421,10 @@ fun SettingsCategoryScreen(
                         icon = Icons.Outlined.Lock,
                         iconColor = Color(0xFF34C759),
                         title = stringResource(R.string.settings_privacy_policy),
-                        onClick = { openExternalUrl(context, "https://openminis.github.io/privacy-policy.html") },
+                        onClick = { openExternalUrl(
+                            context,
+                            com.openminis.app.data.AppLinks.privacyPolicyUrl(context.resources.configuration.locales[0].language),
+                        ) },
                     )
                     SettingsRow(
                         icon = Icons.Outlined.Mail,

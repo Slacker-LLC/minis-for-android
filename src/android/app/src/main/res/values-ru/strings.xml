@@ -216,6 +216,9 @@
     <string name="about_minis_tagline">Minis — ваш полностью локальный и приватный Агент прямо на устройстве.</string>
     <string name="about_links">Ссылки</string>
     <string name="about_github_repository">Репозиторий GitHub</string>
+    <string name="about_open_source_licenses">Лицензии открытого ПО</string>
+    <string name="about_open_source_licenses_subtitle">Основано на OpenMinis и Eta, а также других открытых компонентах</string>
+    <string name="about_license">Лицензия (GPL-3.0)</string>
     <string name="about_version_format">Версия %1$s (%2$s)</string>
     <string name="move_to_sheet_title">Переместить в…</string>
     <string name="move_to_sheet_empty">Нет других доступных Сессий.</string>

@@ -2,7 +2,20 @@
 
 Minis for Android contains code derived from [OpenMinis/OpenMinis](https://github.com/OpenMinis/OpenMinis) and uses additional third-party open-source components.
 
+In the app, *Settings → About Minis → Open-source licenses* opens this file; the corresponding source for each
+release is the tagged tree of [Slacker-LLC/minis-for-android](https://github.com/Slacker-LLC/minis-for-android).
+
 This file is a project-level inventory, not a substitute for license files shipped by each dependency. Exact dependency versions remain authoritative in Gradle, Cargo, vendored source, Go modules, generated rootfs package metadata, and lock/sum files.
+
+## Main sources
+
+| Project | License | Role |
+|---|---|---|
+| [OpenMinis/OpenMinis](https://github.com/OpenMinis/OpenMinis) | GPL-3.0 | The upstream this project derives from; the application's base code and lineage |
+| [Mangi-11/Eta](https://github.com/Mangi-11/Eta) | PolyForm Noncommercial 1.0.0 | Ported capability modules (see below); those modules stay under the noncommercial terms |
+| [android-notes/ShadowAuto](https://github.com/android-notes/ShadowAuto) | Apache-2.0 | Adapted virtual-screen support code |
+
+Everything else below is a library, runtime component or asset the application uses or ships.
 
 ## Project and source-lineage license
 
@@ -173,12 +186,16 @@ The current `minis-root-network-proxy` Cargo manifest has no third-party crate d
 The rclone mobile module currently pins `github.com/rclone/rclone v1.75.0`; `deps/rclone-mobile/go.mod` and `go.sum` are authoritative for its transitive module graph. Those transitive dependencies keep their own licenses and notices.
 
 The Ubuntu rootfs is a generated build artifact. Packages inside it retain their individual licenses and notices.
+Source for those packages is published by the Ubuntu project for 24.04 (noble), for example through
+`apt source <package>` or <https://archive.ubuntu.com/ubuntu/pool/>.
 
 ## Android dependencies
 
 | Library / family | License |
 |---|---|
-| AndroidX / Jetpack / Compose | Apache-2.0 |
+| AndroidX / Jetpack / Compose (including `security-crypto`, `room`, `datastore`, `navigation`, `webkit`) | Apache-2.0 |
+| JetBrains annotations | Apache-2.0 |
+| libxposed API and service | Apache-2.0 |
 | OkHttp / MockWebServer | Apache-2.0 |
 | Kotlin coroutines / serialization | Apache-2.0 |
 | Coil | Apache-2.0 |
@@ -192,11 +209,21 @@ The Ubuntu rootfs is a generated build artifact. Packages inside it retain their
 
 Use `src/android/app/build.gradle.kts` and Gradle dependency reports for the current version set.
 
+## Vendored source
+
+| Component | Source | License | Current use |
+|---|---|---|---|
+| Backdrop (AndroidLiquidGlass 2.0.0) | [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) | Apache-2.0 | glass/blur surfaces in the UI, under `com.kyant.backdrop` |
+
+License text: `src/android/app/src/main/java/com/kyant/backdrop/LICENSE-backdrop.txt`. The vendored copy carries local changes (Kotlin/Compose compatibility and prevention of same-layer self-sampling), recorded in that file.
+
 ## Bundled web/UI assets
 
 | Asset | Location | License |
 |---|---|---|
 | KaTeX | Android app assets | MIT |
+| JetBrains Mono (regular, bold) | Android app resources, `res/font/` | SIL OFL-1.1 ([license](https://github.com/JetBrains/JetBrainsMono/blob/master/OFL.txt)) |
+| [models.dev](https://github.com/sst/models.dev) model catalog snapshot (`models-dev-api.json`) | Android app assets | MIT |
 | cppjieba dictionaries | Android app assets | MIT / upstream distribution terms |
 
 ## Removed or historical runtime components

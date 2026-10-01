@@ -34,10 +34,8 @@ import java.util.concurrent.TimeUnit
 object UpdateChecker {
 
     private const val TAG = "UpdateChecker"
-    // This Pet fork publishes and signs its own Android artifacts; never offer
-    // an upstream APK with a different application history to fork users.
-    private const val OWNER = "limuzi013"
-    private const val REPO = "OpenMinis-Pet"
+    // This project publishes and signs its own Android artifacts (AppLinks.OWNER /
+    // REPO); never offer an upstream APK with a different application history.
     private const val DOWNLOAD_FILENAME = "minis-update.apk"
     /**
      * Sub-directory of `filesDir` where we stage downloaded update APKs. We
@@ -101,7 +99,7 @@ object UpdateChecker {
      * coroutine scope.
      */
     suspend fun check(): CheckResult = withContext(Dispatchers.IO) {
-        val url = "https://api.github.com/repos/$OWNER/$REPO/releases?per_page=30"
+        val url = AppLinks.RELEASES_API_URL
         AppLogger.info(TAG, "GET $url (local=${BuildConfig.VERSION_NAME})")
         try {
             val req = Request.Builder()
@@ -258,7 +256,7 @@ object UpdateChecker {
     }
 
     /** Public so UI can deep-link users to manual download when GitHub is blocked. */
-    const val RELEASES_URL: String = "https://github.com/limuzi013/minis-for-android/releases"
+    const val RELEASES_URL: String = AppLinks.RELEASES_URL
 
     /** Returns (downloadUrl, sizeBytes) for the first .apk asset, or (null, 0). */
     private fun findApkAsset(assets: JSONArray?): Pair<String?, Long> {

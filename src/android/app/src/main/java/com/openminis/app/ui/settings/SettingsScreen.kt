@@ -250,7 +250,7 @@ internal fun SubagentLimitsDialog(
  * triage instead of asking the user to fill in environment details.
  *
  * URL shape:
- *   https://github.com/limuzi013/minis-for-android/issues/new
+ *   AppLinks.NEW_ISSUE_URL (https://github.com/Slacker-LLC/minis-for-android/issues/new)
  *     ?template=bug_report.md
  *     &title=[Bug]
  *     &body=<percent-encoded markdown>
@@ -313,7 +313,7 @@ internal fun buildBugReportUrl(): String {
     // since URLEncoder turns spaces into '+' which GitHub also accepts but
     // the spec calls for the literal "[Bug] " form.
     val title = java.net.URLEncoder.encode("[Bug] ", "UTF-8")
-    return "https://github.com/limuzi013/minis-for-android/issues/new" +
+    return com.openminis.app.data.AppLinks.NEW_ISSUE_URL +
         "?template=bug_report.md" +
         "&title=$title" +
         "&body=$encodedBody"

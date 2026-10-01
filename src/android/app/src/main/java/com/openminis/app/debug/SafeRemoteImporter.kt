@@ -56,7 +56,7 @@ internal object SafeRemoteImporter {
             val request = Request.Builder()
                 .url(url)
                 .header("Accept", "application/json, text/markdown, text/plain;q=0.9, */*;q=0.1")
-                .header("User-Agent", "OpenMinis-Pet-Remote-Importer")
+                .header("User-Agent", "Minis-for-Android-Remote-Importer")
                 .get()
                 .build()
             client.newCall(request).execute().use { response ->

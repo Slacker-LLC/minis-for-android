@@ -33,4 +33,21 @@ class UpdateCheckerVersionTest {
             ) > 0,
         )
     }
+
+    @Test
+    fun `release 1_0 is up to date on itself and older than every later release`() {
+        val local = UpdateChecker.normalizeTag("1.0")
+        assertEquals(0, UpdateChecker.compareVersions(UpdateChecker.normalizeTag("v1.0"), local))
+        assertTrue(UpdateChecker.compareVersions(UpdateChecker.normalizeTag("v1.0.1"), local) > 0)
+        assertTrue(UpdateChecker.compareVersions(UpdateChecker.normalizeTag("v1.1"), local) > 0)
+        assertTrue(UpdateChecker.compareVersions(UpdateChecker.normalizeTag("v0.22-preview"), local) < 0)
+    }
+
+    @Test
+    fun `the 1_01 beta builds read as newer than 1_0 so the updater does not offer 1_0 over them`() {
+        // Known and accepted: 1.0 is installed over a beta by hand (its versionCode is higher).
+        val beta = UpdateChecker.normalizeTag("1.01-beta.2")
+        assertEquals("1.01", beta)
+        assertTrue(UpdateChecker.compareVersions(beta, UpdateChecker.normalizeTag("v1.0")) > 0)
+    }
 }

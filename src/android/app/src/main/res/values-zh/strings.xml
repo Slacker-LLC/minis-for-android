@@ -211,6 +211,9 @@
     <string name="about_minis_tagline">Minis 是完全本地、完全私密的设备端 Agent。</string>
     <string name="about_links">链接</string>
     <string name="about_github_repository">GitHub 仓库</string>
+    <string name="about_open_source_licenses">开源软件说明</string>
+    <string name="about_open_source_licenses_subtitle">基于 OpenMinis 与 Eta，以及其他开源组件</string>
+    <string name="about_license">开源许可证（GPL-3.0）</string>
     <string name="about_version_format">版本 %1$s (%2$s)</string>
 
     <!-- T172 — chat sheets i18n -->

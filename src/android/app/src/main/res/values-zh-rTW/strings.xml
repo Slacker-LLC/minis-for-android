@@ -1334,6 +1334,9 @@
     <string name="about_minis_tagline">Minis 是完全本地、完全私密的裝置端 Agent。</string>
     <string name="about_links">連結</string>
     <string name="about_github_repository">GitHub 倉庫</string>
+    <string name="about_open_source_licenses">開源軟體說明</string>
+    <string name="about_open_source_licenses_subtitle">基於 OpenMinis 與 Eta，以及其他開源元件</string>
+    <string name="about_license">開源授權（GPL-3.0）</string>
     <string name="about_version_format">版本 %1$s (%2$s)</string>
     <string name="thinking_rules_section">思考規則</string>
     <string name="thinking_rules_footer">規則自上而下依次匹配，第一條匹配當前模型的規則決定傳送哪些思考引數。預設規則為內建規則，不可刪除——在其上方新增一條規則即可覆蓋。</string>

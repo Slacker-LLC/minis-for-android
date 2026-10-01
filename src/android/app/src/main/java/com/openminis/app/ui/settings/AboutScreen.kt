@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -107,7 +109,22 @@ fun AboutScreen(onBack: () -> Unit) {
                 // LocalInAppBrowserLauncher ambient defaults to a no-op when
                 // no InAppBrowserHost is in the tree above this screen — and
                 // nothing wraps Settings, so the row used to be a dead tap.
-                onClick = { openExternalUrl(context, "https://github.com/limuzi013/minis-for-android") },
+                onClick = { openExternalUrl(context, com.openminis.app.data.AppLinks.REPOSITORY_URL) },
+                trailing = { ExternalLinkIcon() },
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Description,
+                iconColor = tileBlue,
+                title = stringResource(R.string.about_open_source_licenses),
+                subtitle = stringResource(R.string.about_open_source_licenses_subtitle),
+                onClick = { openExternalUrl(context, com.openminis.app.data.AppLinks.THIRD_PARTY_LICENSES_URL) },
+                trailing = { ExternalLinkIcon() },
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Gavel,
+                iconColor = tileBlue,
+                title = stringResource(R.string.about_license),
+                onClick = { openExternalUrl(context, com.openminis.app.data.AppLinks.LICENSE_URL) },
                 trailing = { ExternalLinkIcon() },
                 showDivider = false,
             )

@@ -178,6 +178,9 @@
     <string name="about_minis_tagline">Minis는 완전히 로컬에서 동작하며 완전히 프라이빗한 온디바이스 에이전트입니다.</string>
     <string name="about_links">링크</string>
     <string name="about_github_repository">GitHub 저장소</string>
+    <string name="about_open_source_licenses">오픈소스 라이선스</string>
+    <string name="about_open_source_licenses_subtitle">OpenMinis와 Eta를 기반으로 하며 다른 오픈소스 구성 요소를 사용합니다</string>
+    <string name="about_license">라이선스 (GPL-3.0)</string>
     <string name="about_version_format">버전 %1$s (%2$s)</string>
 
     <!-- T172 — chat sheets i18n -->
