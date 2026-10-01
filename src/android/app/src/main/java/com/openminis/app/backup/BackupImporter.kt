@@ -876,6 +876,25 @@ class BackupImporter(
             report.skipped += skipped
         }
 
+        // Custom sub agents: merged into the local roster (never replacing the built-in or a newer local edit).
+        val agentRecords = readJsonlList(File(root, "data"), BackupSubAgentMapping.FILE_BASE).mapNotNull { env ->
+            env.obj?.let {
+                runCatching {
+                    BackupFormat.json.decodeFromJsonElement(BackupSubAgentRecord.serializer(), it)
+                }.getOrNull()
+            }
+        }
+        if (agentRecords.isNotEmpty()) {
+            val incoming = agentRecords.mapNotNull(BackupSubAgentMapping::fromRecord)
+            report.unreadable += agentRecords.size - incoming.size
+            val merged = com.openminis.app.data.model.SubAgentRoster.mergeBackup(
+                com.openminis.app.agent.subagents.SubAgentStore.currentRoster(), incoming,
+            ) { AppLogger.info(TAG, "[Restore] $it") }
+            com.openminis.app.agent.subagents.SubAgentStore.save(merged.roster)
+            report.imported += merged.written
+            report.skipped += merged.skipped
+        }
+
         // Credentials (secrets.json lives at the work root, already decrypted).
         val secrets = readSecrets(root)
         if (secrets != null) {

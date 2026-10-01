@@ -211,4 +211,42 @@ object SubAgentRoster {
             .lowercase()
 
     private val COMBINING_MARKS = Regex("\\p{Mn}+")
+
+    /** Outcome of [mergeBackup]: the roster to save plus the report counts. */
+    data class BackupMerge(val roster: List<SubAgentDefinition>, val written: Int, val skipped: Int)
+
+    /**
+     * Folds a backup package's custom sub agents into the local roster:
+     *  - an id not known locally is added, unless its NAME matches a local agent: the model picks agents
+     *    by name, so two entries it cannot tell apart would make one unreachable and the local one stays;
+     *  - a known id is replaced only when the package's copy is newer, so restoring an old package cannot
+     *    roll back an agent edited since;
+     *  - the built-in is never touched and nothing is deleted.
+     * The result is normalized (count bound, dense sortOrder).
+     */
+    fun mergeBackup(
+        local: List<SubAgentDefinition>,
+        incoming: List<SubAgentDefinition>,
+        log: ((String) -> Unit)? = null,
+    ): BackupMerge {
+        val out = local.toMutableList()
+        var written = 0
+        var skipped = 0
+        for (r in incoming) {
+            if (r.isBuiltIn || r.id == SubAgentDefinition.BUILT_IN_ID) { skipped++; continue }
+            val at = out.indexOfFirst { it.id == r.id }
+            if (at >= 0) {
+                if (r.updatedAt > out[at].updatedAt) { out[at] = r.copy(isBuiltIn = false); written++ } else skipped++
+                continue
+            }
+            if (out.any { nameKey(it.name) == nameKey(r.name) }) {
+                log?.invoke("backup sub agent '${r.name}' skipped: a local agent already has that name")
+                skipped++
+                continue
+            }
+            out.add(r.copy(isBuiltIn = false))
+            written++
+        }
+        return BackupMerge(normalize(out, log), written, skipped)
+    }
 }
