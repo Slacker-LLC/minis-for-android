@@ -1303,6 +1303,9 @@
     <string name="selection_copied_as_plain_text_toast">일반 텍스트로 복사됨</string>
     <string name="chat_longpress_delete_from_here">여기서부터 삭제</string>
     <string name="chat_delete_from_here_confirm">삭제</string>
+    <string name="chat_longpress_compact_above">여기까지 압축</string>
+    <string name="chat_compact_above_dialog_body">이 메시지 이전의 내용이 요약으로 압축됩니다. 나중에 구분선의 정보 아이콘에서 되돌릴 수 있습니다.</string>
+    <string name="chat_compact_above_confirm">압축</string>
     <plurals name="chat_delete_from_here_dialog_body">
         <item quantity="other">이 메시지와 이후의 모든 내용을 삭제합니다. 총 %d개입니다. 이 작업은 되돌릴 수 없습니다.</item>
     </plurals>

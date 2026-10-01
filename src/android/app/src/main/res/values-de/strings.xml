@@ -1304,6 +1304,9 @@
     <string name="selection_copied_as_plain_text_toast">Als Klartext kopiert</string>
     <string name="chat_longpress_delete_from_here">Ab hier löschen</string>
     <string name="chat_delete_from_here_confirm">Löschen</string>
+    <string name="chat_longpress_compact_above">Darüber komprimieren</string>
+    <string name="chat_compact_above_dialog_body">Die Nachrichten oberhalb dieser Stelle werden zu einer Zusammenfassung komprimiert. Über das Info-Symbol am Trenner lässt sich das später rückgängig machen.</string>
+    <string name="chat_compact_above_confirm">Komprimieren</string>
     <plurals name="chat_delete_from_here_dialog_body">
         <item quantity="one">Diese Nachricht und alles danach wird gelöscht. Insgesamt %d Nachricht. Dies kann nicht rückgängig gemacht werden.</item>
         <item quantity="other">Diese Nachricht und alles danach wird gelöscht. Insgesamt %d Nachrichten. Dies kann nicht rückgängig gemacht werden.</item>

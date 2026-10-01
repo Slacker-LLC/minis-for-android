@@ -1311,6 +1311,9 @@
     <string name="selection_copied_as_plain_text_toast">プレーンテキストとしてコピーしました</string>
     <string name="chat_longpress_delete_from_here">ここから削除</string>
     <string name="chat_delete_from_here_confirm">削除</string>
+    <string name="chat_longpress_compact_above">ここから上を圧縮</string>
+    <string name="chat_compact_above_dialog_body">このメッセージより前の内容を要約に圧縮します。あとから区切り線の情報アイコンで元に戻せます。</string>
+    <string name="chat_compact_above_confirm">圧縮</string>
     <plurals name="chat_delete_from_here_dialog_body">
         <item quantity="other">このメッセージと以降のすべてを削除します（計 %d 件）。この操作は元に戻せません。</item>
     </plurals>
