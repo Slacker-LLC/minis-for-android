@@ -197,8 +197,8 @@ android {
         applicationId = "llc.slacker.minis"
         minSdk = 26
         targetSdk = 35
-        versionCode = 39
-        versionName = "1.01-beta.2"
+        versionCode = 40
+        versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

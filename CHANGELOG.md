@@ -4,6 +4,53 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+## 1.0 — 2026-10-02
+
+First official release (`versionName` 1.0, `versionCode` 40). Everything below this heading up to the end of
+the file is the history that led here.
+
+Builds before 1.0 (`1.01-beta.*`) are not offered 1.0 by the in-app updater, because the updater reads `1.01` as
+newer than `1.0`. Install the 1.0 APK over them by hand: its `versionCode` is higher, so it upgrades in place
+and keeps your data.
+
+### Sub agents, Compact Above and reply usage — 2026-10-02
+
+- **Sub agents.** The `subagent` tool can hand work to named sub agents that run as their own child sessions:
+  up to three at once with ten more queued, a card per delegation in the tool detail view, wrap-up on timeout,
+  optional progress reports, resume after an interrupted run or a restart, and a roster the model sees each
+  turn. Settings → Sub agents defines your own agents (name, description, instructions, an optional pinned model) and the master switch; they
+  are part of backup and restore. With the switch off the original single-shot `subagent` behaviour is unchanged.
+  Child sessions never receive the delegation tool, and delegation has its own permission (`agent.subagent`).
+  See [docs/development/SUB-AGENTS.md](docs/development/SUB-AGENTS.md), which also records what has not been
+  exercised with a live model on a device yet.
+- **Compact Above.** Long-press one of your messages to compact everything above it into a summary.
+- **Reply token usage.** The long-press menu of a reply shows its context, input, output and cache tokens and the
+  time it finished; the counts are stored with the message.
+
+### Model discovery and image models — 2026-10-01
+
+- With a ChatGPT sign-in, the model list is read live from the Codex catalog instead of a fixed list, so new
+  models appear without an app update. Manual bearer keys keep the static list.
+- Model refresh also runs when the app returns to the foreground and when the model picker opens (at most every
+  30 minutes after a failure); the daily stamp is only written once every provider instance refreshed.
+  Gemini model lists are paged, and Gemini sign-in is handled as OAuth.
+- GPT Image 2.5 (`gpt-image-2.5-flare`, `gpt-image-2.5-sunburst`) is available through the ChatGPT sign-in as an
+  image-only route; GPT Image 2 is unchanged. The Codex client version is 0.159.0.
+
+### Repository links, privacy policy and open-source notices — 2026-10-02
+
+- The update checker read releases from an old fork (`limuzi013/OpenMinis-Pet`) and several links named
+  `limuzi013/minis-for-android`. All of them now come from one `AppLinks` object and point at
+  `Slacker-LLC/minis-for-android`: update check and manual-download link, About → GitHub repository, the bug
+  report form, the crash-frequency "Submit GitHub issue" row and the OpenRouter attribution headers. The
+  remote importer's User-Agent no longer carries the old fork name.
+- Added [PRIVACY.md](PRIVACY.md) and [PRIVACY.zh-CN.md](PRIVACY.zh-CN.md), written from what the app actually
+  does: no backend, no analytics, crash logs stay on the device, every outbound destination listed.
+  Settings → Privacy Policy opens it (the Chinese file for a Chinese UI) instead of a third party's page.
+- About gains *Open-source licenses* ([THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)) and *License
+  (GPL-3.0)* rows. The inventory now also lists libxposed, JetBrains annotations, the vendored Backdrop source,
+  JetBrains Mono, the models.dev catalog snapshot, and where to get source for the Ubuntu packages.
+
 ### Canonical application identity and repository — 2026-09-20
 
 - The integrated product uses the canonical `llc.slacker.minis` application identity in Gradle,

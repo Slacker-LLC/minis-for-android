@@ -82,7 +82,7 @@ Ubuntu 24.04 userspace
 
 基础包和 Android Guest 命令见[执行环境](docs/EXECUTION-ENVIRONMENT.md)。`minis-mcp-cli` 仍缺失，完整真机功能矩阵也未完成；[当前缺口](docs/contracts/06-CURRENT-GAPS.md)明确区分这些项目与已经通过的检查。
 
-源码分发，不承诺生产 APK / GitHub Release。构建见 [BUILDING.zh-CN.md](BUILDING.zh-CN.md) / [BUILDING.md](BUILDING.md)。运行时见 [docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md)，安全边界见 [docs/SECURITY.md](docs/SECURITY.md)。
+**1.0** 是第一个正式版本（`versionName` 1.0、`versionCode` 40）。版本说明见 [GitHub Releases](https://github.com/Slacker-LLC/minis-for-android/releases) 与 [CHANGELOG.md](CHANGELOG.md)，以发版 tag 对应的源码树为准。只有用项目生产密钥签名的构建才会作为 APK 附在 Release 上，绝不使用 debug 密钥；你也可以自行构建。隐私政策见 [PRIVACY.zh-CN.md](PRIVACY.zh-CN.md)，开源软件说明见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。构建见 [BUILDING.zh-CN.md](BUILDING.zh-CN.md) / [BUILDING.md](BUILDING.md)。运行时见 [docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md)，安全边界见 [docs/SECURITY.md](docs/SECURITY.md)。
 
 ## 许可证
 

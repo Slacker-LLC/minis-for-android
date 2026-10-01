@@ -71,6 +71,8 @@
 | [`DEVELOPMENT-STATUS.md`](DEVELOPMENT-STATUS.md) | 工程状态（结构与验证基线，随 HEAD 更新） |
 | [`EXECUTION-ENVIRONMENT.md`](EXECUTION-ENVIRONMENT.md) | 执行、UID/GID、mount 与网络关系 |
 | [`SECURITY.md`](SECURITY.md) | 安全模型 |
+| [`../PRIVACY.zh-CN.md`](../PRIVACY.zh-CN.md) | 隐私政策（英文版 `PRIVACY.md`）；应用内「设置 → 隐私政策」指向它 |
+| [`../THIRD_PARTY_LICENSES.md`](../THIRD_PARTY_LICENSES.md) | 开源软件说明；应用内「关于 → 开源软件说明」指向它 |
 | [`runtime-package-boundary.md`](runtime-package-boundary.md) | Android runtime 包职责边界 |
 | [`UPSTREAM-COMPARISON.md`](UPSTREAM-COMPARISON.md) | Direct Ubuntu 分支与外部上游的对账快照、双方特有内容和复核命令 |
 | [`REAL-DEVICE-TEST-REPORT.md`](REAL-DEVICE-TEST-REPORT.md) | 小米真机实测记录、通过项、证据边界与未完成矩阵 |
