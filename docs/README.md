@@ -23,6 +23,7 @@
 |---|---|
 | [PROJECT.md](PROJECT.md) | 项目说明：产品定位与身份、能力面、架构边界、构建、本地化、文档地图 |
 | [development/PORTING.md](development/PORTING.md) | 开发规范：复用规则、落地 SOP、验证矩阵、归属登记 |
+| [development/RELEASING.md](development/RELEASING.md) | 版本与发版：版本号与 versionCode 方案、`release/X.Y` 分支、beta 与 tag、预检脚本、更新通道 |
 | [development/PROGRESS.md](development/PROGRESS.md) | 移植与收敛进度：逐片记录、已完成、待办阶段、排除项、未验证清单 |
 | [development/HANDOFF-2026-09-19.md](development/HANDOFF-2026-09-19.md) | 2026-09-19 的交接快照（过去/现在/将来）；查当前状态请回 PROGRESS.md |
 | [I18N.md](I18N.md) | 本地化：语言目录、硬规则、转义与复数坑、审计工具、当前覆盖与剩余 |

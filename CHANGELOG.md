@@ -6,11 +6,11 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## 1.0 — 2026-10-02
 
-First official release (`versionName` 1.0, `versionCode` 40). Everything below this heading up to the end of
+First official release (`versionName` 1.0, `versionCode` 1000099). Everything below this heading up to the end of
 the file is the history that led here.
 
 Builds before 1.0 (`1.01-beta.*`) are not offered 1.0 by the in-app updater, because the updater reads `1.01` as
-newer than `1.0`. Install the 1.0 APK over them by hand: its `versionCode` is higher, so it upgrades in place
+newer than `1.0`. Install the 1.0 APK over them by hand: its `versionCode` is higher (1000099 against 40 or less), so it upgrades in place
 and keeps your data.
 
 ### Sub agents, Compact Above and reply usage — 2026-10-02
@@ -36,6 +36,21 @@ and keeps your data.
   Gemini model lists are paged, and Gemini sign-in is handled as OAuth.
 - GPT Image 2.5 (`gpt-image-2.5-flare`, `gpt-image-2.5-sunburst`) is available through the ChatGPT sign-in as an
   image-only route; GPT Image 2 is unchanged. The Codex client version is 0.159.0.
+
+### Version management — 2026-10-02
+
+- One branch per version: `main` is development (always the highest version, `X.Y-dev`), `release/X.Y` carries
+  that version's betas, final and patches; fixes land on `main` first and are cherry-picked down. Tags are
+  `vX.Y[.Z][-beta.N]`; betas are GitHub prereleases. CI also runs on `release/**` pushes. See
+  [docs/development/RELEASING.md](docs/development/RELEASING.md); `scripts/release-check.sh` is the read-only
+  pre-flight before tagging.
+- `versionName` is set in one place (`appVersionName` in `app/build.gradle.kts`) and `versionCode` is derived
+  from it, so they cannot drift and the code orders like the version (`X.Y-dev < X.Y-beta.N < X.Y < X.Y.Z`).
+  A malformed `versionName` fails the build. `VersionSchemeTest` pins the scheme and its agreement with the
+  updater.
+- The updater understands the stages: a beta is offered the next beta and then the final, and a stable build is
+  no longer offered prereleases. (Before, a prerelease tag read as the same version as its final and would have
+  been offered to everyone.)
 
 ### Repository links, privacy policy and open-source notices — 2026-10-02
 

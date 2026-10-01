@@ -8,4 +8,6 @@ Do not restore the former privileged broker, PRoot/Alpine dual runtime, or any A
 
 The loopback HTTP/CONNECT proxy is a separate network-compatibility component. Proxy functionality is not inherently Root-dependent; the current deployment may use privileged identity only to preserve outbound connectivity on Android/VPN/BPF configurations that restrict App-UID guest sockets. Do not expand it into shell/file/configuration/generic RPC service.
 
+Branches and releases: one `release/X.Y` branch per version, `main` for development; see [docs/development/RELEASING.md](docs/development/RELEASING.md).
+
 Fail closed. Keep GPL attribution; see [PROVENANCE.md](PROVENANCE.md). Project constitution: [AGENTS.md](AGENTS.md) and [docs/contracts/](docs/contracts/00-IDENTITY.md).

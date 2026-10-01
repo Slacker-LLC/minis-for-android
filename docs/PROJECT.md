@@ -36,7 +36,7 @@ Android app（:app）
 | 仓库 / 主线 | `Slacker-LLC/minis-for-android` / `main` |
 | `applicationId` | `llc.slacker.minis` |
 | Android/Kotlin namespace | `com.openminis.app` |
-| 版本 | `1.0`（versionCode 40） |
+| 版本 | `1.0`（versionCode 1000099，由 versionName 推导，见 [RELEASING.md](development/RELEASING.md)） |
 | 平台 | Android 8.0+（`minSdk 26`）、`targetSdk 35`、`compileSdk 36` |
 | ABI | `arm64-v8a`、`x86_64` |
 | 许可 | 主体 GPL-3.0；第三方与移植模块的归属见 `PROVENANCE.md` / `THIRD_PARTY_LICENSES.md` |
