@@ -12,6 +12,8 @@ internal data class VirtualScreenTarget(
     val packageName: String,
     val actions: Set<String>,
     val bounds: Bounds?,
+    /** Everything the service needs to find this node again; opaque to the app. */
+    val locator: JSONObject = JSONObject(),
 ) {
     data class Bounds(val left: Int, val top: Int, val right: Int, val bottom: Int) {
         val centerX: Int get() = (left + right) / 2
@@ -20,39 +22,87 @@ internal data class VirtualScreenTarget(
 }
 
 internal sealed interface VirtualScreenRefResolution {
-    data class Found(val target: VirtualScreenTarget) : VirtualScreenRefResolution
+    /** [scanTruncated]: the observation did not read the whole tree, so the service may not rely on uniqueness. */
+    data class Found(val target: VirtualScreenTarget, val scanTruncated: Boolean = false) : VirtualScreenRefResolution
     data class Error(val code: String, val message: String) : VirtualScreenRefResolution
 }
 
-/** Generation/ref registry scoped to both chat session and Android display id. */
+/** What the model asked to see; mirrors the physical-screen observe options that make sense here. */
+internal data class VirtualScreenObserveOptions(
+    val maxNodes: Int = 120,
+    val textFilter: String? = null,
+    val packageFilter: String? = null,
+    val includeTree: Boolean = false,
+)
+
+/**
+ * Generation/ref registry scoped to both chat session and Android display id.
+ *
+ * A ref is no longer "valid while the whole screen hashes the same". It is a locator the service
+ * re-verifies against the live node (path + identity, see [UiRefResolutionPolicy]) in the same call
+ * that acts, so a ticking clock or a banner no longer invalidates every ref, and there is no gap
+ * between verifying and acting. The registry only enforces lifetime, scope and membership.
+ */
 internal object VirtualScreenObservationRegistry {
-    private const val MAX_OBSERVATIONS = 4
-    private val fence = UiGenerationFence(maxEntries = MAX_OBSERVATIONS, ttlMs = 30_000L)
+    private const val MAX_OBSERVATIONS = 8
+
+    /** Safe to be long now: staleness is decided per target by the service, not by the clock. */
+    private const val TTL_MS = 5 * 60_000L
+    private val fence = UiGenerationFence(maxEntries = MAX_OBSERVATIONS, ttlMs = TTL_MS)
 
     private data class Entry(
         val sessionId: String,
         val displayId: Int,
         val generation: Long,
         val fingerprint: String,
-        val truncated: Boolean,
+        val scanTruncated: Boolean,
         val targets: Map<String, VirtualScreenTarget>,
     )
 
     private val entries = LinkedHashMap<Long, Entry>()
 
+    /** Test and compatibility entry point: [rawDump] is the service's JSON as a string. */
     @Synchronized
-    fun observe(sessionId: String, displayId: Int, rawDump: String): JSONObject {
-        val parsed = JSONObject(rawDump)
-        val fingerprint = fingerprint(rawDump)
-        val truncated = isTruncated(parsed)
+    fun observe(
+        sessionId: String,
+        displayId: Int,
+        rawDump: String,
+        options: VirtualScreenObserveOptions = VirtualScreenObserveOptions(),
+    ): JSONObject = observe(sessionId, displayId, JSONObject(rawDump), options)
+
+    @Synchronized
+    fun observe(
+        sessionId: String,
+        displayId: Int,
+        parsed: JSONObject,
+        options: VirtualScreenObserveOptions = VirtualScreenObserveOptions(),
+    ): JSONObject {
+        val fingerprint = fingerprint(parsed)
+        val scanTruncated = isScanTruncated(parsed)
         val generation = fence.nextGeneration()
         val targetRows = parsed.optJSONArray("targets") ?: JSONArray()
+        val textNeedle = options.textFilter?.trim().orEmpty()
+        val packageNeedle = options.packageFilter?.trim().orEmpty()
+        val cap = options.maxNodes.coerceIn(1, 500)
+
         val targets = LinkedHashMap<String, VirtualScreenTarget>()
         val outputTargets = JSONArray()
+        val refByPath = HashMap<String, String>()
+        var outputTruncated = parsed.optBoolean("outputTruncated", false)
         for (i in 0 until targetRows.length()) {
             val row = targetRows.optJSONObject(i) ?: continue
             val index = row.optInt("index", 0)
             if (index <= 0) continue
+            val label = row.optString("label")
+            val packageName = row.optString("packageName")
+            if (textNeedle.isNotEmpty() && !label.contains(textNeedle, ignoreCase = true) &&
+                !row.optString("viewId").contains(textNeedle, ignoreCase = true)
+            ) continue
+            if (packageNeedle.isNotEmpty() && !packageName.contains(packageNeedle, ignoreCase = true)) continue
+            if (targets.size >= cap) {
+                outputTruncated = true
+                break
+            }
             val ref = "u$index"
             val actionsJson = row.optJSONArray("actions") ?: JSONArray()
             val actions = buildSet {
@@ -60,70 +110,112 @@ internal object VirtualScreenObservationRegistry {
                     actionsJson.optString(actionIndex).takeIf { it.isNotBlank() }?.let(::add)
                 }
             }
-            val target = VirtualScreenTarget(
+            targets[ref] = VirtualScreenTarget(
                 index = index,
                 ref = ref,
-                label = row.optString("label").take(256),
-                packageName = row.optString("packageName").take(256),
+                label = label.take(256),
+                packageName = packageName.take(256),
                 actions = actions,
                 bounds = parseBounds(row.optString("bounds")),
+                locator = locatorOf(row),
             )
-            targets[ref] = target
-            outputTargets.put(JSONObject(row.toString()).put("ref", ref))
+            refByPath[row.optString("path")] = ref
+            // What the model sees: enough to choose, nothing it cannot use. The locator stays here.
+            outputTargets.put(
+                JSONObject().put("ref", ref).put("label", label.take(256))
+                    .put("actions", JSONArray(actions.toList())).put("bounds", row.optString("bounds"))
+                    .also { out ->
+                        // An icon button has no label; its resource id is the next best name.
+                        if (label.isBlank()) row.optString("viewId").substringAfterLast('/').takeIf { it.isNotBlank() }?.let { out.put("id", it) }
+                    },
+            )
         }
-        entries[generation] = Entry(sessionId, displayId, generation, fingerprint, truncated, targets)
+
+        entries[generation] = Entry(sessionId, displayId, generation, fingerprint, scanTruncated, targets)
         while (entries.size > MAX_OBSERVATIONS) entries.remove(entries.keys.first())
         fence.install(
             generation = generation,
             fingerprint = fingerprint,
             refs = targets.keys,
-            truncated = truncated,
+            truncated = scanTruncated,
             sessionId = sessionId,
             displayId = displayId,
         )
+
+        val windows = parsed.optJSONArray("windows") ?: JSONArray()
+        val windowSummary = JSONArray()
+        for (i in 0 until windows.length()) {
+            val window = windows.optJSONObject(i) ?: continue
+            windowSummary.put(
+                JSONObject().put("package", window.optString("package")).put("title", window.optString("title"))
+                    .put("type", window.optInt("type", -1)).put("bounds", window.optString("bounds"))
+                    .also { if (options.includeTree && window.has("root")) it.put("root", window.get("root")) },
+            )
+        }
+
+        val outputInputs = JSONArray()
+        val inputRows = parsed.optJSONArray("inputs") ?: JSONArray()
+        for (i in 0 until inputRows.length()) {
+            val row = inputRows.optJSONObject(i) ?: continue
+            val ref = refByPath[row.optString("path")] ?: continue
+            outputInputs.put(
+                JSONObject().put("ref", ref).put("text", row.optString("text")).put("hint", row.optString("hint"))
+                    .put("bounds", row.optString("bounds")),
+            )
+        }
+
+        val outputTexts = JSONArray()
+        val textRows = parsed.optJSONArray("texts") ?: JSONArray()
+        for (i in 0 until textRows.length()) {
+            val row = textRows.optJSONObject(i) ?: continue
+            if (textNeedle.isNotEmpty() && !row.optString("text").contains(textNeedle, ignoreCase = true)) continue
+            if (outputTexts.length() >= cap) {
+                outputTruncated = true
+                break
+            }
+            outputTexts.put(row)
+        }
+
         return JSONObject()
             .put("displayId", displayId)
             .put("generation", generation)
             .put("coordinateSpace", "display-local")
-            .put("windowSource", parsed.optString("windowSource", "UiAutomation"))
-            .put("windows", parsed.optJSONArray("windows") ?: JSONArray())
+            .put("display", parsed.optJSONObject("display") ?: JSONObject())
+            .put("windows", windowSummary)
             .put("targets", outputTargets)
-            .put("inputs", parsed.optJSONArray("inputs") ?: JSONArray())
-            .put("truncated", truncated)
+            .put("inputs", outputInputs)
+            .put("texts", outputTexts)
+            // truncated = the service stopped READING (refs may be less certain); outputTruncated = the
+            // model was simply not told about every node. Only the first one is a safety signal.
+            .put("truncated", scanTruncated)
+            .put("outputTruncated", outputTruncated)
+            .put("scanNodes", parsed.optInt("scanNodes", 0))
+            .also { out ->
+                val warnings = parsed.optJSONArray("layoutWarnings")
+                if (warnings != null && warnings.length() > 0) out.put("layoutWarnings", warnings)
+            }
     }
 
+    /** Lifetime, scope and membership only. Whether the node is still there is the service's call. */
     @Synchronized
-    fun resolve(
-        sessionId: String,
-        displayId: Int,
-        generation: Long,
-        ref: String,
-        currentDump: String,
-    ): VirtualScreenRefResolution {
-        val current = runCatching { JSONObject(currentDump) }.getOrElse {
-            return VirtualScreenRefResolution.Error("UI_OBSERVATION_UNAVAILABLE", "Could not re-observe the virtual display")
-        }
+    fun locate(sessionId: String, displayId: Int, generation: Long, ref: String): VirtualScreenRefResolution {
         val entry = entries[generation]
             ?: return VirtualScreenRefResolution.Error("STALE_UI_REF", "Observation generation has expired")
-        val verdict = fence.validate(
-            generation = generation,
-            ref = ref,
-            currentFingerprint = fingerprint(currentDump),
-            currentTruncated = isTruncated(current),
-            sessionId = sessionId,
-            displayId = displayId,
-        )
-        val error = when (verdict) {
-            UiGenerationFence.Verdict.VALID -> null
-            UiGenerationFence.Verdict.TRUNCATED -> "UI_SNAPSHOT_TRUNCATED" to "A truncated observation cannot authorize ref-based actions"
-            UiGenerationFence.Verdict.REF_NOT_FOUND -> "UI_REF_NOT_FOUND" to "The ref was not present in this observation"
-            UiGenerationFence.Verdict.STALE -> "STALE_UI_REF" to "The screen changed or the ref belongs to another session/display"
+        return when (fence.lookup(generation, ref, sessionId, displayId)) {
+            UiGenerationFence.Freshness.FRESH -> {
+                val target = entry.targets[ref]
+                    ?: return VirtualScreenRefResolution.Error("UI_REF_NOT_FOUND", "The ref was not present in this observation")
+                VirtualScreenRefResolution.Found(target, entry.scanTruncated)
+            }
+            UiGenerationFence.Freshness.REF_NOT_FOUND ->
+                VirtualScreenRefResolution.Error("UI_REF_NOT_FOUND", "The ref was not present in this observation")
+            else -> VirtualScreenRefResolution.Error("STALE_UI_REF", "The observation expired or belongs to another session/display")
         }
-        if (error != null) return VirtualScreenRefResolution.Error(error.first, error.second)
-        val target = entry.targets[ref]
-            ?: return VirtualScreenRefResolution.Error("UI_REF_NOT_FOUND", "The ref was not present in this observation")
-        return VirtualScreenRefResolution.Found(target)
     }
+
+    /** Fingerprint of what the model was shown for [generation]; evidence that an action changed the screen. */
+    @Synchronized
+    fun observedFingerprint(generation: Long): String? = entries[generation]?.fingerprint
 
     @Synchronized
     fun clearSession(sessionId: String) {
@@ -142,15 +234,25 @@ internal object VirtualScreenObservationRegistry {
         fence.clear()
     }
 
-    internal fun fingerprint(rawDump: String): String = MessageDigest.getInstance("SHA-256")
-        .digest(rawDump.toByteArray(Charsets.UTF_8))
+    internal fun fingerprint(rawDump: String): String = digest(rawDump)
+
+    internal fun fingerprint(parsed: JSONObject): String = digest(parsed.toString())
+
+    private fun digest(value: String): String = MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
 
-    private fun isTruncated(json: JSONObject): Boolean {
+    private fun isScanTruncated(json: JSONObject): Boolean {
         if (json.optBoolean("truncated")) return true
         val windows = json.optJSONArray("windows") ?: return false
         return (0 until windows.length()).any { windows.optJSONObject(it)?.optBoolean("truncated") == true }
     }
+
+    private fun locatorOf(row: JSONObject): JSONObject = JSONObject().apply {
+        for (key in LOCATOR_KEYS) if (row.has(key)) put(key, row.get(key))
+    }
+
+    private val LOCATOR_KEYS = listOf("path", "windowId", "packageName", "className", "viewId", "text", "desc", "uid", "password", "bounds")
 
     private fun parseBounds(raw: String): VirtualScreenTarget.Bounds? {
         val values = raw.split(',').mapNotNull { it.trim().toIntOrNull() }

@@ -235,58 +235,81 @@ object AndroidUiObservationRegistry {
         windowSetRefusal(windowSet)?.let { (code, message) -> return UiRefResolution.Error(code, message) }
         val roots = windowSet.roots
         val scanned = fingerprint(roots)
-        when (generationFence.validate(
+        val freshness = generationFence.freshness(
             generation, ref, scanned.hash, scanned.truncated, sessionId = sessionId, displayId = displayId,
-        )) {
-            UiGenerationFence.Verdict.STALE -> return UiRefResolution.Error(
-                "STALE_UI_REF", "the window changed or generation $generation expired; run android_ui observe again",
-            )
-            UiGenerationFence.Verdict.REF_NOT_FOUND -> return UiRefResolution.Error(
-                "UI_REF_NOT_FOUND", "ref $ref does not belong to generation $generation",
-            )
-            UiGenerationFence.Verdict.TRUNCATED -> return UiRefResolution.Error(
-                ERROR_SNAPSHOT_TRUNCATED,
-                "the observed window is too large to fingerprint completely, so ref $ref cannot be proven " +
-                    "unchanged; run android_ui observe again",
-            )
-            UiGenerationFence.Verdict.VALID -> Unit
-        }
+        )
         var node: AccessibilityNodeInfo? = roots.getOrNull(locator.rootIndex)
         for (index in locator.childPath) node = node?.getChild(index)
-        if (node != null && identityOf(locator).matches(identityOf(node))) {
-            return UiRefResolution.Found(service, node, locator)
+        val wanted = identityOf(locator)
+        val pathMatches = node != null && wanted.matches(identityOf(node))
+        // The whole-screen fingerprint only says whether *anything* changed. It no longer decides
+        // by itself: see UiRefResolutionPolicy for why a changed screen is not automatically stale.
+        var candidates: List<AccessibilityNodeInfo> = emptyList()
+        val decision = UiRefResolutionPolicy.decide(
+            freshness = freshness,
+            pathIdentityMatches = pathMatches,
+            identityStrong = wanted.strong,
+            hasUniqueId = locator.uniqueId.isNotBlank(),
+            snapshotTruncated = observation.snapshotTruncated || scanned.truncated,
+            // Physical screen keeps its stricter rule: a cut-off scan refuses ref actions.
+            trustPathUnderTruncation = false,
+            candidateCount = {
+                candidates = matchIdentities(roots, locator)
+                candidates.size
+            },
+        )
+        return when (decision) {
+            is UiRefResolutionPolicy.Decision.Use ->
+                if (decision.basis == UiRefResolutionPolicy.Basis.PATH) {
+                    UiRefResolution.Found(service, node!!, locator)
+                } else {
+                    UiRefResolution.Found(service, candidates.single(), locator)
+                }
+            is UiRefResolutionPolicy.Decision.Refuse -> when (decision.code) {
+                UiRefResolutionPolicy.UI_SNAPSHOT_TRUNCATED -> UiRefResolution.Error(
+                    ERROR_SNAPSHOT_TRUNCATED,
+                    "the observed window is too large to fingerprint completely, so ref $ref cannot be proven " +
+                        "unchanged; run android_ui observe again",
+                )
+                UiRefResolutionPolicy.UI_REF_NOT_FOUND -> UiRefResolution.Error(
+                    "UI_REF_NOT_FOUND", "ref $ref does not belong to generation $generation",
+                )
+                else -> UiRefResolution.Error(
+                    "STALE_UI_REF",
+                    if (freshness == UiGenerationFence.Freshness.STALE) {
+                        "the window changed or generation $generation expired; run android_ui observe again"
+                    } else {
+                        "ref $ref no longer resolves to the observed semantic node"
+                    },
+                )
+            }
         }
-        // The node moved inside the tree: only an identity that is provably unique
-        // in a complete snapshot may still be used. A truncated fingerprint cannot
-        // prove that a text/description identity is unique in the rest of the window.
-        val candidates = if (observation.snapshotTruncated) emptyList() else matchIdentities(roots, locator)
-        if (
-            AccessibilityIdentityFreshnessPolicy.canBypassContentChange(
-                hasUniqueId = locator.uniqueId.isNotBlank(),
-                snapshotTruncated = observation.snapshotTruncated,
-                identityMatchCount = candidates.size,
-            )
-        ) {
-            return UiRefResolution.Found(service, candidates.single(), locator)
-        }
-        return UiRefResolution.Error("STALE_UI_REF", "ref $ref no longer resolves to the observed semantic node")
     }
 
     /**
-     * Whether re-resolving [ref] proves that the observed window changed. Only a
-     * failed comparison that could not be compared for another reason (expired
-     * generation, truncated snapshot, unreadable window set, disconnected service)
-     * stays [UiChangeObservation.UNKNOWN]; none of those may be reported as an effect.
+     * Whether the whole-screen fingerprint proves that the observed window changed. A
+     * comparison that could not be made (expired or foreign generation, truncated snapshot,
+     * unreadable window set, disconnected service) stays [UiChangeObservation.UNKNOWN];
+     * none of those may be reported as an effect.
      */
     @Synchronized
     fun changeEvidence(generation: Long, ref: String, sessionId: String = "", displayId: Int = 0): UiChangeObservation {
         if (observations[generation]?.let { it.sessionId == sessionId && it.displayId == displayId } != true) {
             return UiChangeObservation.UNKNOWN
         }
-        return when (val resolved = resolve(generation, ref, sessionId, displayId)) {
-            is UiRefResolution.Found -> UiChangeObservation.UNCHANGED
-            is UiRefResolution.Error ->
-                if (resolved.code == "STALE_UI_REF") UiChangeObservation.CHANGED else UiChangeObservation.UNKNOWN
+        // Deliberately NOT derived from resolve(): resolve may now keep a ref usable across a
+        // content change, so "resolved" no longer means "unchanged".
+        val service = MinisAccessibilityService.getInstance() ?: return UiChangeObservation.UNKNOWN
+        val windowSet = service.visibleWindowSet()
+        if (windowSetRefusal(windowSet) != null) return UiChangeObservation.UNKNOWN
+        val scanned = fingerprint(windowSet.roots)
+        return when (generationFence.freshness(generation, ref, scanned.hash, scanned.truncated, sessionId, displayId)) {
+            UiGenerationFence.Freshness.FRESH -> UiChangeObservation.UNCHANGED
+            // A cut-off scan cannot prove either direction.
+            UiGenerationFence.Freshness.CONTENT_CHANGED ->
+                if (scanned.truncated || observations[generation]?.snapshotTruncated == true) UiChangeObservation.UNKNOWN
+                else UiChangeObservation.CHANGED
+            else -> UiChangeObservation.UNKNOWN
         }
     }
 

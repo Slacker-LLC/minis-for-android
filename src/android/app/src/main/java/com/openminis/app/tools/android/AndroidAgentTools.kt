@@ -66,7 +66,7 @@ object AndroidAgentTools {
                 "Every action reports evidence plus its evidenceSource instead of a bare boolean: accepted-with-effect, accepted-without-evidence, direction-mismatch, timed-out and rejected are different outcomes, and a truncated snapshot refuses ref actions. " +
                 "Coordinates are screenshot-space by default on the physical screen: x/y read off the returned screenshot image are converted through that capture's scale, and an action in that space is refused rather than misclicked when there is no capture or the screen changed; send coordinateSpace=screen for real device pixels. On a virtual display (displayId != 0) the default is display pixels (coordinateSpace=screen) and its size comes with open, observe and screenshot, so no screenshot is needed before a coordinate click. " +
                 "Screenshot uses the existing API-30 Accessibility route and returns structured FLAG_SECURE/OEM failures. wait_for_package waits for a package to become (or stop being) the foreground app and reports an unreadable foreground as unknown rather than as a miss. " +
-                "set_text writes the whole value (at most 4000 characters, empty clears); input_text types into what is already there, at the field's own selection (at most 1000 characters, never empty), and refuses (TEXT_CONTENT_UNAVAILABLE/TEXT_SELECTION_UNAVAILABLE) when the field does not hand over enough to reconstruct it - then send the full value with set_text. paste_text is the same selection-aware write with a clipboard fallback for editors that refuse the direct write. ime_enter presses the field's own IME action (search/done/send) on whatever has input focus, or on ref. Actions: observe, screenshot, click, long_press, set_text, input_text, paste_text, ime_enter, scroll, back, home, recents, notifications, quick_settings, wait, wait_for_package.",
+                "set_text writes the whole value (at most 4000 characters, empty clears); input_text types into what is already there, at the field's own selection (at most 1000 characters, never empty), and refuses (TEXT_CONTENT_UNAVAILABLE/TEXT_SELECTION_UNAVAILABLE) when the field does not hand over enough to reconstruct it - then send the full value with set_text. paste_text is the same selection-aware write with a clipboard fallback for editors that refuse the direct write. ime_enter presses the field's own IME action (search/done/send) on whatever has input focus, or on ref. On a virtual display every action waits for the screen to settle and returns the new screen as `observation` (fresh generation + refs): act on those refs directly, and call observe only when `observation` is missing. `truncated:true` means the scan stopped early (refs less certain); `outputTruncated:true` only means not every node was listed - narrow with textFilter/maxNodes. `layoutWarnings` reports windows whose size/orientation does not match the display. Actions: observe, screenshot, click, long_press, set_text, input_text, paste_text, ime_enter, scroll, back, home, recents, notifications, quick_settings, wait, wait_for_package.",
             parameters = commonParams() + mapOf(
                 "action" to AgentToolParam(
                     "string",
@@ -221,7 +221,7 @@ object AndroidAgentTools {
                 JSONObject(executed.output)
                     .put("risk", risk.name)
                     .put("requiresOneTimeApproval", AndroidOperationRiskPolicy.requiresOneTimeApproval(risk))
-                    .toString(2)
+                    .toString()
             }.getOrNull()
             if (decorated == null) executed else executed.copy(output = decorated)
         } catch (t: Throwable) {
@@ -295,7 +295,7 @@ object AndroidAgentTools {
     ): ToolExecutionResult {
         val result = AndroidUiController.execute(context, sid, args, toolId)
         return ToolExecutionResult(
-            output = result.json.toString(2),
+            output = result.json.toString(),
             success = result.success,
             imageData = result.imageData,
             imageMimeType = result.imageMimeType ?: result.imageData?.let { "image/png" },
@@ -590,7 +590,7 @@ object AndroidAgentTools {
         .put("error", probe.error ?: JSONObject.NULL)
 
     private fun jsonResult(json: JSONObject, success: Boolean, title: String): ToolExecutionResult =
-        ToolExecutionResult(json.toString(2), success, toolTitle = title)
+        ToolExecutionResult(json.toString(), success, toolTitle = title)
 
     private fun commonParams(): Map<String, AgentToolParam> = mapOf(
         "tool_title" to AgentToolParam("string", "Concise user-visible summary in the user's language"),

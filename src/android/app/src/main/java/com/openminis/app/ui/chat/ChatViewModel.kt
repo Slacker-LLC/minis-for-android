@@ -102,6 +102,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -8247,6 +8249,10 @@ class ChatViewModel(
                             }.getOrNull(),
                         )
                     }
+                    // Where this request's time went (TTFT vs streaming, tokens, tool calls). One line per
+                    // request, emitted on success, failure and cancellation alike. Read it next to the
+                    // device-side `VScreenTiming` lines to see whether the model or the screen is slow.
+                    val modelTelemetry = ModelTurnTelemetry(turn) { android.os.SystemClock.elapsedRealtime() }
                     currentProvider.streamMessage(
                         messages = roleplayProjection?.messages ?: requestMessages,
                         systemPrompt = roleplayProjection
@@ -8258,7 +8264,10 @@ class ChatViewModel(
                         temperature = sessionOverrides.temperature,
                         tools = turnTools,
                         thinkingLevel = if (currentModelSupportsReasoning) _thinkingLevel.value else ThinkingLevel.OFF,
-                    ).collect { chunk ->
+                    ).onEach { modelTelemetry.onChunk(it) }.onCompletion {
+                        modelTelemetry.finish()
+                        AppLogger.info("ModelTiming", "model=${currentProvider.model.id} ${modelTelemetry.summary()}")
+                    }.collect { chunk ->
                 when (chunk) {
                     is LLMStreamChunk.ThinkingDelta -> {
                         // Record the provider's raw delta before the

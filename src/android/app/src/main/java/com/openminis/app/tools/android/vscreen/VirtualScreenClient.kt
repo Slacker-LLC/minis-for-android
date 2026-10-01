@@ -171,9 +171,6 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
     fun hasPackageWindow(displayId: Int, packageName: String): Boolean =
         execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).hasPackageWindow(displayId, packageName) }
 
-    fun clickTarget(displayId: Int, targetIndex: Int): Boolean =
-        execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).clickTarget(displayId, targetIndex) }
-
     fun tap(displayId: Int, x: Int, y: Int): Boolean =
         execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).tap(displayId, x, y) }
 
@@ -192,11 +189,13 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
     fun setText(displayId: Int, text: String): Boolean =
         execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).setText(displayId, text) }
 
-    fun setTextTarget(displayId: Int, targetIndex: Int, text: String): Boolean =
-        execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).setTextTarget(displayId, targetIndex, text) }
-
-    fun focusTarget(displayId: Int, targetIndex: Int): Boolean =
-        execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).focusTarget(displayId, targetIndex) }
+    /**
+     * Locate + act + settle + observe in one Binder call. [requestJson] and the result are JSON; the
+     * timeout covers the service's own settle deadline, so a slow screen is reported by the service
+     * (settledBy=deadline) instead of surfacing as a client timeout.
+     */
+    fun act(displayId: Int, requestJson: String): String =
+        execute(ACT_TIMEOUT_MS) { requireRemote(ACT_TIMEOUT_MS).act(displayId, requestJson) }
 
     fun back(displayId: Int): Boolean =
         execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).back(displayId) }
@@ -405,9 +404,10 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
 
     companion object {
         // Bumped whenever the UserService code or its AIDL changes: a daemon service outlives the app, so
-        // Shizuku only replaces it when this number differs. 2 = frame stream, raw touch, display info; 3 = Home starts Minis's own desktop; 4 = UiAutomation keeps other accessibility services, launches never move a task; 5 = focus is handed back to the physical screen (and again a moment later); 7 = UiAutomation really connects with DONT_SUPPRESS.
-        private const val USER_SERVICE_VERSION = 7
+        // Shizuku only replaces it when this number differs. 2 = frame stream, raw touch, display info; 3 = Home starts Minis's own desktop; 4 = UiAutomation keeps other accessibility services, launches never move a task; 5 = focus is handed back to the physical screen (and again a moment later); 7 = UiAutomation really connects with DONT_SUPPRESS; 8 = act() replaces the index-based target calls.
+        private const val USER_SERVICE_VERSION = 8
         private const val DEFAULT_TIMEOUT_MS = 8_000L
+        private const val ACT_TIMEOUT_MS = 12_000L
         private const val SCREENSHOT_TIMEOUT_MS = 15_000L
         private const val DEFAULT_WIDTH = 720
         private const val DEFAULT_HEIGHT = 1280

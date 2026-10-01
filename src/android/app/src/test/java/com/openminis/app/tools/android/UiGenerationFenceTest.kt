@@ -65,4 +65,34 @@ class UiGenerationFenceTest {
         assertEquals(UiGenerationFence.Verdict.STALE, fence.validate(virtual, "u1", "vscreen", sessionId = "session-a", displayId = 7))
         assertEquals(UiGenerationFence.Verdict.VALID, fence.validate(physical, "u1", "physical", sessionId = "session-a", displayId = 0))
     }
+
+    @Test
+    fun `freshness separates a changed screen from an unusable ref`() {
+        var now = 0L
+        val fence = UiGenerationFence(maxEntries = 4, ttlMs = 100L) { now }
+        val generation = fence.nextGeneration()
+        fence.install(generation, "screen-a", setOf("u1"), sessionId = "s", displayId = 7)
+
+        assertEquals(UiGenerationFence.Freshness.FRESH, fence.freshness(generation, "u1", "screen-a", sessionId = "s", displayId = 7))
+        // A different fingerprint is a question, not a refusal.
+        assertEquals(UiGenerationFence.Freshness.CONTENT_CHANGED, fence.freshness(generation, "u1", "screen-b", sessionId = "s", displayId = 7))
+        // A cut-off scan can never prove "unchanged".
+        assertEquals(UiGenerationFence.Freshness.CONTENT_CHANGED, fence.freshness(generation, "u1", "screen-a", currentTruncated = true, sessionId = "s", displayId = 7))
+        // Unknown ref, foreign session/display and expiry stay refusals.
+        assertEquals(UiGenerationFence.Freshness.REF_NOT_FOUND, fence.freshness(generation, "u9", "screen-a", sessionId = "s", displayId = 7))
+        assertEquals(UiGenerationFence.Freshness.STALE, fence.freshness(generation, "u1", "screen-a", sessionId = "other", displayId = 7))
+        assertEquals(UiGenerationFence.Freshness.STALE, fence.freshness(generation, "u1", "screen-a", sessionId = "s", displayId = 8))
+        now = 101L
+        assertEquals(UiGenerationFence.Freshness.STALE, fence.freshness(generation, "u1", "screen-a", sessionId = "s", displayId = 7))
+    }
+
+    @Test
+    fun `lookup ignores screen content entirely`() {
+        val fence = UiGenerationFence(maxEntries = 4, ttlMs = 1_000L) { 0L }
+        val generation = fence.nextGeneration()
+        fence.install(generation, "screen-a", setOf("u1"), truncated = true, sessionId = "s", displayId = 7)
+        assertEquals(UiGenerationFence.Freshness.FRESH, fence.lookup(generation, "u1", "s", 7))
+        assertEquals(UiGenerationFence.Freshness.REF_NOT_FOUND, fence.lookup(generation, "u2", "s", 7))
+        assertEquals(UiGenerationFence.Freshness.STALE, fence.lookup(generation + 1, "u1", "s", 7))
+    }
 }

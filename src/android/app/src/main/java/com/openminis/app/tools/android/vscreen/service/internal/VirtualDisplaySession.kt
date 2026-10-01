@@ -48,6 +48,12 @@ internal class VirtualDisplaySession private constructor(
     @Volatile private var sink: IVirtualScreenFrameSink? = null
     private val frameThread = HandlerThread("minis-vscreen-frames").apply { start() }
 
+    /** Called (on the frame thread) for every new frame; the settle tracker uses it to extend the quiet window. */
+    @Volatile var onFrame: (() -> Unit)? = null
+
+    /** Rotation as the system reports it; -1 when unavailable. A letterboxed or rotated app is diagnosed with this. */
+    fun rotation(): Int = runCatching { display.display.rotation }.getOrDefault(-1)
+
     init {
         captureReader.setOnImageAvailableListener({ reader -> onFrameAvailable(reader) }, Handler(frameThread.looper))
     }
@@ -71,6 +77,7 @@ internal class VirtualDisplaySession private constructor(
             if (sink != null) buffer = runCatching { image.hardwareBuffer }.getOrNull()
         }
         deliver(buffer)
+        onFrame?.invoke()
     }
 
     private fun deliver(buffer: HardwareBuffer?) {
@@ -115,6 +122,7 @@ internal class VirtualDisplaySession private constructor(
 
     fun release() {
         if (!released.compareAndSet(false, true)) return
+        onFrame = null
         runCatching { sink?.onEnded() }
         sink = null
         if (previousImePolicy >= 0) runCatching { imeBridge?.setDisplayImePolicy(displayId, previousImePolicy) }

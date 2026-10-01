@@ -9,7 +9,6 @@ interface IVirtualScreenService {
     void releaseDisplay() = 3;
     boolean launch(String packageName, @nullable String activityOrNull, int displayId) = 4;
     String dump(int displayId, String mode) = 5;
-    boolean clickTarget(int displayId, int targetIndex) = 6;
     boolean tap(int displayId, int x, int y) = 7;
     boolean swipe(int displayId, int startX, int startY, int endX, int endY, int durationMs) = 8;
     boolean longPress(int displayId, int x, int y, int durationMs) = 9;
@@ -21,8 +20,8 @@ interface IVirtualScreenService {
     ParcelFileDescriptor screenshot(int displayId, int maxDim, int jpegQuality) = 15;
     int getActiveDisplayId() = 16;
     boolean hasPackageWindow(int displayId, String packageName) = 17;
-    boolean setTextTarget(int displayId, int targetIndex, @nullable String text) = 18;
-    boolean focusTarget(int displayId, int targetIndex) = 19;
+    // Locate + act + wait for the screen to settle + observe, as one call. Request/response are JSON.
+    String act(int displayId, String requestJson) = 24;
 
     // Live viewing and manual control (service version 2).
     /** [displayId, width, height, dpi] of the active display, or an empty array when there is none. */
