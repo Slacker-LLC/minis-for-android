@@ -163,15 +163,18 @@ class OpenAIProvider private constructor(
          * inference must advertise the same number, because the backend gates
          * which models a version may list and call.
          *
-         * 0.155.0 is the value OpenMinis 1.14 ships: gpt-6-sol / gpt-6-luna are
-         * gated above 0.153.3, and OpenMinis validated discovery and inference
-         * for the gpt-6 / gpt-5.6 models on live ChatGPT accounts around it. It
-         * deliberately is not the newest Codex CLI: a newer number changes a
-         * fingerprint that is known to work, so raise it only on evidence — a
-         * model that is listed and then refused, or a wanted model that the list
-         * leaves out — and then verify against a live account.
+         * 0.159.0 is the `client_version` that CLIProxyAPI (the project OpenMinis
+         * tracks for this) fetches the Codex catalog with as of 2026-10-02; its
+         * registry lists gpt-6.1-sol for the team / plus / pro plans, and
+         * OpenMinis 1.15-beta lists GPT-6.1 Sol on the ChatGPT sign-in. It
+         * replaces 0.155.0 (OpenMinis 1.14, which validated the gpt-6 / gpt-5.6
+         * models on live accounts, but cannot list models gated higher). It is
+         * deliberately a release a reference client already uses rather than the
+         * newest Codex CLI: raise it only on evidence — a model that is listed
+         * and then refused, or a wanted model the list leaves out — and verify
+         * against a live account, since this number is not verified here.
          */
-        internal const val CODEX_CLIENT_VERSION = "0.155.0"
+        internal const val CODEX_CLIENT_VERSION = "0.159.0"
 
         /**
          * GPT Image 2.5 (released 2026-09-08). Unlike gpt-image-2, which the
