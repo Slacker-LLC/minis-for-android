@@ -101,7 +101,9 @@ private fun Desktop(displayId: Int, onOpen: (String) -> Unit) {
         apps = withContext(Dispatchers.IO) {
             val pm = context.packageManager
             val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-            pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            // Flags 0: MATCH_DEFAULT_ONLY keeps only activities that also declare CATEGORY_DEFAULT, which most launcher
+            // activities do not, so the grid showed a fraction of the installed apps.
+            pm.queryIntentActivities(intent, 0)
                 .filter { it.activityInfo.packageName != context.packageName }
                 .distinctBy { it.activityInfo.packageName }
                 .map { info ->

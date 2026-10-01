@@ -33,7 +33,8 @@ object AndroidPackageController {
             val limit = AppSearchPolicy.clampLimit(limitRaw)
             val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
             val resolved = runCatching {
-                context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                // Flags 0, not MATCH_DEFAULT_ONLY: launcher activities usually lack CATEGORY_DEFAULT and were dropped.
+                context.packageManager.queryIntentActivities(intent, 0)
             }.getOrDefault(emptyList())
             val entries = resolved.map { info ->
                 val packageName = info.activityInfo.packageName
