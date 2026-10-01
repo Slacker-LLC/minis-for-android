@@ -35,7 +35,7 @@ class ThinkingLevelCatalogSnapshotTest {
                 "grok-4.20-0309-reasoning", "grok-4.20-0309-non-reasoning", "grok-4.20-multi-agent-0309",
                 "grok-build-0.1", "grok-3-mini", "grok-3-mini-fast", "grok-composer-2.5-fast",
                 "grok-4-fast", "grok-4-fast-non-reasoning", "grok-code-fast-1", "kimi-k3", "kimi-k2",
-                "gpt-5.4", "gpt-5.4-mini", "gpt-image-2",
+                "gpt-5.4", "gpt-5.4-mini", "gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst",
                 // Added when the catalogs were brought up to date (2026-10).
                 "claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5-5", "claude-opus-5",
                 "gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-3.5-flash-lite",
