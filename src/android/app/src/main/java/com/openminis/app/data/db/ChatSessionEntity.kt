@@ -73,6 +73,8 @@ data class ChatSessionEntity(
 ) {
     companion object {
         const val SOURCE_BOT_DELEGATION = "bot_delegation"
+        /** A child session started by a sub agent delegation (`subagent`). */
+        const val SOURCE_SUB_AGENT = "sub_agent"
         const val LEGACY_SOURCE_BOT_DELEGATION = "bot-delegation"
     }
 }
