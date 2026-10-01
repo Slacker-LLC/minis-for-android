@@ -2058,4 +2058,23 @@
     <string name="sub_agent_thinking_footer">Par défaut suit le modèle. Un niveau plus élevé réfléchit plus longtemps et coûte plus cher.</string>
     <string name="sub_agent_delete">Supprimer le sous-agent</string>
     <string name="sub_agent_delete_body">Supprimer « %1$s » ? Cette action est irréversible.</string>
+    <string name="sub_agent_card_title">Sous-agent</string>
+    <string name="sub_agent_card_task">Tâche</string>
+    <string name="sub_agent_card_result">Résultat</string>
+    <string name="sub_agent_card_working">En cours…</string>
+    <string name="sub_agent_card_queued_hint">En attente d’une place libre ; il démarre dès qu’une se libère.</string>
+    <string name="sub_agent_card_interrupted_hint">L’application a été fermée pendant l’exécution. « Reprendre » continue là où il s’était arrêté.</string>
+    <string name="sub_agent_card_stop">Arrêter</string>
+    <string name="sub_agent_card_steer">Rectifier</string>
+    <string name="sub_agent_card_resume">Reprendre</string>
+    <string name="sub_agent_card_open_session">Ouvrir la session</string>
+    <string name="sub_agent_card_steer_hint">Dites-lui quoi changer</string>
+    <string name="sub_agent_card_send">Envoyer</string>
+    <string name="sub_agent_state_queued">En file d’attente</string>
+    <string name="sub_agent_state_running">En cours</string>
+    <string name="sub_agent_state_completed">Terminé</string>
+    <string name="sub_agent_state_cancelled">Arrêté</string>
+    <string name="sub_agent_state_failed">Échec</string>
+    <string name="sub_agent_state_timeout">Délai dépassé</string>
+    <string name="sub_agent_state_interrupted">Interrompu</string>
 </resources>

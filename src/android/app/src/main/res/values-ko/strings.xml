@@ -2156,4 +2156,23 @@
     <string name="sub_agent_thinking_footer">기본값은 모델을 따릅니다. 높을수록 더 오래 생각하고 비용이 늘어납니다.</string>
     <string name="sub_agent_delete">서브 에이전트 삭제</string>
     <string name="sub_agent_delete_body">“%1$s”을(를) 삭제할까요? 되돌릴 수 없습니다.</string>
+    <string name="sub_agent_card_title">서브 에이전트</string>
+    <string name="sub_agent_card_task">작업</string>
+    <string name="sub_agent_card_result">결과</string>
+    <string name="sub_agent_card_working">작업 중…</string>
+    <string name="sub_agent_card_queued_hint">빈 자리를 기다리는 중입니다. 자리가 나면 바로 시작합니다.</string>
+    <string name="sub_agent_card_interrupted_hint">실행 중에 앱이 종료되었습니다. 다시 시작하면 중단된 곳부터 이어갑니다.</string>
+    <string name="sub_agent_card_stop">중지</string>
+    <string name="sub_agent_card_steer">방향 수정</string>
+    <string name="sub_agent_card_resume">다시 시작</string>
+    <string name="sub_agent_card_open_session">세션 열기</string>
+    <string name="sub_agent_card_steer_hint">무엇을 바꿀지 알려주세요</string>
+    <string name="sub_agent_card_send">보내기</string>
+    <string name="sub_agent_state_queued">대기 중</string>
+    <string name="sub_agent_state_running">실행 중</string>
+    <string name="sub_agent_state_completed">완료</string>
+    <string name="sub_agent_state_cancelled">중지됨</string>
+    <string name="sub_agent_state_failed">실패</string>
+    <string name="sub_agent_state_timeout">시간 초과</string>
+    <string name="sub_agent_state_interrupted">중단됨</string>
 </resources>

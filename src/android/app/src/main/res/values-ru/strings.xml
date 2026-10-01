@@ -2421,4 +2421,23 @@
     <string name="sub_agent_thinking_footer">По умолчанию следует модели. Чем выше уровень, тем дольше думает и дороже.</string>
     <string name="sub_agent_delete">Удалить субагента</string>
     <string name="sub_agent_delete_body">Удалить «%1$s»? Это действие нельзя отменить.</string>
+    <string name="sub_agent_card_title">Субагент</string>
+    <string name="sub_agent_card_task">Задача</string>
+    <string name="sub_agent_card_result">Результат</string>
+    <string name="sub_agent_card_working">Работает…</string>
+    <string name="sub_agent_card_queued_hint">Ждёт свободного места и начнёт, как только оно появится.</string>
+    <string name="sub_agent_card_interrupted_hint">Приложение было закрыто во время работы. «Продолжить» возобновит с места остановки.</string>
+    <string name="sub_agent_card_stop">Остановить</string>
+    <string name="sub_agent_card_steer">Скорректировать</string>
+    <string name="sub_agent_card_resume">Продолжить</string>
+    <string name="sub_agent_card_open_session">Открыть сессию</string>
+    <string name="sub_agent_card_steer_hint">Скажите, что изменить</string>
+    <string name="sub_agent_card_send">Отправить</string>
+    <string name="sub_agent_state_queued">В очереди</string>
+    <string name="sub_agent_state_running">Работает</string>
+    <string name="sub_agent_state_completed">Готово</string>
+    <string name="sub_agent_state_cancelled">Остановлен</string>
+    <string name="sub_agent_state_failed">Сбой</string>
+    <string name="sub_agent_state_timeout">Время вышло</string>
+    <string name="sub_agent_state_interrupted">Прерван</string>
 </resources>

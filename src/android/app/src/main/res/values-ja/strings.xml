@@ -2164,4 +2164,23 @@
     <string name="sub_agent_thinking_footer">デフォルトはモデルに従います。高いほど長く考え、コストも増えます。</string>
     <string name="sub_agent_delete">サブエージェントを削除</string>
     <string name="sub_agent_delete_body">「%1$s」を削除しますか？この操作は取り消せません。</string>
+    <string name="sub_agent_card_title">サブエージェント</string>
+    <string name="sub_agent_card_task">タスク</string>
+    <string name="sub_agent_card_result">結果</string>
+    <string name="sub_agent_card_working">作業中…</string>
+    <string name="sub_agent_card_queued_hint">空きを待っています。空きが出ると、すぐに始まります。</string>
+    <string name="sub_agent_card_interrupted_hint">実行中にアプリが終了しました。「再開」で中断した続きから進みます。</string>
+    <string name="sub_agent_card_stop">停止</string>
+    <string name="sub_agent_card_steer">修正指示</string>
+    <string name="sub_agent_card_resume">再開</string>
+    <string name="sub_agent_card_open_session">セッションを開く</string>
+    <string name="sub_agent_card_steer_hint">変更してほしいことを伝える</string>
+    <string name="sub_agent_card_send">送信</string>
+    <string name="sub_agent_state_queued">待機中</string>
+    <string name="sub_agent_state_running">実行中</string>
+    <string name="sub_agent_state_completed">完了</string>
+    <string name="sub_agent_state_cancelled">停止済み</string>
+    <string name="sub_agent_state_failed">失敗</string>
+    <string name="sub_agent_state_timeout">時間切れ</string>
+    <string name="sub_agent_state_interrupted">中断</string>
 </resources>

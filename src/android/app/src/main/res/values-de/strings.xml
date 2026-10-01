@@ -2167,4 +2167,23 @@
     <string name="sub_agent_thinking_footer">Standard folgt dem Modell. Eine höhere Stufe denkt länger und kostet mehr.</string>
     <string name="sub_agent_delete">Sub-Agent löschen</string>
     <string name="sub_agent_delete_body">„%1$s“ löschen? Das lässt sich nicht rückgängig machen.</string>
+    <string name="sub_agent_card_title">Sub-Agent</string>
+    <string name="sub_agent_card_task">Aufgabe</string>
+    <string name="sub_agent_card_result">Ergebnis</string>
+    <string name="sub_agent_card_working">Arbeitet…</string>
+    <string name="sub_agent_card_queued_hint">Wartet auf einen freien Platz und startet, sobald einer frei wird.</string>
+    <string name="sub_agent_card_interrupted_hint">Die App wurde während der Ausführung beendet. „Fortsetzen“ macht dort weiter, wo es aufgehört hat.</string>
+    <string name="sub_agent_card_stop">Stoppen</string>
+    <string name="sub_agent_card_steer">Korrigieren</string>
+    <string name="sub_agent_card_resume">Fortsetzen</string>
+    <string name="sub_agent_card_open_session">Sitzung öffnen</string>
+    <string name="sub_agent_card_steer_hint">Sag ihm, was sich ändern soll</string>
+    <string name="sub_agent_card_send">Senden</string>
+    <string name="sub_agent_state_queued">In der Warteschlange</string>
+    <string name="sub_agent_state_running">Läuft</string>
+    <string name="sub_agent_state_completed">Fertig</string>
+    <string name="sub_agent_state_cancelled">Gestoppt</string>
+    <string name="sub_agent_state_failed">Fehlgeschlagen</string>
+    <string name="sub_agent_state_timeout">Zeit abgelaufen</string>
+    <string name="sub_agent_state_interrupted">Unterbrochen</string>
 </resources>

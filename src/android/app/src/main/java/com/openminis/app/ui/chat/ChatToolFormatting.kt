@@ -59,6 +59,7 @@ internal fun toolAccentColor(toolName: String): Color = when (toolName) {
     "read_image" -> Color(0xFFAF52DE)
     "memory_write", "memory_get" -> Color(0xFFFF2D55)
     "web_search" -> Color(0xFF32ADE6)    // iOS: .cyan for search
+    com.openminis.app.data.model.SubAgentDefinition.TOOL_NAME -> Color(0xFF5856D6)
     else -> Color(0xFF8E8E93)
 }
 

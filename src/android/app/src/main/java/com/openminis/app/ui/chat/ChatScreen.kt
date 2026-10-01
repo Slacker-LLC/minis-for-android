@@ -4072,6 +4072,28 @@ fun ChatScreen(
                 val selectedToolBlock = selectedToolDetailId?.let { id ->
                     lastToolBlocks.firstOrNull { it.id == id }
                 }
+                // Stop / Steer / Resume / Open for a sub agent card. Runs through the same tool path the model
+                // uses, scoped to this conversation, so the card can only act on this chat's own runs.
+                val subAgentCardActions = remember(sessionId) {
+                    fun act(args: org.json.JSONObject) {
+                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+                            runCatching {
+                                com.openminis.app.agent.subagents.SubAgents.runtime(context).execute(args.toString(), sessionId)
+                            }
+                        }
+                    }
+                    SubAgentCardActions(
+                        onStop = { id -> act(org.json.JSONObject().put("action", "cancel").put("job_id", id)) },
+                        onResume = { id -> act(org.json.JSONObject().put("action", "resume").put("job_id", id)) },
+                        onSteer = { id, msg ->
+                            act(org.json.JSONObject().put("action", "steer").put("job_id", id).put("message", msg))
+                        },
+                        onOpenSession = { child ->
+                            viewModel.closeToolDetail()
+                            onMoveToSession(child)
+                        },
+                    )
+                }
                 if (selectedToolBlock != null) {
                     val initialIdx = lastToolBlocks
                         .indexOfFirst { it.id == selectedToolBlock.id }
@@ -4085,6 +4107,7 @@ fun ChatScreen(
                             viewModel.closeToolDetail()
                             viewModel.openBrowserSheetForUrl(url)
                         },
+                        subAgentActions = subAgentCardActions,
                     )
                 }
 
