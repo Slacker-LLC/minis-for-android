@@ -791,6 +791,7 @@ class MinisApp : Application(), ImageLoaderFactory {
             com.openminis.app.tools.runtime.AgentSubagentHandler(),
             aliasNames = listOf("subagent"),
         )
+        com.openminis.app.agent.subagents.SubAgentStore.init(this)
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.runtime.AgentAskHandler(),
             aliasNames = listOf("ask_user_question"),

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.FolderShared
 import androidx.compose.material.icons.outlined.FrontHand
 import androidx.compose.material.icons.outlined.Info
@@ -140,6 +141,7 @@ fun SettingsCategoryScreen(
     onUsageClick: () -> Unit = {},
     onSkillsClick: () -> Unit = {},
     onCharactersClick: () -> Unit = {},
+    onSubAgentsClick: () -> Unit = {},
     onSoulClick: () -> Unit = {},
     onSystemPromptClick: () -> Unit = {},
     onMemoryClick: () -> Unit = {},
@@ -291,6 +293,13 @@ fun SettingsCategoryScreen(
                     )
                 }
                 SettingsSection(header = stringResource(R.string.settings_agent_section_delegation)) {
+                    SettingsRow(
+                        icon = Icons.Outlined.Hub,
+                        iconColor = Color(0xFF5856D6),
+                        title = stringResource(R.string.sub_agents_title),
+                        subtitle = stringResource(R.string.sub_agents_subtitle),
+                        onClick = onSubAgentsClick,
+                    )
                     SettingsRow(
                         icon = Icons.Outlined.AccountTree,
                         iconColor = Color(0xFFFF3B30),

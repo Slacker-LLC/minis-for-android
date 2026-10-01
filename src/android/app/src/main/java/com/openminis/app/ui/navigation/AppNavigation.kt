@@ -141,6 +141,9 @@ object Routes {
     /** [T-eta-character-cards] Imported character cards. */
     const val CHARACTERS = "characters"
 
+    /** Sub agent roster and the delegation switch. */
+    const val SUB_AGENTS = "sub_agents"
+
     /** [T-eta-character-cards] One stored character: its card and its world book. */
     const val CHARACTER_DETAIL = "character/{characterId}"
     const val SKILL_DETAIL = "skill/{skillId}"
@@ -668,6 +671,7 @@ fun AppNavigation(
                     onUsageClick = { navController.safeNavigate(Routes.USAGE_STATS) },
                     onSkillsClick = { navController.safeNavigate(Routes.SKILLS) },
                     onCharactersClick = { navController.safeNavigate(Routes.CHARACTERS) },
+                    onSubAgentsClick = { navController.safeNavigate(Routes.SUB_AGENTS) },
                     onSoulClick = { navController.safeNavigate(Routes.SOUL) },
                     onSystemPromptClick = { navController.safeNavigate(Routes.SYSTEM_PROMPT) },
                     onMemoryClick = { navController.safeNavigate(Routes.MEMORY) },
@@ -1222,6 +1226,12 @@ fun AppNavigation(
             val characterId = entry.arguments?.getString("characterId").orEmpty()
             com.openminis.app.ui.settings.CharacterDetailScreen(
                 characterId = characterId,
+                onBack = { navController.safePopBackStack() },
+            )
+        }
+        composable(Routes.SUB_AGENTS) {
+            com.openminis.app.ui.settings.SubAgentsScreen(
+                providerRepository = providerRepository,
                 onBack = { navController.safePopBackStack() },
             )
         }
