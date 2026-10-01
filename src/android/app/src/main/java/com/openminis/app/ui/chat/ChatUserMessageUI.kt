@@ -128,6 +128,7 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RadioButtonChecked
@@ -287,6 +288,10 @@ internal fun UserMessageBubble(
     onRetry: (() -> Unit)? = {},
     onEdit: (() -> Unit)? = null,
     onDeleteFromHere: (() -> Unit)? = null,
+    // Summarize everything above this message. Ported from OpenMinis 1.14
+    // [T-android-compact-above]; the caller passes null while streaming because
+    // compaction refuses to run mid-turn.
+    onCompactAbove: (() -> Unit)? = null,
     onWithdraw: (() -> Unit)? = null,
     onPreviewFile: (Uri, String) -> Unit = { _, _ -> },
 ) {
@@ -520,6 +525,28 @@ internal fun UserMessageBubble(
                         leadingIcon = {
                             Icon(
                                 Icons.Default.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        },
+                    )
+                }
+                // Last, after Delete From Here. Warning-tinted like Delete: the
+                // original turns stop being sent to the model, even though nothing
+                // is removed from the database (Revert Compact brings them back).
+                if (onCompactAbove != null) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(R.string.chat_longpress_compact_above),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        },
+                        onClick = { showMenu = false; onCompactAbove() },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Compress,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(18.dp),

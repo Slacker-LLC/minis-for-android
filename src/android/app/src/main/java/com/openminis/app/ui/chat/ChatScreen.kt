@@ -800,6 +800,7 @@ fun ChatScreen(
     // Reply whose long-press menu is open.
     var messageMenuTarget by remember { mutableStateOf<String?>(null) }
     var deleteFromHereTargetId by remember { mutableStateOf<String?>(null) }
+    var compactAboveTargetId by remember { mutableStateOf<String?>(null) }
     // [T-new-chat-menu-entry] Confirmation gate for "New Chat" while the
     // current session is still streaming — stopping the running task needs
     // an explicit confirm; idle sessions skip the dialog entirely.
@@ -3562,6 +3563,12 @@ fun ChatScreen(
                                 onDeleteFromHere = if (isStreaming || item.message.isQueued) null else ({
                                     deleteFromHereTargetId = item.message.id
                                 }),
+                                // Long-press a user bubble to summarize everything above it.
+                                // Gated like the actions above: compaction refuses mid-turn,
+                                // so offering it there would only produce an error notice.
+                                onCompactAbove = if (isStreaming || item.message.isQueued) null else ({
+                                    compactAboveTargetId = item.message.id
+                                }),
                                 // T187: long-press → Edit pulls the user message
                                 // text into the composer; the next send truncates
                                 // from this turn (inclusive) before persisting
@@ -6308,6 +6315,22 @@ fun ChatScreen(
                     onConfirm = {
                         viewModel.deleteFromMessage(targetId)
                         deleteFromHereTargetId = null
+                    },
+                )
+            }
+            // Compaction replaces the history above this point with a generated
+            // summary and the original turns stop being sent to the model, so it
+            // confirms first the way Delete From Here does.
+            compactAboveTargetId?.let { targetId ->
+                MinisAlertDialog(
+                    onDismissRequest = { compactAboveTargetId = null },
+                    title = stringResource(R.string.chat_longpress_compact_above),
+                    text = stringResource(R.string.chat_compact_above_dialog_body),
+                    confirmText = stringResource(R.string.chat_compact_above_confirm),
+                    isDestructive = true,
+                    onConfirm = {
+                        viewModel.compactBefore(targetId)
+                        compactAboveTargetId = null
                     },
                 )
             }

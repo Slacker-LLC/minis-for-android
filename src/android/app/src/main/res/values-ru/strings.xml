@@ -1537,6 +1537,9 @@
     <string name="selection_copied_as_plain_text_toast">Скопировано как обычный текст</string>
     <string name="chat_longpress_delete_from_here">Удалить отсюда</string>
     <string name="chat_delete_from_here_confirm">Удалить</string>
+    <string name="chat_longpress_compact_above">Сжать выше</string>
+    <string name="chat_compact_above_dialog_body">Сообщения выше этой точки будут сжаты в сводку. Позже это можно отменить значком информации на разделителе.</string>
+    <string name="chat_compact_above_confirm">Сжать</string>
     <plurals name="chat_delete_from_here_dialog_body">
         <item quantity="one">Это сообщение и всё после него будет удалено. Всего %d сообщение. Отменить будет нельзя.</item>
         <item quantity="few">Это сообщение и всё после него будет удалено. Всего %d сообщения. Отменить будет нельзя.</item>

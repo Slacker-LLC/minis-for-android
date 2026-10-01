@@ -1293,6 +1293,9 @@
    <string name="chat_longpress_edit">Edit</string>
     <string name="chat_longpress_delete_from_here">Delete From Here</string>
     <string name="chat_delete_from_here_confirm">Delete</string>
+    <string name="chat_longpress_compact_above">Compact Above</string>
+    <string name="chat_compact_above_dialog_body">Messages above this point will be compacted into a summary. You can undo it later from the info button on the divider.</string>
+    <string name="chat_compact_above_confirm">Compact</string>
     <plurals name="chat_delete_from_here_dialog_body">
         <item quantity="one">This message and everything after it will be deleted. %d message in total. This cannot be undone.</item>
         <item quantity="other">This message and everything after it will be deleted. %d messages in total. This cannot be undone.</item>

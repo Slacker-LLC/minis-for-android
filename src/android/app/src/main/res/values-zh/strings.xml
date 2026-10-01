@@ -1113,6 +1113,9 @@
    <string name="chat_longpress_edit">编辑</string>
     <string name="chat_longpress_delete_from_here">从此处删除</string>
     <string name="chat_delete_from_here_confirm">删除</string>
+    <string name="chat_longpress_compact_above">从此处压缩</string>
+    <string name="chat_compact_above_dialog_body">此消息之前的内容将被压缩为摘要。之后可通过分割线上的信息图标撤销。</string>
+    <string name="chat_compact_above_confirm">压缩</string>
     <plurals name="chat_delete_from_here_dialog_body">
         <item quantity="other">将删除本条消息及其之后的全部内容，共 %d 条消息。此操作无法撤销。</item>
     </plurals>
