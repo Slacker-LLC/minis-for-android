@@ -5571,7 +5571,7 @@ fun ChatScreen(
                                                     color = ChatColors.primaryText,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis,
-                                                    modifier = Modifier.widthIn(max = 120.dp),
+                                                    modifier = Modifier.widthIn(max = 190.dp),
                                                 )
                                                 if (canThink && composerThinking.isEnabled) {
                                                     Text(
