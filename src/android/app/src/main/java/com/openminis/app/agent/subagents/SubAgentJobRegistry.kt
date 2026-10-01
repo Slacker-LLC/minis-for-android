@@ -1,6 +1,8 @@
 package com.openminis.app.agent.subagents
 
+import com.openminis.app.data.model.ThinkingLevel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.serialization.Serializable
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
@@ -12,19 +14,28 @@ import java.util.UUID
  * needs here: no triggers or follow-up targets, a delegation is always "run this brief in a child
  * session now (or when a slot frees)".
  */
+@Serializable
 enum class SubAgentJobState {
     QUEUED, RUNNING, DONE, CANCELLED, FAILED,
 
     /** The wall-clock budget elapsed and the run was cut short. */
-    TIMEOUT;
+    TIMEOUT,
 
-    val isTerminal: Boolean get() = this == DONE || this == CANCELLED || this == FAILED || this == TIMEOUT
+    /**
+     * The app was killed while the run was queued or running. Not resumed automatically; the model (or the
+     * card's Resume button) restarts it with action=resume.
+     */
+    INTERRUPTED;
+
+    val isTerminal: Boolean
+        get() = this == DONE || this == CANCELLED || this == FAILED || this == TIMEOUT || this == INTERRUPTED
 
     /** `done` is reported as `completed`, the word the tool contract uses. */
     val wire: String get() = if (this == DONE) "completed" else name.lowercase()
 }
 
 /** One delegation. An immutable snapshot; the registry replaces entries. */
+@Serializable
 data class SubAgentJob(
     val id: String,
     /** The conversation that delegated it. Every lookup is scoped to this. */
@@ -44,6 +55,16 @@ data class SubAgentJob(
     val startedAtMs: Long? = null,
     val finishedAtMs: Long? = null,
     val resultText: String? = null,
+    /** The model entry the run uses (so a run that never got a child can start one on resume). */
+    val modelEntryId: String? = null,
+    val thinking: ThinkingLevel? = null,
+    /**
+     * The complete brief sent to the child. Kept only while the job is not finished (a queued job needs it
+     * to start; an interrupted one may need it to start over) and dropped once it is.
+     */
+    val brief: String? = null,
+    /** True when this run is a resume of one the app lost. */
+    val resumed: Boolean = false,
 ) {
     val isActive: Boolean get() = !state.isTerminal
     fun elapsedMs(now: Long): Long? = startedAtMs?.let { (finishedAtMs ?: now) - it }
@@ -69,11 +90,18 @@ sealed class SubAgentLookup {
     data class Ambiguous(val matches: List<String>) : SubAgentLookup()
 }
 
+/** Where the registry keeps its last [SubAgentJobRegistry.MAX_KEPT] jobs across app restarts. */
+interface SubAgentJobStore {
+    fun load(): List<SubAgentJob>
+    fun save(jobs: List<SubAgentJob>)
+}
+
 /**
- * In-process registry of every sub agent run.
+ * Registry of every sub agent run.
  *
- * Deliberately NOT persisted: a delegation's whole life is inside the app process, and the parent
- * message's tool block is the durable record of what happened.
+ * Kept in memory and mirrored to a [SubAgentJobStore] so that a run lost to a process kill shows up
+ * afterwards as `interrupted` (and can be resumed) instead of vanishing, and so cards keep their
+ * history. Only the most recent [MAX_KEPT] jobs are kept.
  *
  * Concurrency is bounded globally ([maxConcurrent] running at once) with a bounded wait queue
  * ([maxQueued]); extras are queued instead of refused so a model that delegates more than the cap
@@ -85,9 +113,10 @@ class SubAgentJobRegistry(
     val maxQueued: Int = MAX_QUEUED,
     private val clock: () -> Long = System::currentTimeMillis,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
+    private val store: SubAgentJobStore? = null,
 ) {
     private val lock = Any()
-    private val _jobs = MutableStateFlow<Map<String, SubAgentJob>>(emptyMap())
+    private val _jobs = MutableStateFlow<Map<String, SubAgentJob>>(loadStored())
     val jobs: StateFlow<Map<String, SubAgentJob>> = _jobs.asStateFlow()
 
     /** Insertion order of queued job ids. */
@@ -101,6 +130,9 @@ class SubAgentJobRegistry(
         maxMinutes: Int,
         modelOrigin: String? = null,
         modelLabel: String? = null,
+        modelEntryId: String? = null,
+        thinking: ThinkingLevel? = null,
+        brief: String? = null,
     ): SubAgentAdmission = synchronized(lock) {
         val running = _jobs.value.values.count { it.state == SubAgentJobState.RUNNING }
         val now = clock()
@@ -114,6 +146,9 @@ class SubAgentJobRegistry(
             state = SubAgentJobState.QUEUED,
             modelOrigin = modelOrigin,
             modelLabel = modelLabel,
+            modelEntryId = modelEntryId,
+            thinking = thinking,
+            brief = brief,
             createdAtMs = now,
         )
         when {
@@ -147,7 +182,7 @@ class SubAgentJobRegistry(
         val job = _jobs.value[jobId] ?: return@synchronized null
         if (job.state.isTerminal) return@synchronized null
         queue.remove(jobId)
-        val done = job.copy(state = state, finishedAtMs = clock(), resultText = resultText)
+        val done = job.copy(state = state, finishedAtMs = clock(), resultText = resultText, brief = null)
         put(done)
         done
     }
@@ -195,6 +230,30 @@ class SubAgentJobRegistry(
         }
     }
 
+    /**
+     * Restarts an interrupted job: running when a slot is free, otherwise queued. Returns null when the
+     * job is unknown or is not interrupted. The result text of the lost run is kept until the new run
+     * finishes.
+     */
+    fun resume(jobId: String): SubAgentAdmission? = synchronized(lock) {
+        val job = _jobs.value[jobId] ?: return@synchronized null
+        if (job.state != SubAgentJobState.INTERRUPTED) return@synchronized null
+        val running = _jobs.value.values.count { it.state == SubAgentJobState.RUNNING }
+        val now = clock()
+        if (running < maxConcurrent) {
+            val started = job.copy(state = SubAgentJobState.RUNNING, startedAtMs = now, finishedAtMs = null, resumed = true)
+            put(started)
+            SubAgentAdmission.Started(started)
+        } else if (queue.size < maxQueued) {
+            val queued = job.copy(state = SubAgentJobState.QUEUED, finishedAtMs = null, resumed = true)
+            put(queued)
+            queue.addLast(queued.id)
+            SubAgentAdmission.Queued(queued, queue.size)
+        } else {
+            SubAgentAdmission.Rejected(SubAgentRejection.QUEUE_FULL)
+        }
+    }
+
     /** Test/maintenance hook: forget everything. */
     fun clear() = synchronized(lock) {
         queue.clear()
@@ -202,7 +261,29 @@ class SubAgentJobRegistry(
     }
 
     private fun put(job: SubAgentJob) {
-        _jobs.value = _jobs.value + (job.id to job)
+        var next = _jobs.value + (job.id to job)
+        if (next.size > MAX_KEPT) {
+            // Forget the oldest finished jobs first; an active job is never dropped.
+            val drop = next.values.filter { it.state.isTerminal }.sortedBy { it.createdAtMs }
+                .take(next.size - MAX_KEPT).map { it.id }.toSet()
+            next = next - drop
+        }
+        _jobs.value = next
+        store?.let { runCatching { it.save(next.values.sortedBy { j -> j.createdAtMs }) } }
+    }
+
+    /**
+     * Jobs from before the last start. Whatever was queued or running is gone (its coroutine died with
+     * the process), so it becomes `interrupted`; finished jobs are kept as they were.
+     */
+    private fun loadStored(): Map<String, SubAgentJob> {
+        val stored = runCatching { store?.load() }.getOrNull().orEmpty()
+        return stored.associate { job ->
+            val loaded = if (job.state == SubAgentJobState.QUEUED || job.state == SubAgentJobState.RUNNING) {
+                job.copy(state = SubAgentJobState.INTERRUPTED, finishedAtMs = clock())
+            } else job
+            loaded.id to loaded
+        }
     }
 
     companion object {
@@ -211,5 +292,8 @@ class SubAgentJobRegistry(
 
         /** Delegations beyond the cap wait here instead of being refused. */
         const val MAX_QUEUED = 10
+
+        /** Jobs remembered across restarts (and in memory); the oldest finished ones go first. */
+        const val MAX_KEPT = 30
     }
 }

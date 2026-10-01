@@ -82,11 +82,11 @@ class SubAgentTaskTest {
     }
 
     @Test
-    fun `the tool schema's agent enum is the live roster and resume is not offered`() {
+    fun `the tool schema's agent enum is the live roster and resume is offered`() {
         val def: AgentToolDefinition = SubAgentToolSchema.definition(listOf("General Sub Agent", "researcher"))
         assertEquals("subagent", def.name)
         assertEquals(listOf("General Sub Agent", "researcher"), def.parameters.getValue("agent").enumValues)
-        assertEquals(listOf("delegate", "status", "steer", "cancel"), def.parameters.getValue("action").enumValues)
+        assertEquals(listOf("delegate", "status", "steer", "cancel", "resume"), def.parameters.getValue("action").enumValues)
         assertTrue(def.parameters.keys.none { it == "child_session_id" || it == "progress_report" })
     }
 
@@ -95,7 +95,7 @@ class SubAgentTaskTest {
     @Test
     fun `malformed or incomplete calls are rejected with a specific code`() {
         assertEquals("invalid_arguments", invalid("{oops"))
-        assertEquals("unknown_action", invalid("""{"action":"resume"}"""))
+        assertEquals("unknown_action", invalid("""{"action":"explode"}"""))
         assertEquals("task_required", invalid("""{"tool_title":"t","task":"   "}"""))
         assertEquals("job_id_required", invalid("""{"action":"cancel"}"""))
         assertEquals("message_required", invalid("""{"action":"steer","job_id":"x"}"""))

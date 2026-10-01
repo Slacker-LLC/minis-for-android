@@ -150,7 +150,11 @@ object SubAgents {
 
     fun runtime(context: Context): SubAgentRuntime =
         runtime ?: synchronized(this) {
-            runtime ?: SubAgentRuntime(AppSubAgentPort(context.applicationContext), SubAgentJobRegistry(), scope)
+            runtime ?: SubAgentRuntime(
+                AppSubAgentPort(context.applicationContext),
+                SubAgentJobRegistry(store = PrefsSubAgentJobStore(context.applicationContext)),
+                scope,
+            )
                 .also { runtime = it }
         }
 

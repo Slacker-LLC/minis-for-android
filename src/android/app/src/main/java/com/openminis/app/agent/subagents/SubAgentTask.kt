@@ -14,7 +14,7 @@ import org.json.JSONObject
  * app: model pins are model entries instead of groups, and `resume` is not offered (yet).
  */
 enum class SubAgentAction(val wire: String) {
-    DELEGATE("delegate"), STATUS("status"), STEER("steer"), CANCEL("cancel");
+    DELEGATE("delegate"), STATUS("status"), STEER("steer"), CANCEL("cancel"), RESUME("resume");
 
     companion object {
         fun parse(raw: String?): SubAgentAction? =
@@ -89,7 +89,7 @@ object SubAgentTask {
             SubAgentAction.CANCEL -> if (jobId == null) {
                 return SubAgentArgsResult.Invalid("job_id_required", "`job_id` is required for action=cancel.")
             }
-            SubAgentAction.STATUS -> Unit
+            SubAgentAction.STATUS, SubAgentAction.RESUME -> Unit
         }
         val minutes = if (o.has("max_minutes")) o.optInt("max_minutes", DEFAULT_MINUTES) else DEFAULT_MINUTES
         return SubAgentArgsResult.Ok(
@@ -141,6 +141,7 @@ object SubAgentTask {
             job.modelLabel?.let { put("model", it) }
             job.elapsedMs(now)?.let { put("elapsed_s", it / 1000) }
             job.childSessionId?.let { put("child_session_id", it) }
+            if (job.resumed) put("resumed", true)
             put("result", capResult(job.resultText.orEmpty()))
         }
 
@@ -181,6 +182,16 @@ object SubAgentTask {
         if (text.length > limit) text.take(limit) + "\n\n[truncated: the sub agent's answer exceeded $limit characters]" else text
 
     // ── Prompts ─────────────────────────────────────────────────────────────
+
+    /**
+     * What a resumed child is told on its first turn. States plainly what did and did not survive the
+     * restart, because the transcript still shows tool results whose side effects are gone.
+     */
+    fun resumeNotice(): String =
+        "[This run was interrupted and has been resumed. The tool results above are still valid, but all live state is gone: " +
+            "browser tabs are closed, shell processes have ended, and anything unsaved is lost. Files in the workspace are still there. " +
+            "Continue from what the transcript already establishes — reopen pages or re-run commands when you need them, and do not " +
+            "assume anything is still open.]"
 
     /** What the child session is sent as its first (and only user) message. */
     fun childBrief(def: SubAgentDefinition, task: String, context: String): String = buildString {

@@ -59,10 +59,6 @@ class SubAgentRuntime(
     private val scope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    /** What a queued job needs when its slot frees. */
-    private class Spec(val brief: String, val thinking: ThinkingLevel?, val model: SubAgentModel)
-
-    private val pending = ConcurrentHashMap<String, Spec>()
     private val cancelRequested = ConcurrentHashMap.newKeySet<String>()
     private val waiters = ConcurrentHashMap<String, CompletableDeferred<SubAgentJob>>()
 
@@ -83,6 +79,7 @@ class SubAgentRuntime(
             SubAgentAction.STATUS -> status(args, parentSessionId)
             SubAgentAction.CANCEL -> cancel(args, parentSessionId)
             SubAgentAction.STEER -> steer(args, parentSessionId)
+            SubAgentAction.RESUME -> resume(args, parentSessionId)
         }
     }
 
@@ -100,8 +97,6 @@ class SubAgentRuntime(
                 "No usable model for sub agent '${def.name}': its pinned model is gone or no provider is configured.",
             )
         val title = args.title.ifBlank { args.task.take(40) }
-        val spec = Spec(SubAgentTask.childBrief(def, args.task, args.context), def.thinkingLevelOverride, model)
-
         return when (val admission = registry.submit(
             parentSessionId = parentSessionId,
             agentName = def.name,
@@ -110,16 +105,18 @@ class SubAgentRuntime(
             maxMinutes = args.maxMinutes,
             modelOrigin = model.origin,
             modelLabel = model.label,
+            modelEntryId = model.entryId,
+            thinking = def.thinkingLevelOverride,
+            brief = SubAgentTask.childBrief(def, args.task, args.context),
         )) {
             is SubAgentAdmission.Rejected ->
                 fail("queue_full", "Too many sub agents are waiting (${registry.maxQueued}). Try again after some finish.")
             is SubAgentAdmission.Started -> {
                 val waiter = if (args.wait) waiterFor(admission.job.id) else null
-                launch(admission.job, spec)
+                launch(admission.job)
                 if (waiter != null) awaitFinal(admission.job.id, waiter) else SubAgentReply(SubAgentTask.started(admission.job), true)
             }
             is SubAgentAdmission.Queued -> {
-                pending[admission.job.id] = spec
                 val waiter = if (args.wait) waiterFor(admission.job.id) else null
                 if (waiter != null) awaitFinal(admission.job.id, waiter)
                 else SubAgentReply(SubAgentTask.queued(admission.job, admission.position), true)
@@ -142,18 +139,25 @@ class SubAgentRuntime(
         return SubAgentReply(SubAgentTask.finalPayload(job, clock()).toString(), ok)
     }
 
-    private fun launch(job: SubAgentJob, spec: Spec) {
+    private fun launch(job: SubAgentJob) {
         scope.launch {
             var state = SubAgentJobState.FAILED
             var text: String? = null
             try {
-                val childId = port.createChild(job.parentSessionId, "↳ " + job.title.take(40), spec.model)
-                registry.attachChild(job.id, childId)
+                // A resumed run continues in the child it already has; anything else (and a resumed run
+                // that never got a child) starts a fresh child with the original brief.
+                val existingChild = job.childSessionId.takeIf { job.resumed }
+                val childId = existingChild ?: port.createChild(
+                    job.parentSessionId, "↳ " + job.title.take(40),
+                    SubAgentModel(job.modelEntryId, job.modelLabel.orEmpty(), job.modelOrigin.orEmpty()),
+                ).also { registry.attachChild(job.id, it) }
                 if (job.id in cancelRequested) {
                     state = SubAgentJobState.CANCELLED
                     text = "Cancelled before it started."
                 } else {
-                    val outcome = port.runChild(childId, spec.brief, spec.thinking, job.maxMinutes * 60_000L)
+                    val message = if (existingChild != null) SubAgentTask.resumeNotice()
+                        else job.brief ?: error("the delegation has no brief")
+                    val outcome = port.runChild(childId, message, job.thinking, job.maxMinutes * 60_000L)
                     text = outcome.text?.trim()
                     state = when {
                         job.id in cancelRequested -> SubAgentJobState.CANCELLED
@@ -178,13 +182,12 @@ class SubAgentRuntime(
     /** Closes a job, tells the parent (background runs), wakes a blocked call, and starts the next queued job. */
     private suspend fun complete(jobId: String, state: SubAgentJobState, text: String?) {
         val done = registry.finish(jobId, state, text) ?: return
-        pending.remove(jobId)
         cancelRequested.remove(jobId)
         if (!done.wait) {
             runCatching { port.deliverToParent(done.parentSessionId, SubAgentTask.callbackText(done, clock())) }
         }
         waiters.remove(jobId)?.complete(done)
-        registry.promoteNext()?.let { next -> pending.remove(next.id)?.let { launch(next, it) } }
+        registry.promoteNext()?.let { launch(it) }
     }
 
     // ── status / cancel / steer ─────────────────────────────────────────────
@@ -250,6 +253,35 @@ class SubAgentRuntime(
             org.json.JSONObject().put("status", "steered").put("job_id", job.id)
                 .put("note", "Read at its next turn; a running tool call is not interrupted. If it finishes first, the correction is missed.")
                 .toString(),
+            true,
+        )
+    }
+
+    private suspend fun resume(args: SubAgentTaskArgs, parentSessionId: String): SubAgentReply {
+        val targets = if (args.jobId != null) {
+            when (val found = registry.lookup(parentSessionId, args.jobId)) {
+                is SubAgentLookup.Found -> listOf(found.job)
+                SubAgentLookup.NotFound -> return fail("job_not_found", "No sub agent job '${args.jobId}' in this conversation.")
+                is SubAgentLookup.Ambiguous -> return fail("ambiguous_job_id", "'${args.jobId}' matches several jobs; use more characters.")
+            }
+        } else {
+            registry.jobsOf(parentSessionId).filter { it.state == SubAgentJobState.INTERRUPTED }
+        }
+        if (args.jobId != null && targets.single().state != SubAgentJobState.INTERRUPTED) {
+            return fail("not_interrupted", "Job ${targets.single().id.take(8)} is ${targets.single().state.wire}; only an interrupted sub agent can be resumed.")
+        }
+        val results = org.json.JSONArray()
+        for (job in targets) {
+            when (val admission = registry.resume(job.id)) {
+                is SubAgentAdmission.Started -> { launch(admission.job); results.put(org.json.JSONObject().put("job_id", job.id).put("status", "running")) }
+                is SubAgentAdmission.Queued -> results.put(org.json.JSONObject().put("job_id", job.id).put("status", "queued").put("position", admission.position))
+                is SubAgentAdmission.Rejected -> results.put(org.json.JSONObject().put("job_id", job.id).put("status", "error").put("error", "queue_full"))
+                null -> Unit
+            }
+        }
+        return SubAgentReply(
+            org.json.JSONObject().put("status", "ok").put("resumed", results)
+                .put("note", "Resumed runs report back as a new message when they finish, like any background run.").toString(),
             true,
         )
     }
