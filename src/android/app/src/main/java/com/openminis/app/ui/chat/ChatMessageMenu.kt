@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +19,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -67,6 +71,7 @@ internal fun AssistantMessageMenu(
     isSpeaking: Boolean,
     actions: AssistantActionSet,
     onDismiss: () -> Unit,
+    usage: ReplyUsage? = null,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -127,6 +132,7 @@ internal fun AssistantMessageMenu(
                     MenuRow(stringResource(R.string.assistant_menu_share), MinisIcons.Share, onClick = pick(actions.onShare))
                     MenuRow(stringResource(R.string.assistant_menu_delete), MinisIcons.Trash, destructive = true, onClick = pick(actions.onDelete), last = true)
                 }
+                usage?.let { UsageCaption(it) }
             }
         }
     }
@@ -176,6 +182,40 @@ private fun BlurBehindDialog(radius: Int = 40) {
                 runCatching { window.setBackgroundBlurRadius(0) }
             }
             window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+        }
+    }
+}
+
+/**
+ * The reply's token usage and finish time as a quiet footnote under the menu — "ctx:57k in:2 out:408
+ * cache:57k (96%)  22:30". Counts only; the time is its own Text, pushed to the far edge, so it does not
+ * read as one more number. Style follows OpenMinis 1.14's usage capsule.
+ */
+@Composable
+private fun UsageCaption(reply: ReplyUsage) {
+    val summary = remember(reply) { usageSummary(reply.usage) }
+    val clock = remember(reply) {
+        reply.completedAtMs?.let { java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(java.util.Date(it)) }
+    }
+    val ink = ChatColors.secondaryText
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.padding(top = 10.dp, start = 4.dp).fillMaxWidth(),
+    ) {
+        Icon(Icons.Default.Speed, contentDescription = null, tint = ink, modifier = Modifier.size(12.dp))
+        // The counts give way first when the line is long (cache figures), so the finish time stays visible.
+        Text(
+            summary,
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace,
+            color = ink,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        clock?.let {
+            Text(it, fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = ink, maxLines = 1, softWrap = false)
         }
     }
 }

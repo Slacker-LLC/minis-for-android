@@ -1952,6 +1952,20 @@ class ChatViewModel(
     }
 
     /**
+     * Token usage of a finished reply, for its long-press menu. Read from the persisted rows the reply
+     * was built from rather than carried on every UI message, so the chat list stays untouched; the
+     * reply reports its last turn that has usage (see [lastReplyUsage]). Null when there is none.
+     * Ported from OpenMinis 1.14 [T-android-usage-capsule-time].
+     */
+    internal suspend fun replyUsage(messageId: String): ReplyUsage? {
+        val message = _messages.value.firstOrNull { it.id == messageId } ?: return null
+        val rows = message.sourceDbIds.ifEmpty { listOf(message.id) }.mapNotNull { dbId ->
+            chatRepository.messageById(dbId)?.let { it.tokenUsage to it.createdAt }
+        }
+        return lastReplyUsage(rows)
+    }
+
+    /**
      * Public entrypoint for "compact up through this message" (mirrors iOS
      * AIChatViewModel.compactBefore). The chat list's long-press menu and
      * the debug RPC `chat.compact.before` route through here.

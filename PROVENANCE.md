@@ -15,6 +15,14 @@ Minis for Android 含有从开源项目 **OpenMinis** 衍生的代码：
 
 **没有**把 OpenMinis 变更持续同步进本仓库的政策。若再从任何外部项目导入代码，该变更必须标明来源、保留声明、满足许可证，并适配当前架构。
 
+## Selective imports from OpenMinis
+
+本仓库按需、手工地从 OpenMinis 引入个别改动，并适配当前架构；不是持续同步。每项都记录来源 tag，代码保留原有版权头。
+
+- OpenMinis `1.14`（tag `1.14`，`b4c0661`，GPL-3.0）
+  - 长按用户消息的「压缩以上内容」入口与确认框（`[T-android-compact-above]`）；`compactBefore` 本仓库早已具备，只引入入口。
+  - 回复 Token 用量的读取与格式（`ChatTokenUsage`、`[T-android-usage-capsule-time]`）；展示位置改为回复长按菜单底部，不引入其「点空白处」的手势与聊天列表渲染改动。
+
 ## Referenced projects
 
 以下外部项目为本仓库提供行为参考，并且**其部分代码已被移植进来**：

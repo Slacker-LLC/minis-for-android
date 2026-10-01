@@ -3263,8 +3263,13 @@ fun ChatScreen(
                     } else {
                         val markdown = message.toolBlocks.filter { it.kind == "text" && it.content.isNotEmpty() }
                             .joinToString("\n\n") { it.content }.ifEmpty { message.content }
+                        // The reply's token usage, read when the menu opens (null until it arrives or when there is none).
+                        val replyUsage by androidx.compose.runtime.produceState<ReplyUsage?>(null, targetId) {
+                            value = viewModel.replyUsage(targetId)
+                        }
                         AssistantMessageMenu(
                             previewText = MarkdownClipboard.markdownToPlainText(markdown),
+                            usage = replyUsage,
                             isSpeaking = replySpeechState.activeMessageId == targetId &&
                                 replySpeechState.status == com.openminis.app.speech.ReplySpeechState.Status.READING,
                             actions = actionsFor(targetId, markdown),
