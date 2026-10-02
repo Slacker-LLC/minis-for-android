@@ -15,6 +15,7 @@ README / 专题 docs → 面向读者说明
 ## 分支与 PR
 
 - 默认基于最新 `main`；stacked PR 按明确 base/head 工作。
+- `main` 就是当前版本；只有历史版本才有自己的分支（`release/vX.Y`，一个版本一个，在 `main` 要离开它时创建）。当前版本的 beta、正式版与补丁直接在 `main` 上打 tag；历史版本的补丁先进 `main` 再 `cherry-pick -x` 到它的分支，release 分支不合回 `main`。细则与命令见 [docs/development/RELEASING.md](../development/RELEASING.md)。
 - 一次 PR 只解决一个问题或一条可独立验收边界。
 - 不 force-push、不重写历史，除非维护者对该具体操作明确授权。
 - 合并前核对最终 diff；合并后验证最终目标分支，不只看 PR 页面曾显示通过。

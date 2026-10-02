@@ -24,6 +24,7 @@
 | [PROJECT.md](PROJECT.md) | 项目说明：产品定位与身份、能力面、架构边界、构建、本地化、文档地图 |
 | [development/PORTING.md](development/PORTING.md) | 开发规范：复用规则、落地 SOP、验证矩阵、归属登记 |
 | [development/BACKUP.md](development/BACKUP.md) | 备份与恢复：包含什么、不包含什么、恢复规则、换签名重装的步骤 |
+| [development/RELEASING.md](development/RELEASING.md) | 版本与发版：版本号与 versionCode 方案、历史版本的 `release/vX.Y` 分支、beta 与 tag、预检脚本、更新通道 |
 | [development/PROGRESS.md](development/PROGRESS.md) | 移植与收敛进度：逐片记录、已完成、待办阶段、排除项、未验证清单 |
 | [development/HANDOFF-2026-09-19.md](development/HANDOFF-2026-09-19.md) | 2026-09-19 的交接快照（过去/现在/将来）；查当前状态请回 PROGRESS.md |
 | [I18N.md](I18N.md) | 本地化：语言目录、硬规则、转义与复数坑、审计工具、当前覆盖与剩余 |
@@ -72,6 +73,8 @@
 | [`DEVELOPMENT-STATUS.md`](DEVELOPMENT-STATUS.md) | 工程状态（结构与验证基线，随 HEAD 更新） |
 | [`EXECUTION-ENVIRONMENT.md`](EXECUTION-ENVIRONMENT.md) | 执行、UID/GID、mount 与网络关系 |
 | [`SECURITY.md`](SECURITY.md) | 安全模型 |
+| [`../PRIVACY.zh-CN.md`](../PRIVACY.zh-CN.md) | 隐私政策（英文版 `PRIVACY.md`）；应用内「设置 → 隐私政策」指向它 |
+| [`../THIRD_PARTY_LICENSES.md`](../THIRD_PARTY_LICENSES.md) | 开源软件说明；应用内「关于 → 开源软件说明」指向它 |
 | [`runtime-package-boundary.md`](runtime-package-boundary.md) | Android runtime 包职责边界 |
 | [`UPSTREAM-COMPARISON.md`](UPSTREAM-COMPARISON.md) | Direct Ubuntu 分支与外部上游的对账快照、双方特有内容和复核命令 |
 | [`REAL-DEVICE-TEST-REPORT.md`](REAL-DEVICE-TEST-REPORT.md) | 小米真机实测记录、通过项、证据边界与未完成矩阵 |

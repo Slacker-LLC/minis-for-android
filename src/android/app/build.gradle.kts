@@ -13,6 +13,30 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// The one place the release version is set (docs/development/RELEASING.md). versionCode is derived from it, so
+// the two cannot drift and the code orders exactly like the version:
+//   X.Y-dev  <  X.Y-beta.N  <  X.Y  <  X.Y.Z-beta.N  <  X.Y.Z
+// code = major * 1_000_000 + minor * 10_000 + patch * 100 + stage; stage is 0 for -dev, N (1..98) for -beta.N
+// and 99 for a stable release.
+val appVersionName = "1.0"
+val appVersionCode: Int = run {
+    val match = Regex(
+        """^(0|[1-9]\d{0,2})\.(0|[1-9]\d?)(?:\.(0|[1-9]\d?))?(?:-(dev|beta\.([1-9]\d?)))?$""",
+    ).matchEntire(appVersionName)
+        ?: throw GradleException(
+            "versionName \"$appVersionName\" must be 1.2, 1.2.3, 1.2-dev, 1.2-beta.4 or 1.2.3-beta.4",
+        )
+    val (major, minor, patch, label, betaNumber) = match.destructured
+    val stage = when {
+        label.isEmpty() -> 99
+        label == "dev" -> 0
+        else -> betaNumber.toInt().also {
+            if (it > 98) throw GradleException("versionName \"$appVersionName\": beta number must be 1..98")
+        }
+    }
+    major.toInt() * 1_000_000 + minor.toInt() * 10_000 + patch.ifEmpty { "0" }.toInt() * 100 + stage
+}
+
 // Provider customization is local build configuration. Public-source builds
 // intentionally omit provider-customization.properties and compile the
 // affected integration as an explicit disabled capability. Private/production
@@ -197,8 +221,8 @@ android {
         applicationId = "llc.slacker.minis"
         minSdk = 26
         targetSdk = 35
-        versionCode = 39
-        versionName = "1.01-beta.2"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

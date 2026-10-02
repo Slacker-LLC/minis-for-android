@@ -30,14 +30,18 @@ import java.util.concurrent.TimeUnit
  * the tag and the local versionName on `.` and compare numerically component
  * by component. A tag like `v1.0.1` beats local `1.0.0`; `v1.0.0-rc1` beats
  * `1.0.0` because the suffix sorts higher under string fallback.
+ *
+ * Release stages (docs/development/RELEASING.md): `X.Y-dev < X.Y-beta.N < X.Y`, so a
+ * beta is offered its next beta and then the final, and never outranks the final.
+ * Channels: a stable build is only offered stable releases; a beta or dev build is
+ * offered prereleases as well, so betas reach the people who chose to run one and
+ * nobody else.
  */
 object UpdateChecker {
 
     private const val TAG = "UpdateChecker"
-    // This Pet fork publishes and signs its own Android artifacts; never offer
-    // an upstream APK with a different application history to fork users.
-    private const val OWNER = "limuzi013"
-    private const val REPO = "OpenMinis-Pet"
+    // This project publishes and signs its own Android artifacts (AppLinks.OWNER /
+    // REPO); never offer an upstream APK with a different application history.
     private const val DOWNLOAD_FILENAME = "minis-update.apk"
     /**
      * Sub-directory of `filesDir` where we stage downloaded update APKs. We
@@ -101,7 +105,7 @@ object UpdateChecker {
      * coroutine scope.
      */
     suspend fun check(): CheckResult = withContext(Dispatchers.IO) {
-        val url = "https://api.github.com/repos/$OWNER/$REPO/releases?per_page=30"
+        val url = AppLinks.RELEASES_API_URL
         AppLogger.info(TAG, "GET $url (local=${BuildConfig.VERSION_NAME})")
         try {
             val req = Request.Builder()
@@ -152,6 +156,7 @@ object UpdateChecker {
                     if (r.optBoolean("draft", false)) continue
                     val tag = r.optString("tag_name")
                     if (tag.isEmpty()) continue
+                    if (!isVisibleToChannel(BuildConfig.VERSION_NAME, tag, r.optBoolean("prerelease", false))) continue
                     val (apkUrl, apkSize) = findApkAsset(r.optJSONArray("assets"))
                     candidates += ReleaseInfo(
                         tagName = tag,
@@ -258,7 +263,7 @@ object UpdateChecker {
     }
 
     /** Public so UI can deep-link users to manual download when GitHub is blocked. */
-    const val RELEASES_URL: String = "https://github.com/limuzi013/minis-for-android/releases"
+    const val RELEASES_URL: String = AppLinks.RELEASES_URL
 
     /** Returns (downloadUrl, sizeBytes) for the first .apk asset, or (null, 0). */
     private fun findApkAsset(assets: JSONArray?): Pair<String?, Long> {
@@ -295,6 +300,13 @@ object UpdateChecker {
         Regex("^(\\d+(?:\\.\\d+)*)-pet[.-]?(\\d+)(?:[-.].*)?$", RegexOption.IGNORE_CASE)
             .matchEntire(trimmed)
             ?.let { return "${it.groupValues[1]}.pet.${it.groupValues[2].toInt()}" }
+        Regex("^(\\d+(?:\\.\\d+)*)-(beta|dev)(?:[.-]?(\\d+))?(?:[-+.].*)?$", RegexOption.IGNORE_CASE)
+            .matchEntire(trimmed)
+            ?.let {
+                val (base, label, number) = it.destructured
+                return if (label.equals("dev", ignoreCase = true)) "$base-dev"
+                else "$base-beta.${number.ifEmpty { "1" }.toInt()}"
+            }
         Regex("^rc[.-]?(\\d+)$", RegexOption.IGNORE_CASE)
             .matchEntire(trimmed)
             ?.let { return "0.rc.${it.groupValues[1].toInt()}" }
@@ -480,6 +492,36 @@ object UpdateChecker {
      * treated as "newer than 1.0.0" — acceptable noise for our use case.
      */
     internal fun compareVersions(a: String, b: String): Int {
+        val (aBase, aStage) = splitStage(a)
+        val (bBase, bStage) = splitStage(b)
+        val base = compareBase(aBase, bBase)
+        return if (base != 0) base else aStage.compareTo(bStage)
+    }
+
+    /**
+     * `1.1-dev` / `1.1-beta.2` -> base `1.1` plus a rank that sorts dev < beta.N < stable. Strings with no stage
+     * (stable releases and the legacy `.pet.N` form) keep the highest rank.
+     */
+    private fun splitStage(version: String): Pair<String, Int> {
+        STAGE.matchEntire(version)?.let { m ->
+            val label = m.groupValues[2]
+            return m.groupValues[1] to if (label == "dev") 0 else m.groupValues[3].toInt()
+        }
+        return version to Int.MAX_VALUE
+    }
+
+    private val STAGE = Regex("^(.*)-(dev|beta\\.(\\d+))$")
+
+    /** Whether a build running [localVersionName] is offered the release tagged [tag]. */
+    internal fun isVisibleToChannel(localVersionName: String, tag: String, flaggedPrerelease: Boolean): Boolean {
+        if (isStaged(localVersionName)) return true
+        return !flaggedPrerelease && !isStaged(tag)
+    }
+
+    /** True for a `-dev` or `-beta.N` version, in any spelling [normalizeTag] accepts. */
+    internal fun isStaged(version: String): Boolean = STAGE.matches(normalizeTag(version))
+
+    private fun compareBase(a: String, b: String): Int {
         val ap = a.split('.', '-')
         val bp = b.split('.', '-')
         val n = maxOf(ap.size, bp.size)

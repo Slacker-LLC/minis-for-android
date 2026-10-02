@@ -178,6 +178,9 @@
     <string name="about_minis_tagline">Minis est votre agent on-device entièrement local et entièrement privé.</string>
     <string name="about_links">Liens</string>
     <string name="about_github_repository">Dépôt GitHub</string>
+    <string name="about_open_source_licenses">Licences open source</string>
+    <string name="about_open_source_licenses_subtitle">Basé sur OpenMinis et Eta, avec d’autres composants open source</string>
+    <string name="about_license">Licence (GPL-3.0)</string>
     <string name="about_version_format">Version %1$s (%2$s)</string>
 
     <!-- T172 — chat sheets i18n -->

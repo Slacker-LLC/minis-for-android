@@ -565,7 +565,7 @@ object CrashFrequencyDetector {
             runCatching {
                 activity.startActivity(Intent(
                     Intent.ACTION_VIEW,
-                    Uri.parse("https://github.com/limuzi013/minis-for-android/issues/new"),
+                    Uri.parse(com.openminis.app.data.AppLinks.NEW_ISSUE_URL),
                 ))
             }
             finishClose(onClosed)

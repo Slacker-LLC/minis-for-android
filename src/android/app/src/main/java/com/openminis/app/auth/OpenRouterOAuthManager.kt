@@ -163,7 +163,7 @@ object OpenRouterOAuthManager {
             .url(ProviderTransportPolicy.requireHttps(KEYS_URL, "OpenRouter key exchange URL"))
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .header("Content-Type", "application/json")
-            .header("HTTP-Referer", "https://github.com/limuzi013/minis-for-android")
+            .header("HTTP-Referer", com.openminis.app.data.AppLinks.REPOSITORY_URL)
             .header("X-Title", "Minis App")
             .build()
 

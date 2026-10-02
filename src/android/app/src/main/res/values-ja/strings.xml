@@ -178,6 +178,9 @@
     <string name="about_minis_tagline">Minis は完全にローカルで完全にプライベートなオンデバイスエージェントです。</string>
     <string name="about_links">リンク</string>
     <string name="about_github_repository">GitHub リポジトリ</string>
+    <string name="about_open_source_licenses">オープンソースライセンス</string>
+    <string name="about_open_source_licenses_subtitle">OpenMinis と Eta をベースに、その他のオープンソースコンポーネントを使用</string>
+    <string name="about_license">ライセンス (GPL-3.0)</string>
     <string name="about_version_format">バージョン %1$s (%2$s)</string>
 
     <!-- T172 — chat sheets i18n -->

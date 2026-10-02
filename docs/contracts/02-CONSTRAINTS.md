@@ -43,7 +43,7 @@
 
 - runtime payload 只包含 Ubuntu rootfs + rootfs manifest；网络 helper 是独立 native artifact。
 - 构建、CI 和 APK/AAB 中不得重新出现已删除 broker 的二进制、socket、runtime package 或 build task；负向 regression guard / 历史归档文字除外。
-- 仓库 source-first，不承诺 GitHub Release 对应 `versionName`。
+- 发版见 [docs/development/RELEASING.md](../development/RELEASING.md)：`main` 是当前版本，历史版本一个版本一个 `release/vX.Y` 分支，tag 为 `vX.Y[.Z][-beta.N]`，`versionCode` 由 `versionName` 推导；以 tag 对应的源码树为准。只有用项目生产密钥签名的构建才可作为 APK 附在 Release 上，绝不使用 debug 密钥。
 - 禁止把 APK/AAB、密钥、OAuth 机密提交进 Git。
 
 ## 进程死亡
