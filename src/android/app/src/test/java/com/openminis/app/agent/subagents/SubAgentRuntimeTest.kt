@@ -124,6 +124,7 @@ class SubAgentRuntimeTest {
         val jobId = started.getString("job_id")
 
         until("child created") { port.created.isNotEmpty() }
+        until("child 1 started its run") { port.briefs.containsKey("child-1") }
         assertTrue(port.briefs.getValue("child-1").contains("do it"))
         port.finish("child-1", "the answer")
 
@@ -169,6 +170,7 @@ class SubAgentRuntimeTest {
         val rt = runtime(port)
         rt.execute(args("agent" to "Researcher"), "chat-A")
         until("child created") { port.created.isNotEmpty() }
+        until("child started its run") { port.briefs.containsKey("child-1") }
         assertEquals(ThinkingLevel.HIGH, port.thinking["child-1"])
         assertTrue(port.briefs.getValue("child-1").contains("Always cite sources."))
         port.finish("child-1", "ok")
@@ -187,6 +189,7 @@ class SubAgentRuntimeTest {
         until("first child created") { port.created.size == 1 }
         port.finish("child-1", "first done")
         until("second child created") { port.created.size == 2 }
+        until("second child started its run") { port.briefs.containsKey("child-2") }
         assertTrue(port.briefs.getValue("child-2").contains("two"))
         port.finish("child-2", "second done")
         until("both callbacks") { port.delivered.size == 2 }
