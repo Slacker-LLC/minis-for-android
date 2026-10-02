@@ -4,6 +4,12 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+### Repository permissions — 2026-10-02
+
+- Only the owner/administrator can merge pull requests, create or update `main` and `release/**`, and create,
+  move or delete `v*` tags; this is enforced by rulesets, so it holds if collaborators are added later.
+  External contributors' CI runs need approval. Details in `docs/development/RELEASING.md`.
+
 ## 1.0 — 2026-10-02
 
 First official release (`versionName` 1.0, `versionCode` 1000099). Everything below this heading up to the end of
