@@ -1413,7 +1413,7 @@
     <string name="settings_category_appearance_sub">Apparence et compagnon de bureau</string>
     <string name="settings_category_runtime_sub">Terminal et variables d\'environnement</string>
     <string name="settings_section_files">Gestion des fichiers</string>
-    <string name="settings_category_files_sub">Stockage, dossiers partagés, montages, fichiers de session</string>
+    <string name="settings_category_files_sub">Stockage, dossiers partagés, montages, fichiers de session, sauvegarde et restauration</string>
     <string name="settings_category_system_sub">Root, module, autorisations et arrière-plan</string>
     <string name="settings_category_about_sub">Journaux, à propos et retours</string>
     <string name="settings_cat_models">Modèles</string>
@@ -1427,7 +1427,7 @@
     <string name="settings_cat_appearance_sub2">Thème, police, langue, icône, mascotte</string>
     <string name="settings_cat_runtime_sub2">Rootfs, variables d\'environnement</string>
     <string name="settings_cat_system_sub2">Root, Shizuku, autorisations de l’agent, arrière-plan et notifications</string>
-    <string name="settings_cat_data_sub">Sauvegarde et restauration, journaux, mises à jour, confidentialité</string>
+    <string name="settings_cat_data_sub">Journaux, mises à jour, confidentialité</string>
     <string name="settings_root_footer">Le terminal est dans le tiroir des sessions ; l\'équipe et les tâches planifiées sont dans Agent.</string>
     <string name="settings_attention_count">%1$d point(s) à traiter</string>
     <string name="settings_ready_header">Vérification de l’état</string>

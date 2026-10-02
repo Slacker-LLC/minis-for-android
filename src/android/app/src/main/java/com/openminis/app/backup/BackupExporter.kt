@@ -442,7 +442,11 @@ class BackupExporter(
      */
     private fun exportSkills(trees: BackupFileTreeExporter): BackupManifest.CategoryStat {
         val root = File(context.filesDir, "minis-global/skills")
-        val r = trees.export(root, "skills", BackupCategory.SKILLS)
+        // The installer keeps its transaction staging inside the skills folder; it is not a skill.
+        val r = trees.export(
+            root, "skills", BackupCategory.SKILLS,
+            excludeTopLevel = setOf(com.openminis.app.data.repository.SkillInstallLayout.WORK_DIRECTORY),
+        )
         return BackupManifest.CategoryStat(
             entries = Companion.skillCount(root),
             bytes = r.bytesIncluded,
@@ -887,7 +891,7 @@ class BackupExporter(
          * skills and are not counted.
          */
         fun skillCount(skillsRoot: File): Int =
-            skillsRoot.listFiles()?.count { it.isDirectory } ?: 0
+            skillsRoot.listFiles()?.count { it.isDirectory && !it.name.startsWith(".") } ?: 0
 
         /**
          * Servers declared in `servers.json`, which is

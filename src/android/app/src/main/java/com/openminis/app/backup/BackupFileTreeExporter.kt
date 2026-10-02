@@ -57,6 +57,8 @@ class BackupFileTreeExporter(
         logicalPrefix: String,
         category: BackupCategory,
         sessionId: String? = null,
+        /** First path components to leave out entirely, such as a store's internal work directory. */
+        excludeTopLevel: Set<String> = emptySet(),
     ): Result {
         val result = Result()
         if (!root.exists() || !root.isDirectory) return result
@@ -73,6 +75,7 @@ class BackupFileTreeExporter(
 
             // Never package a backup artifact — see isBackupArtifact.
             if (isBackupArtifact(rel)) continue
+            if (rel.substringBefore('/') in excludeTopLevel) continue
 
             if (entry.isDirectory) {
                 // Empty directories would otherwise vanish, since nothing

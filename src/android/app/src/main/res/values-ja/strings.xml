@@ -1527,7 +1527,7 @@
     <string name="settings_category_appearance_sub">外観とデスクトップペット</string>
     <string name="settings_category_runtime_sub">ターミナルと環境変数</string>
     <string name="settings_section_files">ファイル管理</string>
-    <string name="settings_category_files_sub">ストレージ、共有フォルダ、マウント、セッションファイル</string>
+    <string name="settings_category_files_sub">ストレージ、共有フォルダ、マウント、セッションファイル、バックアップと復元</string>
     <string name="settings_category_system_sub">Root、モジュール、権限、バックグラウンド</string>
     <string name="settings_category_about_sub">ログ、情報、フィードバック</string>
     <string name="settings_cat_models">モデル</string>
@@ -1541,7 +1541,7 @@
     <string name="settings_cat_appearance_sub2">テーマ、フォント、言語、アプリアイコン、デスクトップペット</string>
     <string name="settings_cat_runtime_sub2">Rootfs、環境変数</string>
     <string name="settings_cat_system_sub2">Root、Shizuku、エージェント権限、バックグラウンドと通知</string>
-    <string name="settings_cat_data_sub">バックアップと復元、ログ、更新、プライバシー</string>
+    <string name="settings_cat_data_sub">ログ、更新、プライバシー</string>
     <string name="settings_root_footer">ターミナルはセッションドロワーに、チームと定期タスクは Agent にあります。</string>
     <string name="settings_attention_count">%1$d 件の対応が必要です</string>
     <string name="settings_ready_header">準備状況</string>

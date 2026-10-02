@@ -1053,7 +1053,7 @@
     <string name="settings_category_appearance_sub">外觀與桌面寵物</string>
     <string name="settings_category_runtime_sub">終端與環境變數</string>
     <string name="settings_section_files">檔案管理</string>
-    <string name="settings_category_files_sub">儲存空間、共享資料夾、掛載、對話檔案</string>
+    <string name="settings_category_files_sub">儲存空間、共享資料夾、掛載、對話檔案、備份與還原</string>
     <string name="settings_category_system_sub">Root、模組、權限與背景</string>
     <string name="settings_category_about_sub">日誌、關於與回饋</string>
     <string name="settings_cat_models">模型</string>
@@ -1067,7 +1067,7 @@
     <string name="settings_cat_appearance_sub2">主題、字型、語言、應用程式圖示、桌寵</string>
     <string name="settings_cat_runtime_sub2">Rootfs、環境變數</string>
     <string name="settings_cat_system_sub2">Root、Shizuku、Agent 權限、背景與通知</string>
-    <string name="settings_cat_data_sub">備份與還原、日誌、更新、隱私</string>
+    <string name="settings_cat_data_sub">日誌、更新、隱私</string>
     <string name="settings_root_footer">終端機在對話抽屜裡；團隊和排程任務在 Agent 裡。</string>
     <string name="settings_attention_count">%1$d 項需要處理</string>
     <string name="settings_ready_header">就緒檢查</string>
