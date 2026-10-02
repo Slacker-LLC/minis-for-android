@@ -4,6 +4,21 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+### Backup covers the rest of what a reinstall would lose — 2026-10-02
+
+- Backups now also carry: interface and behaviour preferences (an explicit allowlist), the custom system prompt
+  with its module overrides, scheduled tasks, characters (card, artwork, story memory) and bots. Restoring
+  follows the same rule as the rest of the app: a record already on the device is replaced only by a strictly
+  newer one.
+- Fail closed: permission grants, approvals, device identity, install state and secrets are never in a backup
+  and never restored, whatever a package claims; unknown prompt modules, unsafe ids and unreadable cards are
+  ignored and counted; a scheduled task with full access is restored switched off, because granting full access
+  needs the user's confirmation. The restore report lists what came back and what was ignored.
+- Verified on a device with a real export and import (plain and encrypted), a crafted package that tries to
+  plant a permission preference, and an edited package caught by the integrity check.
+- `docs/development/BACKUP.md` lists what a backup contains and does not, and the steps for moving to a
+  differently signed build.
+
 ### Canonical application identity and repository — 2026-09-20
 
 - The integrated product uses the canonical `llc.slacker.minis` application identity in Gradle,

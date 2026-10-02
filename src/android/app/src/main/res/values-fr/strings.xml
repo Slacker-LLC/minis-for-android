@@ -1088,6 +1088,15 @@
     <string name="backup_report_up_to_date">Déjà à jour</string>
     <string name="backup_report_missing_files">Fichiers manquants</string>
     <string name="backup_report_issues">Problèmes</string>
+    <string name="backup_report_extras">Également restauré</string>
+    <string name="backup_report_extra_settings">Réglages : %1$d</string>
+    <string name="backup_report_extra_prompt">Prompt système : %1$d</string>
+    <string name="backup_report_extra_characters">Personnages : %1$d</string>
+    <string name="backup_report_extra_bots">Bots : %1$d</string>
+    <string name="backup_report_extra_tasks">Tâches planifiées : %1$d</string>
+    <string name="backup_report_tasks_disabled">%1$d tâche(s) planifiée(s) ont un accès complet et ont été restaurées désactivées. Vérifiez-les dans Tâches planifiées avant de les activer.</string>
+    <string name="backup_report_settings_restart">Les réglages s’appliquent après le redémarrage de l’app.</string>
+    <string name="backup_report_ignored">%1$d élément(s) de la sauvegarde n’ont pas été reconnus et ont été ignorés.</string>
     <string name="backup_report_failed">%1$s : %2$s</string>
     <string name="backup_report_size_skipped">%1$s : %2$d fichier(s) ne figuraient pas dans la sauvegarde (limite de taille)</string>
     <string name="backup_report_not_downloaded">%1$s : %2$d fichier(s) ne figuraient pas dans la sauvegarde (non téléchargés sur l\'appareil source)</string>

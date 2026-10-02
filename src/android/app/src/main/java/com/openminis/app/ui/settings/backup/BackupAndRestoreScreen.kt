@@ -1014,6 +1014,40 @@ private fun RestoreReport(
         }
     }
 
+    // What came back besides the category records (settings, prompt, characters, bots, scheduled tasks).
+    val extraLines = buildList {
+        val e = report.extras
+        e["settings"]?.let { add(stringResource(R.string.backup_report_extra_settings, it)) }
+        e["prompt"]?.let { add(stringResource(R.string.backup_report_extra_prompt, it)) }
+        e["characters"]?.let { add(stringResource(R.string.backup_report_extra_characters, it)) }
+        e["bots"]?.let { add(stringResource(R.string.backup_report_extra_bots, it)) }
+        e["scheduled_tasks"]?.let { add(stringResource(R.string.backup_report_extra_tasks, it)) }
+    }
+    val extraNotes = buildList {
+        report.extras["scheduled_tasks_disabled"]?.let {
+            add(stringResource(R.string.backup_report_tasks_disabled, it))
+        }
+        if (report.extras.containsKey("settings_restart")) add(stringResource(R.string.backup_report_settings_restart))
+        report.extras["ignored"]?.let { add(stringResource(R.string.backup_report_ignored, it)) }
+    }
+    if (extraLines.isNotEmpty() || extraNotes.isNotEmpty()) {
+        SettingsSection(header = stringResource(R.string.backup_report_extras)) {
+            Column(Modifier.padding(16.dp)) {
+                extraLines.forEach {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 2.dp))
+                }
+                extraNotes.forEach {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 2.dp),
+                    )
+                }
+            }
+        }
+    }
+
     // Per-category problems. The totals above say a restore had issues; these
     // say WHICH data was affected and why, which is the difference between
     // "something went wrong" and knowing whether it matters. Each line names

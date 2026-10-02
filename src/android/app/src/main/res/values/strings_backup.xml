@@ -131,6 +131,15 @@
     <string name="backup_report_up_to_date">Already up to date</string>
     <string name="backup_report_missing_files">Missing files</string>
     <string name="backup_report_issues">Issues</string>
+    <string name="backup_report_extras">Also restored</string>
+    <string name="backup_report_extra_settings">Settings: %1$d</string>
+    <string name="backup_report_extra_prompt">System prompt: %1$d</string>
+    <string name="backup_report_extra_characters">Characters: %1$d</string>
+    <string name="backup_report_extra_bots">Bots: %1$d</string>
+    <string name="backup_report_extra_tasks">Scheduled tasks: %1$d</string>
+    <string name="backup_report_tasks_disabled">%1$d scheduled task(s) have full access, so they were restored switched off. Review and enable them in Scheduled Tasks.</string>
+    <string name="backup_report_settings_restart">Settings apply after you restart the app.</string>
+    <string name="backup_report_ignored">%1$d item(s) in the backup were not recognised and were ignored.</string>
     <string name="backup_report_failed">%1$s: %2$s</string>
     <string name="backup_report_size_skipped">%1$s: %2$d file(s) weren\'t in the backup (size limit)</string>
     <string name="backup_report_not_downloaded">%1$s: %2$d file(s) weren\'t in the backup (not downloaded on the source device)</string>

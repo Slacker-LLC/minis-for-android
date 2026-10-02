@@ -1226,6 +1226,15 @@
     <string name="backup_report_up_to_date">Bereits aktuell</string>
     <string name="backup_report_missing_files">Fehlende Dateien</string>
     <string name="backup_report_issues">Probleme</string>
+    <string name="backup_report_extras">Außerdem wiederhergestellt</string>
+    <string name="backup_report_extra_settings">Einstellungen: %1$d</string>
+    <string name="backup_report_extra_prompt">Systemprompt: %1$d</string>
+    <string name="backup_report_extra_characters">Charaktere: %1$d</string>
+    <string name="backup_report_extra_bots">Bots: %1$d</string>
+    <string name="backup_report_extra_tasks">Geplante Aufgaben: %1$d</string>
+    <string name="backup_report_tasks_disabled">%1$d geplante Aufgabe(n) haben Vollzugriff und wurden deaktiviert wiederhergestellt. Prüfen Sie sie unter „Geplante Aufgaben“ und aktivieren Sie sie dort.</string>
+    <string name="backup_report_settings_restart">Einstellungen gelten nach einem Neustart der App.</string>
+    <string name="backup_report_ignored">%1$d Element(e) der Sicherung wurden nicht erkannt und ignoriert.</string>
     <string name="backup_report_failed">%1$s: %2$s</string>
     <string name="backup_report_size_skipped">%1$s: %2$d Datei(en) waren nicht in der Sicherung enthalten (Größenbegrenzung)</string>
     <string name="backup_report_not_downloaded">%1$s: %2$d Datei(en) waren nicht in der Sicherung enthalten (auf dem Quellgerät nicht heruntergeladen)</string>

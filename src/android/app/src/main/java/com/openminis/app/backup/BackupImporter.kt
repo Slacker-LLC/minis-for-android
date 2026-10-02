@@ -105,6 +105,13 @@ class BackupImporter(
         var wasEncrypted: Boolean = false,
         val warnings: MutableList<String> = mutableListOf(),
         var durationMillis: Long = 0,
+        /**
+         * What was restored besides the category records, by key: `characters`, `bots`, `scheduled_tasks`,
+         * `settings`, `prompt`; plus `scheduled_tasks_disabled` (full-access tasks restored switched off),
+         * `settings_restart` (preferences that apply after a restart) and `ignored` (items the package
+         * carried that were refused). The UI localises the keys; the importer writes no user-facing text.
+         */
+        val extras: MutableMap<String, Int> = mutableMapOf(),
     ) {
         val totalImported: Int get() = categories.sumOf { it.imported }
         val totalUpdated: Int get() = categories.sumOf { it.updated }
@@ -220,6 +227,19 @@ class BackupImporter(
                 } catch (e: Exception) {
                     AppLogger.error(TAG, "[Restore] category ${category.key} failed: ${e.message}")
                     CategoryReport(category.key, failed = e.message ?: e.toString())
+                }
+                if (categoryReport != null && categoryReport.failed == null) {
+                    try {
+                        when (category) {
+                            BackupCategory.CHATS -> restoreCharactersAndBots(work, report)
+                            BackupCategory.PROVIDERS -> restoreAppSettings(work, report)
+                            else -> Unit
+                        }
+                    } catch (e: Exception) {
+                        // The category itself came in; a failing extra must not undo or hide that.
+                        AppLogger.error(TAG, "[Restore] extras of ${category.key} failed: ${e.message}")
+                        report.warnings.add("${category.key}: ${e.message ?: e.javaClass.simpleName}")
+                    }
                 }
                 categoryReport?.let {
                     report.categories.add(it)
@@ -1068,6 +1088,125 @@ class BackupImporter(
         mutableListOf<Envelope>().also { out -> readJsonl(dataDir, baseName) { out.add(it) } }
 
     private class Envelope(val obj: JsonObject?)
+
+    // -- Settings, system prompt, scheduled tasks (PROVIDERS) -------------------------------------
+
+    private fun restoreAppSettings(root: File, report: Report) {
+        val file = File(root, "data/${BackupAppSettings.FILE_NAME}")
+        if (!file.isFile) return
+        val doc = runCatching { BackupFormat.json.parseToJsonElement(file.readText()) as? JsonObject }.getOrNull()
+        if (doc == null) {
+            report.extras.merge("ignored", 1, Int::plus)
+            return
+        }
+        var ignored = 0
+
+        val prefsPlan = BackupAppSettings.planPrefs(doc["prefs"] as? JsonObject)
+        ignored += prefsPlan.rejected
+        for ((name, values) in prefsPlan.writes) {
+            val editor = context.getSharedPreferences(name, Context.MODE_PRIVATE).edit()
+            for ((key, value) in values) {
+                when (value) {
+                    is Boolean -> editor.putBoolean(key, value)
+                    is Int -> editor.putInt(key, value)
+                    is Long -> editor.putLong(key, value)
+                    is Float -> editor.putFloat(key, value)
+                    is String -> editor.putString(key, value)
+                }
+            }
+            editor.apply()
+        }
+        if (prefsPlan.count > 0) {
+            report.extras["settings"] = prefsPlan.count
+            // Several of these are read once at start-up, so they take effect after a restart.
+            report.extras["settings_restart"] = 1
+        }
+
+        val promptPlan = BackupAppSettings.planPrompt(doc["system_prompt"] as? JsonObject)
+        ignored += promptPlan.rejected
+        promptPlan.custom?.let { com.openminis.app.prompt.CustomPromptStore.save(context, it) }
+        for ((id, text) in promptPlan.modules) com.openminis.app.prompt.PromptModuleStore.saveOverride(context, id, text)
+        if (prefsPlan.writes.containsKey("minis_system_prompt") || promptPlan.modules.isNotEmpty()) {
+            com.openminis.app.prompt.PromptModuleStore.refresh(context)
+        }
+        if (promptPlan.count > 0) report.extras["prompt"] = promptPlan.count
+
+        val store = com.openminis.app.scheduled.ScheduledTaskStore(context)
+        val tasksPlan = BackupAppSettings.planTasks(
+            doc["scheduled_tasks"] as? kotlinx.serialization.json.JsonArray,
+            store.all().map { it.id }.toSet(),
+        )
+        ignored += tasksPlan.rejected
+        for (task in tasksPlan.toWrite) store.upsert(task, synchronous = true)
+        if (tasksPlan.toWrite.isNotEmpty()) {
+            // Alarms are not part of the data: register the restored tasks with the system.
+            runCatching { com.openminis.app.scheduled.ScheduledTaskManager(context).rescheduleAll() }
+                .onFailure { AppLogger.warning(TAG, "[Restore] rescheduling tasks failed: ${it.message}") }
+            report.extras["scheduled_tasks"] = tasksPlan.toWrite.size
+        }
+        if (tasksPlan.disabledForFullAccess > 0) report.extras["scheduled_tasks_disabled"] = tasksPlan.disabledForFullAccess
+        if (ignored > 0) report.extras.merge("ignored", ignored, Int::plus)
+    }
+
+    // -- Characters and bots (CHATS) ---------------------------------------------------------------
+
+    private suspend fun restoreCharactersAndBots(root: File, report: Report) {
+        val dataDir = File(root, "data")
+        var ignored = 0
+
+        val characterDao = db.characterDao()
+        var characters = 0
+        val characterRecords = readJsonlList(dataDir, BackupRoleplayMapping.CHARACTER_FILE)
+        if (characterRecords.size > BackupRoleplayMapping.MAX_ITEMS) ignored += characterRecords.size - BackupRoleplayMapping.MAX_ITEMS
+        for (env in characterRecords.take(BackupRoleplayMapping.MAX_ITEMS)) {
+            val record = env.obj?.let {
+                runCatching { BackupFormat.json.decodeFromJsonElement(BackupCharacterRecord.serializer(), it) }.getOrNull()
+            }
+            val restorable = record?.let(BackupRoleplayMapping::restorableCharacter)
+            if (restorable == null) { ignored++; continue }
+            val local = characterDao.character(restorable.entity.id)
+            // A character the user has edited since is theirs: only a strictly newer record replaces it.
+            if (!BackupRoleplayMapping.isNewer(restorable.entity.updatedAt, local?.updatedAt)) continue
+            var avatarPath = local?.avatarPath
+            restorable.avatar?.let { bytes ->
+                val target = File(context.filesDir, com.openminis.app.roleplay.CharacterStoragePolicy.avatarRelativePath(restorable.entity.id))
+                target.parentFile?.mkdirs()
+                target.writeBytes(bytes)
+                avatarPath = target.absolutePath
+            }
+            characterDao.upsertCharacter(restorable.entity.copy(avatarPath = avatarPath))
+            restorable.memory?.let { text ->
+                val memory = com.openminis.app.roleplay.CharacterMemoryRepository.file(context, restorable.entity.id)
+                memory.parentFile?.mkdirs()
+                memory.writeText(text)
+            }
+            characters++
+        }
+        if (characters > 0) report.extras["characters"] = characters
+
+        val botDao = db.botDao()
+        var bots = 0
+        val botRecords = readJsonlList(dataDir, BackupRoleplayMapping.BOT_FILE)
+        if (botRecords.size > BackupRoleplayMapping.MAX_ITEMS) ignored += botRecords.size - BackupRoleplayMapping.MAX_ITEMS
+        for (env in botRecords.take(BackupRoleplayMapping.MAX_ITEMS)) {
+            val record = env.obj?.let {
+                runCatching { BackupFormat.json.decodeFromJsonElement(BackupBotRecord.serializer(), it) }.getOrNull()
+            }
+            val bot = record?.let(BackupRoleplayMapping::restorableBot)
+            if (bot == null) { ignored++; continue }
+            val local = botDao.getBot(bot.id)
+            if (local == null) {
+                botDao.insertBot(bot)
+                bots++
+            } else if (BackupRoleplayMapping.isNewer(bot.updatedAt, local.updatedAt)) {
+                botDao.updateBotProfile(bot.id, bot.name, bot.systemPrompt, bot.modelBinding, bot.updatedAt)
+                botDao.setBotEnabled(bot.id, bot.enabled, bot.updatedAt)
+                bots++
+            }
+        }
+        if (bots > 0) report.extras["bots"] = bots
+        if (ignored > 0) report.extras.merge("ignored", ignored, Int::plus)
+    }
 
     companion object {
         private const val TAG = "Restore"
