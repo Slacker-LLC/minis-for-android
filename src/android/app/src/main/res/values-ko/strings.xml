@@ -1136,6 +1136,9 @@
     <string name="backup_section_destinations">대상</string>
     <string name="backup_destinations_footer">새 백업은 여기에 표시된 모든 대상으로 전송됩니다.</string>
     <string name="backup_destinations_empty_footer">대상이 없는 백업은 이 앱 안에만 남아 있어 앱을 삭제하면 함께 사라집니다. 계속하려면 대상을 추가하세요.</string>
+    <string name="backup_dest_device_name">이 기기</string>
+    <string name="backup_destinations_device_footer">백업은 다운로드의 Minis Backups 폴더에 저장됩니다. 파일 관리자에서 볼 수 있고 앱을 삭제해도 남습니다. 서버를 추가하면 사본을 하나 더 보관할 수 있습니다.</string>
+    <string name="backup_choose_file_device_hint">이 기기에 저장한 백업은 다운로드 → Minis Backups에 있습니다.</string>
     <string name="backup_needs_destination">계속하려면 저장 대상을 추가하세요.</string>
     <string name="backup_needs_category">포함할 항목을 하나 이상 선택하세요.</string>
     <string name="backup_needs_passphrase">이 백업을 암호화할 암호문을 설정하세요.</string>
@@ -1807,6 +1810,7 @@
     <string name="files_section_external">외부 폴더</string>
     <string name="files_mounted_title">마운트된 폴더</string>
     <string name="files_section_generated">생성된 파일</string>
+    <string name="files_section_backup">백업</string>
     <string name="files_session_files_title">세션 파일</string>
     <string name="files_session_files_sub">세션별로 보고 지우기</string>
     <string name="files_section_advanced">고급</string>

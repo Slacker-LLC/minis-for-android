@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Folder
@@ -74,6 +75,7 @@ fun FilesHubScreen(
     onOpenMemory: () -> Unit,
     onOpenMounts: () -> Unit,
     onOpenSessionFiles: () -> Unit,
+    onOpenBackup: () -> Unit,
 ) {
     val context = LocalContext.current
     var snapshot by remember { mutableStateOf<StorageSnapshot?>(null) }
@@ -145,6 +147,18 @@ fun FilesHubScreen(
                         )
                     }
                 },
+            )
+        }
+
+        // Backups are files too: they are written to Downloads/Minis Backups and restored from a file.
+        SettingsSection(header = stringResource(R.string.files_section_backup)) {
+            SettingsRow(
+                icon = Icons.Outlined.Backup,
+                iconColor = Color(0xFF5856D6),
+                title = stringResource(R.string.settings_backup_restore),
+                subtitle = stringResource(R.string.settings_backup_restore_subtitle),
+                onClick = onOpenBackup,
+                showDivider = false,
             )
         }
 

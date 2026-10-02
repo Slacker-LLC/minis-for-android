@@ -36,6 +36,9 @@
     <string name="backup_section_destinations">儲存目的地</string>
     <string name="backup_destinations_footer">新備份會發送到這裡列出的所有目的地。</string>
     <string name="backup_destinations_empty_footer">沒有目的地的備份只會留在本應用內，應用被解除安裝時一併丟失。請新增一個以繼續。</string>
+    <string name="backup_dest_device_name">本機</string>
+    <string name="backup_destinations_device_footer">備份儲存在「下載」中的 Minis Backups 資料夾，檔案管理中可直接看到，解除安裝應用程式後仍會保留。再新增一個伺服器可多存一份。</string>
+    <string name="backup_choose_file_device_hint">儲存在本機的備份位於「下載 → Minis Backups」。</string>
     <string name="backup_needs_destination">新增儲存目的地以繼續備份。</string>
     <string name="backup_needs_category">請至少選擇一項要備份的內容。</string>
     <string name="backup_needs_passphrase">請設定密碼以加密此備份。</string>

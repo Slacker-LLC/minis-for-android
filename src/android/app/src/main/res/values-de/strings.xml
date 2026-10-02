@@ -1137,6 +1137,9 @@
     <string name="backup_section_destinations">Ziele</string>
     <string name="backup_destinations_footer">Neue Sicherungen werden an jedes hier aufgeführte Ziel gesendet.</string>
     <string name="backup_destinations_empty_footer">Eine Sicherung ohne Ziel bleibt in dieser App und geht verloren, wenn die App entfernt wird. Fügen Sie ein Ziel hinzu, um fortzufahren.</string>
+    <string name="backup_dest_device_name">Dieses Gerät</string>
+    <string name="backup_destinations_device_footer">Sicherungen werden im Ordner Minis Backups unter Downloads gespeichert. Der Dateimanager zeigt sie dort an, und sie bleiben erhalten, wenn die App deinstalliert wird. Fügen Sie einen Server hinzu, um eine zweite Kopie aufzubewahren.</string>
+    <string name="backup_choose_file_device_hint">Auf diesem Gerät gespeicherte Sicherungen liegen unter Downloads → Minis Backups.</string>
     <string name="backup_needs_destination">Fügen Sie ein Speicherziel hinzu, um fortzufahren.</string>
     <string name="backup_needs_category">Wählen Sie mindestens einen Inhalt aus.</string>
     <string name="backup_needs_passphrase">Legen Sie eine Passphrase fest, um diese Sicherung zu verschlüsseln.</string>
@@ -1818,6 +1821,7 @@
     <string name="files_section_external">Externe Ordner</string>
     <string name="files_mounted_title">Eingebundene Ordner</string>
     <string name="files_section_generated">Erzeugte Dateien</string>
+    <string name="files_section_backup">Sicherung</string>
     <string name="files_session_files_title">Sitzungsdateien</string>
     <string name="files_session_files_sub">Nach Unterhaltung ansehen und löschen</string>
     <string name="files_section_advanced">Erweitert</string>

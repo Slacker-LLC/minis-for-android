@@ -999,6 +999,9 @@
     <string name="backup_section_destinations">Destinations</string>
     <string name="backup_destinations_footer">Les nouvelles sauvegardes sont envoyées à toutes les destinations listées ici.</string>
     <string name="backup_destinations_empty_footer">Une sauvegarde sans destination reste dans cette app et est perdue si l\'app est supprimée. Ajoutez-en une pour continuer.</string>
+    <string name="backup_dest_device_name">Cet appareil</string>
+    <string name="backup_destinations_device_footer">Les sauvegardes sont enregistrées dans le dossier Minis Backups de Téléchargements. Le gestionnaire de fichiers les y affiche et elles restent si l’app est désinstallée. Ajoutez un serveur pour garder une seconde copie.</string>
+    <string name="backup_choose_file_device_hint">Les sauvegardes enregistrées sur cet appareil se trouvent dans Téléchargements → Minis Backups.</string>
     <string name="backup_needs_destination">Ajoutez une destination de stockage pour continuer.</string>
     <string name="backup_needs_category">Choisissez au moins un élément à inclure.</string>
     <string name="backup_needs_passphrase">Définissez une phrase secrète pour chiffrer cette sauvegarde.</string>
@@ -1709,6 +1712,7 @@
     <string name="files_section_external">Dossiers externes</string>
     <string name="files_mounted_title">Dossiers montés</string>
     <string name="files_section_generated">Fichiers générés</string>
+    <string name="files_section_backup">Sauvegarde</string>
     <string name="files_session_files_title">Fichiers de session</string>
     <string name="files_session_files_sub">Voir et effacer par conversation</string>
     <string name="files_section_advanced">Avancé</string>

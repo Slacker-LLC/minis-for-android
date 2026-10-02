@@ -42,6 +42,7 @@ import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Terminal
@@ -224,6 +225,7 @@ private fun BackupTab(
     val status by vm.statusText.collectAsState()
     val error by vm.errorText.collectAsState()
     val destinations by vm.destinations.collectAsState()
+    val deviceEnabled by vm.deviceEnabled.collectAsState()
     val historyRecords by vm.historyRecords.collectAsState()
     val lastResult by vm.lastResult.collectAsState()
 
@@ -365,11 +367,14 @@ private fun BackupTab(
     // Destinations…" button, so the backup screen never showed WHETHER a
     // destination existed — which is how "back up with none configured"
     // stayed invisible.
+    val hasDestination = deviceEnabled || destinations.any { it.enabled }
     DestinationsSection(
         destinations = destinations,
+        deviceEnabled = deviceEnabled,
         enabled = !running,
         onManage = onManageDestinations,
         onToggle = vm::setDestinationEnabled,
+        onToggleDevice = vm::setDeviceEnabled,
     )
 
     // -- Action --
@@ -398,7 +403,7 @@ private fun BackupTab(
             // dies with the app it protects — that is not a backup, so the
             // button refuses rather than producing one (iOS parity).
             enabled = running || (
-                selected.isNotEmpty() && passphraseValid && destinations.isNotEmpty()
+                selected.isNotEmpty() && passphraseValid && hasDestination
                 ),
             destructive = running,
             modifier = Modifier.fillMaxWidth(),
@@ -431,7 +436,7 @@ private fun BackupTab(
         // already selected (same ordering and rationale as iOS).
         if (!running) {
             val hint = when {
-                destinations.isEmpty() -> stringResource(R.string.backup_needs_destination)
+                !hasDestination -> stringResource(R.string.backup_needs_destination)
                 selected.isEmpty() -> stringResource(R.string.backup_needs_category)
                 encrypt && passphrase.isEmpty() -> stringResource(R.string.backup_needs_passphrase)
                 else -> null
@@ -803,7 +808,8 @@ private fun RestoreTab(
 
         SettingsSection(
             header = stringResource(R.string.backup_restore_other_sources),
-            footer = stringResource(R.string.backup_choose_file_footer),
+            footer = stringResource(R.string.backup_choose_file_footer) + "\n" +
+                stringResource(R.string.backup_choose_file_device_hint),
         ) {
             // Two sources, matching iOS: local file / configured rclone servers.
             // There is deliberately no "Choose from Shared Folders…" row: the
@@ -1102,17 +1108,32 @@ private fun RestoreReport(
 @Composable
 private fun DestinationsSection(
     destinations: List<com.openminis.app.backup.remote.RcloneRemoteStore.Remote>,
+    deviceEnabled: Boolean,
     enabled: Boolean,
     onManage: () -> Unit,
     onToggle: (String, Boolean) -> Unit,
+    onToggleDevice: (Boolean) -> Unit,
 ) {
     SettingsSection(
         header = stringResource(R.string.backup_section_destinations),
         footer = stringResource(
-            if (destinations.isEmpty()) R.string.backup_destinations_empty_footer
-            else R.string.backup_destinations_footer,
+            when {
+                // Nowhere to put the package: it would only reach this app's own sandbox.
+                !deviceEnabled && destinations.none { it.enabled } -> R.string.backup_destinations_empty_footer
+                destinations.isEmpty() -> R.string.backup_destinations_device_footer
+                else -> R.string.backup_destinations_footer
+            },
         ),
     ) {
+        DestinationRowLayout(
+            icon = Icons.Outlined.PhoneAndroid,
+            title = stringResource(R.string.backup_dest_device_name),
+            subtitle = com.openminis.app.backup.BackupDeviceStorage.DISPLAY_PATH,
+            checked = deviceEnabled,
+            enabled = enabled,
+            onToggle = onToggleDevice,
+            onClick = null,
+        )
         destinations.forEach { remote ->
             DestinationRow(
                 remote = remote,
@@ -1161,12 +1182,38 @@ private fun DestinationRow(
         "ftp" -> Icons.Outlined.SwapVert
         else -> Icons.Outlined.Cloud
     }
+    DestinationRowLayout(
+        icon = icon,
+        title = remote.name,
+        subtitle = stringResource(
+            R.string.backup_dest_row_subtitle,
+            remote.backend.uppercase(),
+            remote.path,
+        ),
+        checked = remote.enabled,
+        enabled = enabled,
+        onToggle = onToggle,
+        onClick = onClick,
+    )
+}
+
+/** The shared look of a destination row: icon, title over subtitle, and the delivery switch. */
+@Composable
+private fun DestinationRowLayout(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onClick: (() -> Unit)?,
+) {
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
-                .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+                .then(if (enabled && onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 // 12dp, matching every other settings row — 10dp here left this
                 // row 4dp shorter than its neighbours.
                 .padding(horizontal = 14.dp, vertical = 12.dp),
@@ -1181,17 +1228,13 @@ private fun DestinationRow(
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    remote.name,
+                    title,
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    stringResource(
-                        R.string.backup_dest_row_subtitle,
-                        remote.backend.uppercase(),
-                        remote.path,
-                    ),
+                    subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -1199,7 +1242,7 @@ private fun DestinationRow(
                 )
             }
             Spacer(Modifier.width(8.dp))
-            SettingsSwitch(checked = remote.enabled, onCheckedChange = onToggle, enabled = enabled)
+            SettingsSwitch(checked = checked, onCheckedChange = onToggle, enabled = enabled)
         }
         Box(
             Modifier.fillMaxWidth().padding(start = 56.dp)

@@ -1144,6 +1144,9 @@
     <string name="backup_section_destinations">保存先</string>
     <string name="backup_destinations_footer">新しいバックアップは、ここに表示されているすべての保存先に送られます。</string>
     <string name="backup_destinations_empty_footer">保存先のないバックアップはこのアプリ内に留まるため、アプリを削除すると失われます。続けるには保存先を追加してください。</string>
+    <string name="backup_dest_device_name">この端末</string>
+    <string name="backup_destinations_device_footer">バックアップは「ダウンロード」の Minis Backups フォルダに保存されます。ファイル管理アプリで確認でき、アプリを削除しても残ります。サーバーを追加すると、もう1つコピーを保管できます。</string>
+    <string name="backup_choose_file_device_hint">この端末に保存したバックアップは「ダウンロード → Minis Backups」にあります。</string>
     <string name="backup_needs_destination">続けるにはストレージの保存先を追加してください。</string>
     <string name="backup_needs_category">含める内容を 1 つ以上選んでください。</string>
     <string name="backup_needs_passphrase">このバックアップを暗号化するパスフレーズを設定してください。</string>
@@ -1815,6 +1818,7 @@
     <string name="files_section_external">外部フォルダ</string>
     <string name="files_mounted_title">マウント済みフォルダ</string>
     <string name="files_section_generated">生成されたファイル</string>
+    <string name="files_section_backup">バックアップ</string>
     <string name="files_session_files_title">セッションのファイル</string>
     <string name="files_session_files_sub">セッションごとに確認・削除</string>
     <string name="files_section_advanced">詳細設定</string>
