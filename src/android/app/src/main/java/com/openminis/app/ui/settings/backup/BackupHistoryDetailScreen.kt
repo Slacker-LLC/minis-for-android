@@ -418,6 +418,8 @@ private fun RowDivider(inset: androidx.compose.ui.unit.Dp) {
 private fun destinationSubtitle(d: BackupHistory.DestinationOutcome): String? {
     val kind = d.kind?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
     val path = d.path?.trim()?.takeIf { it.isNotEmpty() }
+    // The device folder is a path in shared storage, not a server: show the folder alone.
+    if (d.kind == com.openminis.app.backup.BackupDeviceStorage.KIND) return path
     return when {
         kind != null && path != null -> "$kind · /$path"
         kind != null -> kind

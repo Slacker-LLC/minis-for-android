@@ -2081,6 +2081,7 @@
     <string name="files_section_external">外部資料夾</string>
     <string name="files_mounted_title">已掛載資料夾</string>
     <string name="files_section_generated">產生的檔案</string>
+    <string name="files_section_backup">備份</string>
     <string name="files_session_files_title">對話檔案</string>
     <string name="files_session_files_sub">依對話查看與清除</string>
     <string name="files_section_advanced">進階</string>

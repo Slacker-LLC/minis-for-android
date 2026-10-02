@@ -40,6 +40,9 @@
     <string name="backup_section_destinations">Destinations</string>
     <string name="backup_destinations_footer">New backups are sent to every destination listed here.</string>
     <string name="backup_destinations_empty_footer">A backup with no destination stays inside this app and is lost if the app is removed. Add one to continue.</string>
+    <string name="backup_dest_device_name">This device</string>
+    <string name="backup_destinations_device_footer">Backups are saved to Minis Backups in Downloads. The file manager shows them there, and they stay when the app is uninstalled. Add a server to keep a second copy.</string>
+    <string name="backup_choose_file_device_hint">Backups saved on this device are in Downloads → Minis Backups.</string>
     <string name="backup_needs_destination">Add a storage destination to continue.</string>
     <string name="backup_needs_category">Choose at least one thing to include.</string>
     <string name="backup_needs_passphrase">Set a passphrase to encrypt this backup.</string>

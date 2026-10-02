@@ -7,7 +7,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
@@ -147,7 +146,6 @@ fun SettingsCategoryScreen(
     onMemoryClick: () -> Unit = {},
     onMcpClick: () -> Unit = {},
     onEnvVarsClick: () -> Unit = {},
-    onBackupClick: () -> Unit = {},
     onAppearanceClick: () -> Unit = {},
     onSystemEnhanceClick: () -> Unit = {},
     onPermissionsClick: () -> Unit = {},
@@ -393,13 +391,6 @@ fun SettingsCategoryScreen(
 
             SettingsCategory.DATA -> {
                 SettingsSection {
-                    SettingsRow(
-                        icon = Icons.Outlined.Backup,
-                        iconColor = Color(0xFF5856D6),
-                        title = stringResource(R.string.settings_backup_restore),
-                        subtitle = stringResource(R.string.settings_backup_restore_subtitle),
-                        onClick = onBackupClick,
-                    )
                     SettingsRow(
                         icon = Icons.Outlined.Description,
                         iconColor = Color(0xFF8E8E93),

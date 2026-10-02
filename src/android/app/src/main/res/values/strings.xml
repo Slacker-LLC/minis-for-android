@@ -2199,6 +2199,7 @@
     <string name="files_section_external">External folders</string>
     <string name="files_mounted_title">Mounted folders</string>
     <string name="files_section_generated">Generated files</string>
+    <string name="files_section_backup">Backup</string>
     <string name="files_session_files_title">Session files</string>
     <string name="files_session_files_sub">View and clear by conversation</string>
     <string name="files_section_advanced">Advanced</string>
