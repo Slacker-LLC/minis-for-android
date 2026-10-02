@@ -98,7 +98,15 @@ beta 加 `--prerelease`。
 - 想试 beta 的稳定版用户手动安装 beta 的 APK；之后它按 beta 通道收更新。
 - 已知：发 1.0 之前的 `1.01-beta.*` 构建会把 `1.01` 视为比 `1.0` 新，不会被推送 1.0，手动安装即可（`versionCode` 更高，原地升级并保留数据）。
 
-## CI 与分支保护
+## CI、分支保护与仓库权限
 
-- PR 以及 `main`、`release/**` 的 push 都跑 CI。
-- `main` 和 `release/**` 由仓库规则保护：必须经 PR、必须通过状态检查、禁止强推和删除。仓库管理员只能通过 PR 绕过检查，不能直接推送。
+仓库 `Slacker-LLC/minis-for-android` 属于个人账号 `Slacker-LLC`，不是组织：账号所有者就是管理员，目前也是唯一的协作者，没有团队。**只有所有者/管理员能合并 PR、创建或更新分支、移动或删除发版 tag**；其他人只能 fork 后提 PR。
+
+- CI：PR 以及 `main`、`release/**` 的 push 都跑。新建的 release 分支第一次 push 会按全量改动跑完整流水线。
+- 规则集 `Protect main and release branches`（`main` 与 `release/**`）：必须经 PR；必须通过 `Android build, test and release checks`、`Documentation provenance guard`、`Build cleanup guard`；只有拥有绕过权限的人能创建或更新这些分支；禁止强推和删除。绕过权限只给仓库管理员角色，且模式是“仅通过 PR”：管理员也不能直接往 `main` 推送，只能合并 PR。
+- 规则集 `Protect release tags`（`v*`）：只有管理员能创建、更新、删除，没人能移动一个已发布的 tag。
+- 合并方式只允许 squash 与 rebase，不允许 merge commit。
+- Actions：默认令牌只读、不能批准 PR；外部贡献者的 fork PR 触发 CI 前都要人工批准。
+- 安全：已开启私密漏洞报告（见 [SECURITY.md](../../SECURITY.md)）、密钥扫描与推送保护、Dependabot 安全更新。
+
+以后加协作者：即使给了 Write 权限，规则集也不允许他们合并到 `main`/`release/**` 或打 tag；需要让某人能合并，就把他提升为管理员，或在规则集的绕过名单里加他。
