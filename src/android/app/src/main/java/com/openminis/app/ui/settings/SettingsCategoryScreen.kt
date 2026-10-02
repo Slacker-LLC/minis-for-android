@@ -163,6 +163,8 @@ fun SettingsCategoryScreen(
     onOpenBackground: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    // The UI language, which follows the in-app language setting: it picks the Chinese or English policy.
+    val uiLanguage = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language
     var showSubagentLimits by remember { mutableStateOf(false) }
     var showFeedbackSheet by remember { mutableStateOf(false) }
     var autoCompactState by remember { mutableStateOf(com.openminis.app.data.AutoCompactPrefs.isEnabled()) }
@@ -423,7 +425,7 @@ fun SettingsCategoryScreen(
                         title = stringResource(R.string.settings_privacy_policy),
                         onClick = { openExternalUrl(
                             context,
-                            com.openminis.app.data.AppLinks.privacyPolicyUrl(context.resources.configuration.locales[0].language),
+                            com.openminis.app.data.AppLinks.privacyPolicyUrl(uiLanguage),
                         ) },
                     )
                     SettingsRow(
