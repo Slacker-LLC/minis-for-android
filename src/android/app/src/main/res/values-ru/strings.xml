@@ -1759,7 +1759,7 @@
     <string name="settings_category_appearance_sub">Внешний вид и настольный питомец</string>
     <string name="settings_category_runtime_sub">Терминал и переменные окружения</string>
     <string name="settings_section_files">Управление файлами</string>
-    <string name="settings_category_files_sub">Хранилище, общие папки, подключения, файлы сеансов</string>
+    <string name="settings_category_files_sub">Хранилище, общие папки, подключения, файлы сеансов, резервное копирование</string>
     <string name="settings_category_system_sub">Root, модуль, разрешения и фон</string>
     <string name="settings_category_about_sub">Журналы, информация и отзывы</string>
     <string name="settings_cat_models">Модели</string>
@@ -1773,7 +1773,7 @@
     <string name="settings_cat_appearance_sub2">Тема, шрифты, язык, значок, питомец</string>
     <string name="settings_cat_runtime_sub2">Rootfs, переменные окружения</string>
     <string name="settings_cat_system_sub2">Root, Shizuku, права агента, фон и уведомления</string>
-    <string name="settings_cat_data_sub">Резервные копии, журналы, обновления, конфиденциальность</string>
+    <string name="settings_cat_data_sub">Журналы, обновления, конфиденциальность</string>
     <string name="settings_root_footer">Терминал — в боковой панели; команда и задачи по расписанию — в разделе Agent.</string>
     <string name="settings_attention_count">Требуют внимания: %1$d</string>
     <string name="settings_ready_header">Проверка готовности</string>

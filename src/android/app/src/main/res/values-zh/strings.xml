@@ -1748,7 +1748,7 @@
     <string name="settings_category_appearance_sub">外观与桌面宠物</string>
     <string name="settings_category_runtime_sub">终端与环境变量</string>
     <string name="settings_section_files">文件管理</string>
-    <string name="settings_category_files_sub">存储占用、共享文件夹、挂载、会话文件</string>
+    <string name="settings_category_files_sub">存储占用、共享文件夹、挂载、会话文件、备份与恢复</string>
     <string name="settings_category_system_sub">Root、模块、权限与后台</string>
     <string name="settings_category_about_sub">日志、关于与反馈</string>
     <string name="settings_cat_models">模型</string>
@@ -1762,7 +1762,7 @@
     <string name="settings_cat_appearance_sub2">主题、字体、语言、应用图标、桌宠</string>
     <string name="settings_cat_runtime_sub2">Rootfs、环境变量</string>
     <string name="settings_cat_system_sub2">Root、Shizuku、Agent 权限、后台与通知</string>
-    <string name="settings_cat_data_sub">备份与恢复、日志、更新、隐私</string>
+    <string name="settings_cat_data_sub">日志、更新、隐私</string>
     <string name="settings_root_footer">终端在会话抽屉里；团队和定时任务在 Agent 里。</string>
     <string name="settings_attention_count">%1$d 项需要处理</string>
     <string name="settings_ready_header">就绪检查</string>

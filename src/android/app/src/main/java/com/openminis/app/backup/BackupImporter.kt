@@ -689,6 +689,9 @@ class BackupImporter(
         val grouped = linkedMapOf<String, MutableList<BackupFileIndexEntry>>()
         for (entry in fileIndex) {
             if (entry.category != BackupCategory.SKILLS.key) continue
+            // Packages written before the exporter left it out carry the installer's work folder. It is not a
+            // skill and was never meant to travel; ignore it quietly rather than report an unreadable skill.
+            if (isSkillInstallerWorkPath(entry.path)) continue
             val skillId = skillIdOfPath(entry.path)
             if (skillId == null) {
                 AppLogger.error(TAG, "[Restore] REJECTED skill entry outside skills/<id>/: " + entry.path)
@@ -1210,6 +1213,11 @@ class BackupImporter(
 
     companion object {
         private const val TAG = "Restore"
+
+        /** `skills/.minis-skill-installer` and everything under it. */
+        internal fun isSkillInstallerWorkPath(path: String): Boolean =
+            path == "skills/" + com.openminis.app.data.repository.SkillInstallLayout.WORK_DIRECTORY ||
+                path.startsWith("skills/" + com.openminis.app.data.repository.SkillInstallLayout.WORK_DIRECTORY + "/")
 
         /**
          * [XSessionDiag] Mirror of the auto launch-mode freshness window in

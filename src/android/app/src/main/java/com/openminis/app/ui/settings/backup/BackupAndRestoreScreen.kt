@@ -161,7 +161,7 @@ fun BackupAndRestoreScreen(
     SettingsScaffold(
         title = stringResource(R.string.backup_title),
         onBack = onBack,
-        backLabel = stringResource(R.string.settings_cat_data),
+        backLabel = stringResource(R.string.settings_section_files),
     ) {
         SettingsSegmented(
             options = listOf(

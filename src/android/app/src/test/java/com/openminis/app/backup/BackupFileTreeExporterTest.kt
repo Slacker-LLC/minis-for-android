@@ -46,6 +46,45 @@ class BackupFileTreeExporterTest {
         }
 
     @Test
+    fun `an excluded top-level folder is left out with everything under it`() {
+        File(source, "writer/SKILL.md").apply { parentFile.mkdirs() }.writeText("# writer")
+        File(source, ".minis-skill-installer/recovery/op-1/journal.json").apply { parentFile.mkdirs() }.writeText("{}")
+        File(source, ".minis-skill-installer/new").mkdirs()
+
+        val (trees, _, indexFile) = exporter()
+        val r = trees.export(
+            source, "skills", BackupCategory.SKILLS,
+            excludeTopLevel = setOf(".minis-skill-installer"),
+        )
+
+        assertEquals(1, r.filesIncluded)
+        assertEquals(
+            "only the real skill is indexed, no installer staging and no empty directory from it",
+            listOf("skills/writer/SKILL.md"),
+            readIndex(indexFile).map { it.path },
+        )
+    }
+
+    @Test
+    fun `the installer work folder is not counted as a skill`() {
+        File(source, "writer").mkdirs()
+        File(source, "reviewer").mkdirs()
+        File(source, ".minis-skill-installer").mkdirs()
+        File(source, ".hidden").mkdirs()
+        File(source, "stray.txt").writeText("not a skill")
+        assertEquals(2, BackupExporter.skillCount(source))
+    }
+
+    @Test
+    fun `an older package that carries the installer folder is recognised so the restore can ignore it`() {
+        assertTrue(BackupImporter.isSkillInstallerWorkPath("skills/.minis-skill-installer"))
+        assertTrue(BackupImporter.isSkillInstallerWorkPath("skills/.minis-skill-installer/recovery/op-1/journal.json"))
+        assertEquals(false, BackupImporter.isSkillInstallerWorkPath("skills/writer/SKILL.md"))
+        assertEquals(false, BackupImporter.isSkillInstallerWorkPath("skills/.minis-skill-installer-copy/SKILL.md"))
+        assertEquals(false, BackupImporter.isSkillInstallerWorkPath("chats/x/.minis-skill-installer/a"))
+    }
+
+    @Test
     fun `walks a tree into blobs and index entries`() {
         File(source, "attachments").mkdirs()
         File(source, "attachments/a.png").writeBytes(byteArrayOf(1, 2, 3))
