@@ -1225,6 +1225,15 @@
     <string name="backup_report_up_to_date">이미 최신입니다</string>
     <string name="backup_report_missing_files">없는 파일</string>
     <string name="backup_report_issues">문제</string>
+    <string name="backup_report_extras">함께 복원됨</string>
+    <string name="backup_report_extra_settings">설정: %1$d개</string>
+    <string name="backup_report_extra_prompt">시스템 프롬프트: %1$d개</string>
+    <string name="backup_report_extra_characters">캐릭터: %1$d개</string>
+    <string name="backup_report_extra_bots">봇: %1$d개</string>
+    <string name="backup_report_extra_tasks">예약 작업: %1$d개</string>
+    <string name="backup_report_tasks_disabled">전체 권한을 가진 예약 작업 %1$d개는 꺼진 상태로 복원되었습니다. 예약 작업에서 확인한 뒤 켜세요.</string>
+    <string name="backup_report_settings_restart">설정은 앱을 다시 시작하면 적용됩니다.</string>
+    <string name="backup_report_ignored">백업의 %1$d개 항목을 인식하지 못해 무시했습니다.</string>
     <string name="backup_report_failed">%1$s: %2$s</string>
     <string name="backup_report_size_skipped">%1$s: 파일 %2$d개가 백업에 없었습니다(크기 제한)</string>
     <string name="backup_report_not_downloaded">%1$s: 파일 %2$d개가 백업에 없었습니다(원본 기기에 내려받지 않음)</string>

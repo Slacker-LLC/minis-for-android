@@ -125,6 +125,15 @@
     <string name="backup_report_up_to_date">已是最新</string>
     <string name="backup_report_missing_files">缺失檔案</string>
     <string name="backup_report_issues">問題</string>
+    <string name="backup_report_extras">另外還原了</string>
+    <string name="backup_report_extra_settings">設定：%1$d 項</string>
+    <string name="backup_report_extra_prompt">系統提示詞：%1$d 項</string>
+    <string name="backup_report_extra_characters">角色：%1$d 個</string>
+    <string name="backup_report_extra_bots">機器人：%1$d 個</string>
+    <string name="backup_report_extra_tasks">排程任務：%1$d 個</string>
+    <string name="backup_report_tasks_disabled">有 %1$d 個排程任務擁有完整權限，已以關閉狀態還原。請在「排程任務」中確認後再開啟。</string>
+    <string name="backup_report_settings_restart">設定需要重新啟動應用程式後生效。</string>
+    <string name="backup_report_ignored">備份中有 %1$d 項無法辨識，已略過。</string>
     <string name="backup_report_failed">%1$s：%2$s</string>
     <string name="backup_report_size_skipped">%1$s：%2$d 個檔案不在備份中（大小限制）</string>
     <string name="backup_report_not_downloaded">%1$s：%2$d 個檔案不在備份中（源裝置上未下載）</string>

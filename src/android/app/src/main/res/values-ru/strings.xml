@@ -1459,6 +1459,15 @@
     <string name="backup_report_up_to_date">Уже актуально</string>
     <string name="backup_report_missing_files">Отсутствующие файлы</string>
     <string name="backup_report_issues">Замечания</string>
+    <string name="backup_report_extras">Также восстановлено</string>
+    <string name="backup_report_extra_settings">Настройки: %1$d</string>
+    <string name="backup_report_extra_prompt">Системный промпт: %1$d</string>
+    <string name="backup_report_extra_characters">Персонажи: %1$d</string>
+    <string name="backup_report_extra_bots">Боты: %1$d</string>
+    <string name="backup_report_extra_tasks">Запланированные задачи: %1$d</string>
+    <string name="backup_report_tasks_disabled">Запланированных задач с полным доступом: %1$d — они восстановлены выключенными. Проверьте их в «Запланированных задачах» и включите.</string>
+    <string name="backup_report_settings_restart">Настройки применятся после перезапуска приложения.</string>
+    <string name="backup_report_ignored">Элементов копии, которые не удалось распознать и которые пропущены: %1$d.</string>
     <string name="backup_report_failed">%1$s: %2$s</string>
     <string name="backup_report_size_skipped">%1$s: файлов не было в копии: %2$d (ограничение размера)</string>
     <string name="backup_report_not_downloaded">%1$s: файлов не было в копии: %2$d (не загружены на исходном устройстве)</string>
