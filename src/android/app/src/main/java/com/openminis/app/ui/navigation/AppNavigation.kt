@@ -660,6 +660,7 @@ fun AppNavigation(
                     onOpenMemory = { navController.safeNavigate(Routes.MEMORY) },
                     onOpenMounts = { navController.safeNavigate(Routes.MOUNTED_FOLDERS) },
                     onOpenSessionFiles = { navController.safeNavigate(Routes.STORAGE) },
+                    onOpenBackup = { navController.safeNavigate(Routes.BACKUP) },
                 )
             } else {
                 SettingsCategoryScreen(
@@ -679,7 +680,6 @@ fun AppNavigation(
                     onEnvVarsClick = { navController.safeNavigate(Routes.ENV_VARS) },
                     onRootfsManagementClick = { navController.safeNavigate(Routes.ROOTFS_MANAGEMENT) },
                     onOpenBackground = { navController.safeNavigate(Routes.BACKGROUND) },
-                    onBackupClick = { navController.safeNavigate(Routes.BACKUP) },
                     onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
                     onSystemEnhanceClick = { navController.safeNavigate(Routes.SYSTEM_ENHANCE) },
                     onPermissionsClick = { navController.safeNavigate(Routes.SYSTEM_PERMISSIONS) },

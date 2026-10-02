@@ -1140,6 +1140,9 @@
     <string name="backup_section_destinations">Ziele</string>
     <string name="backup_destinations_footer">Neue Sicherungen werden an jedes hier aufgeführte Ziel gesendet.</string>
     <string name="backup_destinations_empty_footer">Eine Sicherung ohne Ziel bleibt in dieser App und geht verloren, wenn die App entfernt wird. Fügen Sie ein Ziel hinzu, um fortzufahren.</string>
+    <string name="backup_dest_device_name">Dieses Gerät</string>
+    <string name="backup_destinations_device_footer">Sicherungen werden im Ordner Minis Backups unter Downloads gespeichert. Der Dateimanager zeigt sie dort an, und sie bleiben erhalten, wenn die App deinstalliert wird. Fügen Sie einen Server hinzu, um eine zweite Kopie aufzubewahren.</string>
+    <string name="backup_choose_file_device_hint">Auf diesem Gerät gespeicherte Sicherungen liegen unter Downloads → Minis Backups.</string>
     <string name="backup_needs_destination">Fügen Sie ein Speicherziel hinzu, um fortzufahren.</string>
     <string name="backup_needs_category">Wählen Sie mindestens einen Inhalt aus.</string>
     <string name="backup_needs_passphrase">Legen Sie eine Passphrase fest, um diese Sicherung zu verschlüsseln.</string>
@@ -1229,6 +1232,15 @@
     <string name="backup_report_up_to_date">Bereits aktuell</string>
     <string name="backup_report_missing_files">Fehlende Dateien</string>
     <string name="backup_report_issues">Probleme</string>
+    <string name="backup_report_extras">Außerdem wiederhergestellt</string>
+    <string name="backup_report_extra_settings">Einstellungen: %1$d</string>
+    <string name="backup_report_extra_prompt">Systemprompt: %1$d</string>
+    <string name="backup_report_extra_characters">Charaktere: %1$d</string>
+    <string name="backup_report_extra_bots">Bots: %1$d</string>
+    <string name="backup_report_extra_tasks">Geplante Aufgaben: %1$d</string>
+    <string name="backup_report_tasks_disabled">%1$d geplante Aufgabe(n) haben Vollzugriff und wurden deaktiviert wiederhergestellt. Prüfen Sie sie unter „Geplante Aufgaben“ und aktivieren Sie sie dort.</string>
+    <string name="backup_report_settings_restart">Einstellungen gelten nach einem Neustart der App.</string>
+    <string name="backup_report_ignored">%1$d Element(e) der Sicherung wurden nicht erkannt und ignoriert.</string>
     <string name="backup_report_failed">%1$s: %2$s</string>
     <string name="backup_report_size_skipped">%1$s: %2$d Datei(en) waren nicht in der Sicherung enthalten (Größenbegrenzung)</string>
     <string name="backup_report_not_downloaded">%1$s: %2$d Datei(en) waren nicht in der Sicherung enthalten (auf dem Quellgerät nicht heruntergeladen)</string>
@@ -1821,6 +1833,7 @@
     <string name="files_section_external">Externe Ordner</string>
     <string name="files_mounted_title">Eingebundene Ordner</string>
     <string name="files_section_generated">Erzeugte Dateien</string>
+    <string name="files_section_backup">Sicherung</string>
     <string name="files_session_files_title">Sitzungsdateien</string>
     <string name="files_session_files_sub">Nach Unterhaltung ansehen und löschen</string>
     <string name="files_section_advanced">Erweitert</string>

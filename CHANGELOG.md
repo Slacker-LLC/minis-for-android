@@ -13,6 +13,29 @@ Builds before 1.0 (`1.01-beta.*`) are not offered 1.0 by the in-app updater, bec
 newer than `1.0`. Install the 1.0 APK over them by hand: its `versionCode` is higher (1000099 against 40 or less), so it upgrades in place
 and keeps your data.
 
+### Backup covers the rest of what a reinstall would lose — 2026-10-02
+
+- Backups now also carry: interface and behaviour preferences (an explicit allowlist), the custom system prompt
+  with its module overrides, scheduled tasks, characters (card, artwork, story memory) and bots. Restoring
+  follows the same rule as the rest of the app: a record already on the device is replaced only by a strictly
+  newer one.
+- Fail closed: permission grants, approvals, device identity, install state and secrets are never in a backup
+  and never restored, whatever a package claims; unknown prompt modules, unsafe ids and unreadable cards are
+  ignored and counted; a scheduled task with full access is restored switched off, because granting full access
+  needs the user's confirmation. The restore report lists what came back and what was ignored.
+- Verified on a device with a real export and import (plain and encrypted), a crafted package that tries to
+  plant a permission preference, and an edited package caught by the integrity check.
+- `docs/development/BACKUP.md` lists what a backup contains and does not, and the steps for moving to a
+  differently signed build.
+
+### Backups can be saved on the phone — 2026-10-02
+
+- Exporting used to need a network server (SMB, WebDAV, SFTP, S3 or FTP) and deleted the on-phone package once
+  every server held a copy, so there was no way to make a backup that survives uninstalling the app. "This
+  device" is now a destination, on by default: the package goes to `Download/Minis Backups`, where the file
+  manager shows it, and is restored with *Choose file*. The copy is size-verified and a partial file is removed.
+- Backup & Restore moved from Settings → Data to the Files hub.
+
 ### Sub agents, Compact Above and reply usage — 2026-10-02
 
 - **Sub agents.** The `subagent` tool can hand work to named sub agents that run as their own child sessions:

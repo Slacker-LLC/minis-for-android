@@ -1002,6 +1002,9 @@
     <string name="backup_section_destinations">Destinations</string>
     <string name="backup_destinations_footer">Les nouvelles sauvegardes sont envoyées à toutes les destinations listées ici.</string>
     <string name="backup_destinations_empty_footer">Une sauvegarde sans destination reste dans cette app et est perdue si l\'app est supprimée. Ajoutez-en une pour continuer.</string>
+    <string name="backup_dest_device_name">Cet appareil</string>
+    <string name="backup_destinations_device_footer">Les sauvegardes sont enregistrées dans le dossier Minis Backups de Téléchargements. Le gestionnaire de fichiers les y affiche et elles restent si l’app est désinstallée. Ajoutez un serveur pour garder une seconde copie.</string>
+    <string name="backup_choose_file_device_hint">Les sauvegardes enregistrées sur cet appareil se trouvent dans Téléchargements → Minis Backups.</string>
     <string name="backup_needs_destination">Ajoutez une destination de stockage pour continuer.</string>
     <string name="backup_needs_category">Choisissez au moins un élément à inclure.</string>
     <string name="backup_needs_passphrase">Définissez une phrase secrète pour chiffrer cette sauvegarde.</string>
@@ -1091,6 +1094,15 @@
     <string name="backup_report_up_to_date">Déjà à jour</string>
     <string name="backup_report_missing_files">Fichiers manquants</string>
     <string name="backup_report_issues">Problèmes</string>
+    <string name="backup_report_extras">Également restauré</string>
+    <string name="backup_report_extra_settings">Réglages : %1$d</string>
+    <string name="backup_report_extra_prompt">Prompt système : %1$d</string>
+    <string name="backup_report_extra_characters">Personnages : %1$d</string>
+    <string name="backup_report_extra_bots">Bots : %1$d</string>
+    <string name="backup_report_extra_tasks">Tâches planifiées : %1$d</string>
+    <string name="backup_report_tasks_disabled">%1$d tâche(s) planifiée(s) ont un accès complet et ont été restaurées désactivées. Vérifiez-les dans Tâches planifiées avant de les activer.</string>
+    <string name="backup_report_settings_restart">Les réglages s’appliquent après le redémarrage de l’app.</string>
+    <string name="backup_report_ignored">%1$d élément(s) de la sauvegarde n’ont pas été reconnus et ont été ignorés.</string>
     <string name="backup_report_failed">%1$s : %2$s</string>
     <string name="backup_report_size_skipped">%1$s : %2$d fichier(s) ne figuraient pas dans la sauvegarde (limite de taille)</string>
     <string name="backup_report_not_downloaded">%1$s : %2$d fichier(s) ne figuraient pas dans la sauvegarde (non téléchargés sur l\'appareil source)</string>
@@ -1712,6 +1724,7 @@
     <string name="files_section_external">Dossiers externes</string>
     <string name="files_mounted_title">Dossiers montés</string>
     <string name="files_section_generated">Fichiers générés</string>
+    <string name="files_section_backup">Sauvegarde</string>
     <string name="files_session_files_title">Fichiers de session</string>
     <string name="files_session_files_sub">Voir et effacer par conversation</string>
     <string name="files_section_advanced">Avancé</string>

@@ -2113,6 +2113,7 @@
     <string name="files_section_external">外部文件夹</string>
     <string name="files_mounted_title">已挂载文件夹</string>
     <string name="files_section_generated">生成的文件</string>
+    <string name="files_section_backup">备份</string>
     <string name="files_session_files_title">会话文件</string>
     <string name="files_session_files_sub">按会话查看与清除</string>
     <string name="files_section_advanced">高级</string>

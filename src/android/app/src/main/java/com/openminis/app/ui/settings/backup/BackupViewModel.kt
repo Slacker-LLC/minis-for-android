@@ -102,7 +102,20 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
      * server: a user who switched all of them off has destinations but nowhere
      * for the package to go, so the Start button must still refuse.
      */
-    val hasDestination: Boolean get() = _destinations.value.any { it.enabled }
+    val hasDestination: Boolean get() = _deviceEnabled.value || _destinations.value.any { it.enabled }
+
+    /**
+     * The phone's own Downloads/Minis Backups folder as a destination (see [BackupDeviceStorage]). On by default,
+     * so a user with no server can still make a backup that outlives the app.
+     */
+    private val deviceStorage by lazy { com.openminis.app.backup.BackupDeviceStorage(getApplication()) }
+    private val _deviceEnabled = MutableStateFlow(deviceStorage.enabled)
+    val deviceEnabled: StateFlow<Boolean> = _deviceEnabled.asStateFlow()
+
+    fun setDeviceEnabled(on: Boolean) {
+        deviceStorage.enabled = on
+        _deviceEnabled.value = on
+    }
 
     /**
      * Re-read configured destinations. Call on screen resume.
@@ -289,17 +302,30 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
 
-                // Deliver to every enabled rclone remote. Failures are surfaced
-                // but do NOT discard the local package — the user can still
-                // Share / Save it, and re-run delivery later. Mirrors iOS's
-                // "package is ready even if a destination failed" behaviour.
-                val outcomes = withContext(Dispatchers.IO) {
+                // Deliver to the device's own Downloads folder and to every
+                // enabled rclone remote. Failures are surfaced but do NOT
+                // discard the local package — the user can still Share / Save
+                // it, and re-run delivery later. Mirrors iOS's "package is
+                // ready even if a destination failed" behaviour.
+                val deviceOutcome = if (_deviceEnabled.value) {
+                    withContext(Dispatchers.IO) {
+                        deliverToDevice(summary.packageFile) { line ->
+                            _statusText.value = line
+                            note(line)
+                            publishRunning(record, log)
+                        }
+                    }
+                } else {
+                    null
+                }
+                val remoteOutcomes = withContext(Dispatchers.IO) {
                     deliverToRemotes(summary.packageFile, summary.backupId) { line ->
                         _statusText.value = line
                         note(line)
                         publishRunning(record, log)
                     }
                 }
+                val outcomes = listOfNotNull(deviceOutcome) + remoteOutcomes
                 outcomes.forEach {
                     note(
                         if (it.succeeded) "Delivered to ${it.name}"
@@ -452,12 +478,17 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
+                // The device copy first, and on its own: it must not depend on a server being reachable.
+                if (record.destinations.any { it.succeeded && it.kind == com.openminis.app.backup.BackupDeviceStorage.KIND }) {
+                    runCatching { deviceStorage.delete(name) }
+                        .onFailure { AppLogger.error(TAG, "[Backup] deleting '$name' from the device failed: ${it.message}") }
+                }
                 runCatching {
                     val store = com.openminis.app.backup.remote.RcloneRemoteStore(getApplication())
                     store.syncToRclone()
                     val uploader =
                         com.openminis.app.backup.remote.RcloneChunkedUpload(getApplication())
-                    for (outcome in record.destinations.filter { it.succeeded }) {
+                    for (outcome in record.destinations.filter { it.succeeded && it.kind != com.openminis.app.backup.BackupDeviceStorage.KIND }) {
                         val remote = store.remotes.firstOrNull { it.name == outcome.name }
                             ?: continue
                         runCatching { uploader.deletePackage(remote, name) }
@@ -477,6 +508,33 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
     fun removeHistoryRecord(id: String) {
         history.remove(id)
         _historyRecords.value = history.records()
+    }
+
+    /** Copy the package into Downloads/Minis Backups and report how it went. Never throws. */
+    private fun deliverToDevice(
+        packageFile: File,
+        onProgress: (String) -> Unit,
+    ): BackupHistory.DestinationOutcome {
+        val name = com.openminis.app.backup.BackupDeviceStorage.NAME
+        val kind = com.openminis.app.backup.BackupDeviceStorage.KIND
+        val path = com.openminis.app.backup.BackupDeviceStorage.DISPLAY_PATH
+        return try {
+            onProgress("Saving to $name…")
+            var lastPct = -1L
+            deviceStorage.deliver(packageFile) { sent, total ->
+                val pct = if (total > 0) sent * 100 / total else 0
+                if (pct != lastPct) {
+                    lastPct = pct
+                    onProgress("Saving to $name… $pct%")
+                }
+            }
+            BackupHistory.DestinationOutcome(name, succeeded = true, kind = kind, path = path)
+        } catch (e: Exception) {
+            AppLogger.error(TAG, "[Backup] saving to the device failed: ${e.message}")
+            BackupHistory.DestinationOutcome(
+                name, succeeded = false, detail = e.message ?: "failed", kind = kind, path = path,
+            )
+        }
     }
 
     /**

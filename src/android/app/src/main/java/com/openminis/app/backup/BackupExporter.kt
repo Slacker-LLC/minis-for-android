@@ -10,6 +10,7 @@ import com.openminis.app.logging.AppLogger
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -127,6 +128,7 @@ class BackupExporter(
                     onProgress?.invoke("Exporting chats…")
                     stats[BackupCategory.CHATS.key] =
                         exportChats(dataDir, trees, options.snapshotAtMillis)
+                    exportCharactersAndBots(dataDir)
                 }
                 if (BackupCategory.SHARED_FILES in options.categories) {
                     onProgress?.invoke("Exporting shared files…")
@@ -523,6 +525,8 @@ class BackupExporter(
         if (exportSubAgents(dataDir) > 0) {
             bytes += File(dataDir, "sub_agents.jsonl").length()
         }
+        // So do the user's settings, custom system prompt and scheduled tasks (see BackupAppSettings).
+        bytes += exportAppSettings(dataDir)
         // `entries` is PROVIDERS only. Custom thinking rules ride in this
         // category (they have no category of their own, and giving them one
         // would change the cross-platform category set), but adding them to
@@ -535,6 +539,71 @@ class BackupExporter(
             includesCredentials = includeCredentials,
             thinkingRules = ruleCount.takeIf { it > 0 },
         )
+    }
+
+    /**
+     * Allowlisted preferences, the custom system prompt with its module overrides, and scheduled tasks →
+     * `data/app_settings.json`. Returns its size in bytes, 0 when there is nothing to write.
+     */
+    private fun exportAppSettings(dataDir: File): Long {
+        val prefs = BackupAppSettings.snapshotPrefs { name ->
+            context.getSharedPreferences(name, Context.MODE_PRIVATE).all
+        }
+        val custom = com.openminis.app.prompt.CustomPromptStore.text(context)
+            ?.takeIf { it.isNotBlank() && it.length <= BackupAppSettings.MAX_PROMPT_CHARS }
+        val overrides = com.openminis.app.prompt.PromptModuleStore.snapshots(context)
+            .mapNotNull { s -> s.overrideText?.takeIf { it.length <= BackupAppSettings.MAX_PROMPT_CHARS }?.let { s.module.id to it } }
+            .toMap()
+        val tasks = BackupAppSettings.tasksToJson(com.openminis.app.scheduled.ScheduledTaskStore(context).all())
+        val doc = BackupAppSettings.document(prefs, custom, overrides, tasks)
+        if (BackupAppSettings.isEmpty(doc)) return 0
+        val file = File(dataDir, BackupAppSettings.FILE_NAME)
+        file.writeText(BackupFormat.json.encodeToString(JsonObject.serializer(), doc))
+        AppLogger.info(
+            TAG,
+            "[Backup] exported settings: ${prefs.size} preference file(s), custom prompt=${custom != null}, " +
+                "${overrides.size} module override(s), ${tasks.size} scheduled task(s)",
+        )
+        return file.length()
+    }
+
+    /** Characters (card, artwork, story memory) and bot definitions → `characters.jsonl` / `bots.jsonl`. */
+    private suspend fun exportCharactersAndBots(dataDir: File) {
+        val characters = db.characterDao().characters().take(BackupRoleplayMapping.MAX_ITEMS)
+        if (characters.isNotEmpty()) {
+            BackupJsonlWriter(dataDir, BackupRoleplayMapping.CHARACTER_FILE).use { writer ->
+                for (entity in characters) {
+                    val avatar = File(context.filesDir, com.openminis.app.roleplay.CharacterStoragePolicy.avatarRelativePath(entity.id))
+                        .takeIf { it.isFile && it.length() <= com.openminis.app.roleplay.CharacterStoragePolicy.MAX_AVATAR_BYTES }
+                        ?.let { runCatching { it.readBytes() }.getOrNull() }
+                    val memory = runCatching {
+                        com.openminis.app.roleplay.CharacterMemoryRepository.file(context, entity.id)
+                            .takeIf { it.isFile && it.length() <= BackupRoleplayMapping.MAX_MEMORY_CHARS * 4L }?.readText()
+                    }.getOrNull()
+                    writer.write(
+                        BackupRoleplayMapping.CHARACTER_TYPE, 1,
+                        BackupFormat.json.encodeToJsonElement(
+                            BackupCharacterRecord.serializer(),
+                            BackupRoleplayMapping.characterRecord(entity, avatar, memory),
+                        ),
+                    )
+                }
+            }
+        }
+        val bots = db.botDao().listBots().take(BackupRoleplayMapping.MAX_ITEMS)
+        if (bots.isNotEmpty()) {
+            BackupJsonlWriter(dataDir, BackupRoleplayMapping.BOT_FILE).use { writer ->
+                for (bot in bots) {
+                    writer.write(
+                        BackupRoleplayMapping.BOT_TYPE, 1,
+                        BackupFormat.json.encodeToJsonElement(
+                            BackupBotRecord.serializer(), BackupRoleplayMapping.botRecord(bot),
+                        ),
+                    )
+                }
+            }
+        }
+        AppLogger.info(TAG, "[Backup] exported ${characters.size} character(s), ${bots.size} bot(s)")
     }
 
     /** The user's custom sub agents → `data/sub_agents.jsonl`, one `SubAgentV1` line each. Returns the count. */
