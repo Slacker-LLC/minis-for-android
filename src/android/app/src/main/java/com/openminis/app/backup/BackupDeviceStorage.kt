@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.annotation.RequiresApi
 import java.io.File
 import java.io.IOException
 
@@ -52,16 +53,21 @@ class BackupDeviceStorage(private val context: Context) {
     fun delete(packageName: String): Boolean {
         if (!isPackageName(packageName)) return false
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            context.contentResolver.delete(
-                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                "${MediaStore.MediaColumns.RELATIVE_PATH}=? AND ${MediaStore.MediaColumns.DISPLAY_NAME}=?",
-                arrayOf("${Environment.DIRECTORY_DOWNLOADS}/$FOLDER/", packageName),
-            ) > 0
+            deleteThroughMediaStore(packageName)
         } else {
             File(publicDirectory(), packageName).takeIf { it.isFile }?.delete() ?: false
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun deleteThroughMediaStore(packageName: String): Boolean =
+        context.contentResolver.delete(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+            "${MediaStore.MediaColumns.RELATIVE_PATH}=? AND ${MediaStore.MediaColumns.DISPLAY_NAME}=?",
+            arrayOf("${Environment.DIRECTORY_DOWNLOADS}/$FOLDER/", packageName),
+        ) > 0
+
+    @RequiresApi(Build.VERSION_CODES.Q)
     private fun deliverThroughMediaStore(packageFile: File, onProgress: (Long, Long) -> Unit): Delivery {
         val resolver = context.contentResolver
         val values = ContentValues().apply {
