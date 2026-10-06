@@ -341,6 +341,65 @@ object PrivilegedCommandRunner {
         return null
     }
 
+    /**
+     * Programs that run other code: shells, `su` front-ends, multi-call binaries that can become a
+     * shell, exec wrappers and interpreters. Through the generic `root.shell` seam any of them would
+     * turn the structured tool/argv contract back into a raw Root command (`sh -c …`, `env sh …`,
+     * `toybox sh …`), which the security contract forbids. Product-owned handlers build their own
+     * fixed argv and do not go through this check.
+     */
+    private val codeRunningTools = setOf(
+        // shells
+        "sh", "bash", "mksh", "ash", "dash", "zsh", "ksh", "csh", "tcsh", "fish",
+        // Root front-ends
+        "su", "magisk", "ksud", "apd", "sudo", "doas",
+        // multi-call binaries whose applets include a shell
+        "toybox", "busybox", "toolbox",
+        // run another program
+        "env", "nohup", "setsid", "nice", "ionice", "chrt", "taskset", "timeout", "time",
+        "xargs", "chroot", "unshare", "nsenter", "runcon", "run-as", "setpriv", "strace",
+        "ltrace", "watch", "flock", "script", "stdbuf", "logwrapper", "start-stop-daemon",
+        "app_process", "app_process32", "app_process64", "dalvikvm", "dalvikvm32", "dalvikvm64",
+        "simpleperf", "perf", "gdbserver", "gdbserver64", "lldb-server",
+        // interpreters and editors with a command escape
+        "awk", "gawk", "mawk", "nawk", "perl", "python", "python3", "lua", "php", "ruby", "node",
+        "vi", "vim", "ex", "ed", "less", "more", "man",
+    )
+
+    /** Options that make an otherwise ordinary tool run a command. */
+    private val commandRunningOptions = mapOf(
+        "find" to setOf("-exec", "-execdir", "-ok", "-okdir"),
+        "tar" to setOf("--to-command", "--checkpoint-action", "--use-compress-program", "-I", "--info-script", "--new-volume-script", "-F"),
+        "sqlite3" to setOf("-cmd", "-init"),
+        // `ip netns exec <ns> <program>`
+        "ip" to setOf("exec"),
+    )
+
+    /**
+     * Why the local Agent's generic `root.shell` must refuse this request, or null when it may run.
+     * Covers interpreters/launchers, their command-running options and sqlite3 dot-commands that
+     * spawn a shell. This is a denylist on top of the trusted-path and argv bounds: it closes the
+     * direct ways to hand Root a script, not every way a Root tool can change the system.
+     */
+    internal fun genericRootToolDenial(tool: String, args: List<String>): String? {
+        val name = tool.lowercase()
+        if (name in codeRunningTools || name.startsWith("python") || name.startsWith("perl")) {
+            return "$tool runs other programs or code; root.shell accepts one Android tool, not a shell or interpreter"
+        }
+        commandRunningOptions[name]?.let { options ->
+            args.firstOrNull { arg -> options.any { arg == it || arg.startsWith("$it=") } }?.let {
+                return "$tool $it runs a command; root.shell does not accept command-running options"
+            }
+        }
+        if (name == "sqlite3") {
+            val dotCommand = Regex("""(^|\n)\s*\.(shell|system)\b""")
+            args.firstOrNull { dotCommand.containsMatchIn(it) }?.let {
+                return "sqlite3 .shell/.system runs a command; root.shell does not accept it"
+            }
+        }
+        return null
+    }
+
     /** Resolve only a basename from trusted Android system executable trees. */
     internal fun resolveTrustedToolPath(tool: String): String? {
         if (tool.isEmpty() || tool.contains('/') || tool.contains('\u0000')) return null
