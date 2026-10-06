@@ -465,6 +465,11 @@ class MinisApp : Application(), ImageLoaderFactory {
         // the comment there for why an exception at this point permanently
         // breaks the Application and produces the GH#147 crash loop.
         skillRepository = SkillRepository(this)
+        // The legacy copy runs at the first Ubuntu readiness pass; re-read what was loaded before it.
+        com.openminis.app.runtime.ubuntu.LegacyDataMigration.onComplete {
+            skillRepository.reloadFromDisk()
+            com.openminis.app.agent.SoulStore.refreshCache(this)
+        }
         // [T-eta-character-cards] Stored character cards; the repository reads the database
         // lazily, so nothing is loaded during startup.
         com.openminis.app.roleplay.CharacterRepository.initialize(this)

@@ -47,6 +47,19 @@ class SkillRepository(private val context: Context) {
 
     companion object {
         private const val TAG = "SkillRepository"
+
+        /**
+         * Whether a DB row whose skill files are missing should be deleted: never for a bundled skill,
+         * never when the tree could not be listed, and never before the legacy migration has copied the
+         * user's skills in.
+         */
+        internal inline fun shouldPruneOrphan(
+            bundled: Boolean,
+            legacyMigrated: Boolean,
+            onDisk: Collection<String>?,
+            id: String,
+            hasSkillMd: () -> Boolean,
+        ): Boolean = !bundled && legacyMigrated && onDisk != null && (id !in onDisk || !hasSkillMd())
         private const val DB_NAME = "skills.db"
         private const val DB_VERSION = 3
         private const val MAX_SKILLS_IN_PROMPT = 20
@@ -1780,6 +1793,10 @@ class SkillRepository(private val context: Context) {
         // nullable result so a transient runtime outage cannot prune valid DB
         // rows before the guest runtime becomes ready again.
         val onDisk = listSkillDirectoriesForLoad()
+        // Until the legacy data migration has run, the App-owned skills tree can be empty only because
+        // the user's skills are still in the legacy location: pruning then would delete their switches,
+        // usage counts and session overrides before the files arrive.
+        val legacyMigrated = com.openminis.app.runtime.ubuntu.LegacyDataMigration.isComplete(context)
 
         // Load from DB
         val dbSkills = mutableListOf<Skill>()
@@ -1816,9 +1833,12 @@ class SkillRepository(private val context: Context) {
             //
              // Only one location to check, unlike iOS's Library+rootfs pair:
              // the App-owned guest file API owns the canonical `/var/minis/skills` view.
-             if (importSource != ImportSource.BUNDLED &&
-                 onDisk != null &&
-                 (id !in onDisk || readSkillFileForLoad(id, "SKILL.md") == null)
+             if (shouldPruneOrphan(
+                     bundled = importSource == ImportSource.BUNDLED,
+                     legacyMigrated = legacyMigrated,
+                     onDisk = onDisk,
+                     id = id,
+                 ) { readSkillFileForLoad(id, "SKILL.md") != null }
              ) {
                 db.execSQL("DELETE FROM skills WHERE id=?", arrayOf(id))
                 db.execSQL("DELETE FROM session_skill_overrides WHERE skill_id=?", arrayOf(id))

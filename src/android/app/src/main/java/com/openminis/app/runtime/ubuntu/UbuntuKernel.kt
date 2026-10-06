@@ -33,6 +33,8 @@ internal object UbuntuKernel {
     private const val ROOT_TIMEOUT_MS = 15_000L
     private const val SIZE_PROBE_TIMEOUT_MS = 60_000L
     private const val ROOTFS_TIMEOUT_MS = 600_000L
+    /** Under the App-owned migration root: one empty file per legacy tree that finished copying. */
+    private const val MIGRATION_PROGRESS_DIR = ".legacy-migration"
 
     data class Status(
         val ready: Boolean,
@@ -659,7 +661,7 @@ internal object UbuntuKernel {
     }
 
     private suspend fun migrateRootOwnedUserDataLocked(ctx: Context): Boolean {
-        val marker = File(ctx.filesDir, "minis/.root-data-migrated-v1")
+        val marker = LegacyDataMigration.marker(ctx)
         if (marker.isFile) return true
         marker.parentFile?.mkdirs()
         val identity = currentAppIdentity(ctx)
@@ -683,12 +685,16 @@ internal object UbuntuKernel {
             Log.w(TAG, "legacy data migration failed: $detail")
             return false
         }
-        return withContext(Dispatchers.IO) {
+        val written = withContext(Dispatchers.IO) {
             runCatching {
                 marker.writeText("migrated=${System.currentTimeMillis()}\n")
                 true
             }.getOrDefault(false)
         }
+        // Repositories that held off on the new tree (SkillRepository's orphan pruning) and caches
+        // read before the copy (SOUL) look again now that the legacy data is in place.
+        if (written) LegacyDataMigration.notifyComplete()
+        return written
     }
 
     /**
@@ -722,22 +728,38 @@ internal object UbuntuKernel {
                         "\$(readlink $quoted 2>/dev/null || true) >&2; exit 72; fi",
                 )
             }
+            // Per-tree progress: a tree that finished copying is not checked or copied again when a
+            // later tree fails and the migration is retried. Without it, links the first attempt
+            // copied in made the destination check (exit 75) refuse every retry.
+            val progress = shellQuote("${parentDirectories.first()}/$MIGRATION_PROGRESS_DIR")
+            appendLine("PROGRESS=$progress")
+            appendLine("[ ! -L \"\$PROGRESS\" ] || { echo 'legacy migration progress dir is a symlink' >&2; exit 72; }")
+            appendLine("mkdir -p \"\$PROGRESS\"; chown ${identity.uid}:${identity.gid} \"\$PROGRESS\"")
             appendLine(
                 "copy_tree() { " +
-                    "SRC=\"\$1\"; DST=\"\$2\"; " +
-                    "[ -d \"\$SRC\" ] || return 0; " +
+                    "SRC=\"\$1\"; DST=\"\$2\"; DONE=\"\$PROGRESS/\$3\"; " +
+                    "[ ! -L \"\$DONE\" ] || return 76; " +
+                    "[ ! -e \"\$DONE\" ] || return 0; " +
+                    "if [ -d \"\$SRC\" ]; then " +
                     "[ ! -L \"\$DST\" ] || return 73; " +
                     "if [ -e \"\$DST\" ] && [ ! -d \"\$DST\" ]; then return 74; fi; " +
                     "mkdir -p \"\$DST\"; " +
                     "[ ! -L \"\$DST\" ] || return 73; " +
                     "LINKS=\$(/system/bin/find \"\$DST\" -type l -print -quit 2>/dev/null || true); " +
                     "[ -z \"\$LINKS\" ] || return 75; " +
-                    "cp -a \"\$SRC\"/. \"\$DST\"/; " +
+                    // -n: a file the user already wrote in the new location (before the runtime first
+                    // became ready) is newer than the legacy copy and is kept.
+                    "cp -a -n \"\$SRC\"/. \"\$DST\"/; " +
                     "chown -R ${identity.uid}:${identity.gid} \"\$DST\"; " +
+                    "fi; " +
+                    ": > \"\$DONE\"; chown ${identity.uid}:${identity.gid} \"\$DONE\"; " +
                     "}"
             )
-            mappings.forEach { (source, destination) ->
-                appendLine("copy_tree ${shellQuote(source)} ${shellQuote(destination)}")
+            mappings.forEachIndexed { index, (source, destination) ->
+                appendLine(
+                    "copy_tree ${shellQuote(source)} ${shellQuote(destination)} " +
+                        "${index}-${destination.trimEnd('/').substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")}",
+                )
             }
         }
     }
