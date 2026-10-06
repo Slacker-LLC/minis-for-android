@@ -246,13 +246,19 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
             ?: return NativeOffloadResult(2, "android-calendar: invalid --start '$startStr'\n")
         // A --end that was given must parse (and come after the start); only a missing --end defaults.
         val endStr = args.get("end")
-        val endMs = if (endStr != null) {
+        val parsedEnd = if (endStr != null) {
             parseDate(endStr) ?: return NativeOffloadResult(2, "android-calendar: invalid --end '$endStr'\n")
-        } else {
-            startMs + 60 * 60 * 1000L
-        }
-        if (endMs <= startMs && !args.hasFlag("all-day")) {
+        } else null
+        val allDay = args.hasFlag("all-day")
+        if (parsedEnd != null && parsedEnd <= startMs && !allDay) {
             return NativeOffloadResult(2, "android-calendar create: --end must be after --start\n")
+        }
+        // An all-day event is stored as UTC midnights with an exclusive end; the given dates are
+        // local calendar days. Anything else (local midnight, or "+1 hour") is not a whole day.
+        val (storedStart, endMs) = if (allDay) {
+            allDayStoredRange(startMs, parsedEnd)
+        } else {
+            startMs to (parsedEnd ?: (startMs + 60 * 60 * 1000L))
         }
         // Notes — apple-calendar uses --notes; --description kept as alias.
         val notes = args.get("notes") ?: args.get("description")
@@ -267,7 +273,7 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
         val values = ContentValues().apply {
             put(CalendarContract.Events.CALENDAR_ID, calendarId)
             put(CalendarContract.Events.TITLE, title)
-            put(CalendarContract.Events.DTSTART, startMs)
+            put(CalendarContract.Events.DTSTART, storedStart)
             put(CalendarContract.Events.DTEND, endMs)
             put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
             notes?.let { put(CalendarContract.Events.DESCRIPTION, it) }
@@ -284,19 +290,21 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
                 NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "insert_failed").put("message", "ContentResolver.insert returned null").toString(), args) + "\n")
             } else {
                 val eventId = uri.lastPathSegment?.toLongOrNull()
-                if (eventId != null && alarmMinutes != null && alarmMinutes >= 0) {
+                val reminderSet = if (eventId != null && alarmMinutes != null && alarmMinutes >= 0) {
                     insertReminder(eventId, alarmMinutes)
-                }
+                } else null
                 AppLogger.info(TAG, "create: id=$eventId title='$title' alarm=$alarmMinutes")
                 val data = JSONObject()
                     .put("id", eventId ?: -1L)
                     .put("title", title)
-                    .put("start", formatIso(startMs))
+                    .put("start", formatIso(storedStart))
                     .put("end", formatIso(endMs))
                     .put("calendar_id", calendarId)
                 if (notes != null) data.put("notes", notes)
-                if (alarmMinutes != null && alarmMinutes >= 0) data.put("alarm_minutes_before", alarmMinutes)
-                NativeOffloadResult(0, OffloadOutput.formatBody(data.toString(2), args) + "\n")
+                // Report the reminder the provider actually stored; the event itself was created.
+                if (reminderSet == true) data.put("alarm_minutes_before", alarmMinutes)
+                if (reminderSet == false) data.put("reminder_error", "the event was created but its reminder could not be saved")
+                NativeOffloadResult(if (reminderSet == false) 1 else 0, OffloadOutput.formatBody(data.toString(2), args) + "\n")
             }
         } catch (e: SecurityException) {
             NativeOffloadResult(77, providerBlockedJson("WRITE_CALENDAR", e, args))
@@ -355,16 +363,16 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
                     .appendPath(id.toString()).build()
                 context.contentResolver.update(uri, values, null, null)
             } else 0
-            if (alarmMinutes != null && alarmMinutes >= 0) {
-                replaceReminder(id, alarmMinutes)
-            }
-            AppLogger.info(TAG, "update: id=$id rows=$updated alarm=$alarmMinutes")
+            val reminderSet = if (alarmMinutes != null && alarmMinutes >= 0) replaceReminder(id, alarmMinutes) else null
+            AppLogger.info(TAG, "update: id=$id rows=$updated alarm=$alarmMinutes reminder=$reminderSet")
             val data = JSONObject()
                 .put("id", id)
-                .put("updated", updated > 0 || alarmMinutes != null)
+                // "updated" is what was actually written: event rows, or a reminder that was stored.
+                .put("updated", updated > 0 || reminderSet == true)
                 .put("rows", updated)
-            if (alarmMinutes != null && alarmMinutes >= 0) data.put("alarm_minutes_before", alarmMinutes)
-            NativeOffloadResult(0, OffloadOutput.formatBody(data.toString(2), args) + "\n")
+            if (reminderSet == true) data.put("alarm_minutes_before", alarmMinutes)
+            if (reminderSet == false) data.put("reminder_error", "the reminder could not be replaced")
+            NativeOffloadResult(if (reminderSet == false) 1 else 0, OffloadOutput.formatBody(data.toString(2), args) + "\n")
         } catch (e: SecurityException) {
             NativeOffloadResult(77, providerBlockedJson("WRITE_CALENDAR", e, args))
         } catch (e: Throwable) {
@@ -493,21 +501,23 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
      * provider failure, which we silently swallow — the event itself is
      * already created/updated.
      */
-    private fun insertReminder(eventId: Long, minutesBefore: Int) {
+    /** True only when the provider accepted the reminder row. */
+    private fun insertReminder(eventId: Long, minutesBefore: Int): Boolean {
         val values = ContentValues().apply {
             put(CalendarContract.Reminders.EVENT_ID, eventId)
             put(CalendarContract.Reminders.MINUTES, minutesBefore)
             put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
         }
-        try {
-            context.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, values)
+        return try {
+            context.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, values) != null
         } catch (e: Throwable) {
             AppLogger.warning(TAG, "insertReminder failed for event=$eventId: ${e.message}")
+            false
         }
     }
 
     /** Remove existing reminders for [eventId] then insert one at [minutesBefore]. */
-    private fun replaceReminder(eventId: Long, minutesBefore: Int) {
+    private fun replaceReminder(eventId: Long, minutesBefore: Int): Boolean {
         try {
             context.contentResolver.delete(
                 CalendarContract.Reminders.CONTENT_URI,
@@ -515,9 +525,11 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
                 arrayOf(eventId.toString()),
             )
         } catch (e: Throwable) {
+            // The old reminder is still there: adding another would leave two, so stop here.
             AppLogger.warning(TAG, "replaceReminder delete failed for event=$eventId: ${e.message}")
+            return false
         }
-        insertReminder(eventId, minutesBefore)
+        return insertReminder(eventId, minutesBefore)
     }
 
     private fun doListCalendars(args: OffloadArgs): NativeOffloadResult {
@@ -736,6 +748,29 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
             data object NoneGiven : CalendarTarget
             data class Found(val id: Long) : CalendarTarget
             data class Rejected(val reason: String, val candidates: List<CalendarRef>) : CalendarTarget
+        }
+
+        /**
+         * (start, end) to store for an all-day event given as local instants: UTC midnight of the
+         * local start day, and UTC midnight of the day AFTER the local end day (the stored end is
+         * exclusive and the given end day is included); one day long when there is no end.
+         */
+        internal fun allDayStoredRange(
+            startMs: Long,
+            endMs: Long?,
+            zone: TimeZone = TimeZone.getDefault(),
+        ): Pair<Long, Long> {
+            fun utcMidnightOfLocalDay(ms: Long, plusDays: Int): Long {
+                val local = Calendar.getInstance(zone).apply { timeInMillis = ms }
+                return Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+                    clear()
+                    set(local.get(Calendar.YEAR), local.get(Calendar.MONTH), local.get(Calendar.DAY_OF_MONTH), 0, 0, 0)
+                    add(Calendar.DAY_OF_MONTH, plusDays)
+                }.timeInMillis
+            }
+            val start = utcMidnightOfLocalDay(startMs, 0)
+            val end = utcMidnightOfLocalDay(endMs ?: startMs, 1)
+            return start to maxOf(end, utcMidnightOfLocalDay(startMs, 1))
         }
 
         internal fun resolveCalendarTarget(id: Long?, name: String?, writable: List<CalendarRef>): CalendarTarget {
