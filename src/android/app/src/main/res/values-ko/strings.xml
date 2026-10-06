@@ -399,6 +399,7 @@
     <string name="storage_clear_session_footer">이 세션에서 생성된 모든 파일을 삭제합니다. 대화 자체는 보존됩니다.</string>
     <string name="storage_browse_files">파일 탐색</string>
     <string name="storage_clearing_status">삭제 중…</string>
+    <string name="storage_clear_incomplete">일부 미디어 파일을 삭제하지 못했습니다. 표시된 크기는 남은 용량입니다.</string>
     <string name="storage_clear_session_button">세션 파일 삭제</string>
     <string name="storage_clear_confirm_title">세션 파일을 삭제하시겠습니까?</string>
     <string name="usage_title">사용량</string>
