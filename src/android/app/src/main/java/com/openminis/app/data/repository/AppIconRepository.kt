@@ -49,36 +49,48 @@ object AppIconRepository {
         Variant.fromId(prefs(context).getString(KEY_SELECTED_ID, Variant.Auto.id))
 
     /**
-     * Apply [target] as the active launcher icon. Disables every other
-     * alias in one PackageManager pass + persists the selection.
-     * No-op when [target] is already current — the PackageManager call
-     * is mildly expensive (writes to package state) and the launcher
-     * doesn't appreciate repeated unchanged toggles.
+     * Apply [target] as the active launcher icon. Enables the target alias FIRST and then disables the
+     * others, so the app never has no launcher entry between two calls; if any call fails the previous
+     * state is restored. Persists the selection only after all of it worked.
+     * No-op (false) when [target] is already current — the PackageManager call is mildly expensive
+     * (writes to package state) and the launcher doesn't appreciate repeated unchanged toggles.
+     * Returns true only when the switch really happened.
      */
     fun apply(context: Context, target: Variant): Boolean {
         val ctx = context.applicationContext
         val current = current(ctx)
         if (current == target) return false
         val pm = ctx.packageManager
+        val ok = switchAliases(current, target) { variant, enabled ->
+            pm.setComponentEnabledSetting(
+                ComponentName(ctx, variant.aliasClass),
+                if (enabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP,
+            )
+        }
+        if (!ok) return false
+        prefs(ctx).edit().putString(KEY_SELECTED_ID, target.id).apply()
+        Log.i(TAG, "icon switched ${current.id} → ${target.id}")
+        return true
+    }
+
+    /**
+     * The switch itself, with the state-setting call injected so the order and the rollback can be
+     * tested. Enable [target], then disable every other alias; on any exception put every alias back to
+     * the [current] arrangement (best effort) and return false.
+     */
+    internal fun switchAliases(current: Variant, target: Variant, setEnabled: (Variant, Boolean) -> Unit): Boolean {
         try {
+            setEnabled(target, true)
             for (variant in Variant.entries) {
-                val component = ComponentName(ctx, variant.aliasClass)
-                val desiredState = if (variant == target) {
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                } else {
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                }
-                pm.setComponentEnabledSetting(
-                    component,
-                    desiredState,
-                    PackageManager.DONT_KILL_APP,
-                )
+                if (variant != target) setEnabled(variant, false)
             }
-            prefs(ctx).edit().putString(KEY_SELECTED_ID, target.id).apply()
-            Log.i(TAG, "icon switched ${current.id} → ${target.id}")
             return true
         } catch (t: Throwable) {
-            Log.w(TAG, "icon switch failed: ${t.message}", t)
+            Log.w(TAG, "icon switch failed, restoring ${current.id}: ${t.message}", t)
+            for (variant in Variant.entries) {
+                runCatching { setEnabled(variant, variant == current) }
+            }
             return false
         }
     }

@@ -437,8 +437,10 @@ fun AppearanceScreen(
                             .weight(1f)
                             .clickable {
                                 if (selectedAppIcon != option.variant) {
-                                    selectedAppIcon = option.variant
-                                    AppIconRepository.apply(context, option.variant)
+                                    // The checkmark follows what actually happened, not what was asked.
+                                    if (AppIconRepository.apply(context, option.variant)) {
+                                        selectedAppIcon = option.variant
+                                    }
                                 }
                             },
                         horizontalAlignment = Alignment.CenterHorizontally,
