@@ -131,17 +131,29 @@ fun ModelEntryDetailScreen(
                 onClick = {
                     val baseInputs = baseModel.inputModalities ?: emptyList()
                     val baseOutputs = baseModel.outputModalities ?: emptyList()
-                    val newInputs = buildList {
-                        if (imageInput) add("image")
-                        if (pdfInput) add("pdf")
-                        if (audioInput) add("audio")
-                        if (videoInput) add("video")
-                    }
-                    val newOutputs = buildList {
-                        if (imageOutput) add("image")
-                        if (audioOutput) add("audio")
-                    }
-                    val newOverrides = ModelOverrides(
+                    // The page shows some modalities only; the rest of the effective set (text in/out,
+                    // video out, ...) belongs to the model and must survive the save.
+                    val newInputs = mergeModalities(
+                        effectiveInput,
+                        shown = setOf("image", "pdf", "audio", "video"),
+                        enabled = buildSet {
+                            if (imageInput) add("image")
+                            if (pdfInput) add("pdf")
+                            if (audioInput) add("audio")
+                            if (videoInput) add("video")
+                        },
+                    )
+                    val newOutputs = mergeModalities(
+                        effectiveOutput,
+                        shown = setOf("image", "audio"),
+                        enabled = buildSet {
+                            if (imageOutput) add("image")
+                            if (audioOutput) add("audio")
+                        },
+                    )
+                    // Start from the stored overrides so fields this page does not edit
+                    // (maxThinkingLevel, ...) are kept, not reset to null.
+                    val newOverrides = overrides.copy(
                         displayName = displayName.trim().takeIf { it.isNotEmpty() && it != baseModel.displayName },
                         maxOutputTokens = maxOutputTokensText.trim().toIntOrNull()?.takeIf { it > 0 },
                         contextWindow = contextWindowText.trim().toIntOrNull()?.takeIf { it > 0 },
@@ -482,4 +494,14 @@ private fun ContextLimitSlider(
             Text(unlimitedLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+}
+
+/**
+ * [effective] with the modalities in [shown] set to exactly [enabled]; modalities the page does not
+ * show stay as they are, in their original order, new ones appended in the order of [shown].
+ */
+internal fun mergeModalities(effective: List<String>, shown: Set<String>, enabled: Set<String>): List<String> {
+    val kept = effective.filter { it !in shown }
+    val added = shown.filter { it in enabled }
+    return (kept + added).distinct()
 }
