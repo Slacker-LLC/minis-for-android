@@ -193,7 +193,7 @@ interface ChatDao {
         SELECT DISTINCT s.* FROM sessions s
         LEFT JOIN messages m ON m.session_id = s.id
         WHERE (s.source IS NULL OR s.source NOT IN ('subagent', 'bot_delegation', 'bot-delegation'))
-          AND (s.title LIKE :pattern OR m.parts_json LIKE :pattern)
+          AND (s.title LIKE :pattern ESCAPE '\' OR m.parts_json LIKE :pattern ESCAPE '\')
         ORDER BY s.updated_at DESC
     """)
     suspend fun searchSessions(pattern: String): List<ChatSessionEntity>
