@@ -13,21 +13,49 @@ object ToolRegistry {
     private val handlers = linkedMapOf<String, ToolHandler>()
     private val aliases = linkedMapOf<String, String>()
 
+    /**
+     * Aliases that name an action of a merged handler (`get_goal` → `agent.goal` with
+     * action=get_goal). Their published schemas have no `action` parameter, so the call carries
+     * the action in its name; [argsForCall] puts it back.
+     */
+    private val actionAliases = mutableSetOf<String>()
+
     internal fun normalize(name: String): String =
         name.lowercase().filter { it.isLetterOrDigit() }
 
-    fun register(handler: ToolHandler, aliasNames: List<String> = emptyList()) {
+    /**
+     * @param aliasesAreActions the aliases are action names of this handler; a call by alias gets
+     *   `action=<alias>` when it does not carry an action itself.
+     */
+    fun register(handler: ToolHandler, aliasNames: List<String> = emptyList(), aliasesAreActions: Boolean = false) {
         val defName = handler.definition.name
         handlers[defName] = handler
         val apiName = handler.definition.apiName
         if (apiName != defName) aliases[apiName] = defName
         for (a in aliasNames) aliases[a] = defName
+        if (aliasesAreActions) actionAliases.addAll(aliasNames)
     }
 
     fun unregister(name: String) {
         val canonical = canonicalName(name) ?: return
         handlers.remove(canonical)
-        aliases.filterValues { it == canonical }.keys.toList().forEach { aliases.remove(it) }
+        aliases.filterValues { it == canonical }.keys.toList().forEach {
+            aliases.remove(it)
+            actionAliases.remove(it)
+        }
+    }
+
+    /**
+     * The arguments to hand the handler for a call made by [name]. Unchanged unless [name] is an
+     * action alias and the arguments carry no action, in which case the alias becomes the action.
+     */
+    fun argsForCall(name: String, argsJson: String): String {
+        val alias = actionAliases.firstOrNull { it == name } ?: actionAliases.firstOrNull {
+            it.equals(name, ignoreCase = true) || normalize(it) == normalize(name)
+        } ?: return argsJson
+        val args = runCatching { JSONObject(argsJson) }.getOrNull() ?: JSONObject()
+        if (args.optString("action").isNotBlank()) return argsJson
+        return args.put("action", alias).toString()
     }
 
     fun canonicalName(name: String): String? {
@@ -93,6 +121,8 @@ object ToolExecutor {
             ?: return ToolExecutionResult("Error: unknown_tool: $name", false)
         val handler = ToolRegistry.handler(canonical)
             ?: return ToolExecutionResult("Error: no handler for $canonical", false)
+        @Suppress("NAME_SHADOWING")
+        val argsJson = ToolRegistry.argsForCall(name, argsJson)
         if (com.openminis.app.offload.OffloadPermissionManager.tierFor(sessionId) ==
             com.openminis.app.scheduled.ScheduledTaskPermissionTier.READ_ONLY
         ) {

@@ -141,6 +141,8 @@ object AndroidLogManager {
             }
         }
         watches[jobId] = job
+        // job_kill and the RPC cancel go through JobRegistry; this makes them stop the watch itself.
+        JobRegistry.setCanceller(jobId) { job.cancel() }
         return JSONObject()
             .put("jobId", jobId)
             .put("cursor", cursorId)
