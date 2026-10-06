@@ -170,10 +170,15 @@ class TextToSpeechManager : TextToSpeech.OnInitListener {
 
     /**
      * Speaks text immediately, interrupting any ongoing speech (QUEUE_FLUSH).
-     * Automatically detects language from text content.
+     * Automatically detects language from text content, unless [locale] is given: an explicit
+     * language is used as asked, and a language the engine cannot speak makes the call return false
+     * instead of quietly speaking in another one.
+     *
+     * @return false when the request was refused (nothing is speaking because of it): blank text,
+     *   a dead engine, an unsupported [locale], or an engine that rejected the queueing.
      */
-    fun speak(text: String) {
-        if (text.isBlank()) return
+    fun speak(text: String, locale: Locale? = null): Boolean {
+        if (text.isBlank()) return false
         if (!isInitialized) {
             // [T-android-tts-silent-blackhole] Engine still binding (or dead).
             // Buffer instead of dropping; onInit replays in order. On a failed
@@ -184,8 +189,9 @@ class TextToSpeechManager : TextToSpeech.OnInitListener {
                     preInitQueue.add(text)
                 }
                 _isSpeaking.value = true
+                return true
             }
-            return
+            return false
         }
 
         isPaused = false
@@ -194,7 +200,15 @@ class TextToSpeechManager : TextToSpeech.OnInitListener {
         pausedAtIndex = 0
         sentenceBuffer.setLength(0)
 
-        autoDetectAndSetLanguage(text)
+        if (locale != null) {
+            val result = tts?.setLanguage(locale)
+            if (result == null || result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Log.w(TAG, "speak: language ${locale.toLanguageTag()} is not available (rc=$result)")
+                return false
+            }
+        } else {
+            autoDetectAndSetLanguage(text)
+        }
 
         val params = buildSpeechParams()
         // [T-android-tts-rom-compat] speak() returns ERROR synchronously when
@@ -208,9 +222,10 @@ class TextToSpeechManager : TextToSpeech.OnInitListener {
         if (rc != TextToSpeech.SUCCESS) {
             Log.w(TAG, "speak rejected by engine (rc=$rc len=${text.length})")
             _isSpeaking.value = false
-            return
+            return false
         }
         _isSpeaking.value = true
+        return true
     }
 
     /**

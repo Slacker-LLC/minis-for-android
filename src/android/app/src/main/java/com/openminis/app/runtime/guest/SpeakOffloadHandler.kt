@@ -106,15 +106,26 @@ class SpeakOffloadHandler(private val context: Context) : NativeOffloadHandler {
         // BCP-47 language tag (matches iOS). Empty / invalid tags fall
         // through to the auto-detect path inside speak().
         val voiceTag = args.get("voice")
-        if (!voiceTag.isNullOrBlank()) {
-            tts.setLanguage(Locale.forLanguageTag(voiceTag))
+        val locale = voiceTag?.takeIf { it.isNotBlank() }?.let { Locale.forLanguageTag(it) }
+
+        // Every request states its own rate/pitch/volume (defaults 1.0, as the help says). The
+        // manager keeps what was last set, so a `--volume 0` once silenced every later call, in
+        // every session.
+        tts.speechRate = args.getDouble("rate")?.toFloat() ?: 1.0f
+        tts.speechPitch = args.getDouble("pitch")?.toFloat() ?: 1.0f
+        tts.speechVolume = args.getDouble("volume")?.toFloat() ?: 1.0f
+
+        if (!tts.speak(text, locale)) {
+            val body = JSONObject()
+                .put("error", "speak_rejected")
+                .put(
+                    "message",
+                    if (locale != null) "The speech engine cannot speak language '${locale.toLanguageTag()}' or refused the text."
+                    else "The speech engine refused the text.",
+                )
+                .toString()
+            return NativeOffloadResult(1, OffloadOutput.formatBody(body, args) + "\n")
         }
-
-        args.getDouble("rate")?.let { tts.speechRate = it.toFloat() }
-        args.getDouble("pitch")?.let { tts.speechPitch = it.toFloat() }
-        args.getDouble("volume")?.let { tts.speechVolume = it.toFloat() }
-
-        tts.speak(text)
         val preview = if (text.length > 100) text.take(100) + "..." else text
         val body = JSONObject()
             .put("text", preview)
