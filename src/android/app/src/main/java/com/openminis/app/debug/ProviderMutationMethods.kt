@@ -74,6 +74,10 @@ internal object ProviderMutationMethods {
             throw RPCException(-32602, "Custom User-Agent is only supported for third-party API-key providers. OAuth providers (Anthropic/Codex) use their own authentication UA and cannot be overridden.")
         }
 
+        // Credentials are validated with the rest of the request, before anything is created.
+        val apiKey = RpcParams.string(params, "apiKey")?.ifEmpty { null }
+        val oauthToken = RpcParams.string(params, "oauthToken")?.ifEmpty { null }
+
         val instance = ProviderInstance(
             id = UUID.randomUUID().toString(),
             label = label,
@@ -108,8 +112,6 @@ internal object ProviderMutationMethods {
         }
 
         // Credential write (write-only — never returned).
-        val apiKey = params.optString("apiKey", "").ifEmpty { null }
-        val oauthToken = params.optString("oauthToken", "").ifEmpty { null }
         val secret = apiKey ?: oauthToken
         if (secret != null) repo.saveApiKey(instance.id, secret)
 
@@ -151,6 +153,11 @@ internal object ProviderMutationMethods {
             }
         } else current.imageEndpointMode
 
+        // Read both credential fields up front: a malformed one must fail the request before the
+        // instance or the other credential has changed.
+        val apiKey = RpcParams.string(params, "apiKey")
+        val oauthToken = RpcParams.string(params, "oauthToken")
+
         val updated = current.copy(
             label = if (params.has("label")) params.optString("label", current.label) else current.label,
             customBaseURL = if (params.has("customBaseURL")) {
@@ -169,12 +176,7 @@ internal object ProviderMutationMethods {
         repo.updateInstance(updated)
 
         // Credential refresh — pass `""` to clear, missing to leave alone.
-        if (params.has("apiKey")) {
-            val v = params.optString("apiKey", "")
-            if (v.isEmpty()) repo.deleteApiKey(id) else repo.saveApiKey(id, v)
-        }
-        if (params.has("oauthToken")) {
-            val v = params.optString("oauthToken", "")
+        for (v in listOfNotNull(apiKey, oauthToken)) {
             if (v.isEmpty()) repo.deleteApiKey(id) else repo.saveApiKey(id, v)
         }
 
@@ -422,7 +424,7 @@ internal object ProviderMutationMethods {
 
         val before = repo.entriesFor(instanceId).map { it.baseModel.id }.toSet()
         val start = System.currentTimeMillis()
-        try {
+        val refreshed = try {
             repo.refreshModels(instance)
         } catch (e: Exception) {
             throw RPCException(-32000, "refreshModels failed: ${e.message}")
@@ -432,6 +434,8 @@ internal object ProviderMutationMethods {
         val disappeared = (before - after).size
         return JSONObject().apply {
             put("instanceId", instanceId)
+            // False when no catalog source returned models and the existing list was kept.
+            put("refreshed", refreshed)
             put("added", added)
             put("disappeared", disappeared)
             put("total", after.size)
@@ -490,25 +494,25 @@ internal object ProviderMutationMethods {
     fun slotsSet(context: Context, params: JSONObject): JSONObject {
         val repo = repo(context)
         val result = JSONObject()
-        if (params.has("fallbackTrigger")) {
-            val raw = params.optString("fallbackTrigger", "")
-            val value = runCatching { FallbackStrategy.valueOf(raw) }.getOrNull()
+        // Validate the whole request first; the repository saves as soon as it is called, so a
+        // fallback trigger applied before a bad slot would stay applied behind the error.
+        val trigger: FallbackStrategy? = if (params.has("fallbackTrigger")) {
+            val raw = RpcParams.string(params, "fallbackTrigger") ?: ""
+            runCatching { FallbackStrategy.valueOf(raw) }.getOrNull()
                 ?: throw RPCException(-32602, "Unknown fallback trigger: $raw")
-            repo.setFallbackTrigger(value)
-            result.put("fallbackTrigger", value.name)
-        }
+        } else null
+        var slotChange: Pair<ModelSlot, List<String>>? = null
         if (params.has("slot") || params.has("entryIds")) {
-            val rawSlot = params.optString("slot", "").ifEmpty {
+            val rawSlot = (RpcParams.string(params, "slot") ?: "").ifEmpty {
                 throw RPCException(-32602, "Missing 'slot' param")
             }
             val slot = ModelSlot.entries.firstOrNull { it.name == rawSlot }
                 ?: throw RPCException(-32602, "Unknown model slot: $rawSlot")
-            val array = params.optJSONArray("entryIds")
+            val entryIds = RpcParams.stringList(params, "entryIds")
                 ?: throw RPCException(-32602, "Missing 'entryIds' array")
             val cfg = repo.config.value
             val ids = buildList {
-                for (i in 0 until array.length()) {
-                    val id = array.optString(i)
+                for (id in entryIds) {
                     if (id.isBlank()) continue
                     val virtual = SystemVoiceEntries.resolve(id)
                     val compatible = if (virtual != null) {
@@ -530,10 +534,17 @@ internal object ProviderMutationMethods {
                     if (id !in this) add(id)
                 }
             }
+            slotChange = slot to ids
+        }
+        if (trigger == null && slotChange == null) throw RPCException(-32602, "Pass slot+entryIds or fallbackTrigger")
+        if (trigger != null) {
+            repo.setFallbackTrigger(trigger)
+            result.put("fallbackTrigger", trigger.name)
+        }
+        slotChange?.let { (slot, ids) ->
             repo.setSlotEntries(slot, ids)
             result.put("slot", slot.name).put("entryIds", JSONArray(ids))
         }
-        if (result.length() == 0) throw RPCException(-32602, "Pass slot+entryIds or fallbackTrigger")
         return result
     }
 
