@@ -766,6 +766,16 @@ class ProviderRepository(private val context: Context) {
         // mutable list is changed in place before StateFlow can compare it.
         // T273 bumps `revision` so every mutation is emitted.
         synchronized(configLock) {
+            // The loader refused to read the stored config (see ensureConfigLoaded), so what the
+            // mutator edited is the empty placeholder, not the user's providers. Saving it would
+            // replace them; drop the change and keep the stored data for the retry.
+            if (!_configLoaded.value) {
+                android.util.Log.e(
+                    "ProviderRepo",
+                    "[ProviderStore] not saving: the stored config has not been loaded successfully",
+                )
+                return
+            }
             // [T-android-provider-empty-load-wipe] No "block empty saves" guard
             // here on purpose: an empty config can be a legitimate "user
             // deleted their last provider" mutation. The wipe is prevented at
