@@ -78,11 +78,14 @@ class AlarmOffloadHandler(private val context: Context) : NativeOffloadHandler {
         // legacy positional second arg (`schedule HH:MM`).
         val timeStr = args.get("time") ?: args.positional.getOrNull(1)
             ?: return NativeOffloadResult(2, "android-alarm set: --time <HH:MM|ISO> is required\n")
-        val (hour, minute) = parseTimeArg(timeStr)
-            ?: return NativeOffloadResult(
-                2,
-                "android-alarm: invalid time '$timeStr' (expected HH:MM or ISO 8601)\n",
-            )
+        val (hour, minute) = try {
+            parseTimeArg(timeStr)
+        } catch (e: IllegalArgumentException) {
+            return NativeOffloadResult(2, "android-alarm: ${e.message}\n")
+        } ?: return NativeOffloadResult(
+            2,
+            "android-alarm: invalid time '$timeStr' (expected HH:MM or ISO 8601)\n",
+        )
         val label = args.get("label") ?: "Alarm"
         val repeat = args.get("repeat")?.uppercase() ?: "ONCE"
         val mode = runCatching { RepeatMode.valueOf(repeat) }.getOrNull()
@@ -202,9 +205,12 @@ class AlarmOffloadHandler(private val context: Context) : NativeOffloadHandler {
         val secs = parseDuration(durationStr)
             ?: return NativeOffloadResult(
                 2,
-                "android-alarm: invalid duration '$durationStr' (use seconds or shorthand 30s, 5m, 1h, 2d)\n",
+                "android-alarm: invalid duration '$durationStr' (use seconds or shorthand 30s, 5m, 1h; at most 24h)\n",
             )
-        if (secs <= 0) return NativeOffloadResult(2, "android-alarm: duration must be positive\n")
+        // The system Clock accepts 1..86400 seconds (AlarmClock.EXTRA_LENGTH).
+        if (secs !in 1..MAX_TIMER_SECONDS) {
+            return NativeOffloadResult(2, "android-alarm: duration must be between 1 second and 24h\n")
+        }
         val label = args.get("label") ?: "Timer"
         // T266b: single-source timer via the system Clock app
         // (AlarmClock.ACTION_SET_TIMER, API 19+). Same rationale as T266 set:
@@ -306,62 +312,6 @@ class AlarmOffloadHandler(private val context: Context) : NativeOffloadHandler {
         }
     }
 
-    private fun parseHHMM(s: String): Pair<Int, Int>? {
-        val parts = s.split(":")
-        if (parts.size != 2) return null
-        val h = parts[0].toIntOrNull() ?: return null
-        val m = parts[1].toIntOrNull() ?: return null
-        if (h !in 0..23 || m !in 0..59) return null
-        return h to m
-    }
-
-    /**
-     * Accept HH:MM (parsed against today's calendar) or ISO 8601 like
-     * "2026-02-25T14:00", "2026-02-25T14:00:00Z". Both forms collapse to the
-     * (hour, minute) pair the manager expects — manager will roll forward to
-     * the next day if HH:MM is already past. Mirrors apple-alarm parseTime.
-     */
-    private fun parseTimeArg(s: String): Pair<Int, Int>? {
-        parseHHMM(s)?.let { return it }
-        // Try a few common ISO 8601 forms.
-        val patterns = listOf(
-            "yyyy-MM-dd'T'HH:mm:ss'Z'",
-            "yyyy-MM-dd'T'HH:mm:ssXXX",
-            "yyyy-MM-dd'T'HH:mm:ss",
-            "yyyy-MM-dd'T'HH:mm",
-        )
-        for (pat in patterns) {
-            val date = runCatching {
-                val sdf = SimpleDateFormat(pat, Locale.US)
-                if (pat.endsWith("'Z'")) sdf.timeZone = TimeZone.getTimeZone("UTC")
-                sdf.parse(s)
-            }.getOrNull() ?: continue
-            val cal = Calendar.getInstance().apply { time = date }
-            return cal.get(Calendar.HOUR_OF_DAY) to cal.get(Calendar.MINUTE)
-        }
-        return null
-    }
-
-    /**
-     * Mirror apple-alarm `parseDuration`: accept raw seconds or shorthand
-     * 30s / 5m / 1h / 2d. Returns total seconds, or null on bad input.
-     */
-    private fun parseDuration(s: String): Int? {
-        val trimmed = s.trim().lowercase()
-        if (trimmed.isEmpty()) return null
-        trimmed.toIntOrNull()?.let { return it }
-        if (trimmed.length < 2) return null
-        val unit = trimmed.last()
-        val num = trimmed.dropLast(1).toIntOrNull() ?: return null
-        return when (unit) {
-            's' -> num
-            'm' -> num * 60
-            'h' -> num * 3600
-            'd' -> num * 86400
-            else -> null
-        }
-    }
-
     /**
      * Format a Date as ISO 8601 `yyyy-MM-dd'T'HH:mm:ssXXX` to match
      * apple-alarm `noff_format_date`. Stable across locales.
@@ -444,6 +394,79 @@ class AlarmOffloadHandler(private val context: Context) : NativeOffloadHandler {
     }
 
     companion object {
+        private const val MAX_TIMER_SECONDS = 86400
+
+        internal fun parseHHMM(s: String): Pair<Int, Int>? {
+            val parts = s.split(":")
+            if (parts.size != 2) return null
+            val h = parts[0].toIntOrNull() ?: return null
+            val m = parts[1].toIntOrNull() ?: return null
+            if (h !in 0..23 || m !in 0..59) return null
+            return h to m
+        }
+
+        /**
+         * Accept HH:MM (parsed against today's calendar) or ISO 8601 like
+         * "2026-02-25T14:00", "2026-02-25T14:00:00Z". Both forms collapse to the
+         * (hour, minute) pair the manager expects — manager will roll forward to
+         * the next day if HH:MM is already past. Mirrors apple-alarm parseTime.
+         *
+         * The system Clock can only be asked for "the next HH:MM", so an ISO value
+         * that is not that next occurrence (a later date, or the past) is refused
+         * with [IllegalArgumentException] instead of quietly becoming some other time.
+         */
+        internal fun parseTimeArg(s: String, now: Long = System.currentTimeMillis()): Pair<Int, Int>? {
+            parseHHMM(s)?.let { return it }
+            // Try a few common ISO 8601 forms.
+            val patterns = listOf(
+                "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                "yyyy-MM-dd'T'HH:mm:ssXXX",
+                "yyyy-MM-dd'T'HH:mm:ss",
+                "yyyy-MM-dd'T'HH:mm",
+            )
+            for (pat in patterns) {
+                val date = runCatching {
+                    val sdf = SimpleDateFormat(pat, Locale.US)
+                    if (pat.endsWith("'Z'")) sdf.timeZone = TimeZone.getTimeZone("UTC")
+                    sdf.parse(s)
+                }.getOrNull() ?: continue
+                if (date.time < now - 60_000L || date.time > now + 24 * 3_600_000L) {
+                    throw IllegalArgumentException(
+                        "'$s' is not within the next 24h; the system Clock can only set the next HH:MM. " +
+                            "Use --time HH:MM at the right moment, or a scheduled task for a later date",
+                    )
+                }
+                val cal = Calendar.getInstance().apply { time = date }
+                return cal.get(Calendar.HOUR_OF_DAY) to cal.get(Calendar.MINUTE)
+            }
+            return null
+        }
+
+        /**
+         * Mirror apple-alarm `parseDuration`: accept raw seconds or shorthand
+         * 30s / 5m / 1h / 2d. Returns total seconds, or null on bad input.
+         */
+        internal fun parseDuration(s: String): Int? {
+            val trimmed = s.trim().lowercase()
+            if (trimmed.isEmpty()) return null
+            // Long arithmetic: "1193047h" overflows Int and wraps to a small positive number.
+            val seconds: Long = trimmed.toLongOrNull() ?: run {
+                if (trimmed.length < 2) return null
+                val num = trimmed.dropLast(1).toLongOrNull() ?: return null
+                val unitSeconds = when (trimmed.last()) {
+                    's' -> 1L
+                    'm' -> 60L
+                    'h' -> 3600L
+                    'd' -> 86400L
+                    else -> return null
+                }
+                // Overflow of even Long is "too large", not a small number.
+                runCatching { Math.multiplyExact(num, unitSeconds) }.getOrDefault(Long.MAX_VALUE)
+            }
+            // Out of range stays out of range (callers reject it); never wrap into range.
+            return if (seconds in Int.MIN_VALUE..Int.MAX_VALUE) seconds.toInt() else Int.MAX_VALUE
+        }
+
         private const val TAG = "AlarmOffload"
         private const val VIEW_URL = "minis://views/alarm"
         private const val HELP = """android-alarm — schedule alarms and timers (mirrors apple-alarm)
