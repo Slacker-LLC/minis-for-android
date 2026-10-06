@@ -9,4 +9,10 @@ class UiSensitiveValuePolicyTest {
         assertEquals("", UiSensitiveValuePolicy.redactAccessibilityValue(true, "sensitive-value"))
         assertEquals("Email address", UiSensitiveValuePolicy.redactAccessibilityValue(false, "Email address"))
     }
+
+    @Test
+    fun `bullets and empty values of a password node are not returned either`() {
+        assertEquals("", UiSensitiveValuePolicy.redactAccessibilityValue(true, "•••••••"))
+        assertEquals("", UiSensitiveValuePolicy.redactAccessibilityValue(true, ""))
+    }
 }
