@@ -1,6 +1,5 @@
 package com.openminis.app.ui.settings
 
-import android.graphics.BitmapFactory
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -90,6 +89,9 @@ import com.openminis.app.ui.components.MinisModalBottomSheet
  *     in-memory metadata cache so chat bubble headers update without a
  *     restart.
  */
+/** Largest image file read for an icon (matches the guest file reader's 50 MiB ceiling). */
+private const val MAX_PICKED_ICON_BYTES = 50L * 1024 * 1024
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SoulSettingsScreen(onBack: () -> Unit) {
@@ -138,8 +140,12 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 val bmp = runCatching {
-                    context.contentResolver.openInputStream(uri)?.use {
-                        BitmapFactory.decodeStream(it)
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        // Same ceiling as the file reader behind the config route; the sampled decode
+                        // then keeps the bitmap small however many pixels the file claims.
+                        SoulIcon.decodeForIcon(
+                            com.openminis.app.util.BoundedStreams.readBytes(input, MAX_PICKED_ICON_BYTES),
+                        )
                     }
                 }.getOrNull()
                 if (bmp == null) {
