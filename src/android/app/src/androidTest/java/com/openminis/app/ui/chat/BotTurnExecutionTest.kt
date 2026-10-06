@@ -140,6 +140,36 @@ class BotTurnExecutionTest {
         }
     }
 
+    @Test
+    fun aProgrammaticPromptLeavesTheUsersDraftAndEditAlone() = runBlocking {
+        withVm { vm, _, _ ->
+            val first = withContext(Dispatchers.Main) { vm.submitPrompt("Earlier message") }
+            assertEquals(AgentTurnOutcome.Completed, withTimeout(15_000L) { first.result.await() })
+            val draft = InputAttachment(
+                fileName = "draft.txt",
+                uri = android.net.Uri.parse("content://test/draft.txt"),
+                mimeType = "text/plain",
+                kind = InputAttachment.Kind.DOCUMENT,
+            )
+            withContext(Dispatchers.Main) {
+                assertNotNull("the user starts editing the earlier message", vm.editMessage(first.userMessageId!!))
+                // editMessage loads the edited message's own attachments; this one is added while editing.
+                vm.addAttachment(draft)
+            }
+
+            // A background callback arrives while the user is composing.
+            val callback = withContext(Dispatchers.Main) { vm.submitPrompt("[Background task finished] result") }
+            assertEquals(AgentTurnOutcome.Completed, withTimeout(15_000L) { callback.result.await() })
+
+            assertEquals("the draft attachment stays in the composer", listOf(draft), vm.attachments.value)
+            assertEquals("the edit is still the user's", first.userMessageId, vm.editingMessageId.value)
+            assertTrue(
+                "the earlier message was not truncated away",
+                vm.messages.value.any { it.id == first.userMessageId },
+            )
+        }
+    }
+
     private class ControlledProvider : LLMProvider {
         override val name = "Controlled provider"
         override var model = LLMModel("controlled-model", "Controlled model", "controlled", contextWindow = 32768)

@@ -8,6 +8,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
@@ -224,15 +226,28 @@ class SubAgentRuntime(
         }
     }
 
-    /** Closes a job, tells the parent (background runs), wakes a blocked call, and starts the next queued job. */
+    /**
+     * Closes a job, wakes a blocked call, starts the next queued job, and then tells the parent
+     * (background runs). The callback is posted on its own: delivering it waits for the parent's turn to
+     * settle, and the parent's turn may be the very call that is cancelling this job, so completion and
+     * the queue must not wait for it.
+     */
     private suspend fun complete(jobId: String, state: SubAgentJobState, text: String?) {
         val done = registry.finish(jobId, state, text) ?: return
         cancelRequested.remove(jobId)
-        if (!done.wait) {
-            runCatching { port.deliverToParent(done.parentSessionId, SubAgentTask.callbackText(done, clock())) }
-        }
         waiters.remove(jobId)?.complete(done)
         registry.promoteNext()?.let { launch(it) }
+        if (!done.wait) deliverInOrder(done.parentSessionId, SubAgentTask.callbackText(done, clock()))
+    }
+
+    /** One delivery queue per parent, so callbacks reach a conversation in the order the jobs finished. */
+    private val deliveryLocks = ConcurrentHashMap<String, Mutex>()
+
+    private fun deliverInOrder(parentSessionId: String, text: String) {
+        val lock = deliveryLocks.getOrPut(parentSessionId) { Mutex() }
+        scope.launch {
+            lock.withLock { runCatching { port.deliverToParent(parentSessionId, text) } }
+        }
     }
 
     // ── status / cancel / steer ─────────────────────────────────────────────
