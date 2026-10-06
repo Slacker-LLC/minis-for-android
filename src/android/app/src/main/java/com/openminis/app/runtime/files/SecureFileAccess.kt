@@ -56,9 +56,14 @@ internal object SecureFileAccess {
             }
             val count = minOf(length.toLong(), attributes.size - offset).toInt()
             val bytes = ByteArray(count)
-            openRead(parent).use { channel ->
+            val read = openRead(parent).use { channel ->
                 channel.position(offset)
                 readFully(channel, bytes)
+            }
+            // The file shrank between the stat and the read: hand back what was there, not the
+            // unread tail as zero bytes, and report the end.
+            if (read < count) {
+                return@withParent WorkspaceFileClient.ReadChunk(bytes.copyOf(read), offset, offset + read, true)
             }
             WorkspaceFileClient.ReadChunk(bytes, offset, attributes.size, offset + count >= attributes.size)
         }
@@ -73,8 +78,10 @@ internal object SecureFileAccess {
             throw WorkspaceFileClient.Failure("BAD_PARAMS", "file is too large")
         }
         val bytes = ByteArray(attributes.size.toInt())
-        openRead(parent).use { readFully(it, bytes) }
-        bytes
+        val read = openRead(parent).use { readFully(it, bytes) }
+        // A file that shrank after the stat is returned as it now is; zeros for the missing tail
+        // would be mistaken for content.
+        if (read < bytes.size) bytes.copyOf(read) else bytes
     }
 
     fun readToFile(path: UbuntuPaths.SecureFilePath, destination: File, maxBytes: Long): Long =
@@ -544,7 +551,8 @@ internal object SecureFileAccess {
         parent.deleteDirectory(entry)
     }
 
-    private fun readFully(channel: SeekableByteChannel, output: ByteArray) {
+    /** Fills [output] from [channel]; returns how many bytes were actually there (fewer at EOF). */
+    internal fun readFully(channel: SeekableByteChannel, output: ByteArray): Int {
         var offset = 0
         while (offset < output.size) {
             val count = channel.read(ByteBuffer.wrap(output, offset, output.size - offset))
@@ -552,6 +560,7 @@ internal object SecureFileAccess {
             if (count == 0) continue
             offset += count
         }
+        return offset
     }
 
     private fun writeFully(channel: SeekableByteChannel, bytes: ByteArray, length: Int = bytes.size) {
