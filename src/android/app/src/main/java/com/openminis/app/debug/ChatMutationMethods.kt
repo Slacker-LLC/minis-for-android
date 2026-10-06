@@ -422,7 +422,8 @@ internal object ChatMutationMethods {
         // writing into a deleted session row.
         AgentRunner.cancel(context, sessionId)
         app.chatRepository.deleteSession(sessionId)
-        AgentRunner.forget(sessionId)
+        // Same release the session list does, on the same thread: one cache.
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { AgentRunner.forget(sessionId) }
         return JSONObject().apply {
             put("sessionId", sessionId)
             put("deleted", true)

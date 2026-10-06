@@ -61,6 +61,10 @@ object ChatViewModelStore {
         }
     }
 
+    /** True when a ViewModel store is live for [sessionId] (alias-aware). */
+    @Synchronized
+    fun hasStore(sessionId: String): Boolean = resolveKey(sessionId) in stores
+
     /**
      * Drop the cached VM for this session (cancels `viewModelScope`, triggers
      * `ChatViewModel.onCleared`). Call when the session is deleted. Also

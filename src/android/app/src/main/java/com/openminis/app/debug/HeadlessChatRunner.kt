@@ -41,17 +41,13 @@ import org.json.JSONObject
 @Deprecated("Use com.openminis.app.agent.AgentRunner for product execution")
 internal object HeadlessChatRunner {
 
-    /** sessionId → ViewModelProvider that owns its single ChatViewModel. */
-    private val providers = mutableMapOf<String, ViewModelProvider>()
-
     private fun app(context: Context): MinisApp =
         context.applicationContext as? MinisApp
             ?: throw RPCException(-32000, "MinisApp not initialized")
 
-    @Synchronized
+    // No cache of our own: ChatViewModelStore is the only owner of a session's
+    // ViewModel, so releasing the store (delete, from any path) really drops it.
     private fun providerFor(context: Context, sessionId: String): ViewModelProvider {
-        val cached = providers[sessionId]
-        if (cached != null) return cached
         val app = app(context)
         // Share the process-wide ChatViewModelStore so the in-flight VM (with
         // its live streamJob + _isStreaming) is the same instance the UI's
@@ -60,7 +56,7 @@ internal object HeadlessChatRunner {
         // "run now" started streaming on the headless VM while the UI's VM
         // saw only a static snapshot — no thinking indicator, no live text.
         val owner = ChatViewModelStore.ownerFor(sessionId)
-        val provider = ViewModelProvider(
+        return ViewModelProvider(
             owner,
             ChatViewModel.factory(
                 sessionId = sessionId,
@@ -73,8 +69,6 @@ internal object HeadlessChatRunner {
                 botRepository = app.botRepository,
             ),
         )
-        providers[sessionId] = provider
-        return provider
     }
 
     private fun viewModel(context: Context, sessionId: String): ChatViewModel =
@@ -544,8 +538,10 @@ internal object HeadlessChatRunner {
     }
 
     suspend fun cancel(context: Context, sessionId: String): Boolean = withContext(Dispatchers.Main) {
-        val cached = providers[sessionId] ?: return@withContext false
-        val vm = cached[ChatViewModel::class.java]
+        // Nothing has ever opened this session: there is nothing to cancel, and
+        // cancelling must not build a ViewModel just to find that out.
+        if (!ChatViewModelStore.hasStore(sessionId)) return@withContext false
+        val vm = viewModel(context, sessionId)
         val wasRunning = vm.isStreaming.value
         if (wasRunning) vm.cancelStream()
         wasRunning
@@ -790,10 +786,7 @@ internal object HeadlessChatRunner {
     }
 
     /** Drop the cached ViewModel for [sessionId] (used after delete). */
-    @Synchronized
-    fun forget(sessionId: String) {
-        providers.remove(sessionId)
-    }
+    fun forget(sessionId: String) = ChatViewModelStore.release(sessionId)
 
     private fun extractText(partsJson: String): String? {
         return try {
