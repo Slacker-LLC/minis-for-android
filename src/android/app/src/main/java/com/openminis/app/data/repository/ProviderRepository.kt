@@ -1250,6 +1250,13 @@ class ProviderRepository(private val context: Context) {
         // race on the shared config.modelEntries ArrayList. The working copy
         // additionally keeps this refresh off the list Compose is iterating.
         val config = workingCopy()
+        // A refresh that was already in flight when the provider was deleted must not bring its
+        // models back: the model table has a foreign key to the instance, so every later full
+        // save would carry rows the database rejects.
+        if (config.instances.none { it.id == instanceId }) {
+            android.util.Log.w("ProviderRepo", "replaceEntries: instance $instanceId no longer exists, dropping refresh result")
+            return@synchronized
+        }
         val existing = config.modelEntries.filter { it.providerInstanceId == instanceId }
         val existingEntryIds = existing.map { it.id }.toSet()
 
