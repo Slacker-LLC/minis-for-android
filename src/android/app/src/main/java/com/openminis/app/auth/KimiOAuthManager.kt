@@ -248,6 +248,10 @@ class KimiOAuthManager(
                     // Carry the device identity + stamp last_refresh.
                     json.put("device_id", stored.optString("device_id", UUID.randomUUID().toString()))
                     json.put("last_refresh", System.currentTimeMillis())
+                    if (!storedRefreshTokenIs(refreshTokenValue)) {
+                        Log.w(TAG, "Token refresh result discarded: the stored credential changed meanwhile")
+                        return@withLock if (isAuthenticated()) RefreshOutcome.SUCCESS else RefreshOutcome.NO_TOKEN
+                    }
                     saveOAuthString("tokens", json.toString())
                     Log.i(TAG, "Token refresh successful (expires in ${expiresIn}s)")
                     return@withLock RefreshOutcome.SUCCESS

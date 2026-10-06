@@ -325,6 +325,10 @@ class ClaudeOAuthManager(context: Context, instanceId: String) : OAuthManager(co
                     if (expiresIn > 0) {
                         json.put("expire_at", System.currentTimeMillis() + expiresIn * 1000)
                     }
+                    if (!storedRefreshTokenIs(refreshTokenValue)) {
+                        Log.w(TAG, "Token refresh result discarded: the stored credential changed meanwhile")
+                        return@withLock if (isAuthenticated()) RefreshOutcome.SUCCESS else RefreshOutcome.NO_TOKEN
+                    }
                     saveOAuthString("tokens", json.toString())
                     Log.i(TAG, "Token refresh successful. Expires in ${expiresIn}s")
                     return@withLock RefreshOutcome.SUCCESS

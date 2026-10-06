@@ -375,6 +375,10 @@ class XAIOAuthManager(context: Context, instanceId: String) : OAuthManager(conte
             if (expiresIn > 0) {
                 json.put("expire_at", System.currentTimeMillis() + expiresIn * 1000)
             }
+            if (!storedRefreshTokenIs(refresh)) {
+                Log.w(TAG, "xAI refresh result discarded: the stored credential changed meanwhile")
+                return@withContext loadOAuthString("tokens") != null
+            }
             saveTokensJson(json)
             true
         } catch (e: Exception) {
