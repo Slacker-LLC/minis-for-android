@@ -433,20 +433,13 @@
     <string name="rootfs_actions_section">Actions</string>
     <string name="rootfs_install_label">Installer le rootfs</string>
     <string name="rootfs_reset_label">Réinitialiser le rootfs</string>
-    <string name="rootfs_reset_description">Tout supprimer et réinstaller</string>
-    <string name="rootfs_reset_backup_label">Réinitialiser et sauvegarder</string>
-    <string name="rootfs_reset_backup_description">Sauvegarder /root avant la réinitialisation</string>
-    <string name="rootfs_restore_label">Restaurer les données</string>
-    <string name="rootfs_restore_description">Restaurer un /root précédemment sauvegardé</string>
+    <string name="rootfs_reset_description">Réinstaller le système Ubuntu ; vos fichiers sont conservés</string>
     <string name="rootfs_progress_section">Progression</string>
     <string name="rootfs_result_section">Résultat</string>
     <string name="rootfs_info_section">Infos</string>
     <string name="rootfs_about_title">À propos du rootfs</string>
     <string name="rootfs_reset_confirm_title">Réinitialiser le rootfs ?</string>
-    <string name="rootfs_reset_confirm_message">Cela supprimera tout le rootfs. Toutes les données seront perdues.</string>
-    <string name="rootfs_reset_backup_confirm_title">Réinitialiser avec sauvegarde ?</string>
-    <string name="rootfs_reset_backup_confirm_message">Le dossier /root sera sauvegardé, puis le rootfs sera réinitialisé. Vous pourrez restaurer la sauvegarde plus tard.</string>
-    <string name="rootfs_reset_backup_confirm_button">Réinitialiser et sauvegarder</string>
+    <string name="rootfs_reset_confirm_message">Réinstalle le système Ubuntu depuis l\'application. L\'espace de travail, le dossier personnel, les compétences, la mémoire, les fichiers partagés et de session sont conservés. Les paquets installés avec apt et les autres modifications du système sont supprimés.</string>
 
     <!-- T172 — components / onboarding / preview i18n -->
     <string name="common_back">Retour</string>
@@ -1554,22 +1547,16 @@
     <string name="mcp_copy_config_subtitle">JSON mcpServers compatible Claude Desktop / Cursor</string>
     <string name="mcp_revoke_settings_token">Révoquer le jeton des réglages</string>
     <string name="rootfs_about_body">Le rootfs contient le système de fichiers Ubuntu 24.04 utilisé par le bac à sable. La réinitialisation ne supprime que le rootfs ; l\'espace de travail, la mémoire, les compétences et les fichiers partagés de l\'app sont conservés.</string>
-    <string name="rootfs_reset_summary_body">Réinitialiser : supprimer le rootfs Ubuntu\nSauvegarde/Restauration : les données utilisateur de l\'app sont gérées séparément</string>
+    <string name="rootfs_reset_summary_body">Réinitialiser : réinstalle le système Ubuntu depuis l\'application\nConservés : espace de travail, dossier personnel, compétences, mémoire, fichiers partagés et de session (hors du rootfs)</string>
     <string name="rootfs_status_preparing">Préparation du rootfs…</string>
     <string name="rootfs_status_extracting">Extraction du rootfs… %1$d%%</string>
     <string name="rootfs_status_finalizing">Finalisation…</string>
     <string name="rootfs_status_installing">Installation du rootfs…</string>
     <string name="rootfs_install_failed">Échec de l\'installation : %1$s</string>
-    <string name="rootfs_status_backing_up">Sauvegarde et réinitialisation…</string>
     <string name="rootfs_status_resetting">Réinitialisation du rootfs…</string>
     <string name="rootfs_reset_failed">Échec de la réinitialisation : %1$s</string>
-    <string name="rootfs_no_backup">Aucune sauvegarde disponible</string>
-    <string name="rootfs_status_restoring">Restauration des données utilisateur…</string>
-    <string name="rootfs_user_data_restored">Données utilisateur restaurées</string>
-    <string name="rootfs_restore_failed">Échec de la restauration : %1$s</string>
     <string name="rootfs_installed_successfully">Rootfs installé</string>
     <string name="rootfs_install_failed_detail">Échec de l\'installation : %1$s — %2$s</string>
-    <string name="rootfs_reset_with_backup">Rootfs réinitialisé, sauvegarde créée</string>
     <string name="rootfs_reset_complete">Réinitialisation du rootfs terminée</string>
     <string name="mcp_exposure_footer">Streamable HTTP sur 127.0.0.1 uniquement. L\'exposition LAN/TLS n\'est pas activée ici. Les nouveaux jetons des réglages ne contiennent que les outils MCP_ALLOWED ; vous pouvez ajouter ou retirer des outils ci-dessous.</string>
     <string name="mcp_status_running">En cours · %1$s</string>

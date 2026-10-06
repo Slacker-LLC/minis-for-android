@@ -433,20 +433,13 @@
     <string name="rootfs_actions_section">Aktionen</string>
     <string name="rootfs_install_label">Rootfs installieren</string>
     <string name="rootfs_reset_label">Rootfs zurücksetzen</string>
-    <string name="rootfs_reset_description">Alles löschen und neu installieren</string>
-    <string name="rootfs_reset_backup_label">Zurücksetzen &amp; Benutzerdaten sichern</string>
-    <string name="rootfs_reset_backup_description">/root vor dem Zurücksetzen sichern</string>
-    <string name="rootfs_restore_label">Benutzerdaten wiederherstellen</string>
-    <string name="rootfs_restore_description">Zuvor gesichertes /root wiederherstellen</string>
+    <string name="rootfs_reset_description">Ubuntu-System neu installieren; deine Dateien bleiben erhalten</string>
     <string name="rootfs_progress_section">Fortschritt</string>
     <string name="rootfs_result_section">Ergebnis</string>
     <string name="rootfs_info_section">Info</string>
     <string name="rootfs_about_title">Über Rootfs</string>
     <string name="rootfs_reset_confirm_title">Rootfs zurücksetzen?</string>
-    <string name="rootfs_reset_confirm_message">Das gesamte rootfs wird gelöscht. Alle Daten gehen verloren.</string>
-    <string name="rootfs_reset_backup_confirm_title">Zurücksetzen mit Sicherung?</string>
-    <string name="rootfs_reset_backup_confirm_message">Ihr /root-Verzeichnis wird gesichert, dann wird das Rootfs zurückgesetzt. Sie können die Sicherung später wiederherstellen.</string>
-    <string name="rootfs_reset_backup_confirm_button">Zurücksetzen &amp; Sichern</string>
+    <string name="rootfs_reset_confirm_message">Installiert das Ubuntu-System aus der App neu. Arbeitsbereich, Home-Ordner, Skills, Gedächtnis, geteilte und Sitzungsdateien bleiben erhalten. Mit apt installierte Pakete und andere Systemänderungen werden entfernt.</string>
 
     <!-- T172 — components / onboarding / preview i18n -->
     <string name="common_back">Zurück</string>
@@ -1658,22 +1651,16 @@
     <string name="mcp_copy_config_subtitle">Claude Desktop-/Cursor-kompatibles mcpServers-JSON</string>
     <string name="mcp_revoke_settings_token">Einstellungs-Token widerrufen</string>
     <string name="rootfs_about_body">Das Rootfs enthält das vom Sandbox verwendete Ubuntu-24.04-Dateisystem. Ein Zurücksetzen löscht nur das Rootfs; App-eigener Arbeitsbereich, Speicher, Skills und geteilte Dateien bleiben erhalten.</string>
-    <string name="rootfs_reset_summary_body">Zurücksetzen: Ubuntu-Rootfs löschen\nSichern/Wiederherstellen: App-eigene Benutzerdaten werden separat verwaltet</string>
+    <string name="rootfs_reset_summary_body">Zurücksetzen: installiert das Ubuntu-System aus der App neu\nErhalten: Arbeitsbereich, Home, Skills, Gedächtnis, geteilte und Sitzungsdateien (sie liegen außerhalb des Rootfs)</string>
     <string name="rootfs_status_preparing">Rootfs wird vorbereitet…</string>
     <string name="rootfs_status_extracting">Rootfs wird entpackt… %1$d%%</string>
     <string name="rootfs_status_finalizing">Wird abgeschlossen…</string>
     <string name="rootfs_status_installing">Rootfs wird installiert…</string>
     <string name="rootfs_install_failed">Installation fehlgeschlagen: %1$s</string>
-    <string name="rootfs_status_backing_up">Sichern und zurücksetzen…</string>
     <string name="rootfs_status_resetting">Rootfs wird zurückgesetzt…</string>
     <string name="rootfs_reset_failed">Zurücksetzen fehlgeschlagen: %1$s</string>
-    <string name="rootfs_no_backup">Keine Sicherung verfügbar</string>
-    <string name="rootfs_status_restoring">Benutzerdaten werden wiederhergestellt…</string>
-    <string name="rootfs_user_data_restored">Benutzerdaten erfolgreich wiederhergestellt</string>
-    <string name="rootfs_restore_failed">Wiederherstellung fehlgeschlagen: %1$s</string>
     <string name="rootfs_installed_successfully">Rootfs erfolgreich installiert</string>
     <string name="rootfs_install_failed_detail">Installation fehlgeschlagen: %1$s — %2$s</string>
-    <string name="rootfs_reset_with_backup">Rootfs zurückgesetzt, Sicherung erstellt</string>
     <string name="rootfs_reset_complete">Rootfs-Zurücksetzen abgeschlossen</string>
     <string name="mcp_exposure_footer">Streamable HTTP nur auf 127.0.0.1. LAN-/TLS-Exposition ist hier nicht aktiviert. Neue Einstellungs-Token starten nur mit MCP_ALLOWED-Tools; unten können Sie Tools explizit hinzufügen oder entfernen.</string>
     <string name="mcp_status_running">Läuft · %1$s</string>
