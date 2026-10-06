@@ -21,21 +21,22 @@ fun highlightedAnnotatedString(text: String, query: String): AnnotatedString {
     if (query.isBlank() || text.isEmpty()) return AnnotatedString(text)
     val highlightBg = MaterialTheme.colorScheme.tertiaryContainer
     val highlightFg = MaterialTheme.colorScheme.onTertiaryContainer
-    val lower = text.lowercase()
-    val q = query.lowercase()
     return buildAnnotatedString {
         var idx = 0
         while (idx < text.length) {
-            val match = lower.indexOf(q, idx)
+            // Match in [text] itself: lowercasing can change a string's length
+            // ("İ" becomes two chars), and an index from the lowercased copy is
+            // then not an index into the original.
+            val match = text.indexOf(query, idx, ignoreCase = true)
             if (match < 0) {
                 append(text.substring(idx))
                 break
             }
             if (match > idx) append(text.substring(idx, match))
             withStyle(SpanStyle(background = highlightBg, color = highlightFg)) {
-                append(text.substring(match, match + q.length))
+                append(text.substring(match, match + query.length))
             }
-            idx = match + q.length
+            idx = match + query.length
         }
     }
 }
@@ -47,8 +48,7 @@ fun highlightedAnnotatedString(text: String, query: String): AnnotatedString {
  */
 fun snippetAround(text: String, query: String, radius: Int = 50): String? {
     if (query.isBlank() || text.isEmpty()) return null
-    val lower = text.lowercase()
-    val pos = lower.indexOf(query.lowercase())
+    val pos = text.indexOf(query, ignoreCase = true)
     if (pos < 0) return null
     val start = (pos - radius).coerceAtLeast(0)
     val end = (pos + query.length + radius).coerceAtMost(text.length)
