@@ -215,7 +215,8 @@ class OpenAIOAuthManager(context: Context, instanceId: String) : OAuthManager(co
         response.close()
         AppLogger.info(
             TAG,
-            "token exchange response: $responseCode bodyLen=${responseBody.length} body[0..500]=${responseBody.take(500)}",
+            // The body carries the access and refresh tokens: status and size only.
+            "token exchange response: $responseCode bodyLen=${responseBody.length}",
         )
 
         if (responseCode !in 200..299) {

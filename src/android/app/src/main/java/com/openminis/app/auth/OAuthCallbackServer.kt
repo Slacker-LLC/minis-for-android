@@ -16,6 +16,18 @@ class OAuthCallbackServer(
     private val onCode: (code: String, state: String?) -> Unit,
 ) {
     companion object {
+        /**
+         * The request line without its query string: `GET /callback?code=…&state=…` becomes
+         * `GET /callback (query: yes)`. The authorization code and state must not reach the log.
+         */
+        internal fun loggableRequestLine(requestLine: String): String {
+            val parts = requestLine.split(' ')
+            val method = parts.firstOrNull().orEmpty().take(16)
+            val target = parts.getOrNull(1).orEmpty()
+            val path = target.substringBefore('?').take(120)
+            return "${"$method $path".trim()} (query: ${if ('?' in target) "yes" else "no"})"
+        }
+
         private const val TAG = "OAuthCallbackServer"
     }
 
@@ -77,7 +89,7 @@ class OAuthCallbackServer(
                         socket.soTimeout = 10_000
                         val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
                         val requestLine = reader.readLine() ?: continue
-                        Log.d(TAG, "Request: $requestLine")
+                        Log.d(TAG, "Request: ${loggableRequestLine(requestLine)}")
 
                         // CORS preflight for providers (e.g. xAI) that
                         // OPTIONS /callback from their authorization page
