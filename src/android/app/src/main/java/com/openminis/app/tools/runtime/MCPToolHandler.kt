@@ -15,11 +15,23 @@ import com.openminis.app.tools.internal.ToolResultPruner
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
-/** A remote MCP tool exposed as `mcp.<server>.<tool>`. */
+/**
+ * A remote MCP tool exposed as `mcp.<server>.<tool>`.
+ *
+ * @param serverId the tool-name-safe server id used in the canonical name.
+ * @param configId the server's configured id, which session overrides are keyed on.
+ * @param enabledInSession whether this server is switched on for a session; checked on every call so
+ *   a server the user switched off for a session cannot be reached through a stale tool list or an
+ *   earlier tool call.
+ */
 class MCPToolHandler(
     val serverId: String,
     val remoteTool: MCPClientCodec.RemoteTool,
     private val session: MCPClientSession,
+    val configId: String = serverId,
+    private val enabledInSession: (String) -> Boolean = { sessionId ->
+        com.openminis.app.mcp.client.MCPProvider.isServerEnabledForSession(configId, sessionId)
+    },
 ) : ToolHandler {
 
     private val canonicalName = "mcp.$serverId.${remoteTool.name}"
@@ -40,6 +52,12 @@ class MCPToolHandler(
         context: Context,
         toolId: String,
     ): ToolExecutionResult {
+        if (!enabledInSession(sessionId)) {
+            return ToolExecutionResult(
+                "Error: MCP server $configId is switched off for this session; tool ${remoteTool.name} was not called",
+                false,
+            )
+        }
         val args = runCatching { JSONObject(argsJson) }.getOrElse { JSONObject() }
         val result = try {
             session.callTool(remoteTool.name, args)
