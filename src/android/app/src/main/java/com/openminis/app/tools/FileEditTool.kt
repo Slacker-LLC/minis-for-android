@@ -72,7 +72,7 @@ object FileEditTool {
 
             // Read, match and write under one per-target transaction so another
             // file_write/file_edit cannot invalidate the snapshot in between.
-            FileMutationQueue.withKey("$sessionId\u0000$path") {
+            FileMutationQueue.withKey(FileMutationQueue.keyFor(sessionId, path)) {
                 val metadata = WorkspaceFileClient.info(sessionId, path)
                 if (!metadata.optBoolean("exists", false)) {
                     return@withKey ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
@@ -82,7 +82,22 @@ object FileEditTool {
                     return@withKey ToolExecutionResult("Error: Path is not a regular file: $path", false, toolTitle = toolTitle)
                 }
 
-                val content = WorkspaceFileClient.readAll(sessionId, path).toString(Charsets.UTF_8)
+                // The edit rewrites the whole file, so every byte has to survive
+                // the decode: refuse a file that is not valid UTF-8 instead of
+                // turning its bad bytes into U+FFFD.
+                val content = try {
+                    Charsets.UTF_8.newDecoder()
+                        .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                        .decode(java.nio.ByteBuffer.wrap(WorkspaceFileClient.readAll(sessionId, path)))
+                        .toString()
+                } catch (_: java.nio.charset.CharacterCodingException) {
+                    return@withKey ToolExecutionResult(
+                        "Error: $path is not valid UTF-8; file_edit would change bytes outside the edit. " +
+                            "Use a shell tool for binary or non-UTF-8 files.",
+                        false, toolTitle = toolTitle,
+                    )
+                }
                 val edits = parseEdits(args)
                 if (edits.isEmpty()) {
                     return@withKey ToolExecutionResult(
@@ -142,7 +157,7 @@ object FileEditTool {
         return text.substring(0, end)
     }
 
-    private fun parseEdits(args: JSONObject): List<FileEditEngine.Edit> {
+    internal fun parseEdits(args: JSONObject): List<FileEditEngine.Edit> {
         val out = mutableListOf<FileEditEngine.Edit>()
         val array: JSONArray? = when (val raw = args.opt("edits")) {
             is JSONArray -> raw
@@ -152,7 +167,10 @@ object FileEditTool {
         }
         if (array != null) {
             for (i in 0 until array.length()) {
-                val item = array.optJSONObject(i) ?: continue
+                // A null or non-object entry is a malformed request: refuse all of
+                // it rather than apply the rest and report success.
+                val item = array.optJSONObject(i)
+                    ?: throw IllegalArgumentException("edits[$i] must be an object with old_text and new_text")
                 val oldText = if (item.has("old_text")) {
                     item.optString("old_text", "")
                 } else {
