@@ -224,7 +224,12 @@ abstract class OAuthManager(
         return params
     }
 
+    /** Whether the last failed refresh was an explicit revocation (see [OAuthRefreshPolicy]). */
+    @Volatile
+    protected var lastRefreshRevoked: Boolean = false
+
     open suspend fun refreshToken(): Boolean = withContext(Dispatchers.IO) {
+        lastRefreshRevoked = false
         val stored = loadStoredTokens() ?: return@withContext false
         val refreshToken = stored.optString("refresh_token", "").ifEmpty { return@withContext false }
 
@@ -251,6 +256,7 @@ abstract class OAuthManager(
 
             if (responseCode !in 200..299) {
                 Log.e(TAG, "Token refresh failed: $responseCode")
+                lastRefreshRevoked = OAuthRefreshPolicy.isRevoked(responseCode, responseBody)
                 return@withContext false
             }
 
@@ -287,15 +293,20 @@ abstract class OAuthManager(
         val expireAt = stored.optLong("expire_at", 0)
         val now = System.currentTimeMillis()
 
-        // Refresh if expires within 4 hours
-        if (expireAt > 0 && (expireAt - now) < 4 * 3600 * 1000) {
+        // Refresh a quarter of the token's life before it expires (5 min .. 4 h).
+        val lead = OAuthRefreshPolicy.refreshLeadMs(stored.optLong("expires_in", 0))
+        if (expireAt > 0 && (expireAt - now) < lead) {
             if (refreshToken()) {
                 return loadStoredTokens()?.optString("access_token")
             }
-            // Refresh failed — if token is already expired, clear credentials
-            if (expireAt > 0 && now >= expireAt) {
-                Log.w(TAG, "Token expired and refresh failed — clearing credentials")
-                logout()
+            if (now >= expireAt) {
+                if (lastRefreshRevoked) {
+                    Log.w(TAG, "Token expired and the refresh token was rejected — clearing credentials")
+                    logout()
+                } else {
+                    // A timeout or a 5xx is not a revocation: keep the credential for the next try.
+                    Log.w(TAG, "Token expired and refresh failed transiently — keeping credentials")
+                }
                 return null
             }
         }

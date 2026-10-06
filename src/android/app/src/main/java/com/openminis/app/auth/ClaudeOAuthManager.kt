@@ -335,10 +335,7 @@ class ClaudeOAuthManager(context: Context, instanceId: String) : OAuthManager(co
                 }
 
                 // Classify failure.
-                val bodyLower = responseBody.lowercase()
-                val isInvalidGrant = responseCode == 400 || responseCode == 401 || responseCode == 403 ||
-                    bodyLower.contains("invalid_grant") ||
-                    bodyLower.contains("refresh_token")
+                val isInvalidGrant = OAuthRefreshPolicy.isRevoked(responseCode, responseBody)
                 if (isInvalidGrant) {
                     Log.e(TAG, "Refresh token invalid ($responseCode): ${OAuthManager.sanitizeBody(responseBody)} — clearing credentials")
                     logout()

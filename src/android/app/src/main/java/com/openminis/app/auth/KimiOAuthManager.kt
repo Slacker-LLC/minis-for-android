@@ -260,10 +260,7 @@ class KimiOAuthManager(
                 // Classify like ClaudeOAuthManager: hard 4xx auth failures or
                 // an explicit invalid-grant marker → INVALID_GRANT; 5xx /
                 // anything else → TRANSIENT (credentials kept).
-                val bodyLower = json.toString().lowercase()
-                val isInvalidGrant = status == 400 || status == 401 || status == 403 ||
-                    bodyLower.contains("invalid_grant") ||
-                    bodyLower.contains("refresh_token_reused")
+                val isInvalidGrant = OAuthRefreshPolicy.isRevoked(status, json.toString())
                 if (isInvalidGrant) {
                     // [T-oauth-refresh-race] Compare-before-delete: only clear
                     // credentials when the persisted refresh token is STILL
