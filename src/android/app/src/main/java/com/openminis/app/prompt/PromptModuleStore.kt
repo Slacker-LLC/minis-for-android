@@ -160,30 +160,36 @@ object PromptModuleStore {
         val file = overrideFile(context, module)
         val normalized = normalize(text)
         val default = normalize(AssetDefaults(context).read(module.assetName).orEmpty())
-        if (normalized.isEmpty() || normalized == default) {
-            if (file.exists() && !file.delete()) {
-                AppLogger.warning(TAG, "could not delete override: ${file.name}")
+        // One step with the refresh that publishes it, and the shared temp file below is only ever
+        // used by one writer at a time.
+        synchronized(lock) {
+            if (normalized.isEmpty() || normalized == default) {
+                if (file.exists() && !file.delete()) {
+                    AppLogger.warning(TAG, "could not delete override: ${file.name}")
+                }
+            } else {
+                file.parentFile?.mkdirs()
+                val tmp = File(file.parentFile, "${file.name}.tmp")
+                tmp.writeText(normalized, Charsets.UTF_8)
+                if (!tmp.renameTo(file)) {
+                    file.writeText(normalized, Charsets.UTF_8)
+                    tmp.delete()
+                }
             }
-        } else {
-            file.parentFile?.mkdirs()
-            val tmp = File(file.parentFile, "${file.name}.tmp")
-            tmp.writeText(normalized, Charsets.UTF_8)
-            if (!tmp.renameTo(file)) {
-                file.writeText(normalized, Charsets.UTF_8)
-                tmp.delete()
-            }
+            refresh(context)
         }
-        refresh(context)
     }
 
     /** Drop the override so the module falls back to the shipped default. */
     fun resetOverride(context: Context, moduleId: String) {
         val module = PromptModuleRegistry.byId(moduleId) ?: return
         val file = overrideFile(context, module)
-        if (file.exists() && !file.delete()) {
-            AppLogger.warning(TAG, "could not delete override: ${file.name}")
+        synchronized(lock) {
+            if (file.exists() && !file.delete()) {
+                AppLogger.warning(TAG, "could not delete override: ${file.name}")
+            }
+            refresh(context)
         }
-        refresh(context)
     }
 
     /** Include or skip a module without touching its text. */

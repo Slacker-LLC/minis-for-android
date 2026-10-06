@@ -76,24 +76,27 @@ object CustomPromptStore {
     fun save(context: Context, text: String) {
         val normalized = normalize(text)
         val file = file(context)
-        try {
-            if (normalized.isEmpty()) {
-                if (file.exists() && !file.delete()) {
-                    AppLogger.warning(TAG, "could not delete ${FILE_NAME}")
-                }
-            } else {
-                file.parentFile?.mkdirs()
-                val tmp = File(file.parentFile, "$FILE_NAME.tmp")
-                tmp.writeText(normalized, Charsets.UTF_8)
-                if (!tmp.renameTo(file)) {
-                    file.writeText(normalized, Charsets.UTF_8)
-                    tmp.delete()
-                }
-            }
-        } catch (t: Throwable) {
-            AppLogger.warning(TAG, "save failed: ${t.message}")
-        }
+        // The file change and the cache publication are one step. Outside the lock two saves could
+        // interleave as: A writes, B writes and publishes, A publishes, leaving the disk on B and
+        // the text the model is given (and the editor shows) on A.
         synchronized(lock) {
+            try {
+                if (normalized.isEmpty()) {
+                    if (file.exists() && !file.delete()) {
+                        AppLogger.warning(TAG, "could not delete ${FILE_NAME}")
+                    }
+                } else {
+                    file.parentFile?.mkdirs()
+                    val tmp = File(file.parentFile, "$FILE_NAME.tmp")
+                    tmp.writeText(normalized, Charsets.UTF_8)
+                    if (!tmp.renameTo(file)) {
+                        file.writeText(normalized, Charsets.UTF_8)
+                        tmp.delete()
+                    }
+                }
+            } catch (t: Throwable) {
+                AppLogger.warning(TAG, "save failed: ${t.message}")
+            }
             cache = normalized
             _textFlow.value = normalized
         }
