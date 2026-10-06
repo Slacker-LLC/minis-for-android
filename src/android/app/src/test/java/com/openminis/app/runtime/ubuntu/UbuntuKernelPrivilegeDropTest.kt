@@ -64,4 +64,25 @@ class UbuntuKernelPrivilegeDropTest {
         assertTrue(command.contains("LINKS=\$(/system/bin/find \"\$DST\" -type l"))
         assertTrue(command.contains("[ -z \"\$LINKS\" ] || return 75"))
     }
+
+    @Test
+    fun `legacy migration keeps newer files and resumes past trees it already copied`() {
+        val command = UbuntuKernel.buildLegacyMigrationCommand(
+            identity = UbuntuKernel.AppIdentity(uid = 10234, gid = 20234),
+            mappings = listOf(
+                "/data/adb/minis/workspace" to "/data/user/0/pkg/files/minis/workspace",
+                "/data/adb/minis/home" to "/data/user/0/pkg/files/minis/home",
+            ),
+        )
+        assertTrue("a file already written in the new tree is not overwritten", command.contains("cp -a -n "))
+        assertFalse(command.contains("cp -a \""))
+        assertTrue(command.contains("PROGRESS='/data/user/0/pkg/files/minis/.legacy-migration'"))
+        assertTrue("a progress dir planted as a link is refused", command.contains("[ ! -L \"\$PROGRESS\" ]"))
+        assertTrue("a finished tree is skipped on retry", command.contains("[ ! -e \"\$DONE\" ] || return 0"))
+        assertTrue("a progress file planted as a link is refused", command.contains("[ ! -L \"\$DONE\" ] || return 76"))
+        assertTrue(command.contains("copy_tree '/data/adb/minis/workspace' '/data/user/0/pkg/files/minis/workspace' 0-workspace"))
+        assertTrue(command.contains("copy_tree '/data/adb/minis/home' '/data/user/0/pkg/files/minis/home' 1-home"))
+        // The destination link check still guards a tree that has not been copied yet.
+        assertTrue(command.contains("[ -z \"\$LINKS\" ] || return 75"))
+    }
 }
