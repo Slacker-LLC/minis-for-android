@@ -42,6 +42,28 @@ class SecureFileAccessInstrumentedTest {
     }
 
     @Test
+    fun movingAFileOntoItsOwnAliasKeepsTheFile() = runBlocking {
+        val payload = "keep me\n".toByteArray()
+        WorkspaceFileClient.writeBytes(null, "/workspace/attachments/a.txt", payload)
+        // The same file under two names: before the fix the "destination" was deleted first,
+        // which was the source itself.
+        runCatching {
+            WorkspaceFileClient.move(null, "/workspace/attachments/a.txt", "/var/minis/attachments/a.txt")
+        }
+        assertArrayEquals(payload, WorkspaceFileClient.readAll(null, "/workspace/attachments/a.txt"))
+    }
+
+    @Test
+    fun copyingADirectoryIntoItselfThroughAnAliasIsRefused() = runBlocking {
+        WorkspaceFileClient.writeBytes(null, "/workspace/data/one.txt", "1".toByteArray())
+        val failure = runCatching {
+            WorkspaceFileClient.copy(null, "/workspace", "/var/minis/attachments/copy")
+        }.exceptionOrNull()
+        assertTrue("copying into itself must fail, not recurse", failure != null)
+        assertTrue(!File(root, "workspace/attachments/copy/attachments").exists())
+    }
+
+    @Test
     fun symlinkEscapeIsRejectedWithoutTouchingOutsideFile() = runBlocking {
         val outside = File(root.parentFile, "minis-secure-outside").apply {
             deleteRecursively()
