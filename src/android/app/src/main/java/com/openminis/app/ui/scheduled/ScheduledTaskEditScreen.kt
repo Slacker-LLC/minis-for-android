@@ -951,7 +951,8 @@ private fun MessagePickerDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DateDialog(initialMs: Long?, onDismiss: () -> Unit, onPick: (Long) -> Unit) {
-    val state = rememberDatePickerState(initialSelectedDateMillis = initialMs)
+    // The picker reads its initial value as a UTC date, but initialMs is a local start-of-day.
+    val state = rememberDatePickerState(initialSelectedDateMillis = initialMs?.let(::localDayToPickerUtcMidnight))
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
@@ -966,16 +967,29 @@ private fun DateDialog(initialMs: Long?, onDismiss: () -> Unit, onPick: (Long) -
 }
 
 /** DatePicker hands back a UTC-midnight ms; convert to local start-of-day. */
-private fun startOfLocalDay(utcMidnightMs: Long): Long {
+internal fun startOfLocalDay(utcMidnightMs: Long, zone: java.util.TimeZone = java.util.TimeZone.getDefault()): Long {
     // The picker's value is UTC midnight of the picked calendar day. Re-anchor
     // to the local time zone's start-of-day so the active-window comparison in
     // ScheduledTask.nextTriggerMs (which works in local time) matches.
     val utc = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
         timeInMillis = utcMidnightMs
     }
-    return Calendar.getInstance().apply {
+    return Calendar.getInstance(zone).apply {
         clear()
         set(utc.get(Calendar.YEAR), utc.get(Calendar.MONTH), utc.get(Calendar.DAY_OF_MONTH), 0, 0, 0)
+    }.timeInMillis
+}
+
+/**
+ * The inverse of [startOfLocalDay]: the UTC midnight of the same calendar day as [localMs], which is
+ * what the picker expects as its initial value. Handing it the local start-of-day instead shows the
+ * previous day east of UTC, and confirming without a change then saves that day.
+ */
+internal fun localDayToPickerUtcMidnight(localMs: Long, zone: java.util.TimeZone = java.util.TimeZone.getDefault()): Long {
+    val local = Calendar.getInstance(zone).apply { timeInMillis = localMs }
+    return Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+        clear()
+        set(local.get(Calendar.YEAR), local.get(Calendar.MONTH), local.get(Calendar.DAY_OF_MONTH), 0, 0, 0)
     }.timeInMillis
 }
 
