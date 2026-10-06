@@ -243,25 +243,31 @@ class ShareReceiverActivity : ComponentActivity() {
 
     private fun handleSingleSend(intent: Intent, out: MutableList<PendingShare.Item>, budget: ShareCopyBudget) {
         val type = intent.type ?: ""
-        when {
-            type == "text/plain" -> {
-                val text = intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() }
-                    ?: return
-                if (text.length <= INLINE_TEXT_LIMIT) {
-                    out += PendingShare.Item(PendingShare.Item.Kind.INLINE_TEXT, text)
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+        val uri = getParcelableExtra<Uri>(intent, Intent.EXTRA_STREAM)
+        when (ShareIntakePolicy.singleSendSource(type, text, hasStream = uri != null)) {
+            ShareIntakePolicy.SingleSendSource.TEXT -> {
+                val body = text ?: return
+                if (body.length <= INLINE_TEXT_LIMIT) {
+                    out += PendingShare.Item(PendingShare.Item.Kind.INLINE_TEXT, body)
                 } else {
+                    // Long text is staged as a file, so it spends the same budget as any other.
+                    if (!budget.tryConsume(body.toByteArray(Charsets.UTF_8).size.toLong())) {
+                        AppLogger.warning(TAG, "shared text exceeds the staging budget; dropped")
+                        return
+                    }
                     val name = "shared-text-${shortId()}.txt"
                     File(SharedShareStore.sharedFileDirectory(this), name)
-                        .writeText(text, Charsets.UTF_8)
+                        .writeText(body, Charsets.UTF_8)
                     out += PendingShare.Item(PendingShare.Item.Kind.ATTACHMENT, name)
                 }
             }
-            else -> {
-                val uri = getParcelableExtra<Uri>(intent, Intent.EXTRA_STREAM) ?: return
-                copyUriToStaging(uri, type, budget)?.let {
+            ShareIntakePolicy.SingleSendSource.STREAM -> {
+                copyUriToStaging(uri ?: return, type, budget)?.let {
                     out += PendingShare.Item(PendingShare.Item.Kind.ATTACHMENT, it)
                 }
             }
+            ShareIntakePolicy.SingleSendSource.NONE -> Unit
         }
     }
 

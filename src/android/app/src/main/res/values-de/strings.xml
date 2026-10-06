@@ -621,6 +621,8 @@
     <string name="provider_list_import_provider">Import Provider</string>
     <string name="share_provider_json_title">Provider-Konfiguration erkannt</string>
     <string name="share_expired_toast">Geteilter Inhalt ist abgelaufen. Bitte erneut teilen.</string>
+    <string name="share_attach_failed_toast">Einige geteilte Dateien konnten nicht angehängt werden. Bitte erneut teilen.</string>
+    <string name="share_overflow_toast">Zu viele geteilte Inhalte warten. Einige wurden verworfen; öffne einen Chat und teile den Rest erneut.</string>
     <string name="share_provider_json_message">Diese JSON-Datei sieht wie ein exportierter Provider aus. Was möchtest du tun?</string>
     <string name="share_provider_json_import">Provider importieren</string>
     <string name="share_provider_json_attach">Als Chat-Anhang hinzufügen</string>

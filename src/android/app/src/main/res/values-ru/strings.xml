@@ -720,6 +720,8 @@
     <string name="provider_list_import_provider">Импортировать провайдера</string>
     <string name="share_provider_json_title">Обнаружена конфигурация провайдера</string>
     <string name="share_expired_toast">Срок действия отправленного содержимого истёк. Поделитесь ещё раз.</string>
+    <string name="share_attach_failed_toast">Не удалось прикрепить часть файлов. Поделитесь ими ещё раз.</string>
+    <string name="share_overflow_toast">Слишком много отправленного содержимого в ожидании. Часть удалена; откройте чат и поделитесь остальным ещё раз.</string>
     <string name="share_provider_json_message">Этот JSON-файл похож на экспортированного провайдера. Что вы хотите сделать?</string>
     <string name="share_provider_json_import">Импортировать провайдера</string>
     <string name="share_provider_json_attach">Добавить как вложение к чату</string>

@@ -621,6 +621,8 @@
     <string name="provider_list_import_provider">Import Provider</string>
     <string name="share_provider_json_title">プロバイダー設定を検出しました</string>
     <string name="share_expired_toast">共有内容の有効期限が切れました。もう一度共有してください。</string>
+    <string name="share_attach_failed_toast">共有されたファイルの一部を添付できませんでした。もう一度共有してください。</string>
+    <string name="share_overflow_toast">共有コンテンツが多すぎます。一部は破棄されました。チャットを開いて残りをもう一度共有してください。</string>
     <string name="share_provider_json_message">この JSON ファイルはエクスポートされたプロバイダーのようです。どうしますか？</string>
     <string name="share_provider_json_import">プロバイダーをインポート</string>
     <string name="share_provider_json_attach">チャットの添付ファイルとして追加</string>

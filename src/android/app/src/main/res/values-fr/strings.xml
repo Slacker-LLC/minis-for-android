@@ -480,6 +480,8 @@
     <string name="provider_list_import_provider">Import Provider</string>
     <string name="share_provider_json_title">Configuration de fournisseur détectée</string>
     <string name="share_expired_toast">Le contenu partagé a expiré. Veuillez le partager à nouveau.</string>
+    <string name="share_attach_failed_toast">Certains fichiers partagés n\'ont pas pu être joints. Veuillez les partager à nouveau.</string>
+    <string name="share_overflow_toast">Trop de contenu partagé en attente. Certains éléments ont été ignorés ; ouvrez une conversation et partagez le reste à nouveau.</string>
     <string name="share_provider_json_message">Ce fichier JSON ressemble à un fournisseur exporté. Que souhaitez-vous faire ?</string>
     <string name="share_provider_json_import">Importer le fournisseur</string>
     <string name="share_provider_json_attach">Ajouter en pièce jointe</string>
