@@ -9134,13 +9134,17 @@ class ChatViewModel(
                 withContext(Dispatchers.Main) {
                     updateAssistantMessage(assistantId, accumulatedText, false, allToolBlocks)
                 }
-                persistAssistantTurn(
+                val finalAssistantDbId = persistAssistantTurn(
                     turnContent,
                     lastUsage,
                     turnReasoningContent,
                     pendingTurn = pendingTurn,
                     modelSnapshot = modelAttributionSnapshot(currentProvider),
                 )
+                // Link the history entry to its stored row, as the tool-round path does. Without it a
+                // plain-text turn stays unlinked until the session is reloaded, and Compact cannot
+                // anchor on it (it walks back onto a user message and refuses to split the pair).
+                backfillAssistantDbId(finalAssistantDbId)
                 // [T-error-persist-android] Empty-response hint: the model ended a
                 // turn (finish=stop/end_turn) with no visible text anywhere in the
                 // reply and no tool blocks — the user just sees a blank bubble.
@@ -9654,10 +9658,7 @@ class ChatViewModel(
                 // [C6-android-model-failure-discipline] A turn of this round is now
                 // durable: later failures in the same round are terminal.
                 roundTurnCommitted = true
-                val lastIdx = agentHistory.indexOfLast { it.role == LLMMessage.Role.ASSISTANT && it.dbMessageId == null }
-                if (lastIdx >= 0) {
-                    agentHistory[lastIdx] = agentHistory[lastIdx].copy(dbMessageId = assistantDbId)
-                }
+                backfillAssistantDbId(assistantDbId)
             }
 
             // Persist tool results as user-role message (mirrors iOS)
@@ -10377,6 +10378,13 @@ class ChatViewModel(
             providerTypeRaw = instance.providerType.name,
             providerInstanceId = instance.id,
         )
+    }
+
+    /** Gives the newest assistant entry in [agentHistory] that has no stored-row id the id [dbId]. */
+    private fun backfillAssistantDbId(dbId: String?) {
+        if (dbId == null) return
+        val lastIdx = agentHistory.indexOfLast { it.role == LLMMessage.Role.ASSISTANT && it.dbMessageId == null }
+        if (lastIdx >= 0) agentHistory[lastIdx] = agentHistory[lastIdx].copy(dbMessageId = dbId)
     }
 
     private suspend fun persistAssistantTurn(
