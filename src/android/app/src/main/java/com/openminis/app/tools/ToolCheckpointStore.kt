@@ -16,9 +16,12 @@ import java.io.File
  * the agent does not blindly re-run a call that may already have had side
  * effects (duplicate file writes, double API charges, ...).
  *
- * Storage is a per-session JSONL sidecar under filesDir/checkpoints/
- * (append-only, replayable — same spirit as the DSH JSONL persistence,
- * without touching Room). Writes are serialized per process.
+ * Storage is a per-session JSONL sidecar under filesDir/checkpoints/. Only
+ * unsettled intents are kept: a settled call is removed, so the file stays the
+ * size of the calls in flight rather than of the whole session, and it is
+ * deleted with the session. A sensitive tool's arguments (see
+ * [ToolSensitivePolicy]) are never written here; recovery reports the call by
+ * name. Writes are serialized per process.
  */
 object ToolCheckpointStore {
     private const val TAG = "ToolCheckpointStore"
@@ -41,18 +44,27 @@ object ToolCheckpointStore {
     fun recordIntent(context: Context, sessionId: String, callId: String, toolName: String, argsJson: String) {
         if (sessionId.isBlank() || callId.isBlank()) return
         try {
-            val line = JSONObject()
-                .put("callId", callId)
-                .put("tool", toolName)
-                .put("args", argsJson.take(4000))
-                .put("at", System.currentTimeMillis())
-                .put("state", "pending")
-                .toString()
-            fileFor(context, sessionId).appendText(line + "\n")
+            recordIntentTo(fileFor(context, sessionId), callId, toolName, argsJson)
         } catch (t: Throwable) {
             // Checkpoints must never take the agent turn down.
             Log.w(TAG, "recordIntent failed: ${t.message}")
         }
+    }
+
+    internal fun recordIntentTo(file: File, callId: String, toolName: String, argsJson: String) {
+        val args = if (ToolSensitivePolicy.isSensitive(toolName)) {
+            ToolSensitivePolicy.ARGUMENTS_PLACEHOLDER
+        } else {
+            argsJson.take(4000)
+        }
+        val line = JSONObject()
+            .put("callId", callId)
+            .put("tool", toolName)
+            .put("args", args)
+            .put("at", System.currentTimeMillis())
+            .put("state", "pending")
+            .toString()
+        file.appendText(line + "\n")
     }
 
     /** Mark the intent settled AFTER the tool body returns (success or failure). */
@@ -66,24 +78,26 @@ object ToolCheckpointStore {
     fun markDoneBatch(context: Context, sessionId: String, outcomes: Map<String, Boolean>) {
         if (sessionId.isBlank() || outcomes.isEmpty()) return
         try {
-            val f = fileFor(context, sessionId)
-            if (!f.exists()) return
-            val lines = f.readLines().toMutableList()
-            var changed = false
-            for (i in lines.indices) {
-                val parsed = runCatching { JSONObject(lines[i]) }.getOrNull() ?: continue
-                val success = outcomes[parsed.optString("callId")]
-                if (success != null && parsed.optString("state") == "pending") {
-                    parsed.put("state", if (success) "done" else "done-failed")
-                    parsed.put("finishedAt", System.currentTimeMillis())
-                    lines[i] = parsed.toString()
-                    changed = true
-                }
-            }
-            if (changed) replaceAtomically(f, lines.joinToString("\n") + "\n")
+            settle(fileFor(context, sessionId), outcomes.keys)
         } catch (t: Throwable) {
             Log.w(TAG, "markDone failed: ${t.message}")
         }
+    }
+
+    /**
+     * Remove the intents of [callIds] once their results are persisted. Lines still pending (an
+     * outcome-unknown call) are kept exactly; anything else — settled rows, older "done" rows from
+     * before this was pruned, unreadable lines — is dropped. An empty file is deleted.
+     */
+    internal fun settle(file: File, callIds: Set<String>) {
+        if (!file.exists()) return
+        val lines = file.readLines().filter { it.isNotBlank() }
+        val kept = lines.filter { line ->
+            val parsed = runCatching { JSONObject(line) }.getOrNull() ?: return@filter false
+            parsed.optString("state") == "pending" && parsed.optString("callId") !in callIds
+        }
+        if (kept.size == lines.size) return
+        if (kept.isEmpty()) file.delete() else replaceAtomically(file, kept.joinToString("\n") + "\n")
     }
 
     internal fun replaceAtomically(file: File, content: String) {
