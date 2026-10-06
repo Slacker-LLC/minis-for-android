@@ -61,8 +61,10 @@ class BotDelegationCoordinator private constructor(
             // source-session result card is appended (or after append and before
             // delivered_at is written). Retry these rows at the explicit app
             // recovery entry; deliverReceipt is idempotent by task marker.
-            delegationRepository.listUndeliveredTerminal(MAX_DISPATCH_BATCH).forEach { delegation ->
-                deliverReceipt(delegation)
+            // Every such row, in bounded pages: the backlog across sessions and turns can exceed one
+            // page, and nothing else would come back for the rest until the next start.
+            forEachPage<BotDelegationEntity>(MAX_DISPATCH_BATCH, { after -> delegationRepository.listUndeliveredTerminal(MAX_DISPATCH_BATCH, after) }) {
+                deliverReceipt(it)
             }
             dispatchAll()
             wakeDispatcher.recoverAfterProcessStart()
@@ -293,8 +295,9 @@ class BotDelegationCoordinator private constructor(
         )
     }
 
+    /** Hand every dispatchable delegation to its target, a page at a time; dispatchOne serialises per target. */
     private suspend fun dispatchAll() {
-        delegationRepository.listDispatchable(MAX_DISPATCH_BATCH).forEach { delegation ->
+        forEachPage<BotDelegationEntity>(MAX_DISPATCH_BATCH, { after -> delegationRepository.listDispatchable(MAX_DISPATCH_BATCH, after) }) { delegation ->
             scope.launch { dispatchOne(delegation) }
         }
     }
@@ -537,6 +540,21 @@ class BotDelegationCoordinator private constructor(
     companion object {
         private const val MAX_FANOUT_PER_RUN = 4
         private const val MAX_DISPATCH_BATCH = 32
+
+        /**
+         * Walk a keyset-paged query to its end: [fetch] gets the previous page's last item (null for
+         * the first page) and a short page ends the walk. The cursor moves forward even when [each]
+         * leaves a row unchanged (a receipt that could not be delivered), so a stuck row cannot loop.
+         */
+        internal suspend fun <T> forEachPage(pageSize: Int, fetch: suspend (T?) -> List<T>, each: suspend (T) -> Unit) {
+            var cursor: T? = null
+            while (true) {
+                val page = fetch(cursor)
+                page.forEach { each(it) }
+                if (page.size < pageSize) return
+                cursor = page.last()
+            }
+        }
         private const val TARGET_TIMEOUT_MS = 15 * 60 * 1000L
         private const val MAX_BUSY_RETRIES = 3
         private const val ROSTER_NAME_MAX_CHARS = 80

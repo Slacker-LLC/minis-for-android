@@ -38,14 +38,16 @@ interface BotDelegationDao {
     @Query("SELECT * FROM bot_delegations WHERE status = 'RUNNING' ORDER BY created_at ASC")
     suspend fun listRunning(): List<BotDelegationEntity>
 
-    @Query("SELECT * FROM bot_delegations WHERE status IN ('QUEUED', 'WAITING_TARGET') AND source_turn_settled = 1 ORDER BY created_at ASC LIMIT :limit")
-    suspend fun listDispatchable(limit: Int): List<BotDelegationEntity>
+    /** One page of dispatchable rows after the (created_at, id) cursor, oldest first. */
+    @Query("SELECT * FROM bot_delegations WHERE status IN ('QUEUED', 'WAITING_TARGET') AND source_turn_settled = 1 AND (created_at > :afterCreatedAt OR (created_at = :afterCreatedAt AND id > :afterId)) ORDER BY created_at ASC, id ASC LIMIT :limit")
+    suspend fun listDispatchable(limit: Int, afterCreatedAt: Long, afterId: String): List<BotDelegationEntity>
 
     @Query("UPDATE bot_delegations SET source_turn_settled = 1, updated_at = :now WHERE source_session_id = :sessionId AND source_run_id = :runId AND status IN ('QUEUED', 'WAITING_TARGET')")
     suspend fun markSourceRunSettled(sessionId: String, runId: String, now: Long): Int
 
-    @Query("SELECT * FROM bot_delegations WHERE status IN ('COMPLETED', 'FAILED', 'DENIED', 'CANCELLED', 'BUSY_GAVE_UP') AND delivered_at IS NULL ORDER BY finished_at ASC, created_at ASC LIMIT :limit")
-    suspend fun listUndeliveredTerminal(limit: Int): List<BotDelegationEntity>
+    /** One page of finished-but-undelivered rows after the (created_at, id) cursor, oldest first. */
+    @Query("SELECT * FROM bot_delegations WHERE status IN ('COMPLETED', 'FAILED', 'DENIED', 'CANCELLED', 'BUSY_GAVE_UP') AND delivered_at IS NULL AND (created_at > :afterCreatedAt OR (created_at = :afterCreatedAt AND id > :afterId)) ORDER BY created_at ASC, id ASC LIMIT :limit")
+    suspend fun listUndeliveredTerminal(limit: Int, afterCreatedAt: Long, afterId: String): List<BotDelegationEntity>
 
     @Query("UPDATE bot_delegations SET status = 'WAITING_TARGET', attempts = attempts + 1, updated_at = :now WHERE id = :id AND source_turn_settled = 1 AND status IN ('QUEUED', 'WAITING_TARGET')")
     suspend fun markWaitingTarget(id: String, now: Long): Int

@@ -63,14 +63,16 @@ class BotDelegationRepository(private val dao: BotDelegationDao) {
 
     suspend fun listRunning(): List<BotDelegationEntity> = dao.listRunning()
 
-    suspend fun listDispatchable(limit: Int = 32): List<BotDelegationEntity> =
-        dao.listDispatchable(limit.coerceIn(1, 100))
+    /** A page of dispatchable delegations, oldest first; pass the previous page's last row as [after]. */
+    suspend fun listDispatchable(limit: Int = 32, after: BotDelegationEntity? = null): List<BotDelegationEntity> =
+        dao.listDispatchable(limit.coerceIn(1, 100), after?.createdAt ?: Long.MIN_VALUE, after?.id.orEmpty())
 
     suspend fun markSourceRunSettled(sessionId: String, runId: String): Int =
         dao.markSourceRunSettled(sessionId, runId, System.currentTimeMillis())
 
-    suspend fun listUndeliveredTerminal(limit: Int = 32): List<BotDelegationEntity> =
-        dao.listUndeliveredTerminal(limit.coerceIn(1, 100))
+    /** A page of finished, undelivered delegations, oldest first; pass the previous page's last row as [after]. */
+    suspend fun listUndeliveredTerminal(limit: Int = 32, after: BotDelegationEntity? = null): List<BotDelegationEntity> =
+        dao.listUndeliveredTerminal(limit.coerceIn(1, 100), after?.createdAt ?: Long.MIN_VALUE, after?.id.orEmpty())
 
     suspend fun markWaitingTarget(id: String): Boolean =
         dao.markWaitingTarget(id, System.currentTimeMillis()) == 1
