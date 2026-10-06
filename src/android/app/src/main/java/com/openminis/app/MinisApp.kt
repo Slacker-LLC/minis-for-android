@@ -782,6 +782,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.runtime.AgentGoalHandler(),
             aliasNames = listOf("get_goal", "create_goal", "update_goal"),
+            aliasesAreActions = true,
         )
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.runtime.AgentTodoHandler(),
@@ -799,6 +800,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.runtime.SystemJobsHandler(),
             aliasNames = listOf("job_list", "job_kill", "job_output"),
+            aliasesAreActions = true,
         )
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.runtime.AgentRalphHandler(),

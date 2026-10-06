@@ -8,8 +8,8 @@ import java.util.concurrent.ConcurrentHashMap
  * contract, minimal port).
  *
  * A job is created via [start], receives streamed output via [appendOutput],
- * and is terminated by [finish] (natural completion) or [kill] (cancellation
- * request). All mutating operations are `@Synchronized` on the singleton
+ * and is terminated by [finish] (natural completion) or [kill] (cancellation,
+ * which also runs the worker's [setCanceller] callback). All mutating operations are `@Synchronized` on the singleton
  * object monitor, so concurrent writers (background tasks appending output,
  * the agent loop finishing a job, a remote RPC cancelling it) are safe.
  * [get] and [list] are lock-free reads over a [ConcurrentHashMap].
@@ -56,6 +56,12 @@ object JobRegistry {
     private val jobs = ConcurrentHashMap<String, Job>()
 
     /**
+     * How to stop the work behind a job. [kill] marks the job KILLED and runs this, so a generic
+     * cancel (job_kill, RPC) stops the worker instead of only relabelling it.
+     */
+    private val cancellers = ConcurrentHashMap<String, () -> Unit>()
+
+    /**
      * Start a new job and return its id. If the registry is at capacity the
      * oldest jobs are evicted first.
      */
@@ -73,10 +79,29 @@ object JobRegistry {
         return id
     }
 
-    /** Append [text] to the job's accumulated output. No-op for unknown ids. */
+    /**
+     * Register how to stop the job's worker. If the job was already killed before the worker got
+     * here, the worker is stopped at once.
+     */
+    fun setCanceller(id: String, cancel: () -> Unit) {
+        val runNow = synchronized(this) {
+            val job = jobs[id]
+            if (job?.status == JobStatus.RUNNING) {
+                cancellers[id] = cancel
+                false
+            } else {
+                job?.status == JobStatus.KILLED
+            }
+        }
+        if (runNow) cancel()
+    }
+
+    /** Append [text] to the job's accumulated output. No-op for unknown or no-longer-running jobs. */
     @Synchronized
     fun appendOutput(id: String, text: String) {
-        jobs[id]?.output?.append(text)
+        val job = jobs[id] ?: return
+        if (job.status != JobStatus.RUNNING) return
+        job.output.append(text)
     }
 
     /**
@@ -88,6 +113,7 @@ object JobRegistry {
         val job = jobs[id] ?: return
         if (job.status != JobStatus.RUNNING) return
         jobs[id] = job.copy(status = status, detail = detail, finishedAt = System.currentTimeMillis())
+        cancellers.remove(id)
     }
 
     /** Snapshot of the job's current output, or null for unknown ids. */
@@ -105,11 +131,15 @@ object JobRegistry {
      * and records [reason] in the detail. Returns true when the transition
      * happened, false when the job is unknown or already terminal.
      */
-    @Synchronized
     fun kill(id: String, reason: String): Boolean {
-        val job = jobs[id] ?: return false
-        if (job.status != JobStatus.RUNNING) return false
-        jobs[id] = job.copy(status = JobStatus.KILLED, detail = reason, finishedAt = System.currentTimeMillis())
+        val cancel = synchronized(this) {
+            val job = jobs[id] ?: return false
+            if (job.status != JobStatus.RUNNING) return false
+            jobs[id] = job.copy(status = JobStatus.KILLED, detail = reason, finishedAt = System.currentTimeMillis())
+            cancellers.remove(id)
+        }
+        // Outside the monitor: the canceller may touch the worker's own locks.
+        cancel?.invoke()
         return true
     }
 
@@ -119,6 +149,9 @@ object JobRegistry {
         if (jobs.size <= MAX_ENTRIES) return
         val excess = jobs.size - MAX_ENTRIES
         val oldest = jobs.values.sortedBy { it.startedAt }.take(excess)
-        for (job in oldest) jobs.remove(job.id)
+        for (job in oldest) {
+            jobs.remove(job.id)
+            cancellers.remove(job.id)
+        }
     }
 }

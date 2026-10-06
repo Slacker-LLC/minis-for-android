@@ -9824,7 +9824,7 @@ class ChatViewModel(
         val canonical = com.openminis.app.tools.runtime.ToolRegistry.canonicalName(name) ?: name
         if (com.openminis.app.tools.runtime.ToolRegistry.contains(canonical)) {
             return com.openminis.app.tools.runtime.ToolExecutor.execute(
-                name = canonical,
+                name = name,
                 argsJson = argsJson,
                 sessionId = activeSessionId,
                 context = context,
