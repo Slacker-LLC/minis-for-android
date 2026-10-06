@@ -250,10 +250,7 @@ class GeminiOAuthManager(context: Context, instanceId: String) : OAuthManager(co
                 // with `error=invalid_grant` for revoked/expired refresh tokens,
                 // and `error=invalid_token` for truly malformed tokens. Both are
                 // non-recoverable; user must re-auth.
-                val bodyLower = responseBody.lowercase()
-                val isInvalidGrant = responseCode == 400 || responseCode == 401 || responseCode == 403 ||
-                    bodyLower.contains("invalid_grant") ||
-                    bodyLower.contains("invalid_token")
+                val isInvalidGrant = OAuthRefreshPolicy.isRevoked(responseCode, responseBody)
                 if (isInvalidGrant) {
                     Log.e(TAG, "Refresh token invalid ($responseCode): ${OAuthManager.sanitizeBody(responseBody)} — clearing credentials")
                     logout()
