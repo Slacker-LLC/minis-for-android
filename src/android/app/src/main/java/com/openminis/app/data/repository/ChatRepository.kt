@@ -359,16 +359,38 @@ class ChatRepository(
     ): List<MessageEntity> {
         val result = ArrayList<MessageEntity>(limit)
         for (i in 0 until limit) {
+            val offset = baseOffset + i
             val row = try {
-                dao.loadMessagesPage(sessionId, baseOffset + i, 1).firstOrNull()
+                dao.loadMessagesPage(sessionId, offset, 1).firstOrNull() ?: break
             } catch (e: SQLiteBlobTooBigException) {
-                null
+                unreadableRow(sessionId, offset)
             } catch (e: IllegalStateException) {
-                if (e.message?.contains("CursorWindow", ignoreCase = true) == true) null else throw e
-            } ?: continue
+                if (e.message?.contains("CursorWindow", ignoreCase = true) == true) {
+                    unreadableRow(sessionId, offset)
+                } else {
+                    throw e
+                }
+            }
             result.add(row)
         }
         return result
+    }
+
+    /**
+     * Stand-in for a row whose payload cannot be read: its real id, role and position with a
+     * text part saying so, so the transcript keeps its shape and a later edit or delete still
+     * targets the real row. A row that cannot even give its header is skipped.
+     */
+    private suspend fun unreadableRow(sessionId: String, offset: Int): MessageEntity {
+        val header = runCatching { dao.messageHeaderAt(sessionId, offset) }.getOrNull()
+        return MessageEntity(
+            id = header?.id ?: "unreadable-$sessionId-$offset",
+            sessionId = sessionId,
+            role = header?.role ?: "assistant",
+            partsJson = UNREADABLE_PARTS_JSON,
+            createdAt = header?.createdAt ?: 0L,
+            sortOrder = header?.sortOrder ?: offset,
+        )
     }
 
     suspend fun deleteMessagesAfter(sessionId: String, keepCount: Int) =
@@ -994,7 +1016,57 @@ class ChatRepository(
         // they remain JSON-parseable downstream.
         internal const val MAX_MESSAGE_PARTS_JSON_LENGTH = 500_000
 
+        internal const val UNREADABLE_PARTS_JSON =
+            """[{"type":"text","value":"[This message is too large to load and is not shown.]"}]"""
+
+        /**
+         * Brings an oversized parts array under [MAX_MESSAGE_PARTS_JSON_LENGTH] without changing
+         * its shape: part types, ids, names and pairing stay, and only the longest string values
+         * are cut (each with a marker) until it fits. Something that is not a JSON array falls back
+         * to a single text part holding the cut text.
+         */
         internal fun buildTruncatedPartsJson(original: String): String {
+            val parts = runCatching { org.json.JSONArray(original) }.getOrNull()
+                ?: return wrapAsTruncatedText(original)
+            val fields = mutableListOf<StringField>()
+            collectStringFields(parts, fields)
+            val marker = "\n\n[Content truncated — original length "
+            while (parts.toString().length > MAX_MESSAGE_PARTS_JSON_LENGTH) {
+                val longest = fields.maxByOrNull { it.get().length } ?: break
+                val text = longest.get()
+                if (text.length <= MIN_TRUNCATED_FIELD) break
+                // Cut roughly in half (or by the overshoot, if that is bigger): fewer passes than
+                // chipping, and the other fields keep their content.
+                val over = parts.toString().length - MAX_MESSAGE_PARTS_JSON_LENGTH
+                val keep = (text.length - maxOf(over, text.length / 2)).coerceAtLeast(MIN_TRUNCATED_FIELD)
+                longest.set(text.take(keep) + marker + text.length + " chars]")
+            }
+            return if (parts.toString().length <= MAX_MESSAGE_PARTS_JSON_LENGTH) parts.toString()
+            else wrapAsTruncatedText(original)
+        }
+
+        private const val MIN_TRUNCATED_FIELD = 1_000
+
+        private class StringField(val get: () -> String, val set: (String) -> Unit)
+
+        private fun collectStringFields(node: Any?, out: MutableList<StringField>) {
+            when (node) {
+                is org.json.JSONObject -> node.keys().asSequence().toList().forEach { key ->
+                    when (val v = node.opt(key)) {
+                        is String -> out += StringField({ node.getString(key) }, { node.put(key, it) })
+                        is org.json.JSONObject, is org.json.JSONArray -> collectStringFields(v, out)
+                    }
+                }
+                is org.json.JSONArray -> for (i in 0 until node.length()) {
+                    when (val v = node.opt(i)) {
+                        is String -> out += StringField({ node.getString(i) }, { node.put(i, it) })
+                        is org.json.JSONObject, is org.json.JSONArray -> collectStringFields(v, out)
+                    }
+                }
+            }
+        }
+
+        private fun wrapAsTruncatedText(original: String): String {
             val keep = original.take(MAX_MESSAGE_PARTS_JSON_LENGTH)
             val marker = "\n\n[Content truncated at " +
                 "${MAX_MESSAGE_PARTS_JSON_LENGTH / 1000} KB — original length " +

@@ -518,6 +518,18 @@ interface ChatDao {
     suspend fun loadMessagesPage(sessionId: String, offset: Int, limit: Int): List<MessageEntity>
 
     /**
+     * Identity of the row at [offset] without its (possibly unreadable) parts_json, in the same
+     * order as [loadMessagesPage]. Lets the loader keep a row it cannot materialise.
+     */
+    @Query("""
+        SELECT id, role, created_at AS createdAt, sort_order AS sortOrder FROM messages
+        WHERE session_id = :sessionId
+        ORDER BY sort_order ASC, created_at ASC
+        LIMIT 1 OFFSET :offset
+    """)
+    suspend fun messageHeaderAt(sessionId: String, offset: Int): MessageHeader?
+
+    /**
      * [T-android-sessions-cli-messages-daterange] GH#200 (iOS 8f3189a73).
      * Date-filtered variant of [loadMessagesPage]. `--start` / `--end` were
      * documented in the CLI help and honoured by `list` / `search`, but
@@ -567,3 +579,6 @@ interface ChatDao {
         endMs: Long?,
     ): Int
 }
+
+/** A message row minus its payload: what is still known when the payload cannot be read. */
+data class MessageHeader(val id: String, val role: String, val createdAt: Long, val sortOrder: Int)
