@@ -356,8 +356,12 @@ class SessionListViewModel(
         isSelecting.value = true
     }
 
-    fun selectAll() {
-        selectedIds.value = _allSessions.value.map { it.id }.toSet()
+    /**
+     * The selection bar's "Select all" / "Deselect all". It acts on the rows the user
+     * can see (search results while searching), never on sessions the search hid.
+     */
+    fun toggleSelectAll() {
+        selectedIds.value = toggledSelection(selectedIds.value, displayedSessions.value.map { it.id })
     }
 
     fun clearSelection() {
@@ -1160,3 +1164,11 @@ class SessionListViewModel(
         return out
     }
 }
+
+/**
+ * Select every [visible] id, or, when they are all selected already, drop them from the
+ * selection. Ids outside [visible] (selected earlier, or hidden by a search) are left alone.
+ */
+internal fun toggledSelection(current: Set<String>, visible: List<String>): Set<String> =
+    if (visible.isNotEmpty() && current.containsAll(visible)) current - visible.toSet()
+    else current + visible

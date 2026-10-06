@@ -698,10 +698,10 @@ fun SessionListScreen(
                 },
                 actions = {
                     if (isSelecting) {
-                        MinisTextButton(onClick = { viewModel.selectAll() }) {
+                        MinisTextButton(onClick = { viewModel.toggleSelectAll() }) {
                             Text(
                                 stringResource(
-                                    if (selectedIds.size == sessions.size) R.string.sessionlist_deselect_all
+                                    if (persistedSessions.isNotEmpty() && persistedSessions.all { it.id in selectedIds }) R.string.sessionlist_deselect_all
                                     else R.string.sessionlist_select_all
                                 )
                             )
