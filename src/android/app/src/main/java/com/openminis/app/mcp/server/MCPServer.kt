@@ -227,11 +227,15 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         }
     }
 
-    private suspend fun handleToolCall(
+    internal suspend fun handleToolCall(
         req: MCPCodec.MCPRequest,
-        tokenRecord: TokenStore.Token,
+        acceptedToken: TokenStore.Token,
         caller: String,
     ): String {
+        // The record was read when the headers arrived; the body may have taken a while. Use what
+        // the token is allowed to do now: a revoked token or a narrowed scope applies at once.
+        val tokenRecord = TokenStore.findById(acceptedToken.id)?.takeIf { it.token == acceptedToken.token }
+            ?: return MCPCodec.errorResponse(req.id, MCPCodec.INVALID_REQUEST, "permission_denied: token no longer valid")
         val params = req.params
         val name = params.optString("name")
         val arguments = params.optJSONObject("arguments") ?: JSONObject()
