@@ -743,9 +743,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
 
     private fun inputText(text: String, args: OffloadArgs): NativeOffloadResult {
         if (text.isBlank()) return errEnvelope("INVALID_ARGS", "input text <text>", args)
-        // `input text` doesn't accept spaces directly — replace with %s
-        val safe = text.replace(' ', '%').replace("'", "")
-        val r = ShizukuManager.runProcess(arrayOf("input", "text", safe))
+        val r = ShizukuManager.runProcess(arrayOf("input", "text", encodeInputText(text)))
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("text", text), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
@@ -1101,6 +1099,11 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
             val uid = Regex("""userId=(\d+)""").find(stdout)?.groupValues?.get(1)?.toIntOrNull()
             return uid?.takeIf { it >= 1000 }?.toString()
         }
+         * The argument for `input text`: it reads `%s` as a space (a bare `%` is not one), and
+         * the text travels as an argv element, so nothing else — apostrophes included — needs to
+         * change.
+         */
+        internal fun encodeInputText(text: String): String = text.replace(" ", "%s")
 
         private const val TAG = "ShizukuOffload"
 
