@@ -82,6 +82,18 @@ interface ChatDao {
     )
     suspend fun emptyUntitledSessionIds(olderThan: Long): List<String>
 
+    /**
+     * Deletes [id] only if it is still an unused draft (the [emptyUntitledSessionIds] conditions,
+     * checked in the same statement as the delete). A message that arrived after the candidate
+     * list was read keeps the session. Returns 1 when it was deleted.
+     */
+    @Query(
+        "DELETE FROM sessions WHERE id = :id AND title IS NULL AND folder_id IS NULL AND bot_id IS NULL " +
+            "AND source IS NULL AND pinned_at IS NULL " +
+            "AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.session_id = :id)",
+    )
+    suspend fun deleteSessionIfUnusedDraft(id: String): Int
+
     @Query("SELECT * FROM sessions WHERE id = :id")
     suspend fun getSession(id: String): ChatSessionEntity?
 

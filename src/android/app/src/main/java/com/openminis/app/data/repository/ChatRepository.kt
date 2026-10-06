@@ -141,8 +141,16 @@ class ChatRepository(
      */
     suspend fun pruneEmptyDrafts(minAgeMs: Long = 10 * 60 * 1000L): Int {
         val ids = dao.emptyUntitledSessionIds(System.currentTimeMillis() - minAgeMs)
-        ids.forEach { deleteSession(it) }
-        return ids.size
+        var deleted = 0
+        for (id in ids) {
+            // The candidate list is stale by now: a chat opened since may have received its
+            // first message. The delete re-checks that in the same statement.
+            if (dao.deleteSessionIfUnusedDraft(id) > 0) {
+                releaseDeletedSession(id)
+                deleted++
+            }
+        }
+        return deleted
     }
 
     suspend fun deleteSession(id: String) {
@@ -150,6 +158,14 @@ class ChatRepository(
         com.openminis.app.tools.android.AndroidDebugSessionStore.clear(id)
         dao.deleteMessages(id)
         dao.deleteSession(id)
+        withContext(Dispatchers.IO) {
+            runCatching { onSessionDeleted(id) }
+        }
+    }
+
+    private suspend fun releaseDeletedSession(id: String) {
+        com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(id)
+        com.openminis.app.tools.android.AndroidDebugSessionStore.clear(id)
         withContext(Dispatchers.IO) {
             runCatching { onSessionDeleted(id) }
         }
