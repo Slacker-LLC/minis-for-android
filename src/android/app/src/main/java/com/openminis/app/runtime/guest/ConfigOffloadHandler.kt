@@ -130,7 +130,7 @@ class ConfigOffloadHandler : NativeOffloadHandler {
             when (sub) {
                 "list-topics" -> cmdListTopics(args)
                 "topic-help" -> cmdTopicHelp(args)
-                "get" -> cmdGet(args)
+                "get" -> cmdGet(args, request.sessionId ?: args.get("session"))
                 "set" -> cmdSet(args, request.sessionId ?: args.get("session"))
                 "add" -> cmdAdd(args, request.sessionId ?: args.get("session"))
                 "set-batch" -> cmdSetBatch(args, request)
@@ -189,7 +189,7 @@ class ConfigOffloadHandler : NativeOffloadHandler {
         return envelopeResult(args, out)
     }
 
-    private fun cmdGet(args: OffloadArgs): NativeOffloadResult {
+    private fun cmdGet(args: OffloadArgs, sessionId: String?): NativeOffloadResult {
         val path = args.positional.getOrNull(1) ?: return errorResult(
             args, EXIT_INVALID_ARGS, "INVALID_ARGS",
             "get <path> requires a field path."
@@ -197,7 +197,10 @@ class ConfigOffloadHandler : NativeOffloadHandler {
         val filter = args.get("filter", "f")
         val page = args.getInt("page", "p")?.coerceAtLeast(0) ?: 0
         val pageSize = args.getInt("page-size", "s")?.coerceAtLeast(0) ?: 0
-        val envelope = ConfigBridge.readField(path = path, filter = filter, page = page, pageSize = pageSize)
+        val envelope = ConfigBridge.readField(
+            path = path, filter = filter, page = page, pageSize = pageSize,
+            sessionId = sessionId,
+        )
         return envelopeResult(args, envelope)
     }
 
@@ -228,7 +231,6 @@ class ConfigOffloadHandler : NativeOffloadHandler {
         }
         val caption = args.get("caption")
         val actor = args.get("actor") ?: "agent"
-        val sessionId = args.get("session")
         val items = JSONArray().put(JSONObject().apply {
             put("path", path)
             put("value_json", valueJSON)
@@ -267,7 +269,6 @@ class ConfigOffloadHandler : NativeOffloadHandler {
         }
         val caption = args.get("caption")
         val actor = args.get("actor") ?: "agent"
-        val sessionId = args.get("session")
         val items = JSONArray().put(JSONObject().apply {
             put("path", "$topic.append")
             put("value_json", valueJSON)
@@ -303,7 +304,7 @@ class ConfigOffloadHandler : NativeOffloadHandler {
         }
         val caption = args.get("caption")
         val actor = args.get("actor") ?: "agent"
-        val sessionId = args.get("session")
+        val sessionId = request.sessionId ?: args.get("session")
         val envelope = ConfigBridge.writeFields(parsed, caption, actor, sessionId)
         return envelopeResult(args, envelope)
     }

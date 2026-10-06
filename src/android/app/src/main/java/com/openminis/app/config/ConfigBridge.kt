@@ -100,8 +100,9 @@ object ConfigBridge {
         filter: String? = null,
         page: Int = 0,
         pageSize: Int = 0,
+        sessionId: String? = null,
     ): JSONObject {
-        val base = readFieldRaw(path)
+        val base = readFieldRaw(path, sessionId)
         if (base.optBoolean("ok", false) != true) return base
 
         val filterText = filter?.trim()?.takeIf { it.isNotEmpty() }
@@ -189,7 +190,7 @@ object ConfigBridge {
         return out
     }
 
-    private fun readFieldRaw(path: String): JSONObject {
+    private fun readFieldRaw(path: String, sessionId: String?): JSONObject {
         if (!MinisConfigPermissionStore.isEnabled) return disabledErrorEnvelope()
         val field = ConfigRegistry.get().resolveField(path) ?: return JSONObject().apply {
             put("ok", false)
@@ -206,7 +207,7 @@ object ConfigBridge {
         // user can't act on.
         field.unavailableReason?.let { return unavailableErrorEnvelope(path, it) }
         return try {
-            val v = field.read()
+            val v = ConfigCallSession.with(sessionId) { field.read() }
             JSONObject().apply {
                 put("ok", true)
                 put("value", v.jsonString())
@@ -419,7 +420,7 @@ object ConfigBridge {
             }
 
             val oldValue: ConfigValue = try {
-                field.read()
+                ConfigCallSession.with(sessionId) { field.read() }
             } catch (_: Throwable) {
                 ConfigValue.Null
             }
@@ -654,7 +655,7 @@ object ConfigBridge {
                             displayName = r.collection.displayName
                             displayPath = r.rawPath
                         } else if (r.field != null) {
-                            r.field.write(r.newValue)
+                            ConfigCallSession.with(sessionId) { r.field.write(r.newValue) }
                             displayName = r.field.displayName
                             displayPath = r.field.path
                             // [T-minis-config-provider-add] If this is a
