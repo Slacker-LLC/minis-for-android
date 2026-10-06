@@ -249,8 +249,14 @@ class ToolOverlayController(private val context: Context) {
             val savedX = backgroundRepo.getOverlayX()
             val savedY = backgroundRepo.getOverlayY()
             if (savedX >= 0 && savedY >= 0) {
-                x = savedX
-                y = savedY
+                // The screen may have changed while the overlay was hidden or detached, when nothing
+                // clamps the saved position: bring it back inside the current display.
+                val dm = context.resources.displayMetrics
+                val (cx, cy) = clampOverlayPosition(
+                    savedX, savedY, fixedCapsuleWidthPx(), dpToPx(CAPSULE_HEIGHT_DP), dm.widthPixels, dm.heightPixels,
+                )
+                x = cx
+                y = cy
             } else {
                 // [T-bg-overlay-polish] First-paint default: bottom-left,
                 // 10 dp from the left edge and 10 dp above the nav-bar
@@ -749,10 +755,7 @@ class ToolOverlayController(private val context: Context) {
             val dm = context.resources.displayMetrics
             val width = fixedCapsuleWidthPx()
             val height = dpToPx(CAPSULE_HEIGHT_DP)
-            val maxX = (dm.widthPixels - width).coerceAtLeast(0)
-            val maxY = (dm.heightPixels - height).coerceAtLeast(0)
-            val clampedX = params.x.coerceIn(0, maxX)
-            val clampedY = params.y.coerceIn(0, maxY)
+            val (clampedX, clampedY) = clampOverlayPosition(params.x, params.y, width, height, dm.widthPixels, dm.heightPixels)
             if (params.width == width && params.x == clampedX && params.y == clampedY) return@post
             params.width = width
             params.x = clampedX
@@ -916,4 +919,14 @@ class ToolOverlayController(private val context: Context) {
             canvas.drawPath(path, paint)
         }
     }
+}
+
+/**
+ * Keeps an overlay of [width] x [height] fully inside a [screenWidth] x [screenHeight] display: the
+ * position is pulled back to the nearest edge, and a window larger than the screen sits at 0.
+ */
+internal fun clampOverlayPosition(x: Int, y: Int, width: Int, height: Int, screenWidth: Int, screenHeight: Int): Pair<Int, Int> {
+    val maxX = (screenWidth - width).coerceAtLeast(0)
+    val maxY = (screenHeight - height).coerceAtLeast(0)
+    return x.coerceIn(0, maxX) to y.coerceIn(0, maxY)
 }
