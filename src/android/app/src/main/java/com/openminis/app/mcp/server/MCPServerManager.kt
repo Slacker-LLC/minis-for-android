@@ -144,10 +144,12 @@ object MCPServerManager {
             lastError = "No safe MCP tools are currently available"
             return null
         }
+        // Rotating replaces the secret, not the user's choice of tools.
+        val scope = rotatedScope(managedToken()?.scope, availableToolsForManagedToken().toSet(), safeScope)
         val token = TokenStore.Token(
             id = MANAGED_TOKEN_ID,
             token = generateTokenValue(),
-            scope = safeScope,
+            scope = scope,
         )
         TokenStore.upsert(token)
         refreshConfigured()
@@ -157,6 +159,15 @@ object MCPServerManager {
     }
 
     fun managedToken(): TokenStore.Token? = TokenStore.findById(MANAGED_TOKEN_ID)
+
+    /**
+     * The scope a rotated token gets: the previous one, limited to tools that are still offered,
+     * or [default] for a first token or when nothing of the old choice is left.
+     */
+    internal fun rotatedScope(previous: Set<String>?, offered: Set<String>, default: Set<String>): Set<String> {
+        val kept = previous.orEmpty().intersect(offered)
+        return if (kept.isEmpty()) default else kept
+    }
 
     fun availableToolsForManagedToken(): List<String> =
         ToolPermissionManager.mcpVisibleTools()
