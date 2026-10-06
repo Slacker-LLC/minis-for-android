@@ -1261,6 +1261,7 @@
     <string name="mount_badge_rw">R/W</string>
     <string name="mount_badge_locked">Locked</string>
     <string name="mount_badge_readonly">Read-only</string>
+    <string name="mount_badge_unavailable">Unavailable</string>
     <string name="mount_only_on_device_supported">Only on-device folders are supported (cloud providers like Google Drive are not supported).</string>
     <string name="mount_all_files_access_required">All files access not granted</string>
     <string name="mount_all_files_access_required_desc">Without this, the shell will only see files this app created — files written by other apps (e.g. Obsidian) will be hidden. Tap to grant in Settings.</string>

@@ -916,6 +916,7 @@
     <string name="mount_badge_rw">Чт/Зап</string>
     <string name="mount_badge_locked">Заблокировано</string>
     <string name="mount_badge_readonly">Только чтение</string>
+    <string name="mount_badge_unavailable">Недоступно</string>
     <string name="mount_only_on_device_supported">Поддерживаются только папки на устройстве (облачные провайдеры, такие как Google Drive, не поддерживаются).</string>
     <string name="mount_all_files_access_required">Доступ ко всем файлам не предоставлен</string>
     <string name="mount_all_files_access_required_desc">Без него оболочка увидит только файлы, созданные этим приложением — файлы, записанные другими приложениями (например, Obsidian), будут скрыты. Нажмите, чтобы предоставить в Настройках.</string>

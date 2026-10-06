@@ -676,6 +676,7 @@
     <string name="mount_badge_rw">L/É</string>
     <string name="mount_badge_locked">Verrouillé</string>
     <string name="mount_badge_readonly">Lecture seule</string>
+    <string name="mount_badge_unavailable">Indisponible</string>
     <string name="mount_only_on_device_supported">Seuls les dossiers locaux sont pris en charge (les fournisseurs cloud comme Google Drive ne sont pas supportés).</string>
     <string name="mount_all_files_access_required">Accès à tous les fichiers non accordé</string>
     <string name="mount_all_files_access_required_desc">Sans cette autorisation, le shell ne verra que les fichiers créés par cette app — les fichiers écrits par d\'autres apps (par ex. Obsidian) seront masqués. Touchez pour autoriser dans les Paramètres.</string>

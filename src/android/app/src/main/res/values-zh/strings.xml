@@ -1079,6 +1079,7 @@
     <string name="mount_badge_rw">读写</string>
     <string name="mount_badge_locked">已锁定</string>
     <string name="mount_badge_readonly">只读</string>
+    <string name="mount_badge_unavailable">不可用</string>
     <string name="mount_only_on_device_supported">仅支持设备本地文件夹（不支持 Google Drive 等云端提供方）。</string>
     <string name="mount_all_files_access_required">未授予「所有文件访问权限」</string>
     <string name="mount_all_files_access_required_desc">未开启时，shell 只能看到本应用创建的文件——其他应用（如 Obsidian）写入的文件会被隐藏。点此前往系统设置授权。</string>

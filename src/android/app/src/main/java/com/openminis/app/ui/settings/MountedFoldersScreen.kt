@@ -479,6 +479,8 @@ private fun MountRow(
 @Composable
 private fun AccessBadge(entry: MountedFoldersStore.Entry) {
     val (text, color) = when {
+        // Not mounted at all (grant lost, folder or volume gone): not the same as read-only.
+        !entry.isActive -> stringResource(R.string.mount_badge_unavailable) to ChatColors.warn
         !entry.isWritable -> stringResource(R.string.mount_badge_readonly) to ChatColors.warn
         !entry.userAllowWrite -> stringResource(R.string.mount_badge_locked) to Color(0xFFAF52DE)
         else -> stringResource(R.string.mount_badge_rw) to ChatColors.ok

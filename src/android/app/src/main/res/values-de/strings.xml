@@ -817,6 +817,7 @@
     <string name="mount_badge_rw">L/S</string>
     <string name="mount_badge_locked">Gesperrt</string>
     <string name="mount_badge_readonly">Schreibgeschützt</string>
+    <string name="mount_badge_unavailable">Nicht verfügbar</string>
     <string name="mount_only_on_device_supported">Nur lokale Ordner werden unterstützt (Cloud-Anbieter wie Google Drive werden nicht unterstützt).</string>
     <string name="mount_all_files_access_required">„Zugriff auf alle Dateien" nicht erteilt</string>
     <string name="mount_all_files_access_required_desc">Ohne diese Berechtigung sieht die Shell nur Dateien, die diese App erstellt hat — Dateien anderer Apps (z. B. Obsidian) bleiben verborgen. Tippen, um sie in den Einstellungen zu erteilen.</string>
