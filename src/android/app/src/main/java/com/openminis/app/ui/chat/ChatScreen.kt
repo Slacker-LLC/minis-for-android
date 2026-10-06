@@ -654,7 +654,7 @@ fun ChatScreen(
         com.openminis.app.diagnostics.PerfLongCtx.step(sessionId, "chatScreen.mount")
         onDispose {
             println("[T-HANG-DIAG] ChatScreen UNMOUNT session=$sessionId")
-            ChatViewModelStore.setActiveSession(null)
+            ChatViewModelStore.clearActiveSession(sessionId)
             // T-android-new-chat-empty-residue: drop sessions materialised by
             // a settings toggle (ensureSession via /memory, /thinking, etc.)
             // but never sent a real message. VM guards on streaming + DB count

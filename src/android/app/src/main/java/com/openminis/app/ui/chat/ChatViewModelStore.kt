@@ -96,15 +96,26 @@ object ChatViewModelStore {
      * throw `No active session`. Resolves through `aliases` so a draft id
      * still maps to the persisted row.
      */
-    @Volatile
-    private var activeSessionIdInternal: String? = null
+    private val activeSessionIdInternal = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 
     val activeSessionId: String?
-        get() = activeSessionIdInternal?.let { resolveKey(it) }
+        get() = activeSessionIdInternal.value?.let { resolveKey(it) }
+
+    /** The id as the ChatScreen mounted it (a draft keeps its draft id), for observers of the visible chat. */
+    val mountedSessionId: kotlinx.coroutines.flow.StateFlow<String?> = activeSessionIdInternal
 
     @Synchronized
     fun setActiveSession(sessionId: String?) {
-        activeSessionIdInternal = sessionId
+        activeSessionIdInternal.value = sessionId
+    }
+
+    /**
+     * Clears the active session only if it is still [sessionId]. A screen that is being replaced by
+     * another chat disposes after the new one has mounted; an unconditional clear would erase the
+     * newcomer.
+     */
+    fun clearActiveSession(sessionId: String) {
+        activeSessionIdInternal.compareAndSet(sessionId, null)
     }
 
     @Synchronized
