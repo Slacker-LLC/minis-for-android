@@ -156,23 +156,31 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
         val max = parseMax(args, default = 20).coerceIn(1, 100)
         val ids = linkedSetOf<Long>()
 
-        context.contentResolver.query(
-            ContactsContract.Contacts.CONTENT_URI,
-            arrayOf(ContactsContract.Contacts._ID),
-            "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} LIKE ?",
-            arrayOf("%$query%"),
-            "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} ASC",
-        )?.use { cursor ->
-            while (cursor.moveToNext()) ids += cursor.getLong(0)
-        }
-        context.contentResolver.query(
-            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-            arrayOf(ContactsContract.CommonDataKinds.Phone.CONTACT_ID),
-            "${ContactsContract.CommonDataKinds.Phone.NUMBER} LIKE ?",
-            arrayOf("%$query%"),
-            null,
-        )?.use { cursor ->
-            while (cursor.moveToNext()) ids += cursor.getLong(0)
+        // A null cursor means the provider could not answer; that must not read as "no matches", and
+        // one source failing must not hand back the other's rows as if they were the whole answer.
+        try {
+            (context.contentResolver.query(
+                ContactsContract.Contacts.CONTENT_URI,
+                arrayOf(ContactsContract.Contacts._ID),
+                "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} LIKE ?",
+                arrayOf("%$query%"),
+                "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} ASC",
+            ) ?: throw IllegalStateException("the contacts provider returned no data")).use { cursor ->
+                while (cursor.moveToNext()) ids += cursor.getLong(0)
+            }
+            (context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(ContactsContract.CommonDataKinds.Phone.CONTACT_ID),
+                "${ContactsContract.CommonDataKinds.Phone.NUMBER} LIKE ?",
+                arrayOf("%$query%"),
+                null,
+            ) ?: throw IllegalStateException("the contacts provider returned no data")).use { cursor ->
+                while (cursor.moveToNext()) ids += cursor.getLong(0)
+            }
+        } catch (e: SecurityException) {
+            return NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).toString(), parsedArgs) + "\n")
+        } catch (e: Throwable) {
+            return NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "contacts_provider_error").put("message", e.message).toString(), parsedArgs) + "\n")
         }
 
         val contacts = JSONArray()
@@ -241,14 +249,17 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
             val results = context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
             val rawId = results.firstOrNull()?.uri?.let(ContentUris::parseId)
                 ?: return NativeOffloadResult(1, "android-contacts create: provider did not return an id\n")
-            val id = contactIdForRaw(rawId) ?: rawId
-            NativeOffloadResult(
-                0,
-                OffloadOutput.formatBody(
-                    JSONObject().put("contact_id", id).put("name", name).toString(2),
-                    args,
-                ) + "\n",
-            )
+            // The raw-contact row id and the aggregated contact id are different id spaces; using the
+            // raw one as a contact id would point later get/update/delete at some other contact.
+            val contactId = contactIdForRaw(rawId)
+            val body = JSONObject().put("name", name).put("raw_contact_id", rawId)
+            if (contactId != null) {
+                body.put("contact_id", contactId)
+            } else {
+                body.put("contact_id_unconfirmed", true)
+                    .put("note", "the contact was created, but its aggregated id could not be read yet; search for it by name")
+            }
+            NativeOffloadResult(0, OffloadOutput.formatBody(body.toString(2), args) + "\n")
         } catch (e: SecurityException) {
             NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).toString(), args) + "\n")
         } catch (e: Throwable) {
@@ -267,44 +278,60 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
         }
         val rawId = firstRawContactId(id)
             ?: return NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "not_found").put("contact_id", id).toString(), args) + "\n")
+        // Name, phone and email are separate provider writes, so a failure part-way leaves the earlier
+        // ones in place; say which fields went in instead of reporting only the failure.
+        val applied = JSONArray()
         return try {
-            name?.let {
-                upsertData(id, rawId, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE,
-                    ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, it)
-            }
-            phone?.let {
-                upsertData(id, rawId, ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
-                    ContactsContract.CommonDataKinds.Phone.NUMBER, it)
-            }
-            email?.let {
-                upsertData(id, rawId, ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE,
-                    ContactsContract.CommonDataKinds.Email.ADDRESS, it)
+            val fields = listOf(
+                Triple("name", name, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE to
+                    ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME),
+                Triple("phone", phone, ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE to
+                    ContactsContract.CommonDataKinds.Phone.NUMBER),
+                Triple("email", email, ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE to
+                    ContactsContract.CommonDataKinds.Email.ADDRESS),
+            )
+            for ((label, value, target) in fields) {
+                if (value == null) continue
+                if (!upsertData(id, rawId, target.first, target.second, value)) {
+                    return NativeOffloadResult(
+                        1,
+                        OffloadOutput.formatBody(
+                            JSONObject().put("error", "contacts_write_failed").put("failed_field", label)
+                                .put("applied", applied).toString(),
+                            args,
+                        ) + "\n",
+                    )
+                }
+                applied.put(label)
             }
             NativeOffloadResult(0, OffloadOutput.formatBody(JSONObject().put("contact_id", id).put("updated", true).toString(2), args) + "\n")
         } catch (e: SecurityException) {
-            NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).toString(), args) + "\n")
+            NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).put("applied", applied).toString(), args) + "\n")
         } catch (e: Throwable) {
-            NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "contacts_provider_error").put("message", e.message).toString(), args) + "\n")
+            NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "contacts_provider_error").put("message", e.message).put("applied", applied).toString(), args) + "\n")
         }
     }
 
-    private fun upsertData(contactId: Long, rawId: Long, mimeType: String, column: String, value: String) {
-        val existingId = context.contentResolver.query(
+    /** True only when the provider reports the write: a returned URI for an insert, a positive row count for an update. */
+    private fun upsertData(contactId: Long, rawId: Long, mimeType: String, column: String, value: String): Boolean {
+        // A null cursor is "could not read", not "no row yet": inserting then could duplicate data.
+        val existingId = (context.contentResolver.query(
             ContactsContract.Data.CONTENT_URI,
             arrayOf(ContactsContract.Data._ID),
             "${ContactsContract.Data.CONTACT_ID}=? AND ${ContactsContract.Data.MIMETYPE}=?",
             arrayOf(contactId.toString(), mimeType),
             "${ContactsContract.Data._ID} ASC",
-        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
+        ) ?: throw IllegalStateException("the contacts provider returned no data"))
+            .use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
         val values = ContentValues().apply {
             put(ContactsContract.Data.MIMETYPE, mimeType)
             put(column, value)
         }
-        if (existingId == null) {
+        return if (existingId == null) {
             values.put(ContactsContract.Data.RAW_CONTACT_ID, rawId)
-            context.contentResolver.insert(ContactsContract.Data.CONTENT_URI, values)
+            context.contentResolver.insert(ContactsContract.Data.CONTENT_URI, values) != null
         } else {
-            context.contentResolver.update(ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, existingId), values, null, null)
+            context.contentResolver.update(ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, existingId), values, null, null) > 0
         }
     }
 

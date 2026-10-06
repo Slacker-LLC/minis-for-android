@@ -53,13 +53,15 @@ object AndroidTelephonyOps {
         val out = JSONArray()
         var total = 0
         try {
-            context.contentResolver.query(
+            (context.contentResolver.query(
                 uri,
                 projection,
                 selection,
                 null,
                 "date DESC",
-            )?.use { c ->
+            )
+                ?: return@withContext ToolExecutionResult("Error: the SMS provider returned no data (it may be unavailable); this is not an empty result", false)
+            ).use { c ->
                 val idCol = c.getColumnIndexOrThrow("_id")
                 val addrCol = c.getColumnIndexOrThrow("address")
                 val bodyCol = c.getColumnIndexOrThrow("body")
@@ -128,13 +130,15 @@ object AndroidTelephonyOps {
         val cutoff = System.currentTimeMillis() - maxAgeMinutes * 60_000L
         val items = JSONArray()
         try {
-            context.contentResolver.query(
+            (context.contentResolver.query(
                 android.net.Uri.parse("content://sms/inbox"),
                 arrayOf("address", "body", "date"),
                 null,
                 null,
                 "date DESC",
-            )?.use { cursor ->
+            )
+                ?: return@withContext ToolExecutionResult("Error: the SMS code provider returned no data (it may be unavailable); this is not an empty result", false)
+            ).use { cursor ->
                 val addressColumn = cursor.getColumnIndexOrThrow("address")
                 val bodyColumn = cursor.getColumnIndexOrThrow("body")
                 val dateColumn = cursor.getColumnIndexOrThrow("date")
@@ -192,13 +196,15 @@ object AndroidTelephonyOps {
         val out = JSONArray()
         var total = 0
         try {
-            context.contentResolver.query(
+            (context.contentResolver.query(
                 CallLog.Calls.CONTENT_URI,
                 projection,
                 selection,
                 selectionArgs,
                 "${CallLog.Calls.DATE} DESC",
-            )?.use { c ->
+            )
+                ?: return@withContext ToolExecutionResult("Error: the call log provider returned no data (it may be unavailable); this is not an empty result", false)
+            ).use { c ->
                 val idCol = c.getColumnIndexOrThrow(CallLog.Calls._ID)
                 val numCol = c.getColumnIndexOrThrow(CallLog.Calls.NUMBER)
                 val nameCol = c.getColumnIndexOrThrow(CallLog.Calls.CACHED_NAME)
