@@ -117,7 +117,10 @@ internal fun FolderActionDialogs(
 
     // iOS "Delete Group & N Sessions" confirmation — the one destructive
     // folder action, so isDestructive here where dissolve deliberately isn't.
-    state.delete?.let { (folder, count) ->
+    state.delete?.let { (folder, openedCount) ->
+        // The delete removes whoever is in the group when it runs, so the count follows the
+        // live membership, not the number at the moment the dialog opened.
+        val count = memberCounts[folder.id] ?: openedCount
         MinisAlertDialog(
             onDismissRequest = { state.delete = null },
             title = stringResource(R.string.group_delete_confirm_title),

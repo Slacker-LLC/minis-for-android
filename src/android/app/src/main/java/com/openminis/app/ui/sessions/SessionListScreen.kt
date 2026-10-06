@@ -1139,7 +1139,7 @@ fun SessionListScreen(
                 // Selection toolbar at bottom (matching iOS: Export + Delete)
                 SelectionToolbar(
                     selectedCount = selectedIds.size,
-                    onExport = { /* TODO: export */ },
+                    onExport = { exportSessions(context, selectedIds.toList(), chatRepository, scope) },
                     onMove = { viewModel.requestGroupPickerForSelection() },
                     onDelete = { showBulkDeleteDialog = true },
                     modifier = Modifier.align(Alignment.BottomCenter),
@@ -2852,9 +2852,17 @@ internal fun SessionEditSheet(
     // new title/category to the DB, `liveSession` updates — mirror those values
     // into the sheet's local edit state so the Title field and Category grid
     // refresh in place (iOS reads the fresh ChatStore session on completion).
+    // A field the user has already edited keeps their text: only a field still equal to the
+    // last value synced from the DB follows the regenerated one.
+    var syncedTitle by remember { mutableStateOf(session.title ?: "") }
+    var syncedCategory by remember { mutableStateOf(session.category) }
     LaunchedEffect(liveSession.title, liveSession.category) {
-        liveSession.title?.let { title = it }
-        selectedCategory = liveSession.category
+        liveSession.title?.let { fresh ->
+            if (title == syncedTitle) title = fresh
+            syncedTitle = fresh
+        }
+        if (selectedCategory == syncedCategory) selectedCategory = liveSession.category
+        syncedCategory = liveSession.category
     }
 
     MinisModalBottomSheet(
@@ -3001,6 +3009,47 @@ internal fun SessionEditSheet(
  * share sheet as a real file attachment. Peak memory stays bounded by
  * batch size regardless of session length.
  */
+/** Exports every session in [ids] as its own zip and offers them together in one share sheet. */
+private fun exportSessions(
+    context: Context,
+    ids: List<String>,
+    chatRepository: ChatRepository,
+    scope: kotlinx.coroutines.CoroutineScope,
+) {
+    if (ids.isEmpty()) return
+    scope.launch {
+        try {
+            val uris = ArrayList<android.net.Uri>()
+            for (id in ids) {
+                val session = chatRepository.getSession(id) ?: continue
+                uris += com.openminis.app.share.ChatExporter.exportToZip(
+                    context = context,
+                    session = session,
+                    repository = chatRepository,
+                    format = "markdown",
+                ).first
+            }
+            if (uris.isEmpty()) return@launch
+            val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "application/zip"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(
+                Intent.createChooser(intent, context.getString(R.string.sessionlist_export))
+                    .apply { addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) },
+            )
+        } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            android.widget.Toast.makeText(
+                context,
+                context.getString(R.string.export_progress_failed),
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+}
+
 private fun exportSession(
     context: Context,
     session: ChatSessionEntity,

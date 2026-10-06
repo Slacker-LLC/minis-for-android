@@ -15,17 +15,20 @@ import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.provider.ProviderFactory
 import com.openminis.app.ui.chat.ChatViewModelStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -39,6 +42,19 @@ class SessionListViewModel(
 
     companion object {
         private const val TAG = "SessionListVM"
+
+        /**
+         * A search result is a snapshot taken when the query last ran. Rows deleted since then are
+         * dropped and survivors are replaced by their current entity, so a rename shows at once
+         * (the re-run that follows decides whether the row still matches).
+         */
+        internal fun liveSearchResults(
+            all: List<ChatSessionEntity>,
+            results: List<ChatSessionEntity>,
+        ): List<ChatSessionEntity> {
+            val byId = all.associateBy { it.id }
+            return results.mapNotNull { byId[it.id] }
+        }
 
         /**
          * [GH#210] The placeholder ChatViewModel writes for a session whose
@@ -161,7 +177,7 @@ class SessionListViewModel(
     val displayedSessions: StateFlow<List<ChatSessionEntity>> = combine(
         _allSessions, searchResults, searchQuery, isSearchActive
     ) { all, results, q, active ->
-        if (active && q.isNotBlank()) results else all
+        if (active && q.isNotBlank()) liveSearchResults(all, results) else all
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ─── Session groups ("folders") ────────────────────────────────────────
@@ -306,20 +322,25 @@ class SessionListViewModel(
             chatRepository.observeFolders().collect { folders.value = it }
         }
         viewModelScope.launch {
-            combine(searchQuery, isSearchActive) { q, active -> q to active }
-                .distinctUntilChanged()
-                .onEach { (q, active) ->
-                    // Flip [isSearching] true the moment a meaningful query
-                    // arrives, BEFORE debounce. The trailing CircularProgress
-                    // shows up immediately when the user types, hiding the
-                    // small gap until the debounced search runs.
-                    isSearching.value = active && q.isNotBlank()
+            // The list of sessions is part of the key: a search result is a snapshot, and a
+            // delete, rename or new message must re-run it. Only a changed query/activation
+            // shows the spinner; a background refresh stays quiet.
+            var shownKey: Pair<String, Boolean>? = null
+            combine(searchQuery, isSearchActive, _allSessions) { q, active, _ -> q to active }
+                .onEach { key ->
+                    if (key != shownKey) {
+                        shownKey = key
+                        // Flip [isSearching] true the moment a meaningful query
+                        // arrives, BEFORE debounce. The trailing CircularProgress
+                        // shows up immediately when the user types, hiding the
+                        // small gap until the debounced search runs.
+                        isSearching.value = key.second && key.first.isNotBlank()
+                    }
                 }
                 .debounce(300)
-                .collect { (q, active) ->
+                .collectLatest { (q, active) ->
                     if (active && q.isNotBlank()) {
                         val results = chatRepository.searchSessions(q)
-                        searchResults.value = results
                         // Compute per-session content snippets off the main
                         // thread. Sessions whose title already matches don't
                         // need a snippet — we only walk messages when the
@@ -327,6 +348,7 @@ class SessionListViewModel(
                         val snips = withContext(Dispatchers.IO) {
                             buildContentSnippets(results, q)
                         }
+                        searchResults.value = results
                         searchSnippets.value = snips
                     } else {
                         searchResults.value = emptyList()
@@ -428,6 +450,8 @@ class SessionListViewModel(
         )
     }
 
+    private var suggestJob: Job? = null
+
     fun dismissGroupPicker() {
         val wasMultiSelect = groupPickerRequest.value?.fromMultiSelect == true
         groupPickerRequest.value = null
@@ -436,6 +460,10 @@ class SessionListViewModel(
         // in-flight request survives recomposition), so without this the next
         // open would inherit the previous selection's suggestion — offering to
         // merge sessions the user never picked.
+        // A reply that arrives after this point belongs to the selection that was just
+        // closed; cancelling keeps it out of the next sheet (and out of its busy flag).
+        suggestJob?.cancel()
+        suggestJob = null
         groupSuggestion.value = null
         groupSuggestFailed.value = false
         groupSuggesting.value = false
@@ -469,18 +497,24 @@ class SessionListViewModel(
         groupSuggestion.value = null
         AppLogger.info(TAG, "[GroupSuggest] START sessions=${sessionIds.size}")
 
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val result = runGroupSuggestion(sessionIds)
-                withContext(Dispatchers.Main) { groupSuggestion.value = result }
+        suggestJob = viewModelScope.launch(Dispatchers.IO) {
+            val outcome = try {
+                Result.success(runGroupSuggestion(sessionIds))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 // iOS's [T-ios-folder-suggest-retry] lesson: the UI flag alone
                 // left "failed — try again" with nothing in the log to hunt
                 // with. Every exit below is traced with its reason.
                 AppLogger.error(TAG, "[GroupSuggest] FAILED reason=exception error=${e.message}")
-                withContext(Dispatchers.Main) { groupSuggestFailed.value = true }
-            } finally {
-                withContext(Dispatchers.Main) { groupSuggesting.value = false }
+                Result.failure(e)
+            }
+            // Dismiss runs on Main, so checking isActive inside the Main block cannot race it.
+            withContext(Dispatchers.Main) {
+                if (!isActive) return@withContext
+                outcome.onSuccess { groupSuggestion.value = it }
+                    .onFailure { groupSuggestFailed.value = true }
+                groupSuggesting.value = false
             }
         }
     }
@@ -693,7 +727,7 @@ class SessionListViewModel(
      * dissolve degenerates to deleting the row), mirroring iOS's
      * pendingDeleteFolderId epilogue.
      */
-    fun deleteFolderWithSessions(folderId: String) {
+    fun deleteFolderWithSessions(folderId: String, onDeleted: (List<String>) -> Unit = {}) {
         viewModelScope.launch {
             val memberIds = chatRepository.sessionIdsInFolder(folderId)
             for (id in memberIds) {
@@ -707,6 +741,7 @@ class SessionListViewModel(
                 TAG,
                 "[Group] deleted folder ${folderId.take(8)} with ${memberIds.size} session(s)",
             )
+            onDeleted(memberIds)
         }
     }
 
@@ -914,7 +949,16 @@ class SessionListViewModel(
                         )
                         val (title, category) = parseTitleResponse(response.text)
                         if (title.isNotEmpty()) {
-                            chatRepository.updateSessionTitleAndCategory(id, title, category)
+                            val written = chatRepository.updateGeneratedTitle(
+                                id, title, category, session.title, session.category,
+                            )
+                            if (!written) {
+                                AppLogger.info(
+                                    "TitleGen",
+                                    "outcome=superseded origin=$origin session=${id.take(8)} reason=edited-meanwhile",
+                                )
+                                return false
+                            }
                             AppLogger.info(
                                 "TitleGen",
                                 "outcome=set origin=$origin session=${id.take(8)} " +

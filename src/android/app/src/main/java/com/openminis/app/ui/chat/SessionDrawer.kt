@@ -420,7 +420,12 @@ fun SessionDrawerContent(
         memberCounts = folderMemberCounts,
         onRename = { id, name, desc -> viewModel.renameFolder(id, name, desc) },
         onDissolve = { viewModel.dissolveFolder(it) },
-        onDeleteWithSessions = { viewModel.deleteFolderWithSessions(it) },
+        onDeleteWithSessions = { folderId ->
+            // Same rule as the single and bulk delete above: the open chat must not outlive it.
+            viewModel.deleteFolderWithSessions(folderId) { deleted ->
+                if (selectedSessionId != null && selectedSessionId in deleted) onNewChat()
+            }
+        },
     )
 
     groupPickerRequest?.let { request ->
