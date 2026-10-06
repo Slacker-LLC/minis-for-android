@@ -111,8 +111,7 @@ object AndroidCapabilityResolver {
                     "Accessibility window-content capability",
                 ))
                 put("canPerformGestures", fact(
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
-                        ((serviceInfo?.capabilities ?: 0) and AccessibilityServiceInfo.CAPABILITY_CAN_PERFORM_GESTURES) != 0,
+                    ((serviceInfo?.capabilities ?: 0) and AccessibilityServiceInfo.CAPABILITY_CAN_PERFORM_GESTURES) != 0,
                     "Accessibility gesture capability (API ${Build.VERSION.SDK_INT})",
                 ))
                 val screenshotCap = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && service != null &&

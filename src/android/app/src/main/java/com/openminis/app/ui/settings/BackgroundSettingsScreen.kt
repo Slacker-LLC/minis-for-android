@@ -3,7 +3,6 @@ package com.openminis.app.ui.settings
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -101,8 +100,7 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
     }
     var canDrawOverlays by remember {
         mutableStateOf(
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
-                Settings.canDrawOverlays(context),
+            Settings.canDrawOverlays(context),
         )
     }
     // [T-android-dynamic-island] Re-probed on ON_RESUME (spec §3) so a
@@ -121,8 +119,7 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
                 ignoringOptimizations =
                     PowerOptimizationManager.isIgnoringBatteryOptimizations(context)
                 canDrawOverlays =
-                    Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
-                        Settings.canDrawOverlays(context)
+                    Settings.canDrawOverlays(context)
                 dynamicIslandCapable =
                     com.openminis.app.service.DynamicIslandSupport.isDynamicIslandCapable(context)
             }

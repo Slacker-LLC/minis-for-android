@@ -379,35 +379,31 @@ class DebugRPCHandler(private val context: Context) {
         suspendCancellableCoroutine { cont ->
             val rootView = activity.window.decorView.rootView
             // Use PixelCopy for accurate capture on API 26+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val width = (rootView.width * scale).toInt().coerceAtLeast(1)
-                val height = (rootView.height * scale).toInt().coerceAtLeast(1)
-                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                // Timeout guard: PixelCopy's callback is not guaranteed to
-                // arrive (window destroyed etc.), which would otherwise leave
-                // the calling coroutine suspended forever.
-                val timeoutRunnable = Runnable {
-                    if (cont.isActive) {
+            val width = (rootView.width * scale).toInt().coerceAtLeast(1)
+            val height = (rootView.height * scale).toInt().coerceAtLeast(1)
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            // Timeout guard: PixelCopy's callback is not guaranteed to
+            // arrive (window destroyed etc.), which would otherwise leave
+            // the calling coroutine suspended forever.
+            val timeoutRunnable = Runnable {
+                if (cont.isActive) {
+                    cont.resume(canvasCapture(rootView, scale))
+                }
+            }
+            Handler(Looper.getMainLooper()).postDelayed(timeoutRunnable, 5_000L)
+            android.view.PixelCopy.request(
+                activity.window, bitmap,
+                { result ->
+                    Handler(Looper.getMainLooper()).removeCallbacks(timeoutRunnable)
+                    if (result == android.view.PixelCopy.SUCCESS) {
+                        cont.resume(bitmap)
+                    } else {
+                        // Fallback to canvas draw
                         cont.resume(canvasCapture(rootView, scale))
                     }
-                }
-                Handler(Looper.getMainLooper()).postDelayed(timeoutRunnable, 5_000L)
-                android.view.PixelCopy.request(
-                    activity.window, bitmap,
-                    { result ->
-                        Handler(Looper.getMainLooper()).removeCallbacks(timeoutRunnable)
-                        if (result == android.view.PixelCopy.SUCCESS) {
-                            cont.resume(bitmap)
-                        } else {
-                            // Fallback to canvas draw
-                            cont.resume(canvasCapture(rootView, scale))
-                        }
-                    },
-                    Handler(Looper.getMainLooper()),
-                )
-            } else {
-                cont.resume(canvasCapture(rootView, scale))
-            }
+                },
+                Handler(Looper.getMainLooper()),
+            )
         }
 
     private fun canvasCapture(view: android.view.View, scale: Float): Bitmap {

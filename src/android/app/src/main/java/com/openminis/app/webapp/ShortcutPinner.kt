@@ -3,7 +3,6 @@ package com.openminis.app.webapp
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.os.Build
 import android.widget.Toast
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
@@ -32,9 +31,7 @@ object ShortcutPinner {
             iconBitmap == null -> IconCompat.createWithResource(
                 context, R.mipmap.ic_launcher,
             )
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ->
-                IconCompat.createWithAdaptiveBitmap(iconBitmap)
-            else -> IconCompat.createWithBitmap(iconBitmap)
+            else -> IconCompat.createWithAdaptiveBitmap(iconBitmap)
         }
 
         val launchIntent = Intent(context, WebAppActivity::class.java).apply {

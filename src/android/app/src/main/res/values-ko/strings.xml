@@ -3,20 +3,10 @@
     <string name="app_name">Minis for Android</string>
     <string name="new_chat">새 채팅</string>
     <string name="settings">설정</string>
-    <string name="providers">AI 공급자</string>
-    <string name="add_provider">AI 공급자 추가</string>
-    <string name="appearance">외관</string>
-    <string name="no_sessions">아직 대화가 없습니다</string>
-    <string name="no_providers">시작하려면 제공자를 추가하세요</string>
     <string name="send">전송</string>
-    <string name="type_message">메시지를 입력하세요…</string>
     <string name="delete">삭제</string>
     <string name="cancel">취소</string>
     <string name="save">저장</string>
-    <string name="api_key">API Key</string>
-    <string name="label">라벨</string>
-    <string name="enabled">활성화됨</string>
-    <string name="select_model">모델 선택</string>
     <string name="session_memory_title">세션의 메모리</string>
     <string name="memory_section_auto_injected">자동 주입</string>
     <string name="memory_section_auto_injected_footer">각 에이전트 턴 시작 시 시스템 프롬프트에 로드됩니다.</string>
@@ -24,7 +14,6 @@
     <string name="memory_section_tool_activity_footer">이 세션 중 에이전트가 수행한 메모리 읽기 및 쓰기.</string>
     <string name="memory_section_written_content">기록된 내용</string>
     <string name="memory_section_tool_result">도구 결과</string>
-    <string name="memory_section_keywords">키워드</string>
     <string name="memory_action_edit">편집</string>
     <string name="memory_action_save">저장</string>
     <string name="memory_action_revoke">철회</string>
@@ -35,7 +24,6 @@
     <string name="memory_revoke_result_not_found">최근 로그에서 항목을 찾을 수 없습니다.</string>
     <string name="memory_revoke_result_io_error">파일 쓰기 오류: %1$s</string>
     <string name="memory_save_toast">저장됨</string>
-    <string name="memory_save_error">저장 실패: %1$s</string>
     <string name="memory_global_footer">모든 세션에서 에이전트에게 표시되는 영구 지침 및 환경 설정입니다. 에이전트는 이 파일을 수정할 수 없습니다.</string>
     <string name="check_update_section_header">앱 업데이트</string>
     <string name="check_update_current_version">현재 버전: %1$s</string>
@@ -54,17 +42,7 @@
     <string name="check_update_install_launch_failed">설치 프로그램을 시작하지 못했습니다. \"알 수 없는 앱 설치\" 권한을 확인하거나 다운로드한 APK를 직접 여세요.</string>
     <string name="check_update_install_hint">팁: 설치 화면이 전혀 나타나지 않으면 서명이 일치하지 않을 수 있습니다. 이전 버전을 먼저 제거한 후 다시 다운로드하세요.</string>
     <string name="check_update_open_install_settings">설정 열기</string>
-    <string name="permissions_title">권한</string>
-    <string name="permissions_reset_all">모두 재설정</string>
-    <string name="permissions_reset_dialog_title">모든 권한을 재설정하시겠습니까?</string>
-    <string name="permissions_reset_dialog_message">모든 권한을 기본값(항상 허용)으로 되돌립니다. 도구별 재정의는 모두 지워집니다.</string>
-    <string name="permissions_reset_confirm">초기화</string>
-    <string name="permissions_level_always_allow">항상 허용</string>
-    <string name="permissions_level_ask_once">한 번 묻기</string>
-    <string name="permissions_level_not_allowed">허용 안 함</string>
-    <string name="permissions_category_privacy">개인정보</string>
     <string name="permissions_category_media">미디어</string>
-    <string name="permissions_category_system">시스템</string>
     <string name="mention_scanning">파일 스캔 중…</string>
     <string name="mention_no_match">일치하는 파일 없음</string>
     <string name="resume_banner_title">중단됨 — 재개를 눌러 계속하세요</string>
@@ -172,8 +150,6 @@
     <string name="settings_privacy_policy">개인정보 처리방침</string>
     <string name="settings_feedback">피드백</string>
     <string name="settings_submit_github_issues">GitHub Issue 제출</string>
-    <string name="settings_feedback_telegram">피드백 (Telegram)</string>
-    <string name="settings_feedback_email">피드백 (이메일)</string>
     <string name="about_title">정보</string>
     <string name="about_minis_tagline">Minis는 완전히 로컬에서 동작하며 완전히 프라이빗한 온디바이스 에이전트입니다.</string>
     <string name="about_links">링크</string>
@@ -285,7 +261,6 @@
     <string name="env_var_empty_title">환경 변수 없음</string>
     <string name="env_var_empty_action">+ 를 눌러 추가</string>
     <string name="env_var_toggle_visibility">표시 전환</string>
-    <string name="env_var_delete_confirm_title">%1$s 을(를) 삭제하시겠습니까?</string>
     <string name="env_var_delete_confirm_text">이 환경 변수와 값이 영구적으로 제거됩니다.</string>
     <string name="env_var_form_edit_title">변수 편집</string>
     <string name="env_var_form_add_title">변수 추가</string>
@@ -296,7 +271,6 @@
     <string name="env_var_error_invalid_key">문자로 시작하며 문자/숫자/밑줄만 사용 가능</string>
     <string name="env_var_error_duplicate">같은 이름의 변수가 이미 있습니다</string>
     <string name="log_title">로그</string>
-    <string name="log_share_all">전체 공유</string>
     <string name="log_section_logging">로깅</string>
     <string name="log_section_logging_footer">활성화하면 모든 콘솔 출력이 앱의 비공개 저장소에 일일 로그 파일로 캡처됩니다.</string>
     <string name="log_enable_switch">로깅 활성화</string>
@@ -309,11 +283,9 @@
     <string name="log_delete_confirm_title">모든 로그를 삭제하시겠습니까?</string>
     <string name="log_delete_confirm_text">%1$s 의 로그 파일이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</string>
     <string name="log_delete_confirm">모두 삭제</string>
-    <string name="log_truncated_marker">…（잘림, 총 %1$s）</string>
     <string name="log_not_found">로그 파일을 찾을 수 없습니다.</string>
     <string name="log_error_reading">로그 읽기 오류: %1$s</string>
     <string name="log_share_chooser">로그 공유</string>
-    <string name="log_share_all_chooser">로그 공유</string>
     <string name="memory_title">메모리</string>
     <string name="memory_empty_title">메모리 파일 없음</string>
     <string name="memory_empty_description">메모리 파일은 세션 간 지식을 유지합니다. GLOBAL.md 를 편집해 에이전트에 보이는 지침을 추가하세요.</string>
@@ -334,11 +306,9 @@
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
     <string name="perm_tool_shizuku_cli">android-shizuku-cli</string>
     <string name="perm_section_a11y">접근성</string>
-    <string name="perm_section_shizuku">Shizuku</string>
     <string name="perm_a11y_section_footer">android-a11y-cli는 에이전트가 화면 UI 구조를 읽고, 탭과 제스처를 수행하며 시스템 이벤트를 감시할 수 있게 합니다. 아래 두 행을 모두 설정하세요: 에이전트 권한을 선택하고 시스템 설정에서 접근성 서비스를 활성화하세요.</string>
     <string name="perm_shizuku_section_footer">android-shizuku-cli는 무선 ADB 또는 root로 시작된 Shizuku 서비스를 통해 에이전트에게 권한 있는 Android API(패키지 설치, settings put, 강제 중지 등)를 부여합니다. 아래 두 행을 모두 설정하세요.</string>
     <string name="perm_a11y_cli_description">에이전트가 화면 UI를 읽고, 탭/입력하며, 이벤트를 감시</string>
-    <string name="perm_shizuku_cli_description">Shizuku 서비스를 통한 권한 있는 Android API</string>
     <string name="perm_a11y_open_settings">접근성 설정 열기</string>
     <string name="perm_system_authorization">시스템 인가</string>
     <string name="perm_agent_policy">에이전트 권한</string>
@@ -362,17 +332,13 @@
     <string name="skill_empty_action">+ 를 눌러 SKILL.md 를 가져오거나 Minis Skills 를 탐색하세요.</string>
     <string name="skill_import_modal_title">스킬 가져오기</string>
     <string name="skill_minis_skills_modal">Minis Skills</string>
-    <string name="skill_delete_confirm_title">%1$s 을(를) 삭제하시겠습니까?</string>
     <string name="skill_delete_confirm_text">이 skill 과 파일이 영구적으로 제거됩니다.</string>
-    <string name="skill_import_sheet_title">스킬 가져오기</string>
     <string name="skill_import_tab_url">URL</string>
     <string name="skill_import_tab_paste">붙여넣기</string>
     <string name="skill_import_tab_file">파일</string>
     <string name="skill_import_url_instruction">SKILL.md 파일의 URL 을 입력하세요 (GitHub 링크 지원).</string>
-    <string name="skill_import_url_label">URL</string>
     <string name="skill_import_url_placeholder">github.com/user/repo/blob/main/SKILL.md</string>
     <string name="skill_import_paste_instruction">SKILL.md 파일 내용을 붙여넣으세요. \'name\' 필드가 포함된 YAML frontmatter 가 필요합니다.</string>
-    <string name="skill_import_paste_label">SKILL.md 내용</string>
     <string name="skill_import_file_instruction">기기에서 .md 또는 .skill 파일을 선택하세요.</string>
     <string name="skill_import_file_button">파일 선택</string>
     <string name="skill_import_error_no_url">URL 을 입력하세요</string>
@@ -392,10 +358,6 @@
     <string name="skill_detail_updated">업데이트됨</string>
     <string name="skill_detail_delete">Skill 삭제</string>
     <string name="skill_detail_edit_name_title">이름 편집</string>
-    <string name="skill_detail_section_description">설명</string>
-    <string name="skill_detail_section_files">파일</string>
-    <string name="skill_detail_section_meta">메타</string>
-    <string name="skill_detail_section_update">업데이트</string>
     <string name="skill_file_save">저장</string>
     <string name="skill_file_edit">편집</string>
     <string name="skill_detail_status_reading">파일 읽는 중…</string>
@@ -405,7 +367,6 @@
     <string name="skill_detail_status_downloading">다운로드 중…</string>
     <string name="skill_detail_status_rescanning">다시 스캔 중…</string>
     <string name="skill_detail_error_missing">디스크의 SKILL.md 가 없거나 잘못됨</string>
-    <string name="skill_detail_source_url">URL</string>
     <string name="skill_detail_source_file">파일 가져오기</string>
     <string name="skill_detail_source_bundled">내장</string>
     <string name="skill_detail_source_session">세션 생성</string>
@@ -434,8 +395,6 @@
     <string name="storage_clearing_status">삭제 중…</string>
     <string name="storage_clear_session_button">세션 파일 삭제</string>
     <string name="storage_clear_confirm_title">세션 파일을 삭제하시겠습니까?</string>
-    <string name="storage_clear_confirm_text">%1$s 의 파일을 삭제합니다. 이 작업은 되돌릴 수 없습니다.</string>
-    <string name="storage_clear_confirm_button">%1$s 지우기</string>
     <string name="usage_title">사용량</string>
     <string name="usage_section_total">총 사용량</string>
     <string name="usage_label_total_input">총 입력 (캐시 포함)</string>
@@ -445,9 +404,6 @@
     <string name="usage_label_cache_hit_rate">캐시 적중률</string>
     <string name="usage_detail_input">입력</string>
     <string name="usage_detail_output">출력</string>
-    <string name="usage_detail_cache_read">캐시 읽기</string>
-    <string name="usage_detail_cache_creation">캐시 생성</string>
-    <string name="usage_detail_cache_hit_rate">캐시 적중률</string>
     <string name="usage_detail_daily_avg">일 평균</string>
     <string name="usage_detail_session_avg">세션 평균</string>
     <string name="usage_detail_attribution">귀속 정보</string>
@@ -463,7 +419,6 @@
     <string name="mirror_mirrors_section">미러</string>
     <string name="mirror_test_speed_testing">테스트 중…</string>
     <string name="mirror_test_speed_label">속도 테스트</string>
-    <string name="mirror_detect_fast_testing">테스트 중…</string>
     <string name="mirror_detect_fast_label">빠른 미러 감지</string>
     <string name="mirror_official_badge">공식</string>
     <string name="mirror_timeout_label">시간 초과</string>
@@ -487,8 +442,6 @@
     <string name="rootfs_result_section">결과</string>
     <string name="rootfs_info_section">정보</string>
     <string name="rootfs_about_title">Rootfs에 대하여</string>
-    <string name="rootfs_about_description">rootfs에는 샌드박스가 사용하는 Ubuntu 24.04 파일시스템이 포함됩니다. 재설정해도 rootfs만 삭제되며 앱 소유 파일은 보존됩니다.</string>
-    <string name="rootfs_about_operations">재설정: Ubuntu rootfs 삭제 | 앱 소유 데이터는 별도로 관리됩니다</string>
     <string name="rootfs_reset_confirm_title">Rootfs를 초기화하시겠습니까?</string>
     <string name="rootfs_reset_confirm_message">rootfs 전체가 삭제됩니다. 모든 데이터가 손실됩니다.</string>
     <string name="rootfs_reset_backup_confirm_title">백업 후 초기화하시겠습니까?</string>
@@ -517,9 +470,7 @@
     <string name="webpreview_close">닫기</string>
     <string name="webpreview_stop">로딩 중지</string>
     <string name="webpreview_reload">새로 고침</string>
-    <string name="webpreview_share">공유</string>
     <string name="webpreview_open_external">외부 브라우저에서 열기</string>
-    <string name="webpreview_open_in_browser">브라우저에서 열기</string>
     <string name="webpreview_open_fullscreen">전체 화면으로 열기</string>
 
     <!-- T172 — sandbox / sessions / browser / terminal i18n -->
@@ -528,7 +479,6 @@
     <string name="filebrowser_delete_title">“%1$s” 삭제하시겠습니까?</string>
     <string name="filebrowser_delete_message">이 작업은 되돌릴 수 없습니다.</string>
     <string name="filebrowser_error_title">오류</string>
-    <string name="filebrowser_sort_action">정렬</string>
     <string name="filebrowser_sort_ascending">오름차순</string>
     <string name="filebrowser_sort_descending">내림차순</string>
     <string name="filebrowser_sort_folders_first">폴더 우선</string>
@@ -550,9 +500,6 @@
     <string name="filepreview_image_decode_error">이미지를 디코딩할 수 없음</string>
     <string name="filepreview_image_load_error">이미지 로드 실패</string>
     <string name="filepreview_file_read_error">파일 읽기 실패</string>
-    <string name="filepreview_csv_parse_error">CSV 파싱 실패</string>
-    <string name="filepreview_archive_read_error">아카이브 읽기 실패</string>
-    <string name="filepreview_pdf_render_error">PDF 렌더링 실패</string>
     <string name="filepreview_page_n">%1$d페이지</string>
     <string name="sessionlist_section_pinned">고정됨</string>
     <string name="sessionlist_section_today">오늘</string>
@@ -660,7 +607,6 @@
     <string name="browser_history_search">기록 검색</string>
     <string name="browser_history_empty_title">브라우징 기록 없음</string>
     <string name="browser_history_empty_subtitle">기록은 7일 동안 보관됩니다</string>
-    <string name="browser_history_results">결과</string>
     <string name="browser_history_clear_dialog_title">브라우징 기록을 지우시겠습니까?</string>
     <string name="browser_history_clear_dialog_message">모든 브라우징 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</string>
     <string name="terminal_title">Minis 셸</string>
@@ -766,14 +712,11 @@
     <string name="modelgroup_speech_transcription">음성 전사</string>
     <string name="modelgroup_text_generation">텍스트 생성</string>
     <string name="common_default">기본값</string>
-    <string name="settings_agent_loop_models">에이전트 루프 모델</string>    <string name="agent_loop_models_add_a_provider_and_refresh_its_model_lis">제공업체를 추가하고 모델 목록을 새로 고치면 이 선택기에 표시됩니다.</string>
-    <string name="agent_loop_models_selected">선택됨</string>
-    <string name="agent_loop_models_not_selected">선택 안 됨</string>
+    <string name="settings_agent_loop_models">에이전트 루프 모델</string>
 
     <!-- T172-A parameterized strings -->
     <string name="add_custom_model_id_footer">Model ID 는 %1$s 에 전송되는 API 식별자입니다. 표시 이름은 모델 선택기에서 사용되는 더 친숙한 라벨이며, 비워두면 Model ID 로 대체됩니다.</string>
     <string name="add_custom_model_eg_id_placeholder">예: gpt-4o-custom</string>
-    <string name="add_provider_built_in_models_count">내장 모델 %1$d 개</string>
     <string name="add_provider_configure_provider">%1$s 구성</string>
     <string name="add_provider_auto_append_v1_quoted">\"/v1\" 자동 추가</string>
     <string name="provider_detail_https_api_example_placeholder">https://api.example.com</string>
@@ -878,7 +821,6 @@
     <string name="mount_all_files_access_required_desc">허용되지 않으면 shell은 이 앱이 만든 파일만 볼 수 있습니다 — 다른 앱(예: Obsidian)이 쓴 파일은 숨겨집니다. 시스템 설정에서 권한을 허용하려면 탭하세요.</string>
     <string name="mount_detail_title">마운트 편집</string>
     <string name="mount_detail_browse_files">파일 탐색</string>
-    <string name="mount_detail_browse_files_toast">채팅 @ 언급에서 이 마운트에 접근하세요.</string>
     <string name="mount_detail_name_invalid">마운트 이름은 비어 있거나 \'/\'를 포함하거나 \'.\'/ \'..\'일 수 없습니다</string>
     <string name="mount_path_unavailable">경로 사용 불가</string>
     <string name="mount_add_failed">마운트를 추가할 수 없습니다. 이름이 사용 중이거나 잘못되었을 수 있습니다.</string>
@@ -913,10 +855,8 @@
     <!-- T288 — 로그 / 설정 변경 -->
     <string name="logs_tab_config_changes">설정 변경</string>
     <string name="logs_config_used_count">%1$d / %2$d 사용됨</string>
-    <string name="logs_config_clear_all">모두 지우기</string>
     <string name="logs_config_empty">설정 변경 기록이 아직 없습니다.</string>
     <string name="logs_config_status_applied">적용됨</string>
-    <string name="logs_config_status_pending">대기 중</string>
     <string name="logs_config_status_rejected">거부됨</string>
     <string name="logs_config_status_timeout">시간 초과</string>
     <string name="logs_config_status_reverted">되돌림</string>
@@ -969,9 +909,6 @@
     <string name="update_error_forbidden_with_link">업데이트 서버에 접근할 수 없습니다. 네트워크 제한일 수 있습니다. GitHub Releases 에서 수동으로 다운로드할 수 있습니다.</string>
     <string name="update_error_open_releases">GitHub Releases 열기</string>
     <!-- T-android-crash-freq-share -->
-    <string name="crash_freq_dialog_title">여러 번의 충돌 감지</string>
-    <string name="crash_freq_dialog_message">Minis가 지난 1시간 동안 여러 번 충돌했습니다. 문제 해결을 위해 충돌 로그를 공유하시겠습니까?</string>
-    <string name="crash_freq_dialog_share">로그 공유</string>
     <string name="crash_freq_dialog_dismiss">나중에</string>
     <string name="crash_safe_mode_restart_needed">복구를 완료하려면 Minis를 다시 시작해야 합니다. 앱 아이콘을 다시 탭해 주세요.</string>
     <string name="crash_freq_email_subject">Minis 충돌 보고서 %1$s</string>

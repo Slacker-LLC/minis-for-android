@@ -6,7 +6,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import com.openminis.app.logging.AppLogger
 import org.json.JSONArray
 import org.json.JSONObject
@@ -43,17 +42,15 @@ class AlarmOffloadManager(private val context: Context) {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Alarms and timers scheduled by the Minis agent"
-                enableVibration(true)
-            }
-            notificationManager.createNotificationChannel(channel)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Alarms and timers scheduled by the Minis agent"
+            enableVibration(true)
         }
+        notificationManager.createNotificationChannel(channel)
     }
 
     // ── Scheduling ──────────────────────────────────────────────────────

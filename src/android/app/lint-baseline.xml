@@ -1,27 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <issues format="6" by="lint 8.10.1" type="baseline" client="gradle" dependencies="false" name="AGP (8.10.1)" variant="all" version="8.10.1">
 
-    <issue
-        id="UnknownIssueId"
-        message="Unknown issue id &quot;NonNullableMutableLiveData&quot;"
-        errorLine1="        disable += &quot;NonNullableMutableLiveData&quot;"
-        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="build.gradle.kts"
-            line="136"
-            column="21"/>
-    </issue>
 
-    <issue
-        id="UnknownIssueId"
-        message="Unknown issue id &quot;NonNullableMutableLiveData&quot;"
-        errorLine1="        disable += &quot;NonNullableMutableLiveData&quot;"
-        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="build.gradle.kts"
-            line="136"
-            column="21"/>
-    </issue>
 
     <issue
         id="MissingPermission"
@@ -364,38 +344,8 @@
             column="30"/>
     </issue>
 
-    <issue
-        id="InlinedApi"
-        message="Field requires API level 29 (current min is 26): `android.app.role.RoleManager#ROLE_ASSISTANT`"
-        errorLine1="            manager.isRoleAvailable(RoleManager.ROLE_ASSISTANT)"
-        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/SettingsScreen.kt"
-            line="157"
-            column="37"/>
-    </issue>
 
-    <issue
-        id="InlinedApi"
-        message="Field requires API level 29 (current min is 26): `android.app.role.RoleManager#ROLE_ASSISTANT`"
-        errorLine1="            manager.isRoleHeld(RoleManager.ROLE_ASSISTANT)"
-        errorLine2="                               ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/SettingsScreen.kt"
-            line="160"
-            column="32"/>
-    </issue>
 
-    <issue
-        id="InlinedApi"
-        message="Field requires API level 29 (current min is 26): `android.app.role.RoleManager#ROLE_ASSISTANT`"
-        errorLine1="                                    roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT),"
-        errorLine2="                                                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/SettingsScreen.kt"
-            line="307"
-            column="73"/>
-    </issue>
 
     <issue
         id="InlinedApi"
@@ -529,38 +479,8 @@
             column="47"/>
     </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 29 (current min is 26): `android.app.role.RoleManager#isRoleAvailable`"
-        errorLine1="            manager.isRoleAvailable(RoleManager.ROLE_ASSISTANT)"
-        errorLine2="                    ~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/SettingsScreen.kt"
-            line="157"
-            column="21"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 29 (current min is 26): `android.app.role.RoleManager#isRoleHeld`"
-        errorLine1="            manager.isRoleHeld(RoleManager.ROLE_ASSISTANT)"
-        errorLine2="                    ~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/SettingsScreen.kt"
-            line="160"
-            column="21"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 29 (current min is 26): `android.app.role.RoleManager#createRequestRoleIntent`"
-        errorLine1="                                    roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT),"
-        errorLine2="                                                ~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/SettingsScreen.kt"
-            line="307"
-            column="49"/>
-    </issue>
 
     <issue
         id="OldTargetApi"
@@ -705,27 +625,7 @@
             column="38"/>
     </issue>
 
-    <issue
-        id="AndroidGradlePluginVersion"
-        message="A newer version of Gradle than 8.11.1 is available: 8.14.5"
-        errorLine1="distributionUrl=https\://services.gradle.org/distributions/gradle-8.11.1-bin.zip"
-        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="$HOME/work/minis-for-android/minis-for-android/src/android/gradle/wrapper/gradle-wrapper.properties"
-            line="3"
-            column="17"/>
-    </issue>
 
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.core:core-ktx than 1.15.0 is available: 1.19.0"
-        errorLine1="    implementation(&quot;androidx.core:core-ktx:1.15.0&quot;)"
-        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="build.gradle.kts"
-            line="193"
-            column="20"/>
-    </issue>
 
     <issue
         id="GradleDependency"
@@ -782,49 +682,9 @@
             column="20"/>
     </issue>
 
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.navigation:navigation-compose than 2.8.5 is available: 2.10.0"
-        errorLine1="    implementation(&quot;androidx.navigation:navigation-compose:2.8.5&quot;)"
-        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="build.gradle.kts"
-            line="203"
-            column="20"/>
-    </issue>
 
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.room:room-runtime than 2.6.1 is available: 2.8.4"
-        errorLine1="    implementation(&quot;androidx.room:room-runtime:2.6.1&quot;)"
-        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="build.gradle.kts"
-            line="206"
-            column="20"/>
-    </issue>
 
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.room:room-ktx than 2.6.1 is available: 2.8.4"
-        errorLine1="    implementation(&quot;androidx.room:room-ktx:2.6.1&quot;)"
-        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="build.gradle.kts"
-            line="207"
-            column="20"/>
-    </issue>
 
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.room:room-compiler than 2.6.1 is available: 2.8.4"
-        errorLine1="    ksp(&quot;androidx.room:room-compiler:2.6.1&quot;)"
-        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="build.gradle.kts"
-            line="208"
-            column="9"/>
-    </issue>
 
     <issue
         id="GradleDependency"
@@ -859,16 +719,6 @@
             column="20"/>
     </issue>
 
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.webkit:webkit than 1.12.1 is available: 1.17.0"
-        errorLine1="    implementation(&quot;androidx.webkit:webkit:1.12.1&quot;)"
-        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="build.gradle.kts"
-            line="245"
-            column="20"/>
-    </issue>
 
     <issue
         id="GradleDependency"
@@ -991,38 +841,8 @@
             column="5"/>
     </issue>
 
-    <issue
-        id="ModifierParameter"
-        message="Modifier parameter should be named modifier"
-        errorLine1="    dragHandleModifier: Modifier = Modifier,"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/ModelGroupsScreen.kt"
-            line="662"
-            column="5"/>
-    </issue>
 
-    <issue
-        id="ModifierParameter"
-        message="Modifier parameter should be named modifier"
-        errorLine1="    dragHandleModifier: Modifier? = null,"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/ModelGroupsScreen.kt"
-            line="862"
-            column="5"/>
-    </issue>
 
-    <issue
-        id="ModifierParameter"
-        message="Optional Modifier parameter should have a default value of `Modifier`"
-        errorLine1="    dragHandleModifier: Modifier? = null,"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/ModelGroupsScreen.kt"
-            line="862"
-            column="5"/>
-    </issue>
 
     <issue
         id="ModifierParameter"
@@ -1068,16 +888,6 @@
             column="5"/>
     </issue>
 
-    <issue
-        id="StateFlowValueCalledInComposition"
-        message="StateFlow.value should not be called within composition"
-        errorLine1="                providerConfig = providerRepository.config.value,"
-        errorLine2="                                                           ~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/navigation/AppNavigation.kt"
-            line="1177"
-            column="60"/>
-    </issue>
 
     <issue
         id="StateFlowValueCalledInComposition"
@@ -1654,16 +1464,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;soul_length_indicator&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;soul_length_indicator&quot;>%1$d characters&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="287"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -1819,16 +1619,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;webpreview_open_external_failed&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;webpreview_open_external_failed&quot;>No app available to open this&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="406"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -1841,16 +1631,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;webpreview_collapse&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;webpreview_collapse&quot;>Collapse&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="410"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -1973,16 +1753,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;filebrowser_sort_action&quot; is not translated in &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;filebrowser_sort_action&quot;>Sort&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="429"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -2248,38 +2018,8 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;filepreview_csv_parse_error&quot; is not translated in &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;filepreview_csv_parse_error&quot;>Failed to parse CSV&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="458"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;filepreview_archive_read_error&quot; is not translated in &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;filepreview_archive_read_error&quot;>Failed to read archive&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="459"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;filepreview_pdf_render_error&quot; is not translated in &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;filepreview_pdf_render_error&quot;>Failed to render PDF&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="460"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -2875,148 +2615,18 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;export_summary_format&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;export_summary_format&quot;>Format&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="519"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;export_summary_format_value_json&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;export_summary_format_value_json&quot;>JSON&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="520"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;export_summary_format_value_txt&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;export_summary_format_value_txt&quot;>Plain Text&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="521"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;export_summary_messages&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;export_summary_messages&quot;>Messages&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="522"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;export_summary_messages_value&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;export_summary_messages_value&quot;>%1$d messages&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="523"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;export_summary_timerange&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;export_summary_timerange&quot;>Time range&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="524"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;export_summary_timerange_value&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;export_summary_timerange_value&quot;>%1$s — %2$s&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="525"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;export_summary_attachments&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;export_summary_attachments&quot;>Attachments&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="526"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;export_summary_attachments_value&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;export_summary_attachments_value&quot;>%1$d images / %2$d videos&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="527"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;export_summary_size&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;export_summary_size&quot;>Estimated size&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="528"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;export_summary_size_value&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;export_summary_size_value&quot;>~ %1$s&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="529"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;export_progress_running&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;export_progress_running&quot;>Exporting %1$d / %2$d…&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="530"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;export_progress_done&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;export_progress_done&quot;>Export complete&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="531"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -3568,16 +3178,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;browser_history_results&quot; is not translated in &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;browser_history_results&quot;>Results&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="588"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -4316,16 +3916,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_settings_subtitle&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_settings_subtitle&quot;>Privileged Android control via Shizuku or AXManager&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="792"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -4382,16 +3972,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_package&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_package&quot;>package&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="798"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -4404,16 +3984,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_permission&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_permission&quot;>permission&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="800"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -4426,16 +3996,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_activity&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_activity&quot;>activity&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="802"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -4448,16 +4008,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_display&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_display&quot;>display&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="804"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -4470,16 +4020,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_settings&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_settings&quot;>settings&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="806"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -4492,16 +4032,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_user&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_user&quot;>user&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="808"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -4514,16 +4044,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_network&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_network&quot;>network&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="810"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -4536,16 +4056,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_input&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_input&quot;>input&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="812"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -4558,16 +4068,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_notification&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_notification&quot;>notification&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="814"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -4580,16 +4080,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_file&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_file&quot;>file&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="816"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -4602,16 +4092,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_device&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_device&quot;>device&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="818"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -4624,16 +4104,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_service&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_service&quot;>service&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="820"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -5278,16 +4748,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;settings_bg_overlay&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;settings_bg_overlay&quot;>Background Task Overlay&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1233"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -5487,16 +4947,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_picker_groups_edit&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_picker_groups_edit&quot;>Edit&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1359"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -5839,16 +5289,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;voice_input_picker_done&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;voice_input_picker_done&quot;>Done&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1413"
-            column="13"/>
-    </issue>
 
 
     <issue
@@ -5862,27 +5302,7 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;voice_input_picker_group_models&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;voice_input_picker_group_models&quot;>%1$d models&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1416"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;voice_input_picker_group_footer&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;voice_input_picker_group_footer&quot;>Pick a group whose audio-capable models drive this direction.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1417"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -5939,16 +5359,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;system_permissions_subtitle&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French), &quot;zh&quot; (Chinese)"
-        errorLine1="    &lt;string name=&quot;system_permissions_subtitle&quot;>OS-level permissions granted from system Settings&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1454"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -6126,16 +5536,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;webapp_source_missing&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;webapp_source_missing&quot;>Source file no longer exists.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1486"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -6423,16 +5823,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;image_budget_dropped&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;image_budget_dropped&quot;>Skipped %1$d oversized URL(s) (&amp;gt;5MB)&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1516"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -6599,16 +5989,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;crash_freq_method_email&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;crash_freq_method_email&quot;>Send via email&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1549"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -6973,27 +6353,7 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;scheduled_task_run_now_done&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;scheduled_task_run_now_done&quot;>Task finished&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1589"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;scheduled_task_run_now_done_body&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;scheduled_task_run_now_done_body&quot;>The scheduled task ran and produced a response.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1590"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -7226,16 +6586,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;scheduled_task_no_models&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;scheduled_task_no_models&quot;>No models configured.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1613"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -7523,27 +6873,7 @@
             column="5"/>
     </issue>
 
-    <issue
-        id="PluralsCandidate"
-        message="Formatting %d followed by words (&quot;messages&quot;): This should probably be a plural rather than a string"
-        errorLine1="    &lt;string name=&quot;export_summary_messages_value&quot;>%1$d messages&lt;/string>"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="523"
-            column="5"/>
-    </issue>
 
-    <issue
-        id="PluralsCandidate"
-        message="Formatting %d followed by words (&quot;images&quot;): This should probably be a plural rather than a string"
-        errorLine1="    &lt;string name=&quot;export_summary_attachments_value&quot;>%1$d images / %2$d videos&lt;/string>"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="527"
-            column="5"/>
-    </issue>
 
     <issue
         id="PluralsCandidate"
@@ -7556,16 +6886,6 @@
             column="5"/>
     </issue>
 
-    <issue
-        id="PluralsCandidate"
-        message="Formatting %d followed by words (&quot;built&quot;): This should probably be a plural rather than a string"
-        errorLine1="    &lt;string name=&quot;add_provider_built_in_models_count&quot;>%1$d built-in models&lt;/string>"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1169"
-            column="5"/>
-    </issue>
 
     <issue
         id="PluralsCandidate"
@@ -7677,16 +6997,6 @@
             column="5"/>
     </issue>
 
-    <issue
-        id="PluralsCandidate"
-        message="Formatting %d followed by words (&quot;oversized&quot;): This should probably be a plural rather than a string"
-        errorLine1="    &lt;string name=&quot;image_budget_dropped&quot;>Skipped %1$d oversized URL(s) (&amp;gt;5MB)&lt;/string>"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1516"
-            column="5"/>
-    </issue>
 
     <issue
         id="PluralsCandidate"
@@ -7787,16 +7097,6 @@
             column="45"/>
     </issue>
 
-    <issue
-        id="DataExtractionRules"
-        message="The attribute `android:allowBackup` is deprecated from Android 12 and higher and may be removed in future versions. Consider adding the attribute `android:dataExtractionRules` specifying an `@xml` resource which configures cloud backups and device transfers on Android 12 and higher."
-        errorLine1="        android:allowBackup=&quot;false&quot;"
-        errorLine2="                             ~~~~~">
-        <location
-            file="src/main/AndroidManifest.xml"
-            line="181"
-            column="30"/>
-    </issue>
 
     <issue
         id="DrawAllocation"
@@ -7842,203 +7142,23 @@
             column="17"/>
     </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
-        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/service/AgentForegroundService.kt"
-            line="67"
-            column="17"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
-        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/service/AgentForegroundService.kt"
-            line="172"
-            column="21"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/service/AgentForegroundService.kt"
-            line="602"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/offload/AlarmOffloadManager.kt"
-            line="46"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &amp;&amp;"
-        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/tools/android/AndroidCapabilityResolver.kt"
-            line="92"
-            column="21"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is never &lt; 26"
-        errorLine1="            Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.M ||"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/BackgroundSettingsScreen.kt"
-            line="101"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is never &lt; 26"
-        errorLine1="                    Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.M ||"
-        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/BackgroundSettingsScreen.kt"
-            line="121"
-            column="21"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is never &lt; 26"
-        errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.O) return"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/notification/BackgroundTaskNotifier.kt"
-            line="152"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is never &lt; 26"
-        errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.O) return"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/notification/BackgroundTaskNotifier.kt"
-            line="168"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is never &lt; 26"
-        errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.O) return"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/notification/ConfigConfirmNotifier.kt"
-            line="114"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
-        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/debug/DebugRPCHandler.kt"
-            line="360"
-            column="17"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
-        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/debug/DebugScreenshotRing.kt"
-            line="75"
-            column="17"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/i18n/LocaleWrap.kt"
-            line="51"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/runtime/RuntimePathRegistry.kt"
-            line="189"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/runtime/guest/NotificationOffloadHandler.kt"
-            line="61"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/runtime/guest/NotificationOffloadHandler.kt"
-            line="400"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)"
-        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/pet/PetBridge.kt"
-            line="56"
-            column="17"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/pet/PetOverlayService.kt"
-            line="876"
-            column="13"/>
-    </issue>
 
     <issue
         id="ObsoleteSdkInt"
@@ -8051,107 +7171,15 @@
             column="44"/>
     </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is never &lt; 26"
-        errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.M) return true"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/power/PowerOptimizationManager.kt"
-            line="48"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is never &lt; 26"
-        errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.M) return false"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/power/PowerOptimizationManager.kt"
-            line="65"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is never &lt; 26"
-        errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.O) return"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/scheduled/ScheduledTaskManager.kt"
-            line="156"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ->"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/webapp/ShortcutPinner.kt"
-            line="35"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is never &lt; 26"
-        errorLine1="        Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.M || Settings.canDrawOverlays(context)"
-        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/service/ToolOverlayController.kt"
-            line="143"
-            column="9"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
-        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/service/ToolOverlayController.kt"
-            line="220"
-            column="24"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
-        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/data/UpdateChecker.kt"
-            line="388"
-            column="20"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is never &lt; 26"
-        errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.O) return"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/data/UpdateChecker.kt"
-            line="401"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="This folder configuration (`v26`) is unnecessary; `minSdkVersion` is 26. Merge all the resources in this folder into `mipmap-anydpi`.">
-        <location
-            file="src/main/res/mipmap-anydpi-v26"/>
-    </issue>
 
-    <issue
-        id="ObsoleteSdkInt"
-        message="This folder configuration (`v26`) is unnecessary; `minSdkVersion` is 26. Merge all the resources in this folder into `mipmap-night-anydpi`.">
-        <location
-            file="src/main/res/mipmap-night-anydpi-v26"/>
-    </issue>
 
     <issue
         id="StaticFieldLeak"
@@ -8219,16 +7247,6 @@
             column="5"/>
     </issue>
 
-    <issue
-        id="StaticFieldLeak"
-        message="Do not place Android context classes in static fields (static reference to `MCPProvider` which has field `context` pointing to `Context`); this is a memory leak"
-        errorLine1="/**"
-        errorLine2="^">
-        <location
-            file="src/main/java/com/openminis/app/mcp/client/MCPProvider.kt"
-            line="16"
-            column="1"/>
-    </issue>
 
     <issue
         id="StaticFieldLeak"
@@ -8241,16 +7259,6 @@
             column="5"/>
     </issue>
 
-    <issue
-        id="StaticFieldLeak"
-        message="Do not place Android context classes in static fields; this is a memory leak"
-        errorLine1="    /** App context placeholder for handler dispatch (handlers ignore it). */"
-        errorLine2="    ^">
-        <location
-            file="src/main/java/com/openminis/app/mcp/client/MCPProvider.kt"
-            line="47"
-            column="5"/>
-    </issue>
 
     <issue
         id="StaticFieldLeak"
@@ -8571,16 +7579,6 @@
             column="25"/>
     </issue>
 
-    <issue
-        id="AutoboxingStateCreation"
-        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
-        errorLine1="        mutableStateOf("
-        errorLine2="        ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/ModelGroupDetailScreen.kt"
-            line="683"
-            column="9"/>
-    </issue>
 
     <issue
         id="AutoboxingStateCreation"
@@ -8725,1210 +7723,120 @@
             column="43"/>
     </issue>
 
-    <issue
-        id="UnusedResources"
-        message="The resource `R.color.seed` appears to be unused"
-        errorLine1="    &lt;color name=&quot;seed&quot;>#6750A4&lt;/color>"
-        errorLine2="           ~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/colors.xml"
-            line="3"
-            column="12"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.new_chat` appears to be unused"
-        errorLine1="    &lt;string name=&quot;new_chat&quot;>New Chat&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="4"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.settings` appears to be unused"
-        errorLine1="    &lt;string name=&quot;settings&quot;>Settings&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="5"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.providers` appears to be unused"
-        errorLine1="    &lt;string name=&quot;providers&quot;>Providers&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="6"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.add_provider` appears to be unused"
-        errorLine1="    &lt;string name=&quot;add_provider&quot;>Add Provider&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="7"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.appearance` appears to be unused"
-        errorLine1="    &lt;string name=&quot;appearance&quot;>Appearance&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="8"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.no_sessions` appears to be unused"
-        errorLine1="    &lt;string name=&quot;no_sessions&quot;>No conversations yet&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="9"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.no_providers` appears to be unused"
-        errorLine1="    &lt;string name=&quot;no_providers&quot;>Add a provider to get started&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="10"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.send` appears to be unused"
-        errorLine1="    &lt;string name=&quot;send&quot;>Send&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="11"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.type_message` appears to be unused"
-        errorLine1="    &lt;string name=&quot;type_message&quot;>Type a message…&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="12"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.api_key` appears to be unused"
-        errorLine1="    &lt;string name=&quot;api_key&quot;>API Key&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="16"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.label` appears to be unused"
-        errorLine1="    &lt;string name=&quot;label&quot;>Label&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="17"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.enabled` appears to be unused"
-        errorLine1="    &lt;string name=&quot;enabled&quot;>Enabled&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="18"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.select_model` appears to be unused"
-        errorLine1="    &lt;string name=&quot;select_model&quot;>Select Model&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="19"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.memory_section_keywords` appears to be unused"
-        errorLine1="    &lt;string name=&quot;memory_section_keywords&quot;>Keywords&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="29"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.memory_save_error` appears to be unused"
-        errorLine1="    &lt;string name=&quot;memory_save_error&quot;>Save failed: %1$s&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="40"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.permissions_title` appears to be unused"
-        errorLine1="    &lt;string name=&quot;permissions_title&quot;>Permissions&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="64"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.permissions_reset_all` appears to be unused"
-        errorLine1="    &lt;string name=&quot;permissions_reset_all&quot;>Reset All&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="65"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.permissions_reset_dialog_title` appears to be unused"
-        errorLine1="    &lt;string name=&quot;permissions_reset_dialog_title&quot;>Reset All Permissions?&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="66"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.permissions_reset_dialog_message` appears to be unused"
-        errorLine1="    &lt;string name=&quot;permissions_reset_dialog_message&quot;>Restore every permission to its default (Always Allow). Per-tool overrides will be cleared.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="67"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.permissions_reset_confirm` appears to be unused"
-        errorLine1="    &lt;string name=&quot;permissions_reset_confirm&quot;>Reset&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="68"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.permissions_level_always_allow` appears to be unused"
-        errorLine1="    &lt;string name=&quot;permissions_level_always_allow&quot;>Always Allow&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="69"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.permissions_level_ask_once` appears to be unused"
-        errorLine1="    &lt;string name=&quot;permissions_level_ask_once&quot;>Ask Once&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="70"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.permissions_level_not_allowed` appears to be unused"
-        errorLine1="    &lt;string name=&quot;permissions_level_not_allowed&quot;>Not Allowed&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="71"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.permissions_category_privacy` appears to be unused"
-        errorLine1="    &lt;string name=&quot;permissions_category_privacy&quot;>Privacy&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="72"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.permissions_category_media` appears to be unused"
-        errorLine1="    &lt;string name=&quot;permissions_category_media&quot;>Media&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="73"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.permissions_category_system` appears to be unused"
-        errorLine1="    &lt;string name=&quot;permissions_category_system&quot;>System&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="74"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.soul_length_indicator` appears to be unused"
-        errorLine1="    &lt;string name=&quot;soul_length_indicator&quot;>%1$d characters&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="287"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.settings_feedback_telegram` appears to be unused"
-        errorLine1="    &lt;string name=&quot;settings_feedback_telegram&quot;>Feedback (Telegram)&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="314"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.settings_feedback_email` appears to be unused"
-        errorLine1="    &lt;string name=&quot;settings_feedback_email&quot;>Feedback (Email)&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="315"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.webpreview_share` appears to be unused"
-        errorLine1="    &lt;string name=&quot;webpreview_share&quot;>Share&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="404"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.webpreview_open_external_failed` appears to be unused"
-        errorLine1="    &lt;string name=&quot;webpreview_open_external_failed&quot;>No app available to open this&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="406"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.webpreview_open_in_browser` appears to be unused"
-        errorLine1="    &lt;string name=&quot;webpreview_open_in_browser&quot;>Open in browser&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="407"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.webpreview_collapse` appears to be unused"
-        errorLine1="    &lt;string name=&quot;webpreview_collapse&quot;>Collapse&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="410"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.filebrowser_sort_action` appears to be unused"
-        errorLine1="    &lt;string name=&quot;filebrowser_sort_action&quot;>Sort&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="429"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.filepreview_file_read_error` appears to be unused"
-        errorLine1="    &lt;string name=&quot;filepreview_file_read_error&quot;>Failed to read file&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="457"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.filepreview_csv_parse_error` appears to be unused"
-        errorLine1="    &lt;string name=&quot;filepreview_csv_parse_error&quot;>Failed to parse CSV&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="458"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.filepreview_archive_read_error` appears to be unused"
-        errorLine1="    &lt;string name=&quot;filepreview_archive_read_error&quot;>Failed to read archive&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="459"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.filepreview_pdf_render_error` appears to be unused"
-        errorLine1="    &lt;string name=&quot;filepreview_pdf_render_error&quot;>Failed to render PDF&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="460"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.export_summary_format` appears to be unused"
-        errorLine1="    &lt;string name=&quot;export_summary_format&quot;>Format&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="519"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.export_summary_format_value_json` appears to be unused"
-        errorLine1="    &lt;string name=&quot;export_summary_format_value_json&quot;>JSON&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="520"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.export_summary_format_value_txt` appears to be unused"
-        errorLine1="    &lt;string name=&quot;export_summary_format_value_txt&quot;>Plain Text&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="521"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.export_summary_messages` appears to be unused"
-        errorLine1="    &lt;string name=&quot;export_summary_messages&quot;>Messages&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="522"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.export_summary_messages_value` appears to be unused"
-        errorLine1="    &lt;string name=&quot;export_summary_messages_value&quot;>%1$d messages&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="523"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.export_summary_timerange` appears to be unused"
-        errorLine1="    &lt;string name=&quot;export_summary_timerange&quot;>Time range&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="524"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.export_summary_timerange_value` appears to be unused"
-        errorLine1="    &lt;string name=&quot;export_summary_timerange_value&quot;>%1$s — %2$s&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="525"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.export_summary_attachments` appears to be unused"
-        errorLine1="    &lt;string name=&quot;export_summary_attachments&quot;>Attachments&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="526"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.export_summary_attachments_value` appears to be unused"
-        errorLine1="    &lt;string name=&quot;export_summary_attachments_value&quot;>%1$d images / %2$d videos&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="527"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.export_summary_size` appears to be unused"
-        errorLine1="    &lt;string name=&quot;export_summary_size&quot;>Estimated size&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="528"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.export_summary_size_value` appears to be unused"
-        errorLine1="    &lt;string name=&quot;export_summary_size_value&quot;>~ %1$s&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="529"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.export_progress_running` appears to be unused"
-        errorLine1="    &lt;string name=&quot;export_progress_running&quot;>Exporting %1$d / %2$d…&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="530"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.export_progress_done` appears to be unused"
-        errorLine1="    &lt;string name=&quot;export_progress_done&quot;>Export complete&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="531"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.browser_history_results` appears to be unused"
-        errorLine1="    &lt;string name=&quot;browser_history_results&quot;>Results&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="588"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.chat_title_pill_session_default` appears to be unused"
-        errorLine1="    &lt;string name=&quot;chat_title_pill_session_default&quot;>Untitled&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="668"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.env_var_delete_confirm_title` appears to be unused"
-        errorLine1="    &lt;string name=&quot;env_var_delete_confirm_title&quot;>Delete %1$s?&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="708"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.log_share_all` appears to be unused"
-        errorLine1="    &lt;string name=&quot;log_share_all&quot;>Share All&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="719"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.log_truncated_marker` appears to be unused"
-        errorLine1="    &lt;string name=&quot;log_truncated_marker&quot;>… (truncated, %1$s total)&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="732"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.log_share_all_chooser` appears to be unused"
-        errorLine1="    &lt;string name=&quot;log_share_all_chooser&quot;>Share Logs&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="736"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.perm_section_shizuku` appears to be unused"
-        errorLine1="    &lt;string name=&quot;perm_section_shizuku&quot;>Shizuku&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="769"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.perm_shizuku_cli_description` appears to be unused"
-        errorLine1="    &lt;string name=&quot;perm_shizuku_cli_description&quot;>Privileged Android APIs via the Shizuku service&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="773"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.shizuku_settings_subtitle` appears to be unused"
-        errorLine1="    &lt;string name=&quot;shizuku_settings_subtitle&quot;>Privileged Android control via Shizuku or AXManager&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="792"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.shizuku_cap_package` appears to be unused"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_package&quot;>package&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="798"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.shizuku_cap_permission` appears to be unused"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_permission&quot;>permission&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="800"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.shizuku_cap_activity` appears to be unused"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_activity&quot;>activity&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="802"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.shizuku_cap_display` appears to be unused"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_display&quot;>display&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="804"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.shizuku_cap_settings` appears to be unused"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_settings&quot;>settings&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="806"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.shizuku_cap_user` appears to be unused"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_user&quot;>user&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="808"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.shizuku_cap_network` appears to be unused"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_network&quot;>network&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="810"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.shizuku_cap_input` appears to be unused"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_input&quot;>input&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="812"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.shizuku_cap_notification` appears to be unused"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_notification&quot;>notification&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="814"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.shizuku_cap_file` appears to be unused"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_file&quot;>file&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="816"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.shizuku_cap_device` appears to be unused"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_device&quot;>device&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="818"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.shizuku_cap_service` appears to be unused"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_service&quot;>service&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="820"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.skill_delete_confirm_title` appears to be unused"
-        errorLine1="    &lt;string name=&quot;skill_delete_confirm_title&quot;>Delete %1$s?&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="867"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.skill_import_sheet_title` appears to be unused"
-        errorLine1="    &lt;string name=&quot;skill_import_sheet_title&quot;>Import Skill&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="869"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.skill_import_url_label` appears to be unused"
-        errorLine1="    &lt;string name=&quot;skill_import_url_label&quot;>URL&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="874"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.skill_import_paste_label` appears to be unused"
-        errorLine1="    &lt;string name=&quot;skill_import_paste_label&quot;>SKILL.md Content&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="877"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.skill_detail_section_description` appears to be unused"
-        errorLine1="    &lt;string name=&quot;skill_detail_section_description&quot;>DESCRIPTION&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="897"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.skill_detail_section_files` appears to be unused"
-        errorLine1="    &lt;string name=&quot;skill_detail_section_files&quot;>FILES&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="898"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.skill_detail_section_meta` appears to be unused"
-        errorLine1="    &lt;string name=&quot;skill_detail_section_meta&quot;>META&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="899"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.skill_detail_section_update` appears to be unused"
-        errorLine1="    &lt;string name=&quot;skill_detail_section_update&quot;>UPDATE&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="900"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.skill_detail_source_url` appears to be unused"
-        errorLine1="    &lt;string name=&quot;skill_detail_source_url&quot;>URL&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="910"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.storage_clear_confirm_text` appears to be unused"
-        errorLine1="    &lt;string name=&quot;storage_clear_confirm_text&quot;>This will delete %1$s of files. This action cannot be undone.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="939"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.storage_clear_confirm_button` appears to be unused"
-        errorLine1="    &lt;string name=&quot;storage_clear_confirm_button&quot;>Clear %1$s&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="940"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.usage_detail_cache_read` appears to be unused"
-        errorLine1="    &lt;string name=&quot;usage_detail_cache_read&quot;>Cache Read&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="950"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.usage_detail_cache_creation` appears to be unused"
-        errorLine1="    &lt;string name=&quot;usage_detail_cache_creation&quot;>Cache Creation&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="951"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.usage_detail_cache_hit_rate` appears to be unused"
-        errorLine1="    &lt;string name=&quot;usage_detail_cache_hit_rate&quot;>Cache Hit Rate&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="952"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.mirror_detect_fast_testing` appears to be unused"
-        errorLine1="    &lt;string name=&quot;mirror_detect_fast_testing&quot;>Testing…&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="965"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.rootfs_about_description` appears to be unused"
-        errorLine1="    &lt;string name=&quot;rootfs_about_description&quot;>The rootfs contains the Alpine Linux filesystem used by the sandbox. Resetting will delete all data and restore to factory state.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="989"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.rootfs_about_operations` appears to be unused"
-        errorLine1="    &lt;string name=&quot;rootfs_about_operations&quot;>Reset: Delete everything | Backup: Save /root directory | Restore: Recover saved data&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="990"
-            column="13"/>
-    </issue>
-
-
-
-
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.agent_loop_models_add_a_provider_and_refresh_its_model_lis` appears to be unused"
-        errorLine1="    &lt;string name=&quot;agent_loop_models_add_a_provider_and_refresh_its_model_lis&quot;>Add a provider and refresh its model list to populate this picker.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1161"
-            column="13"/>
-    </issue>
-
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.agent_loop_models_selected` appears to be unused"
-        errorLine1="    &lt;string name=&quot;agent_loop_models_selected&quot;>Selected&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1163"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.agent_loop_models_not_selected` appears to be unused"
-        errorLine1="    &lt;string name=&quot;agent_loop_models_not_selected&quot;>Not selected&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1164"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.add_provider_built_in_models_count` appears to be unused"
-        errorLine1="    &lt;string name=&quot;add_provider_built_in_models_count&quot;>%1$d built-in models&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1169"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.mount_detail_browse_files_toast` appears to be unused"
-        errorLine1="    &lt;string name=&quot;mount_detail_browse_files_toast&quot;>Access this mount from chat @-mentions.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1332"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.voice_input_picker_done` appears to be unused"
-        errorLine1="    &lt;string name=&quot;voice_input_picker_done&quot;>Done&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1413"
-            column="13"/>
-    </issue>
-
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.logs_config_clear_all` appears to be unused"
-        errorLine1="    &lt;string name=&quot;logs_config_clear_all&quot;>Clear All&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1426"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.logs_config_status_pending` appears to be unused"
-        errorLine1="    &lt;string name=&quot;logs_config_status_pending&quot;>PENDING&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1429"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.system_permissions_subtitle` appears to be unused"
-        errorLine1="    &lt;string name=&quot;system_permissions_subtitle&quot;>OS-level permissions granted from system Settings&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1454"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.webapp_source_missing` appears to be unused"
-        errorLine1="    &lt;string name=&quot;webapp_source_missing&quot;>Source file no longer exists.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1486"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.image_budget_dropped` appears to be unused"
-        errorLine1="    &lt;string name=&quot;image_budget_dropped&quot;>Skipped %1$d oversized URL(s) (&amp;gt;5MB)&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1516"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.crash_freq_dialog_title` appears to be unused"
-        errorLine1="    &lt;string name=&quot;crash_freq_dialog_title&quot;>Multiple crashes detected&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1536"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.crash_freq_dialog_message` appears to be unused"
-        errorLine1="    &lt;string name=&quot;crash_freq_dialog_message&quot;>Minis has crashed several times in the last hour. Share crash logs to help fix the issue?&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1537"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.crash_freq_dialog_share` appears to be unused"
-        errorLine1="    &lt;string name=&quot;crash_freq_dialog_share&quot;>Share logs&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1538"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.crash_freq_method_email` appears to be unused"
-        errorLine1="    &lt;string name=&quot;crash_freq_method_email&quot;>Send via email&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1549"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.scheduled_task_target_new_session_note` appears to be unused"
-        errorLine1="    &lt;string name=&quot;scheduled_task_target_new_session_note&quot;>Each fire creates a new chat session and posts a notification when finished. Tap the notification to view the result.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1578"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.scheduled_task_run_now_done` appears to be unused"
-        errorLine1="    &lt;string name=&quot;scheduled_task_run_now_done&quot;>Task finished&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1589"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.scheduled_task_run_now_done_body` appears to be unused"
-        errorLine1="    &lt;string name=&quot;scheduled_task_run_now_done_body&quot;>The scheduled task ran and produced a response.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1590"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.scheduled_task_no_models` appears to be unused"
-        errorLine1="    &lt;string name=&quot;scheduled_task_no_models&quot;>No models configured.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1613"
-            column="13"/>
-    </issue>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     <issue
         id="UseOfNonLambdaOffsetOverload"
@@ -10600,71 +8508,11 @@
             column="21"/>
     </issue>
 
-    <issue
-        id="UseKtx"
-        message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="                    prefs.edit().putBoolean(KEY_SHOW_CHAT_TITLE, it).apply()"
-        errorLine2="                    ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
-            line="457"
-            column="21"/>
-    </issue>
 
-    <issue
-        id="UseKtx"
-        message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="                    prefs.edit().putBoolean(KEY_AUTO_GROUPING, it).apply()"
-        errorLine2="                    ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
-            line="478"
-            column="21"/>
-    </issue>
 
-    <issue
-        id="UseKtx"
-        message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="                    prefs.edit().putInt(KEY_FONT_CHAT_INPUT, it).apply()"
-        errorLine2="                    ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
-            line="503"
-            column="21"/>
-    </issue>
 
-    <issue
-        id="UseKtx"
-        message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="                    prefs.edit().putInt(KEY_FONT_MESSAGE, it).apply()"
-        errorLine2="                    ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
-            line="512"
-            column="21"/>
-    </issue>
 
-    <issue
-        id="UseKtx"
-        message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="                    prefs.edit().putInt(KEY_FONT_APP_BASE, it).apply()"
-        errorLine2="                    ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
-            line="521"
-            column="21"/>
-    </issue>
 
-    <issue
-        id="UseKtx"
-        message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="                        prefs.edit()"
-        errorLine2="                        ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
-            line="534"
-            column="25"/>
-    </issue>
 
     <issue
         id="UseKtx"
@@ -10677,16 +8525,6 @@
             column="33"/>
     </issue>
 
-    <issue
-        id="UseKtx"
-        message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="                        prefs.edit().putString(KEY_LANGUAGE, lang.code).apply()"
-        errorLine2="                        ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
-            line="691"
-            column="25"/>
-    </issue>
 
     <issue
         id="UseKtx"
@@ -11546,27 +9384,7 @@
             column="9"/>
     </issue>
 
-    <issue
-        id="UseKtx"
-        message="Use the KTX extension function `String.toUri` instead?"
-        errorLine1="                                    Uri.parse(&quot;package:${context.packageName}&quot;),"
-        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/MountedFoldersScreen.kt"
-            line="218"
-            column="37"/>
-    </issue>
 
-    <issue
-        id="UseKtx"
-        message="Use the KTX extension function `String.toUri` instead?"
-        errorLine1="                                        Uri.parse(&quot;package:${context.packageName}&quot;),"
-        errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/ui/settings/MountedFoldersScreen.kt"
-            line="228"
-            column="41"/>
-    </issue>
 
     <issue
         id="UseKtx"
@@ -12239,16 +10057,6 @@
             column="9"/>
     </issue>
 
-    <issue
-        id="UseKtx"
-        message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="        prefs.edit().putString(KEY_TASKS, arr.toString()).apply()"
-        errorLine2="        ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/scheduled/ScheduledTaskStore.kt"
-            line="55"
-            column="9"/>
-    </issue>
 
     <issue
         id="UseKtx"

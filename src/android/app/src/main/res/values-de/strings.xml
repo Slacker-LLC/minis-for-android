@@ -3,20 +3,10 @@
     <string name="app_name">Minis for Android</string>
     <string name="new_chat">Neuer Chat</string>
     <string name="settings">Einstellungen</string>
-    <string name="providers">KI-Anbieter</string>
-    <string name="add_provider">KI-Anbieter hinzufügen</string>
-    <string name="appearance">Erscheinungsbild</string>
-    <string name="no_sessions">Noch keine Unterhaltungen</string>
-    <string name="no_providers">Füge einen Anbieter hinzu, um loszulegen</string>
     <string name="send">Senden</string>
-    <string name="type_message">Nachricht eingeben…</string>
     <string name="delete">Löschen</string>
     <string name="cancel">Abbrechen</string>
     <string name="save">Sichern</string>
-    <string name="api_key">API Key</string>
-    <string name="label">Bezeichnung</string>
-    <string name="enabled">Aktiviert</string>
-    <string name="select_model">Modell auswählen</string>
     <string name="session_memory_title">Erinnerungen in der Sitzung</string>
     <string name="memory_section_auto_injected">Automatisch eingefügt</string>
     <string name="memory_section_auto_injected_footer">Wird zu Beginn jedes Agent-Schritts in den Systemprompt geladen.</string>
@@ -24,7 +14,6 @@
     <string name="memory_section_tool_activity_footer">Speicherlese- und -schreibvorgänge des Agenten in dieser Sitzung.</string>
     <string name="memory_section_written_content">Geschriebener Inhalt</string>
     <string name="memory_section_tool_result">Tool-Ergebnis</string>
-    <string name="memory_section_keywords">Stichwörter</string>
     <string name="memory_action_edit">Bearbeiten</string>
     <string name="memory_action_save">Sichern</string>
     <string name="memory_action_revoke">Widerrufen</string>
@@ -35,7 +24,6 @@
     <string name="memory_revoke_result_not_found">Eintrag in den jüngsten Logs nicht gefunden.</string>
     <string name="memory_revoke_result_io_error">Fehler beim Schreiben der Datei: %1$s</string>
     <string name="memory_save_toast">Gesichert</string>
-    <string name="memory_save_error">Speichern fehlgeschlagen: %1$s</string>
     <string name="memory_global_footer">Dauerhafte Anweisungen und Einstellungen, die dem Agenten in jeder Sitzung angezeigt werden. Der Agent kann diese Datei nicht ändern.</string>
     <string name="check_update_section_header">App-Update</string>
     <string name="check_update_current_version">Aktuelle Version: %1$s</string>
@@ -54,17 +42,7 @@
     <string name="check_update_install_launch_failed">Installer konnte nicht gestartet werden. Prüfe die Berechtigung \"Apps aus unbekannten Quellen installieren\" oder öffne das heruntergeladene APK manuell.</string>
     <string name="check_update_install_hint">Tipp: Wenn die Installation keinerlei Rückmeldung gibt, stimmt möglicherweise die Signatur nicht — deinstalliere zuerst die vorherige Version und lade dann erneut herunter.</string>
     <string name="check_update_open_install_settings">Einstellungen öffnen</string>
-    <string name="permissions_title">Berechtigungen</string>
-    <string name="permissions_reset_all">Alles zurücksetzen</string>
-    <string name="permissions_reset_dialog_title">Alle Berechtigungen zurücksetzen?</string>
-    <string name="permissions_reset_dialog_message">Setzt jede Berechtigung auf den Standard (Immer erlauben) zurück. Tool-spezifische Überschreibungen werden gelöscht.</string>
-    <string name="permissions_reset_confirm">Zurücksetzen</string>
-    <string name="permissions_level_always_allow">Immer erlauben</string>
-    <string name="permissions_level_ask_once">Einmal fragen</string>
-    <string name="permissions_level_not_allowed">Nicht erlaubt</string>
-    <string name="permissions_category_privacy">Datenschutz</string>
     <string name="permissions_category_media">Medien</string>
-    <string name="permissions_category_system">System</string>
     <string name="mention_scanning">Dateien werden durchsucht…</string>
     <string name="mention_no_match">Keine passenden Dateien</string>
     <string name="resume_banner_title">Unterbrochen — tippen Sie auf „Fortfahren“</string>
@@ -172,8 +150,6 @@
     <string name="settings_privacy_policy">Datenschutzrichtlinie</string>
     <string name="settings_feedback">Feedback</string>
     <string name="settings_submit_github_issues">GitHub Issue einreichen</string>
-    <string name="settings_feedback_telegram">Feedback (Telegram)</string>
-    <string name="settings_feedback_email">Feedback (E-Mail)</string>
     <string name="about_title">Über</string>
     <string name="about_minis_tagline">Minis ist dein vollständig lokaler, vollständig privater On-Device-Agent.</string>
     <string name="about_links">Links</string>
@@ -285,7 +261,6 @@
     <string name="env_var_empty_title">Keine Umgebungsvariablen</string>
     <string name="env_var_empty_action">Auf + tippen, um eine hinzuzufügen.</string>
     <string name="env_var_toggle_visibility">Sichtbarkeit umschalten</string>
-    <string name="env_var_delete_confirm_title">%1$s löschen?</string>
     <string name="env_var_delete_confirm_text">Die Umgebungsvariable und ihr Wert werden dauerhaft entfernt.</string>
     <string name="env_var_form_edit_title">Variable bearbeiten</string>
     <string name="env_var_form_add_title">Variable hinzufügen</string>
@@ -296,7 +271,6 @@
     <string name="env_var_error_invalid_key">Muss mit einem Buchstaben beginnen, nur Buchstaben/Zahlen/Unterstriche</string>
     <string name="env_var_error_duplicate">Eine Variable mit diesem Namen existiert bereits</string>
     <string name="log_title">Protokolle</string>
-    <string name="log_share_all">Alle teilen</string>
     <string name="log_section_logging">Protokollierung</string>
     <string name="log_section_logging_footer">Wenn aktiviert, werden alle Konsolenausgaben in tägliche Logdateien im privaten App-Speicher geschrieben.</string>
     <string name="log_enable_switch">Protokollierung aktivieren</string>
@@ -309,11 +283,9 @@
     <string name="log_delete_confirm_title">Alle Logs löschen?</string>
     <string name="log_delete_confirm_text">Es werden %1$s an Logdateien gelöscht. Diese Aktion ist nicht umkehrbar.</string>
     <string name="log_delete_confirm">Alle löschen</string>
-    <string name="log_truncated_marker">… (abgeschnitten, %1$s gesamt)</string>
     <string name="log_not_found">Logdatei nicht gefunden.</string>
     <string name="log_error_reading">Fehler beim Lesen des Logs: %1$s</string>
     <string name="log_share_chooser">Log teilen</string>
-    <string name="log_share_all_chooser">Logs teilen</string>
     <string name="memory_title">Speicher</string>
     <string name="memory_empty_title">Keine Memory-Dateien</string>
     <string name="memory_empty_description">Memory-Dateien speichern persistentes Wissen über Sitzungen. Bearbeiten Sie GLOBAL.md, um für den Agenten sichtbare Anweisungen hinzuzufügen.</string>
@@ -334,11 +306,9 @@
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
     <string name="perm_tool_shizuku_cli">android-shizuku-cli</string>
     <string name="perm_section_a11y">Bedienungshilfen</string>
-    <string name="perm_section_shizuku">Shizuku</string>
     <string name="perm_a11y_section_footer">android-a11y-cli ermöglicht dem Agenten, die UI-Struktur zu lesen, Tippen und Gesten auszuführen sowie Systemereignisse zu beobachten. Beide Zeilen unten müssen gesetzt sein: Agent-Berechtigung wählen und Bedienungshilfen-Dienst in den Systemeinstellungen aktivieren.</string>
     <string name="perm_shizuku_section_footer">android-shizuku-cli gewährt dem Agenten privilegierte Android-APIs (Paket-Installation, settings put, Force-Stop, …) über den Shizuku-Dienst, autorisiert via WLAN-ADB oder Root. Beide Zeilen unten müssen gesetzt sein.</string>
     <string name="perm_a11y_cli_description">Agent darf Bildschirm-UI lesen, tippen, eingeben, Ereignisse beobachten</string>
-    <string name="perm_shizuku_cli_description">Privilegierte Android-APIs über den Shizuku-Dienst</string>
     <string name="perm_a11y_open_settings">Bedienungshilfen-Einstellungen öffnen</string>
     <string name="perm_system_authorization">Systemautorisierung</string>
     <string name="perm_agent_policy">Agent-Berechtigung</string>
@@ -362,17 +332,13 @@
     <string name="skill_empty_action">Auf + tippen, um SKILL.md zu importieren oder Minis Skills zu durchsuchen.</string>
     <string name="skill_import_modal_title">Skill importieren</string>
     <string name="skill_minis_skills_modal">Minis Skills</string>
-    <string name="skill_delete_confirm_title">%1$s löschen?</string>
     <string name="skill_delete_confirm_text">Skill und zugehörige Dateien werden dauerhaft entfernt.</string>
-    <string name="skill_import_sheet_title">Skill importieren</string>
     <string name="skill_import_tab_url">URL</string>
     <string name="skill_import_tab_paste">Einfügen</string>
     <string name="skill_import_tab_file">Datei</string>
     <string name="skill_import_url_instruction">URL einer SKILL.md-Datei eingeben (GitHub-Links unterstützt).</string>
-    <string name="skill_import_url_label">URL</string>
     <string name="skill_import_url_placeholder">github.com/user/repo/blob/main/SKILL.md</string>
     <string name="skill_import_paste_instruction">Inhalt einer SKILL.md-Datei einfügen. Muss YAML-Frontmatter mit \'name\'-Feld enthalten.</string>
-    <string name="skill_import_paste_label">SKILL.md-Inhalt</string>
     <string name="skill_import_file_instruction">.md- oder .skill-Datei vom Gerät auswählen.</string>
     <string name="skill_import_file_button">Datei auswählen</string>
     <string name="skill_import_error_no_url">URL eingeben</string>
@@ -392,10 +358,6 @@
     <string name="skill_detail_updated">Aktualisiert</string>
     <string name="skill_detail_delete">Skill löschen</string>
     <string name="skill_detail_edit_name_title">Name bearbeiten</string>
-    <string name="skill_detail_section_description">BESCHREIBUNG</string>
-    <string name="skill_detail_section_files">DATEIEN</string>
-    <string name="skill_detail_section_meta">META</string>
-    <string name="skill_detail_section_update">AKTUALISIEREN</string>
     <string name="skill_file_save">Sichern</string>
     <string name="skill_file_edit">Bearbeiten</string>
     <string name="skill_detail_status_reading">Datei wird gelesen…</string>
@@ -405,7 +367,6 @@
     <string name="skill_detail_status_downloading">Wird heruntergeladen…</string>
     <string name="skill_detail_status_rescanning">Wird erneut gescannt…</string>
     <string name="skill_detail_error_missing">SKILL.md fehlt oder ist auf der Festplatte ungültig</string>
-    <string name="skill_detail_source_url">URL</string>
     <string name="skill_detail_source_file">Dateiimport</string>
     <string name="skill_detail_source_bundled">Integriert</string>
     <string name="skill_detail_source_session">In Sitzung erstellt</string>
@@ -434,8 +395,6 @@
     <string name="storage_clearing_status">Wird gelöscht…</string>
     <string name="storage_clear_session_button">Sitzungsdateien löschen</string>
     <string name="storage_clear_confirm_title">Sitzungsdateien löschen?</string>
-    <string name="storage_clear_confirm_text">Es werden %1$s an Dateien gelöscht. Diese Aktion ist nicht umkehrbar.</string>
-    <string name="storage_clear_confirm_button">%1$s leeren</string>
     <string name="usage_title">Verbrauch</string>
     <string name="usage_section_total">Gesamtverbrauch</string>
     <string name="usage_label_total_input">Gesamteingabe (inkl. Cache)</string>
@@ -445,9 +404,6 @@
     <string name="usage_label_cache_hit_rate">Cache-Trefferquote</string>
     <string name="usage_detail_input">Eingabe</string>
     <string name="usage_detail_output">Ausgabe</string>
-    <string name="usage_detail_cache_read">Cache-Lesen</string>
-    <string name="usage_detail_cache_creation">Cache-Erstellung</string>
-    <string name="usage_detail_cache_hit_rate">Cache-Trefferquote</string>
     <string name="usage_detail_daily_avg">Tagesdurchschnitt</string>
     <string name="usage_detail_session_avg">Durchschnitt pro Sitzung</string>
     <string name="usage_detail_attribution">Zuordnung</string>
@@ -463,7 +419,6 @@
     <string name="mirror_mirrors_section">Mirrors</string>
     <string name="mirror_test_speed_testing">Wird getestet…</string>
     <string name="mirror_test_speed_label">Geschwindigkeit testen</string>
-    <string name="mirror_detect_fast_testing">Wird getestet…</string>
     <string name="mirror_detect_fast_label">Schnelle Mirrors erkennen</string>
     <string name="mirror_official_badge">Offiziell</string>
     <string name="mirror_timeout_label">Zeitüberschreitung</string>
@@ -487,8 +442,6 @@
     <string name="rootfs_result_section">Ergebnis</string>
     <string name="rootfs_info_section">Info</string>
     <string name="rootfs_about_title">Über Rootfs</string>
-    <string name="rootfs_about_description">Das rootfs enthält das Ubuntu-24.04-Dateisystem der Sandbox. Beim Zurücksetzen wird nur das rootfs gelöscht; Arbeitsbereich, Speicher, Skills und gemeinsame Dateien der App bleiben erhalten.</string>
-    <string name="rootfs_about_operations">Zurücksetzen: Ubuntu-rootfs löschen | App-Daten werden separat verwaltet</string>
     <string name="rootfs_reset_confirm_title">Rootfs zurücksetzen?</string>
     <string name="rootfs_reset_confirm_message">Das gesamte rootfs wird gelöscht. Alle Daten gehen verloren.</string>
     <string name="rootfs_reset_backup_confirm_title">Zurücksetzen mit Sicherung?</string>
@@ -517,9 +470,7 @@
     <string name="webpreview_close">Schließen</string>
     <string name="webpreview_stop">Laden stoppen</string>
     <string name="webpreview_reload">Neu laden</string>
-    <string name="webpreview_share">Teilen</string>
     <string name="webpreview_open_external">Im externen Browser öffnen</string>
-    <string name="webpreview_open_in_browser">Im Browser öffnen</string>
     <string name="webpreview_open_fullscreen">Vollbild öffnen</string>
 
     <!-- T172 — sandbox / sessions / browser / terminal i18n -->
@@ -528,7 +479,6 @@
     <string name="filebrowser_delete_title">„%1$s“ löschen?</string>
     <string name="filebrowser_delete_message">Diese Aktion kann nicht rückgängig gemacht werden.</string>
     <string name="filebrowser_error_title">Fehler</string>
-    <string name="filebrowser_sort_action">Sortieren</string>
     <string name="filebrowser_sort_ascending">Aufsteigend</string>
     <string name="filebrowser_sort_descending">Absteigend</string>
     <string name="filebrowser_sort_folders_first">Ordner zuerst</string>
@@ -550,9 +500,6 @@
     <string name="filepreview_image_decode_error">Bild konnte nicht dekodiert werden</string>
     <string name="filepreview_image_load_error">Bild konnte nicht geladen werden</string>
     <string name="filepreview_file_read_error">Datei konnte nicht gelesen werden</string>
-    <string name="filepreview_csv_parse_error">CSV konnte nicht geparst werden</string>
-    <string name="filepreview_archive_read_error">Archiv konnte nicht gelesen werden</string>
-    <string name="filepreview_pdf_render_error">PDF konnte nicht gerendert werden</string>
     <string name="filepreview_page_n">Seite %1$d</string>
     <string name="sessionlist_section_pinned">Angeheftet</string>
     <string name="sessionlist_section_today">Heute</string>
@@ -660,7 +607,6 @@
     <string name="browser_history_search">Verlauf durchsuchen</string>
     <string name="browser_history_empty_title">Kein Browserverlauf</string>
     <string name="browser_history_empty_subtitle">Verlauf wird 7 Tage aufbewahrt</string>
-    <string name="browser_history_results">Ergebnisse</string>
     <string name="browser_history_clear_dialog_title">Browserverlauf löschen?</string>
     <string name="browser_history_clear_dialog_message">Dadurch wird der gesamte Browserverlauf entfernt. Dies kann nicht rückgängig gemacht werden.</string>
     <string name="terminal_title">Minis-Shell</string>
@@ -766,14 +712,11 @@
     <string name="modelgroup_speech_transcription">Sprachtranskription</string>
     <string name="modelgroup_text_generation">Textgenerierung</string>
     <string name="common_default">Standard</string>
-    <string name="settings_agent_loop_models">Agent-Loop-Modelle</string>    <string name="agent_loop_models_add_a_provider_and_refresh_its_model_lis">Anbieter hinzufügen und dessen Modellliste aktualisieren, um diese Auswahl zu füllen.</string>
-    <string name="agent_loop_models_selected">Ausgewählt</string>
-    <string name="agent_loop_models_not_selected">Nicht ausgewählt</string>
+    <string name="settings_agent_loop_models">Agent-Loop-Modelle</string>
 
     <!-- T172-A parameterized strings -->
     <string name="add_custom_model_id_footer">Die Model ID ist der API-Bezeichner, der an %1$s gesendet wird. Der Anzeigename ist das benutzerfreundlichere Label in der Auswahl; bei leerer Angabe wird auf die Model ID zurückgegriffen.</string>
     <string name="add_custom_model_eg_id_placeholder">z. B. gpt-4o-custom</string>
-    <string name="add_provider_built_in_models_count">%1$d integrierte Modelle</string>
     <string name="add_provider_configure_provider">%1$s konfigurieren</string>
     <string name="add_provider_auto_append_v1_quoted">\"/v1\" automatisch anhängen</string>
     <string name="provider_detail_https_api_example_placeholder">https://api.example.com</string>
@@ -878,7 +821,6 @@
     <string name="mount_all_files_access_required_desc">Ohne diese Berechtigung sieht die Shell nur Dateien, die diese App erstellt hat — Dateien anderer Apps (z. B. Obsidian) bleiben verborgen. Tippen, um sie in den Einstellungen zu erteilen.</string>
     <string name="mount_detail_title">Einbindung bearbeiten</string>
     <string name="mount_detail_browse_files">Dateien durchsuchen</string>
-    <string name="mount_detail_browse_files_toast">Zugriff über @-Erwähnungen im Chat.</string>
     <string name="mount_detail_name_invalid">Der Name darf nicht leer sein, kein \'/\' enthalten und nicht \'.\' oder \'..\' sein</string>
     <string name="mount_path_unavailable">Pfad nicht verfügbar</string>
     <string name="mount_add_failed">Einbindung konnte nicht hinzugefügt werden. Name evtl. vergeben oder ungültig.</string>
@@ -914,10 +856,8 @@
     <!-- T288 — Protokolle / Konfigurationsänderungen -->
     <string name="logs_tab_config_changes">Konfigurationsänderungen</string>
     <string name="logs_config_used_count">%1$d / %2$d belegt</string>
-    <string name="logs_config_clear_all">Alle löschen</string>
     <string name="logs_config_empty">Noch keine Konfigurationsänderungen aufgezeichnet.</string>
     <string name="logs_config_status_applied">ANGEWENDET</string>
-    <string name="logs_config_status_pending">AUSSTEHEND</string>
     <string name="logs_config_status_rejected">ABGELEHNT</string>
     <string name="logs_config_status_timeout">ZEITÜBERSCHREITUNG</string>
     <string name="logs_config_status_reverted">ZURÜCKGESETZT</string>
@@ -970,9 +910,6 @@
     <string name="update_error_forbidden_with_link">Update-Server nicht erreichbar, möglicherweise durch das Netzwerk blockiert. GitHub Releases zum manuellen Download öffnen.</string>
     <string name="update_error_open_releases">GitHub Releases öffnen</string>
     <!-- T-android-crash-freq-share -->
-    <string name="crash_freq_dialog_title">Mehrere Abstürze erkannt</string>
-    <string name="crash_freq_dialog_message">Minis ist in der letzten Stunde mehrfach abgestürzt. Absturzprotokolle teilen, um das Problem zu beheben?</string>
-    <string name="crash_freq_dialog_share">Protokolle teilen</string>
     <string name="crash_freq_dialog_dismiss">Nicht jetzt</string>
     <string name="crash_safe_mode_restart_needed">Minis muss neu gestartet werden, um die Wiederherstellung abzuschließen. Bitte tippe erneut auf das App-Symbol.</string>
     <string name="crash_freq_email_subject">Minis-Absturzbericht %1$s</string>

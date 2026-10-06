@@ -2,7 +2,6 @@ package com.openminis.app.debug
 
 import android.app.Activity
 import android.graphics.Bitmap
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.PixelCopy
@@ -72,21 +71,17 @@ object DebugScreenshotRing {
     private suspend fun captureBitmap(activity: Activity, scale: Float): Bitmap =
         suspendCancellableCoroutine { cont ->
             val rootView = activity.window.decorView.rootView
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val width = (rootView.width * scale).toInt().coerceAtLeast(1)
-                val height = (rootView.height * scale).toInt().coerceAtLeast(1)
-                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                PixelCopy.request(
-                    activity.window, bitmap,
-                    { result ->
-                        if (result == PixelCopy.SUCCESS) cont.resume(bitmap)
-                        else cont.resume(canvasCapture(rootView, scale))
-                    },
-                    Handler(Looper.getMainLooper()),
-                )
-            } else {
-                cont.resume(canvasCapture(rootView, scale))
-            }
+            val width = (rootView.width * scale).toInt().coerceAtLeast(1)
+            val height = (rootView.height * scale).toInt().coerceAtLeast(1)
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            PixelCopy.request(
+                activity.window, bitmap,
+                { result ->
+                    if (result == PixelCopy.SUCCESS) cont.resume(bitmap)
+                    else cont.resume(canvasCapture(rootView, scale))
+                },
+                Handler(Looper.getMainLooper()),
+            )
         }
 
     private fun canvasCapture(view: android.view.View, scale: Float): Bitmap {

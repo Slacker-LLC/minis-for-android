@@ -3,20 +3,10 @@
     <string name="app_name">Minis for Android</string>
     <string name="new_chat">新对话</string>
     <string name="settings">设置</string>
-    <string name="providers">AI 服务商</string>
-    <string name="add_provider">添加 AI 服务商</string>
-    <string name="appearance">外观</string>
-    <string name="no_sessions">暂无会话</string>
-    <string name="no_providers">添加一个提供商以开始使用</string>
     <string name="send">发送</string>
-    <string name="type_message">输入消息…</string>
     <string name="delete">删除</string>
     <string name="cancel">取消</string>
     <string name="save">保存</string>
-    <string name="api_key">API 密钥</string>
-    <string name="label">标签</string>
-    <string name="enabled">已启用</string>
-    <string name="select_model">选择模型</string>
     <string name="session_memory_title">会话中的记忆</string>
     <string name="memory_section_auto_injected">自动注入</string>
     <string name="memory_section_auto_injected_footer">在每个 agent 回合开始时加载到系统提示中。</string>
@@ -24,7 +14,6 @@
     <string name="memory_section_tool_activity_footer">代理在此会话期间执行的记忆读写操作。</string>
     <string name="memory_section_written_content">写入内容</string>
     <string name="memory_section_tool_result">工具结果</string>
-    <string name="memory_section_keywords">关键词</string>
     <string name="memory_action_edit">编辑</string>
     <string name="memory_action_save">保存</string>
     <string name="memory_action_revoke">撤销</string>
@@ -35,7 +24,6 @@
     <string name="memory_revoke_result_not_found">在最近的日志中未找到该条目。</string>
     <string name="memory_revoke_result_io_error">写入文件出错：%1$s</string>
     <string name="memory_save_toast">已保存</string>
-    <string name="memory_save_error">保存失败：%1$s</string>
     <string name="memory_global_footer">每个会话中对智能体可见的持久指令和偏好。智能体无法修改此文件。</string>
     <string name="check_update_section_header">应用更新</string>
     <string name="check_update_current_version">当前版本：%1$s</string>
@@ -54,17 +42,7 @@
     <string name="check_update_install_launch_failed">启动安装程序失败。请检查\"安装未知应用\"权限或手动打开下载的 APK。</string>
     <string name="check_update_install_hint">提示：如果安装时无任何反馈，可能是签名不匹配，请先卸载旧版本再重新点击下载。</string>
     <string name="check_update_open_install_settings">打开设置</string>
-    <string name="permissions_title">权限</string>
-    <string name="permissions_reset_all">全部重置</string>
-    <string name="permissions_reset_dialog_title">重置全部权限？</string>
-    <string name="permissions_reset_dialog_message">将每项权限恢复为默认（始终允许）。逐工具的覆盖配置将被清除。</string>
-    <string name="permissions_reset_confirm">重置</string>
-    <string name="permissions_level_always_allow">始终允许</string>
-    <string name="permissions_level_ask_once">每次询问</string>
-    <string name="permissions_level_not_allowed">不允许</string>
-    <string name="permissions_category_privacy">隐私</string>
     <string name="permissions_category_media">媒体</string>
-    <string name="permissions_category_system">跟随系统</string>
     <string name="mention_scanning">正在扫描文件…</string>
     <string name="mention_no_match">没有匹配的文件</string>
     <string name="resume_banner_title">已中断 - 点击「继续」以恢复</string>
@@ -183,7 +161,6 @@
     <string name="soul_lang_zh">中文</string>
     <string name="soul_lang_en">English</string>
     <string name="soul_body_placeholder">描述助手的语气、思考方式和行为偏好…</string>
-    <string name="soul_length_indicator">%1$d 字符</string>
     <string name="soul_save">保存</string>
     <string name="soul_cancel">取消</string>
     <string name="soul_ok">好</string>
@@ -205,8 +182,6 @@
     <string name="settings_privacy_policy">隐私政策</string>
     <string name="settings_feedback">反馈问题</string>
     <string name="settings_submit_github_issues">提交 GitHub Issue</string>
-    <string name="settings_feedback_telegram">反馈 (Telegram)</string>
-    <string name="settings_feedback_email">反馈 (邮件)</string>
     <string name="about_title">关于</string>
     <string name="about_minis_tagline">Minis 是完全本地、完全私密的设备端 Agent。</string>
     <string name="about_links">链接</string>
@@ -376,7 +351,6 @@
     <string name="env_var_empty_title">无环境变量</string>
     <string name="env_var_empty_action">点击 + 添加。</string>
     <string name="env_var_toggle_visibility">切换可见性</string>
-    <string name="env_var_delete_confirm_title">删除 %1$s？</string>
     <string name="env_var_delete_confirm_text">这将永久删除该环境变量及其值。</string>
     <string name="env_var_form_edit_title">编辑变量</string>
     <string name="env_var_form_add_title">添加变量</string>
@@ -387,7 +361,6 @@
     <string name="env_var_error_invalid_key">必须以字母开头，只能使用字母、数字、下划线</string>
     <string name="env_var_error_duplicate">同名变量已存在</string>
     <string name="log_title">日志</string>
-    <string name="log_share_all">全部分享</string>
     <string name="log_section_logging">日志</string>
     <string name="log_section_logging_footer">启用后，所有控制台输出将每天捕获到应用私有存储中的日志文件。</string>
     <string name="log_enable_switch">启用日志</string>
@@ -400,11 +373,9 @@
     <string name="log_delete_confirm_title">删除所有日志？</string>
     <string name="log_delete_confirm_text">这将删除 %1$s 的日志文件。此操作无法撤销。</string>
     <string name="log_delete_confirm">全部删除</string>
-    <string name="log_truncated_marker">…（已截断，共 %1$s）</string>
     <string name="log_not_found">未找到日志文件。</string>
     <string name="log_error_reading">读取日志出错: %1$s</string>
     <string name="log_share_chooser">分享日志</string>
-    <string name="log_share_all_chooser">分享日志</string>
     <string name="memory_title">记忆</string>
     <string name="settings_memory_global_header">默认</string>
     <string name="settings_memory_global_footer">单个会话的开关（通过 /memory 斜杠命令或"会话记忆"面板设置）会覆盖此默认值。切换此开关不会影响已有会话。</string>
@@ -429,11 +400,9 @@
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
     <string name="perm_tool_shizuku_cli">android-shizuku-cli</string>
     <string name="perm_section_a11y">无障碍</string>
-    <string name="perm_section_shizuku">Shizuku</string>
     <string name="perm_a11y_section_footer">android-a11y-cli 让 Agent 读取屏幕 UI、模拟点击与输入、监听系统事件。下方两项都需配置:选择 Agent 权限,并在系统设置启用无障碍服务。</string>
     <string name="perm_shizuku_section_footer">android-shizuku-cli 通过 Shizuku 服务调用 Android 高权限 API(安装应用、settings put、强制停止等)。Shizuku 由无线 ADB 或 root 启动。下方两项都需配置。</string>
     <string name="perm_a11y_cli_description">让 Agent 读取屏幕、点击、输入、监听事件</string>
-    <string name="perm_shizuku_cli_description">通过 Shizuku 调用 Android 高权限 API</string>
     <string name="perm_a11y_open_settings">前往无障碍设置</string>
     <string name="perm_system_authorization">系统授权</string>
     <string name="perm_agent_policy">Agent 权限</string>
@@ -452,35 +421,22 @@
 
     <!-- T322: Shizuku 权限引导 -->
     <string name="shizuku_title">Root 与 Shizuku</string>
-    <string name="shizuku_settings_subtitle">通过 Shizuku 或 AXManager 调用 Android 高权限 API</string>
     <string name="shizuku_status_header">状态</string>
     <string name="shizuku_status_footer">Shizuku 通过无线 ADB 或 root 启动一个本地服务，让用户应用无需 root 即可调用 Android 系统隐藏 API。支持两款兼容的管理器：Shizuku（RikkaApps）和 AXManager（Axeron），任意安装一个即可。授权后，Minis 可使用 android-shizuku-cli 命令管理包、权限、设置、输入、Activity 等。</string>
     <string name="shizuku_actions_header">下一步</string>
     <string name="shizuku_capabilities_header">可用能力</string>
     <string name="shizuku_capabilities_footer">在终端执行 `android-shizuku-cli --help` 查看完整用法。无论 binder 来自 Shizuku、AXManager 还是 Sui，命令集完全一致。</string>
-    <string name="shizuku_cap_package">包管理</string>
     <string name="shizuku_cap_package_desc">安装、卸载、列出和查询应用</string>
-    <string name="shizuku_cap_permission">权限</string>
     <string name="shizuku_cap_permission_desc">授予或撤销运行时权限</string>
-    <string name="shizuku_cap_activity">活动</string>
     <string name="shizuku_cap_activity_desc">启动 Activity、发送广播</string>
-    <string name="shizuku_cap_display">显示</string>
     <string name="shizuku_cap_display_desc">查询和调整显示设置</string>
-    <string name="shizuku_cap_settings">设置</string>
     <string name="shizuku_cap_settings_desc">读写 system / secure / global 设置</string>
-    <string name="shizuku_cap_user">用户</string>
     <string name="shizuku_cap_user_desc">列出和管理设备用户</string>
-    <string name="shizuku_cap_network">网络</string>
     <string name="shizuku_cap_network_desc">查看和切换网络状态</string>
-    <string name="shizuku_cap_input">输入</string>
     <string name="shizuku_cap_input_desc">注入点击、滑动、按键和文本</string>
-    <string name="shizuku_cap_notification">通知</string>
     <string name="shizuku_cap_notification_desc">发布和管理通知</string>
-    <string name="shizuku_cap_file">文件</string>
     <string name="shizuku_cap_file_desc">读写受保护的文件路径</string>
-    <string name="shizuku_cap_device">设备</string>
     <string name="shizuku_cap_device_desc">查询设备属性和硬件状态</string>
-    <string name="shizuku_cap_service">服务</string>
     <string name="shizuku_cap_service_desc">调用和查看系统服务</string>
     <string name="shizuku_install_footer">安装 Shizuku(RikkaApps)、AXManager(Axeron)或 Sui(RikkaApps)其中任意一个 —— 三者实现同一套协议,可以互换。Shizuku 和 AXManager 是普通 App,通过无线 ADB 激活。Sui 面向已经 root 的设备:它以 Magisk/KernelSU 模块的形式安装,无需 App,且重启后依然保持生效。在 KernelSU 或 APatch 上,Sui 还需要额外的 Zygisk 实现(Zygisk Next / ReZygisk / NeoZygisk)—— 没有它 Sui 不会加载。安装其中一个后返回此页。</string>
     <string name="shizuku_start_footer">打开管理器应用，通过无线 ADB（无需电脑）或 root 启动服务，状态变为运行后返回此页面。\n\n使用 AXManager 时，还需在 AXManager 的"设置 → AX-Permission Intercept"中打开开关，AXManager 才会向 Minis 推送 Shizuku 兼容 binder。</string>
@@ -523,17 +479,13 @@
     <string name="skill_empty_action">点击 + 导入 SKILL.md 或浏览 Minis Skills。</string>
     <string name="skill_import_modal_title">导入技能</string>
     <string name="skill_minis_skills_modal">Minis Skills</string>
-    <string name="skill_delete_confirm_title">删除 %1$s？</string>
     <string name="skill_delete_confirm_text">这将永久删除该 skill 及其文件。</string>
-    <string name="skill_import_sheet_title">导入技能</string>
     <string name="skill_import_tab_url">URL</string>
     <string name="skill_import_tab_paste">粘贴</string>
     <string name="skill_import_tab_file">文件</string>
     <string name="skill_import_url_instruction">输入 SKILL.md 文件的 URL（支持 GitHub 链接）。</string>
-    <string name="skill_import_url_label">URL</string>
     <string name="skill_import_url_placeholder">github.com/user/repo/blob/main/SKILL.md</string>
     <string name="skill_import_paste_instruction">粘贴 SKILL.md 文件的内容。必须包含带 \'name\' 字段的 YAML frontmatter。</string>
-    <string name="skill_import_paste_label">SKILL.md 内容</string>
     <string name="skill_import_file_instruction">从设备中选择 .md 或 .skill 文件。</string>
     <string name="skill_import_file_button">选择文件</string>
     <string name="skill_import_error_no_url">请输入 URL</string>
@@ -553,10 +505,6 @@
     <string name="skill_detail_updated">已更新</string>
     <string name="skill_detail_delete">删除 Skill</string>
     <string name="skill_detail_edit_name_title">编辑名称</string>
-    <string name="skill_detail_section_description">描述</string>
-    <string name="skill_detail_section_files">文件</string>
-    <string name="skill_detail_section_meta">元数据</string>
-    <string name="skill_detail_section_update">更新</string>
     <string name="skill_file_save">保存</string>
     <string name="skill_file_edit">编辑</string>
     <string name="skill_detail_status_reading">正在读取文件…</string>
@@ -566,7 +514,6 @@
     <string name="skill_detail_status_downloading">下载中…</string>
     <string name="skill_detail_status_rescanning">重新扫描中…</string>
     <string name="skill_detail_error_missing">磁盘上 SKILL.md 缺失或无效</string>
-    <string name="skill_detail_source_url">URL</string>
     <string name="skill_detail_source_file">文件导入</string>
     <string name="skill_detail_source_bundled">内置</string>
     <string name="skill_detail_source_session">会话创建</string>
@@ -595,8 +542,6 @@
     <string name="storage_clearing_status">清除中…</string>
     <string name="storage_clear_session_button">清除会话文件</string>
     <string name="storage_clear_confirm_title">清除会话文件？</string>
-    <string name="storage_clear_confirm_text">这将删除 %1$s 的文件。此操作无法撤销。</string>
-    <string name="storage_clear_confirm_button">清除 %1$s</string>
     <string name="usage_title">用量</string>
     <string name="usage_section_total">总用量</string>
     <string name="usage_label_total_input">总输入（含缓存）</string>
@@ -606,9 +551,6 @@
     <string name="usage_label_cache_hit_rate">缓存命中率</string>
     <string name="usage_detail_input">输入</string>
     <string name="usage_detail_output">输出</string>
-    <string name="usage_detail_cache_read">缓存读取</string>
-    <string name="usage_detail_cache_creation">缓存创建</string>
-    <string name="usage_detail_cache_hit_rate">缓存命中率</string>
     <string name="usage_detail_daily_avg">日均</string>
     <string name="usage_detail_session_avg">会话均值</string>
     <string name="usage_detail_attribution">归因信息</string>
@@ -624,7 +566,6 @@
     <string name="mirror_mirrors_section">镜像</string>
     <string name="mirror_test_speed_testing">测试中…</string>
     <string name="mirror_test_speed_label">测速</string>
-    <string name="mirror_detect_fast_testing">测试中…</string>
     <string name="mirror_detect_fast_label">检测最快镜像</string>
     <string name="mirror_official_badge">官方</string>
     <string name="mirror_timeout_label">超时</string>
@@ -648,8 +589,6 @@
     <string name="rootfs_result_section">结果</string>
     <string name="rootfs_info_section">信息</string>
     <string name="rootfs_about_title">关于 Rootfs</string>
-    <string name="rootfs_about_description">rootfs 包含沙箱使用的 Ubuntu 24.04 文件系统。重置只会删除 rootfs；App 自有的工作区、记忆、技能和共享文件会保留。</string>
-    <string name="rootfs_about_operations">重置：删除 Ubuntu rootfs | App 自有数据单独管理</string>
     <string name="rootfs_reset_confirm_title">重置 Rootfs？</string>
     <string name="rootfs_reset_confirm_message">这将删除整个 rootfs。所有数据将丢失。</string>
     <string name="rootfs_reset_backup_confirm_title">备份并重置？</string>
@@ -678,13 +617,9 @@
     <string name="webpreview_close">关闭</string>
     <string name="webpreview_stop">停止加载</string>
     <string name="webpreview_reload">重新加载</string>
-    <string name="webpreview_share">分享</string>
     <string name="webpreview_open_external">在外部浏览器中打开</string>
-    <string name="webpreview_open_external_failed">没有可用应用来打开</string>
-    <string name="webpreview_open_in_browser">在浏览器中打开</string>
     <string name="webpreview_open_fullscreen">全屏打开</string>
     <string name="webpreview_more">更多</string>
-    <string name="webpreview_collapse">收起</string>
     <string name="webpreview_desktop_site">桌面版网页</string>
     <string name="webpreview_mobile_site">移动版网页</string>
     <string name="webpreview_pin_to_home">添加到桌面</string>
@@ -697,7 +632,6 @@
     <string name="filebrowser_delete_title">删除 “%1$s”？</string>
     <string name="filebrowser_delete_message">此操作无法撤销。</string>
     <string name="filebrowser_error_title">错误</string>
-    <string name="filebrowser_sort_action">排序</string>
     <string name="filebrowser_sort_ascending">升序</string>
     <string name="filebrowser_sort_descending">降序</string>
     <string name="filebrowser_sort_folders_first">文件夹优先</string>
@@ -719,9 +653,6 @@
     <string name="filepreview_image_decode_error">无法解码图片</string>
     <string name="filepreview_image_load_error">图片加载失败</string>
     <string name="filepreview_file_read_error">读取文件失败</string>
-    <string name="filepreview_csv_parse_error">解析 CSV 失败</string>
-    <string name="filepreview_archive_read_error">读取压缩包失败</string>
-    <string name="filepreview_pdf_render_error">渲染 PDF 失败</string>
     <string name="filepreview_page_n">第 %1$d 页</string>
     <string name="sessionlist_section_pinned">置顶</string>
     <string name="sessionlist_section_today">今天</string>
@@ -774,19 +705,6 @@
     <string name="characters_import_failed">无法导入该角色卡。</string>
     <string name="characters_export_failed">无法导出该角色。</string>
     <!-- T-export-optimize (b443b54d) — 分批/打包导出进度 + 预览 -->
-    <string name="export_summary_format">导出格式</string>
-    <string name="export_summary_format_value_json">JSON</string>
-    <string name="export_summary_format_value_txt">纯文本</string>
-    <string name="export_summary_messages">选中消息</string>
-    <string name="export_summary_messages_value">%1$d 条</string>
-    <string name="export_summary_timerange">时间范围</string>
-    <string name="export_summary_timerange_value">%1$s — %2$s</string>
-    <string name="export_summary_attachments">附件</string>
-    <string name="export_summary_attachments_value">%1$d 张图片 / %2$d 段视频</string>
-    <string name="export_summary_size">预计大小</string>
-    <string name="export_summary_size_value">约 %1$s</string>
-    <string name="export_progress_running">正在导出 %1$d / %2$d…</string>
-    <string name="export_progress_done">导出完成</string>
     <string name="export_progress_failed">导出失败</string>
     <string name="sessionlist_edit_title_category">编辑标题和分类</string>
     <string name="sessionlist_regenerate_title">重新生成标题</string>
@@ -834,7 +752,6 @@
     <string name="tts_capsule_system_engine">系统 TTS</string>
     <string name="voice_system_tts_subtitle">Android 内置语音合成</string>
     <string name="voice_input_picker_title">语音输入</string>
-    <string name="voice_input_picker_done">完成</string>
     <string name="voice_input_picker_system">系统</string>
     <string name="voice_panel_no_engine_title">当前没有可用的语音识别</string>
     <string name="voice_panel_no_engine_body">语音输入需要一个识别引擎。请开启设备的语音服务，或在 Minis 中配置一个转录服务商。</string>
@@ -872,7 +789,6 @@
     <string name="browser_history_search">搜索历史</string>
     <string name="browser_history_empty_title">没有浏览历史</string>
     <string name="browser_history_empty_subtitle">历史记录保留 7 天</string>
-    <string name="browser_history_results">结果</string>
     <string name="browser_history_clear_dialog_title">清除浏览历史？</string>
     <string name="browser_history_clear_dialog_message">这将删除所有浏览历史。此操作无法撤销。</string>
     <string name="terminal_title">Minis Shell</string>
@@ -1000,14 +916,11 @@
     <string name="modelgroup_text_generation">文本生成</string>
     <string name="common_default">默认</string>
     <!-- [T-android-vision-group / GH#182] Vision Input slot label -->
-    <string name="settings_agent_loop_models">智能体循环模型</string>    <string name="agent_loop_models_add_a_provider_and_refresh_its_model_lis">添加服务商并刷新其模型列表以填充此选择器。</string>
-    <string name="agent_loop_models_selected">已选择</string>
-    <string name="agent_loop_models_not_selected">未选中</string>
+    <string name="settings_agent_loop_models">智能体循环模型</string>
 
     <!-- T172-A parameterized strings -->
     <string name="add_custom_model_id_footer">Model ID 是发送到 %1$s 的 API 标识符。显示名称是模型选择器里更友好的标签；留空时回落到 Model ID。</string>
     <string name="add_custom_model_eg_id_placeholder">例如 gpt-4o-custom</string>
-    <string name="add_provider_built_in_models_count">%1$d 个内置模型</string>
     <string name="add_provider_subtitle_openai">支持 Codex、DeepSeek、Moonshot、Groq 等兼容厂商</string>
     <string name="add_provider_subtitle_anthropic">支持 Claude 及兼容 Anthropic 协议的服务商</string>
     <string name="add_provider_subtitle_gemini">支持 Gemini 系列及 Google AI Studio</string>
@@ -1170,7 +1083,6 @@
     <string name="mount_all_files_access_required_desc">未开启时，shell 只能看到本应用创建的文件——其他应用（如 Obsidian）写入的文件会被隐藏。点此前往系统设置授权。</string>
     <string name="mount_detail_title">编辑挂载</string>
     <string name="mount_detail_browse_files">浏览文件</string>
-    <string name="mount_detail_browse_files_toast">在聊天中通过 @ 提及访问此挂载。</string>
     <string name="mount_detail_name_invalid">挂载名称不能为空，不能包含 \'/\'，也不能是 \'.\' 或 \'..\'</string>
     <string name="mount_path_unavailable">路径不可用</string>
     <string name="mount_add_failed">无法添加挂载，名称可能已被使用或无效。</string>
@@ -1209,10 +1121,8 @@
     <!-- T288 — 日志 / 配置变更 -->
     <string name="logs_tab_config_changes">配置变更</string>
     <string name="logs_config_used_count">%1$d / %2$d 已使用</string>
-    <string name="logs_config_clear_all">清除全部</string>
     <string name="logs_config_empty">暂无配置变更记录。</string>
     <string name="logs_config_status_applied">已应用</string>
-    <string name="logs_config_status_pending">待应用</string>
     <string name="logs_config_status_rejected">已拒绝</string>
     <string name="logs_config_status_timeout">超时</string>
     <string name="logs_config_status_reverted">已撤销</string>
@@ -1257,7 +1167,6 @@
 
     <!-- T-pwa-1: WebApp 快捷方式基础（原 PWA 已重命名） -->
     <string name="webapp_activity_label">Minis 应用</string>
-    <string name="webapp_source_missing">源文件不存在。</string>
     <string name="webapp_external_nav_blocked">已阻止外部跳转。</string>
     <string name="webapp_pin_unsupported">当前桌面不支持创建快捷方式。</string>
     <string name="webapp_pin_failed">添加到桌面失败。</string>
@@ -1286,7 +1195,6 @@
 
     <!-- T-imgsize: composer-side image-budget Snackbar messages -->
     <string name="image_budget_compressed">发送前已压缩 %1$d 张图片</string>
-    <string name="image_budget_dropped">已跳过 %1$d 个超大图片 URL（&gt;5MB）</string>
     <string name="image_budget_total_exceeded">图片总大小超过 25MB，已丢弃后续图片</string>
     <!-- T-request-imgsize: request-level image-budget Snackbar message -->
     <string name="image_budget_request_elided">为适配 25MB 请求预算，已省略 %1$d 张历史图片</string>
@@ -1304,9 +1212,6 @@
     <string name="update_error_forbidden_with_link">访问更新服务器失败，可能是网络限制（GitHub 需要科学上网）。可前往 GitHub Releases 手动下载。</string>
     <string name="update_error_open_releases">打开 GitHub Releases</string>
     <!-- T-android-crash-freq-share -->
-    <string name="crash_freq_dialog_title">检测到多次崩溃</string>
-    <string name="crash_freq_dialog_message">Minis 在过去 1 小时内多次崩溃。是否分享崩溃日志以帮助修复？</string>
-    <string name="crash_freq_dialog_share">分享日志</string>
     <string name="crash_freq_dialog_dismiss">暂不分享</string>
     <string name="crash_safe_mode_restart_needed">Minis 需要重启以完成恢复，请重新点击应用图标。</string>
     <string name="crash_freq_email_subject">Minis 崩溃报告 %1$s</string>
@@ -1317,7 +1222,6 @@
     <string name="crash_freq_pick_section_crashes">最近 24 小时的闪退日志</string>
     <string name="crash_freq_pick_section_logs">最近 3 天的运行日志</string>
     <string name="crash_freq_method_title">分享 %1$d 个文件</string>
-    <string name="crash_freq_method_email">通过邮件发送</string>
     <string name="crash_freq_method_share">分享给…</string>
     <string name="crash_freq_method_save">保存到…</string>
     <string name="crash_freq_zip_failed">打包日志失败：%1$s</string>
@@ -1441,8 +1345,6 @@
     <string name="scheduled_task_delete_title">删除定时任务？</string>
     <string name="scheduled_task_delete_body">将「%1$s」从定时列表中移除。它已经创建的聊天会话会保留。</string>
     <string name="scheduled_task_delete_confirm">删除</string>
-    <string name="scheduled_task_run_now_done">任务已完成</string>
-    <string name="scheduled_task_run_now_done_body">定时任务已运行并生成了回复。</string>
     <string name="scheduled_task_run_now_failed">任务失败</string>
     <string name="scheduled_task_run_now_failed_body">定时任务无法运行。请检查是否已配置服务商。</string>
     <string name="scheduled_task_run_now_open_session">打开会话</string>
@@ -1464,7 +1366,6 @@
     <string name="scheduled_task_rerun_note">从所选消息处重新运行选定的聊天。重新运行时不使用提示词字段。</string>
     <string name="scheduled_task_no_sessions">还没有聊天。</string>
     <string name="scheduled_task_no_messages_in_session">该聊天中没有用户消息。</string>
-    <string name="scheduled_task_no_models">尚未配置模型。</string>
     <string name="scheduled_task_run_now_starting">正在启动任务…</string>
     <string name="scheduled_task_run_now_starting_body">正在派发任务，不会等待其完成。</string>
     <string name="scheduled_task_run_now_started">任务已启动</string>
@@ -1905,7 +1806,6 @@
     <string name="voice_system_online_subtitle">Android 内置，需要联网</string>
     <string name="voice_system_offline_subtitle">Android 内置，离线可用</string>
     <string name="system_permissions_title">系统权限</string>
-    <string name="system_permissions_subtitle">在系统设置中授予的操作系统级权限</string>
     <string name="system_permissions_section_a11y">无障碍</string>
     <string name="system_permissions_a11y_row">Minis 无障碍服务</string>
     <string name="system_permissions_a11y_enabled">已启用 —— android-a11y-cli 可用</string>

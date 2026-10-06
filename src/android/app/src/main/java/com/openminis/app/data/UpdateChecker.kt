@@ -3,7 +3,6 @@ package com.openminis.app.data
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.openminis.app.BuildConfig
@@ -402,16 +401,9 @@ object UpdateChecker {
 
     /**
      * Whether the OS will allow this app to launch a package-installer
-     * intent. On Android 8+ the user must grant "install unknown apps" per
-     * source-app; older releases inherit the system-wide setting.
+     * intent. The user must grant "install unknown apps" per source app.
      */
-    fun canInstall(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.packageManager.canRequestPackageInstalls()
-        } else {
-            true
-        }
-    }
+    fun canInstall(context: Context): Boolean = context.packageManager.canRequestPackageInstalls()
 
     /**
      * Send the user to the system "install unknown apps" preferences page
@@ -419,7 +411,6 @@ object UpdateChecker {
      * returns.
      */
     fun openInstallPermissionSettings(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
             data = Uri.parse("package:${context.packageName}")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

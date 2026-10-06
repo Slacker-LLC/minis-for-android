@@ -51,7 +51,7 @@ fun AboutScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val iconPainter = remember(context) {
-                // painterResource() can't load adaptive-icon XML drawables (mipmap-anydpi-v26),
+                // painterResource() can't load adaptive-icon XML drawables (mipmap-anydpi),
                 // so fetch the launcher icon as a Drawable and convert to a Bitmap.
                 val drawable = context.packageManager.getApplicationIcon(context.packageName)
                 BitmapPainter(drawable.toBitmap(width = 192, height = 192).asImageBitmap())

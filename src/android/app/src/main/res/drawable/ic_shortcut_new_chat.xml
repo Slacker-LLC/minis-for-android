@@ -1,7 +1,7 @@
 <!--
   T-android-shortcut-icons-blank: glyph foreground for the "New Chat"
   app-icon shortcut (Material "chat"). Rendered inside the adaptive
-  shortcut icon (mipmap-anydpi-v26/ic_shortcut_new_chat). Filled with a
+  shortcut icon (mipmap-anydpi/ic_shortcut_new_chat). Filled with a
   fixed @color/shortcut_icon_fg (light/dark variants) instead of a theme
   attribute — shortcut icons are drawn by the launcher process, which
   doesn't resolve the app's ?attr tints, so the prior

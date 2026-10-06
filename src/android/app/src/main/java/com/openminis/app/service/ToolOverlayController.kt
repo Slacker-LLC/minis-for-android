@@ -13,7 +13,6 @@ import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -148,7 +147,7 @@ class ToolOverlayController(private val context: Context) {
         private set
 
     fun hasOverlayPermission(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context)
+        Settings.canDrawOverlays(context)
 
     /**
      * Show or update the overlay. Safe to call repeatedly — content
@@ -227,12 +226,7 @@ class ToolOverlayController(private val context: Context) {
 
     private fun attach() {
         val container = buildView()
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
+        val type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         val params = WindowManager.LayoutParams(
             // [T-android-overlay-fixed-half-width] Pin width to half the
             // screen (floored on tiny screens) so the capsule no longer

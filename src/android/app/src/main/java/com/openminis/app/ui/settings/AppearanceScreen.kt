@@ -373,7 +373,7 @@ fun AppearanceScreen(
         // Grid picker mirrors the iOS Settings → Appearance → App Icon
         // section but uses a 3-column grid layout per spec. Each tile is
         // an adaptive-icon preview (loaded as Bitmap via ResourcesCompat
-        // since painterResource can't decode mipmap-anydpi-v26 XMLs);
+        // since painterResource can't decode mipmap-anydpi XMLs);
         // the currently-selected tile gets a checkmark badge in the
         // top-right corner. Tapping a tile flips the corresponding
         // activity-alias enabled state via PackageManager — the launcher
@@ -413,7 +413,7 @@ fun AppearanceScreen(
                     val isSelected = selectedAppIcon == option.variant
                     val iconPainter: Painter = remember(option.mipmapRes) {
                         // painterResource() can't decode adaptive-icon
-                        // XML drawables (mipmap-anydpi-v26), so rasterize
+                        // XML drawables (mipmap-anydpi), so rasterize
                         // the drawable into a Bitmap first.
                         val drawable = ResourcesCompat.getDrawable(
                             context.resources,

@@ -83,11 +83,7 @@ class AgentForegroundService : Service() {
                 putExtra(EXTRA_TOOL_STATUS, toolStatus)
             }
             lastStartRequestMs = SystemClock.elapsedRealtime()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            context.startForegroundService(intent)
         }
 
         /**
@@ -288,12 +284,7 @@ class AgentForegroundService : Service() {
     }
 
     private fun stopForegroundNow() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(true)
-        }
+        stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
     override fun onDestroy() {
@@ -647,31 +638,29 @@ class AgentForegroundService : Service() {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                getString(R.string.bg_service_channel_name),
-                NotificationManager.IMPORTANCE_LOW,
-            ).apply {
-                description = getString(R.string.bg_service_channel_description)
-                setShowBadge(false)
-            }
-            // [T-bg-overlay phase 2 fix] Higher-importance channel for the
-            // SYSTEM_ALERT_WINDOW permission nudge. IMPORTANCE_DEFAULT
-            // gets a heads-up surface so the user actually sees that the
-            // overlay they enabled needs one more grant.
-            val nudgeChannel = NotificationChannel(
-                OVERLAY_NUDGE_CHANNEL_ID,
-                getString(R.string.bg_overlay_nudge_channel_name),
-                NotificationManager.IMPORTANCE_DEFAULT,
-            ).apply {
-                description = getString(R.string.bg_overlay_nudge_channel_description)
-                setShowBadge(true)
-            }
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
-            manager.createNotificationChannel(nudgeChannel)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            getString(R.string.bg_service_channel_name),
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+            description = getString(R.string.bg_service_channel_description)
+            setShowBadge(false)
         }
+        // [T-bg-overlay phase 2 fix] Higher-importance channel for the
+        // SYSTEM_ALERT_WINDOW permission nudge. IMPORTANCE_DEFAULT
+        // gets a heads-up surface so the user actually sees that the
+        // overlay they enabled needs one more grant.
+        val nudgeChannel = NotificationChannel(
+            OVERLAY_NUDGE_CHANNEL_ID,
+            getString(R.string.bg_overlay_nudge_channel_name),
+            NotificationManager.IMPORTANCE_DEFAULT,
+        ).apply {
+            description = getString(R.string.bg_overlay_nudge_channel_description)
+            setShowBadge(true)
+        }
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(channel)
+        manager.createNotificationChannel(nudgeChannel)
     }
 
     /**
