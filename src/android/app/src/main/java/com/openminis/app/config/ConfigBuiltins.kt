@@ -108,7 +108,7 @@ internal object ConfigBuiltins {
     //
     // Mirrors iOS `session.*` keys in ConfigRegistry+Builtins.swift. The
     // "current session" is whatever ChatScreen is composed with right now,
-    // tracked via `ChatViewModelStore.activeSessionId`. Reads return empty
+    // tracked via `ConfigCallSession.targetSession()`. Reads return empty
     // / writes throw "No active session" when no chat is foregrounded.
 
     private fun registerSession(
@@ -127,7 +127,7 @@ internal object ConfigBuiltins {
                 risk = ConfigRisk.NORMAL,
                 revertable = true,
                 reader = {
-                    val sid = ChatViewModelStore.activeSessionId
+                    val sid = ConfigCallSession.targetSession()
                     if (sid == null) ConfigValue.Null
                     else {
                         val session = runBlocking { chatRepo.dao.getSession(sid) }
@@ -143,7 +143,7 @@ internal object ConfigBuiltins {
                         ?: throw ConfigError.TypeMismatch("string")
                     val level = thinkingLevelFromToken(token)
                         ?: throw ConfigError.InvalidValue("Unknown thinking level: $token")
-                    val sid = ChatViewModelStore.activeSessionId
+                    val sid = ConfigCallSession.targetSession()
                         ?: throw ConfigError.InvalidValue("No active session — open a chat first")
                     runBlocking { chatRepo.dao.updateThinkingOverride(sid, level.name) }
                 },
@@ -158,7 +158,7 @@ internal object ConfigBuiltins {
                 risk = ConfigRisk.SENSITIVE,
                 revertable = true,
                 reader = {
-                    val sid = ChatViewModelStore.activeSessionId
+                    val sid = ConfigCallSession.targetSession()
                     if (sid == null) ConfigValue.Str("")
                     else {
                         val session = runBlocking { chatRepo.dao.getSession(sid) }
@@ -168,7 +168,7 @@ internal object ConfigBuiltins {
                 writer = { v ->
                     val s = (v as? ConfigValue.Str)?.value
                         ?: throw ConfigError.TypeMismatch("string")
-                    val sid = ChatViewModelStore.activeSessionId
+                    val sid = ConfigCallSession.targetSession()
                         ?: throw ConfigError.InvalidValue("No active session — open a chat first")
                     if (s.isEmpty()) {
                         // Clear the binding — follow the Main slot on next load.
@@ -772,7 +772,7 @@ internal object ConfigBuiltins {
                 val sessionScoped = root == "/var/minis/attachments" ||
                     root == "/var/minis/workspace" || root == "/var/minis/offloads"
                 val sid = if (sessionScoped) {
-                    ChatViewModelStore.activeSessionId
+                    ConfigCallSession.targetSession()
                         ?: throw ConfigError.InvalidValue(
                             "no active session — open a chat first, or pass the image inline as a data URI",
                         )
