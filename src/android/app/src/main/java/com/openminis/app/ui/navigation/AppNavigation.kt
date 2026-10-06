@@ -460,46 +460,52 @@ fun AppNavigation(
      // chat so ChatScreen's LaunchedEffect consumes the pending state on
      // first composition — no sessions-list flash, no launch-session
      // preference detour.
-    val htmlShortcut = initialDeepLink as? DeepLinkAction.OpenHtmlPreview
-    // App-icon quick action cold start: mount NavHost directly at a fresh
-    // draft chat, seeding the pending action so ChatScreen consumes it on
-    // its first LaunchedEffect tick. Mirrors the htmlShortcut path —
-    // avoids a sessions-list flash and a duplicate back-stack entry.
-    val quickActionStart: String? = when (initialDeepLink) {
-        is DeepLinkAction.NewVoiceChat -> {
-            DeepLinkCoordinator.setPendingChatAction(
-                DeepLinkCoordinator.ChatAction.START_VOICE,
-            )
-            Routes.chat("__new__${java.util.UUID.randomUUID()}")
+    // Computed once per launch link. The draft chats below get a fresh UUID each time they are built,
+    // and NavHost treats a different start destination as a different graph (it resets the back
+    // stack); this block used to run on every recomposition, e.g. when a share arrived.
+    val startDestination = remember(initialDeepLink) {
+        val htmlShortcut = initialDeepLink as? DeepLinkAction.OpenHtmlPreview
+        // App-icon quick action cold start: mount NavHost directly at a fresh
+        // draft chat, seeding the pending action so ChatScreen consumes it on
+        // its first LaunchedEffect tick. Mirrors the htmlShortcut path —
+        // avoids a sessions-list flash and a duplicate back-stack entry.
+        val quickActionStart: String? = when (initialDeepLink) {
+            is DeepLinkAction.NewVoiceChat -> {
+                DeepLinkCoordinator.setPendingChatAction(
+                    DeepLinkCoordinator.ChatAction.START_VOICE,
+                )
+                Routes.chat("__new__${java.util.UUID.randomUUID()}")
+            }
+            is DeepLinkAction.NewCameraChat -> {
+                DeepLinkCoordinator.setPendingChatAction(
+                    DeepLinkCoordinator.ChatAction.OPEN_CAMERA,
+                )
+                Routes.chat("__new__${java.util.UUID.randomUUID()}")
+            }
+            is DeepLinkAction.NewChat -> Routes.chat("__new__${java.util.UUID.randomUUID()}")
+            else -> null
         }
-        is DeepLinkAction.NewCameraChat -> {
-            DeepLinkCoordinator.setPendingChatAction(
-                DeepLinkCoordinator.ChatAction.OPEN_CAMERA,
-            )
-            Routes.chat("__new__${java.util.UUID.randomUUID()}")
+        val start = when {
+            htmlShortcut != null -> {
+                // Seed coordinator before NavHost composition so ChatScreen sees
+                // the pending state on its very first LaunchedEffect tick.
+                DeepLinkCoordinator.setPendingHtmlPreview(
+                    htmlShortcut.sessionId,
+                    htmlShortcut.resourcePath,
+                    htmlShortcut.title,
+                )
+                Routes.chat(htmlShortcut.sessionId)
+            }
+            quickActionStart != null -> quickActionStart
+            // [T-android-assistant-home] "Open the assistant home on launch" swaps
+            // the list start destination for the home page. Explicit session
+            // targets still win: launch mode 1/2/0 navigates after the graph mounts,
+            // so only the "stay on the list" case (mode 3, or the hang/crash circuit
+            // breaker) is replaced — which is exactly what the user asked for.
+            assistantHomeStartsApp -> Routes.ASSISTANT_HOME
+            else -> Routes.SESSION_LIST
         }
-        is DeepLinkAction.NewChat -> Routes.chat("__new__${java.util.UUID.randomUUID()}")
-        else -> null
-    }
-    val startDestination = when {
-        htmlShortcut != null -> {
-            // Seed coordinator before NavHost composition so ChatScreen sees
-            // the pending state on its very first LaunchedEffect tick.
-            DeepLinkCoordinator.setPendingHtmlPreview(
-                htmlShortcut.sessionId,
-                htmlShortcut.resourcePath,
-                htmlShortcut.title,
-            )
-            Routes.chat(htmlShortcut.sessionId)
-        }
-        quickActionStart != null -> quickActionStart
-        // [T-android-assistant-home] "Open the assistant home on launch" swaps
-        // the list start destination for the home page. Explicit session
-        // targets still win: launch mode 1/2/0 navigates after the graph mounts,
-        // so only the "stay on the list" case (mode 3, or the hang/crash circuit
-        // breaker) is replaced — which is exactly what the user asked for.
-        assistantHomeStartsApp -> Routes.ASSISTANT_HOME
-        else -> Routes.SESSION_LIST
+        start
     }
     NavHost(
         navController = navController,
