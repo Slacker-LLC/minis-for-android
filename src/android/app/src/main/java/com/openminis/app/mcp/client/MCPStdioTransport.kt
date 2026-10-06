@@ -3,6 +3,8 @@ package com.openminis.app.mcp.client
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -76,7 +78,23 @@ class MCPStdioTransport(
         }.apply { isDaemon = true; name = "mcp-stderr-$command" }.start()
     }
 
+    /**
+     * One request on the wire at a time. Sessions of one server share this pipe
+     * and its single stdout reader, so two readers would interleave frames.
+     */
+    private val requestLock = Mutex()
+
+    /**
+     * Writes [frame] and returns the reply that carries the same `id`.
+     * A frame without an `id` is a notification: JSON-RPC defines no reply to it,
+     * so it is written and an empty object comes back without reading anything.
+     * Frames the server sends on its own (notifications, requests) are skipped.
+     */
     suspend fun send(frame: JSONObject): JSONObject = withContext(Dispatchers.IO) {
+        requestLock.withLock { exchange(frame) }
+    }
+
+    private suspend fun exchange(frame: JSONObject): JSONObject {
         val w = writer ?: throw MCPTransportException("stdio transport not started")
         val r = lines ?: throw MCPTransportException("stdio transport not started")
         val p = process ?: throw MCPTransportException("stdio transport process missing")
@@ -92,17 +110,39 @@ class MCPStdioTransport(
             )
         }
 
-        suspendCancellableCoroutine { continuation ->
+        val expectedId = frame.opt("id") ?: return JSONObject()
+
+        return suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { close() }
             Thread {
                 try {
-                    val reply = try {
-                        r.readLine()
-                    } catch (tooLong: MCPTransportException) {
-                        // A server that floods one frame is broken: drop the whole
-                        // transport (kills the process) instead of trying to resync.
-                        close()
-                        throw tooLong
+                    var reply: String?
+                    var parsed: JSONObject? = null
+                    while (true) {
+                        reply = try {
+                            r.readLine()
+                        } catch (tooLong: MCPTransportException) {
+                            // A server that floods one frame is broken: drop the whole
+                            // transport (kills the process) instead of trying to resync.
+                            close()
+                            throw tooLong
+                        }
+                        if (reply == null || !continuation.isActive) break
+                        val candidate = try {
+                            JSONObject(reply)
+                        } catch (t: Throwable) {
+                            continuation.resumeWith(
+                                Result.failure(MCPTransportException("invalid JSON from $command: ${reply.take(120)}")),
+                            )
+                            return@Thread
+                        }
+                        // Our reply, not a notification or a request the server made.
+                        if (candidate.opt("id")?.toString() == expectedId.toString() &&
+                            (candidate.has("result") || candidate.has("error"))
+                        ) {
+                            parsed = candidate
+                            break
+                        }
                     }
                     if (!continuation.isActive) return@Thread
                     if (reply == null) {
@@ -116,15 +156,7 @@ class MCPStdioTransport(
                         )
                         return@Thread
                     }
-                    val parsed = try {
-                        JSONObject(reply)
-                    } catch (t: Throwable) {
-                        continuation.resumeWith(
-                            Result.failure(MCPTransportException("invalid JSON from $command: ${reply.take(120)}")),
-                        )
-                        return@Thread
-                    }
-                    continuation.resumeWith(Result.success(parsed))
+                    continuation.resumeWith(Result.success(parsed!!))
                 } catch (t: Throwable) {
                     if (!continuation.isActive) return@Thread
                     continuation.resumeWith(
