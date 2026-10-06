@@ -2356,4 +2356,7 @@
     <string name="sub_agent_state_failed">Сбой</string>
     <string name="sub_agent_state_timeout">Время вышло</string>
     <string name="sub_agent_state_interrupted">Прерван</string>
+    <string name="restore_stop">Остановить восстановление</string>
+    <string name="restore_stop_title">Остановить восстановление?</string>
+    <string name="restore_stop_message">Уже восстановленные данные сохранятся. Текущая часть будет полностью отменена, поэтому ничего не останется записанным наполовину. Восстановление можно запустить снова позже.</string>
 </resources>

@@ -1,6 +1,7 @@
 package com.openminis.app.backup
 
 import android.content.Context
+import androidx.room.withTransaction
 import com.openminis.app.data.db.AppDatabase
 import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.data.db.CompactMarkerEntity
@@ -11,6 +12,11 @@ import com.openminis.app.data.repository.SkillArchiveReader
 import com.openminis.app.data.repository.SkillRepository
 import com.openminis.app.data.repository.isSafeSkillTransactionId
 import com.openminis.app.logging.AppLogger
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
@@ -204,6 +210,7 @@ class BackupImporter(
             // Order matters: chats writes sessions before the messages that
             // reference them.
             for (category in ORDER.filter { it in wanted }) {
+                currentCoroutineContext().ensureActive()
                 onProgress?.invoke("Restoring ${category.key}…")
                 // The manifest's own count for this category — what the button
                 // needs for the "/ total" half. Absent on an older package, in
@@ -224,6 +231,9 @@ class BackupImporter(
                         BackupCategory.ENVIRONMENT_VARIABLES -> importEnvironmentVariables(work)
                         else -> null
                     }
+                } catch (e: CancellationException) {
+                    // A stop is not a failed category: reporting it as one would carry on with the rest.
+                    throw e
                 } catch (e: Exception) {
                     AppLogger.error(TAG, "[Restore] category ${category.key} failed: ${e.message}")
                     CategoryReport(category.key, failed = e.message ?: e.toString())
@@ -235,6 +245,8 @@ class BackupImporter(
                             BackupCategory.PROVIDERS -> restoreAppSettings(work, report)
                             else -> Unit
                         }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         // The category itself came in; a failing extra must not undo or hide that.
                         AppLogger.error(TAG, "[Restore] extras of ${category.key} failed: ${e.message}")
@@ -358,8 +370,16 @@ class BackupImporter(
         // cannot answer "is every session in the package present in the DB?" —
         // which is exactly the question a message-loss investigation asks.
         var sessionsSeen = 0
+        // Sessions this run created rather than updated. A stop removes the ones still without
+        // messages, so a cancelled restore does not leave a list of empty chats behind.
+        val newlyInsertedSessionIds = mutableSetOf<String>()
+        try {
+        // Each table is written in one transaction: a stop or failure rolls the table back to where
+        // it was instead of leaving it on an arbitrary record.
+        db.withTransaction {
         readJsonl(dataDir, "sessions") { rec ->
             sessionsSeen += 1
+            if (sessionsSeen % 100 == 0) currentCoroutineContext().ensureActive()
             val envelope = rec.obj ?: return@readJsonl
             // [T-android-restore-ios-session-nesting] iOS nests the session
             // under a "session" key, with wrapper fields like memoryEnabled as
@@ -388,7 +408,7 @@ class BackupImporter(
                 restoredSessionIds.add(id)
                 return@readJsonl
             }
-            dao.insertSession(
+            val record =
                 ChatSessionEntity(
                     id = id,
                     title = s.str("title"),
@@ -404,9 +424,21 @@ class BackupImporter(
                     editCount = s.int("editCount") ?: 0,
                     thinkingOverride = s.str("thinkingOverride"),
                     folderId = s.str("folderId"),
+                    // Not carried by the package: keep what this device has.
+                    roleplayJson = existing?.roleplayJson,
+                    sessionOverrides = existing?.sessionOverrides,
+                    botId = existing?.botId,
                 )
-            )
-            if (existing == null) report.imported += 1 else report.updated += 1
+            if (existing == null) {
+                dao.insertSession(record)
+                newlyInsertedSessionIds.add(id)
+                report.imported += 1
+            } else {
+                // Never insertSession here: REPLACE on an existing id cascades to its messages, so
+                // messages that exist only on this device would be deleted by a "merge".
+                dao.updateSession(record)
+                report.updated += 1
+            }
             restoredSessionIds.add(id)
             // [XSessionDiag] Hypothesis 1: a restored session keeps the BACKUP's
             // own updatedAt (incomingUpdated above), not the restore wall clock.
@@ -431,6 +463,7 @@ class BackupImporter(
                 )
             }
         }
+        }
 
         AppLogger.info(
             TAG,
@@ -446,11 +479,21 @@ class BackupImporter(
         // from a few genuinely dangling rows.
         var orphanedMessages = 0
         val orphanSessionIds = mutableSetOf<String>()
+        // Sessions known to exist, so each message does not query its parent again.
+        val knownParents = restoredSessionIds.toMutableSet()
+        suspend fun parentExists(sessionId: String): Boolean =
+            sessionId in knownParents ||
+                (dao.getSession(sessionId) != null).also { if (it) knownParents.add(sessionId) }
+        db.withTransaction {
         readJsonl(dataDir, "messages") { rec ->
             // Every 200 records, not every one: at ~50k messages a per-record
             // StateFlow emit would post more frames than the UI can draw and
-            // the counter would blur rather than inform.
-            if (++seen % 200 == 0) onCount?.invoke(seen)
+            // the counter would blur rather than inform. Cancellation is checked
+            // on the same beat; a stop rolls the whole table back.
+            if (++seen % 200 == 0) {
+                onCount?.invoke(seen)
+                currentCoroutineContext().ensureActive()
+            }
             val m = rec.obj ?: return@readJsonl
             val id = m.str("id")
             val sessionId = m.str("sessionId")
@@ -461,7 +504,7 @@ class BackupImporter(
             // A message whose session was skipped as locally-newer still
             // belongs to a session that exists; one whose session is absent
             // entirely would violate the foreign key.
-            if (dao.getSession(sessionId) == null) {
+            if (!parentExists(sessionId)) {
                 // [T-android-restore-logging] The single most destructive skip
                 // in the importer: it silently discards a message because its
                 // parent session is absent. 356 of 500 sessions restored empty
@@ -501,6 +544,7 @@ class BackupImporter(
             )
             report.imported += 1
         }
+        }
 
         if (orphanedMessages > 0) {
             AppLogger.warning(
@@ -512,11 +556,12 @@ class BackupImporter(
             )
         }
 
+        db.withTransaction {
         readJsonl(dataDir, "compact_markers") { rec ->
             val c = rec.obj ?: return@readJsonl
             val id = c.str("id") ?: return@readJsonl
             val sessionId = c.str("sessionId") ?: return@readJsonl
-            if (dao.getSession(sessionId) == null) {
+            if (!parentExists(sessionId)) {
                 report.skipped += 1
                 return@readJsonl
             }
@@ -540,6 +585,7 @@ class BackupImporter(
                 report.imported += 1
             }.onFailure { report.skipped += 1 }
         }
+        }
 
         // [T-android-restore-preview] Rebuild each restored session's
         // `last_message` from the messages just written.
@@ -562,6 +608,27 @@ class BackupImporter(
             val s = dao.getSession(sid) ?: continue
             dao.updateLastMessage(sid, preview, s.updatedAt)
         }
+        } catch (e: CancellationException) {
+            // The job is already cancelled, so the cleanup's DAO calls must not be.
+            val removed = withContext(NonCancellable) {
+                newlyInsertedSessionIds.count { sid ->
+                    runCatching {
+                        if (dao.messageCountForSession(sid) == 0) {
+                            dao.deleteSession(sid)
+                            true
+                        } else {
+                            false
+                        }
+                    }.getOrDefault(false)
+                }
+            }
+            AppLogger.info(
+                TAG,
+                "[Restore] chats: stopped — removed $removed of ${newlyInsertedSessionIds.size} " +
+                    "newly created session(s) left without messages"
+            )
+            throw e
+        }
 
         // The session file trees. Containment root is the sessions directory:
         // a path in the index that escapes it is refused outright.
@@ -578,6 +645,12 @@ class BackupImporter(
             else File(sessionsRoot, parts.drop(1).joinToString("/"))
         }
         applyFileResult(report, files)
+        // The message transaction can grow the WAL to the size of the restored history; fold it
+        // back into the database. This only costs disk space if it fails, so it must not fail the
+        // restore.
+        runCatching {
+            db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
+        }.onFailure { AppLogger.warning(TAG, "[Restore] WAL checkpoint failed: ${it.message}") }
         return report
     }
 

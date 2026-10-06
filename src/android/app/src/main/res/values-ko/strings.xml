@@ -2128,4 +2128,7 @@
     <string name="sub_agent_state_failed">실패</string>
     <string name="sub_agent_state_timeout">시간 초과</string>
     <string name="sub_agent_state_interrupted">중단됨</string>
+    <string name="restore_stop">복원 중지</string>
+    <string name="restore_stop_title">복원을 중지할까요?</string>
+    <string name="restore_stop_message">이미 복원된 내용은 그대로 남습니다. 진행 중인 부분은 통째로 되돌려지므로 절반만 기록된 데이터가 남지 않습니다. 나중에 다시 복원할 수 있습니다.</string>
 </resources>

@@ -2378,4 +2378,7 @@
     <string name="sub_agent_state_failed">失败</string>
     <string name="sub_agent_state_timeout">超时</string>
     <string name="sub_agent_state_interrupted">已中断</string>
+    <string name="restore_stop">停止恢复</string>
+    <string name="restore_stop_title">停止恢复？</string>
+    <string name="restore_stop_message">已经恢复的内容会保留；正在恢复的部分会整体回滚，不会留下写了一半的数据。之后可以重新恢复。</string>
 </resources>

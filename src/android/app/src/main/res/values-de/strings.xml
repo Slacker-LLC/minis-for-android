@@ -2139,4 +2139,7 @@
     <string name="sub_agent_state_failed">Fehlgeschlagen</string>
     <string name="sub_agent_state_timeout">Zeit abgelaufen</string>
     <string name="sub_agent_state_interrupted">Unterbrochen</string>
+    <string name="restore_stop">Wiederherstellung stoppen</string>
+    <string name="restore_stop_title">Wiederherstellung stoppen?</string>
+    <string name="restore_stop_message">Bereits Wiederhergestelltes bleibt erhalten. Der laufende Teil wird vollständig zurückgesetzt, es bleibt nichts halb geschrieben. Du kannst die Wiederherstellung später erneut starten.</string>
 </resources>
