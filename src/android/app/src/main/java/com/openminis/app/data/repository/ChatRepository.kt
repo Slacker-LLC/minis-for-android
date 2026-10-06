@@ -717,22 +717,39 @@ class ChatRepository(
         // side, so existing callers keep the previous behaviour untouched.
         startMs: Long? = null,
         endMs: Long? = null,
-    ): List<MessagePageItem> {
+    ): List<MessagePageItem> =
+        // --full is a transcript export: every part, tool calls and results whole, in order. The
+        // default page keeps its short projection; see projectForOffload.
+        loadMessagePageWithCursor(sessionId, offset, limit, maxChars, startMs, endMs).items
+
+    /**
+     * One page of [loadMessagePage] plus how many stored rows it covered. Rows with nothing to show are
+     * skipped, so `messages.size` can be smaller than the rows read: a caller paging by offset must
+     * continue from [nextOffset], not from `offset + messages.size`, or it re-reads or stops early.
+     */
+    suspend fun loadMessagePageWithCursor(
+        sessionId: String,
+        offset: Int,
+        limit: Int,
+        maxChars: Int = MESSAGE_TEXT_MAX,
+        startMs: Long? = null,
+        endMs: Long? = null,
+    ): MessagePage {
         val rows = if (startMs == null && endMs == null) {
             dao.loadMessagesPage(sessionId, offset, limit)
         } else {
             dao.loadMessagesPageInRange(sessionId, offset, limit, startMs, endMs)
         }
-        return rows.mapNotNull { e ->
-            val text = extractTextForOffload(e.partsJson)
-            if (text.isBlank()) return@mapNotNull null
+        val full = maxChars >= MESSAGE_TEXT_MAX_FULL
+        val items = rows.mapNotNull { e ->
+            val projected = projectForOffload(e.partsJson, full)
+            if (projected.text.isBlank()) return@mapNotNull null
             MessagePageItem(
-                e.id, e.role, e.createdAt, text.take(maxChars),
-                // Mark messages that exceeded the cap so the caller can emit
-                // "truncated": true (mirrors iOS SessionsOffloadBridge).
-                truncated = text.length > maxChars,
+                e.id, e.role, e.createdAt, projected.text.take(maxChars),
+                truncated = projected.shortened || projected.text.length > maxChars,
             )
         }
+        return MessagePage(items, scannedRows = rows.size, nextOffset = offset + rows.size)
     }
 
     suspend fun messageCount(sessionId: String): Int = dao.messageCountForSession(sessionId)
@@ -769,48 +786,8 @@ class ChatRepository(
      * those collapse markdown for a 100-char single-line preview, while
      * this preserves the full text the offload caller wants to inspect.
      */
-    private fun extractTextForOffload(partsJson: String): String {
-        return try {
-            val arr = org.json.JSONArray(partsJson)
-            val texts = mutableListOf<String>()
-            var hasMedia = false
-            val toolUses = mutableListOf<org.json.JSONObject>()
-            val toolResults = mutableListOf<org.json.JSONObject>()
-            for (i in 0 until arr.length()) {
-                val o = arr.optJSONObject(i) ?: continue
-                when (o.optString("type")) {
-                    "text" -> {
-                        val v = o.optString("value", "")
-                        if (v.isNotBlank()) texts.add(stripSystemReminders(v))
-                    }
-                    "mediaRef" -> hasMedia = true
-                    "toolUse" -> o.optJSONObject("value")?.let { toolUses.add(it) }
-                    "toolResult" -> o.optJSONObject("value")?.let { toolResults.add(it) }
-                }
-            }
-            if (texts.isNotEmpty()) return texts.joinToString("\n")
-            if (hasMedia) return "[Image]"
-            if (toolUses.isNotEmpty()) {
-                return toolUses.joinToString(", ") { tu ->
-                    val title = tu.optString("name", "tool")
-                    val inp = tu.optString("input", "")
-                    val toolTitle = try {
-                        org.json.JSONObject(inp).optString("tool_title", "")
-                    } catch (_: Exception) { "" }
-                    if (toolTitle.isNotBlank()) toolTitle.take(100) else title
-                }
-            }
-            if (toolResults.isNotEmpty()) {
-                return toolResults.joinToString("\n") { tr ->
-                    val output = tr.optString("output", "").take(200)
-                    "[Tool result: $output]"
-                }
-            }
-            ""
-        } catch (_: Exception) {
-            stripSystemReminders(partsJson)
-        }
-    }
+    private fun extractTextForOffload(partsJson: String): String = projectForOffload(partsJson, full = false).text
+
 
     /**
      * Center a snippet of [maxLength] chars on the earliest keyword
@@ -839,6 +816,79 @@ class ChatRepository(
     }
 
     companion object {
+        /**
+         * The text of one stored message for the sessions CLI. [full] renders every part in order — text,
+         * images, each tool call with its input and each tool result with its whole output — for exports;
+         * otherwise the short form below. [OffloadText.shortened] says the short form cut something, so
+         * the page can flag it instead of passing a cut result off as complete.
+         */
+        internal fun projectForOffload(partsJson: String, full: Boolean): OffloadText {
+            if (full) {
+                val arr = runCatching { org.json.JSONArray(partsJson) }.getOrNull()
+                    ?: return OffloadText(stripSystemReminders(partsJson), false)
+                val lines = mutableListOf<String>()
+                for (i in 0 until arr.length()) {
+                    val o = arr.optJSONObject(i) ?: continue
+                    val value = o.optJSONObject("value")
+                    when (o.optString("type")) {
+                        "text" -> o.optString("value", "").takeIf { it.isNotBlank() }?.let { lines += stripSystemReminders(it) }
+                        "mediaRef" -> lines += "[Image]"
+                        "toolUse" -> if (value != null) {
+                            lines += "[Tool call: ${value.optString("name", "tool")}] ${value.optString("input", "")}"
+                        }
+                        "toolResult" -> if (value != null) {
+                            val status = if (value.optBoolean("success", true)) "ok" else "error"
+                            lines += "[Tool result ($status): ${value.optString("output", "")}]"
+                        }
+                    }
+                }
+                return OffloadText(lines.joinToString("\n"), false)
+            }
+            var shortened = false
+            val text = try {
+                val arr = org.json.JSONArray(partsJson)
+                val texts = mutableListOf<String>()
+                var hasMedia = false
+                val toolUses = mutableListOf<org.json.JSONObject>()
+                val toolResults = mutableListOf<org.json.JSONObject>()
+                for (i in 0 until arr.length()) {
+                    val o = arr.optJSONObject(i) ?: continue
+                    when (o.optString("type")) {
+                        "text" -> {
+                            val v = o.optString("value", "")
+                            if (v.isNotBlank()) texts.add(stripSystemReminders(v))
+                        }
+                        "mediaRef" -> hasMedia = true
+                        "toolUse" -> o.optJSONObject("value")?.let { toolUses.add(it) }
+                        "toolResult" -> o.optJSONObject("value")?.let { toolResults.add(it) }
+                    }
+                }
+                when {
+                    texts.isNotEmpty() -> texts.joinToString("\n")
+                    hasMedia -> "[Image]"
+                    toolUses.isNotEmpty() -> {
+                        toolUses.joinToString(", ") { tu ->
+                            val title = tu.optString("name", "tool")
+                            val inp = tu.optString("input", "")
+                            val toolTitle = try {
+                                org.json.JSONObject(inp).optString("tool_title", "")
+                            } catch (_: Exception) { "" }
+                            if (toolTitle.isNotBlank()) toolTitle.take(100) else title
+                        }
+                    }
+                    toolResults.isNotEmpty() -> toolResults.joinToString("\n") { tr ->
+                        val output = tr.optString("output", "")
+                        if (output.length > 200) shortened = true
+                        "[Tool result: ${output.take(200)}]"
+                    }
+                    else -> ""
+                }
+            } catch (_: Exception) {
+                stripSystemReminders(partsJson)
+            }
+            return OffloadText(text, shortened)
+        }
+
         internal fun cleanPreview(raw: String): String {
             return stripSystemReminders(raw)
                 .replace(Regex("[\r\n]+"), " ")      // newlines → space
@@ -966,6 +1016,12 @@ data class MessageSearchMatch(
 
 /** T188: a single message in the paginated transcript returned by
  *  `minis-sessions-cli messages`. */
+/** A message projected for the sessions CLI, and whether the projection cut something. */
+internal data class OffloadText(val text: String, val shortened: Boolean)
+
+/** A page of the sessions CLI's messages and the stored rows it covered. */
+data class MessagePage(val items: List<MessagePageItem>, val scannedRows: Int, val nextOffset: Int)
+
 data class MessagePageItem(
     val messageId: String,
     val role: String,
