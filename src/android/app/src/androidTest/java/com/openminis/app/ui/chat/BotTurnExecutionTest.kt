@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.MinisApp
+import com.openminis.app.agent.AgentTurnHandle
 import com.openminis.app.agent.AgentTurnOutcome
 import com.openminis.app.data.db.AppDatabase
 import com.openminis.app.data.model.*
@@ -102,6 +103,40 @@ class BotTurnExecutionTest {
             val limited = withContext(Dispatchers.Main) { vm.submitPrompt("Limited request") }
             assertEquals(AgentTurnOutcome.NeedsAttention("model_finish_reason:length"),
                 withTimeout(15_000L) { limited.result.await() })
+        }
+    }
+
+    @Test
+    fun retryReportsItsOwnOutcomeNotTheSessionBusyFlag() = runBlocking {
+        withVm { vm, _, provider ->
+            val first = withContext(Dispatchers.Main) { vm.submitPrompt("Retry me") }
+            assertEquals(AgentTurnOutcome.Completed, withTimeout(15_000L) { first.result.await() })
+            val userId = first.userMessageId!!
+
+            // A retry that fails must not read as completed.
+            provider.mode = "error"
+            val failed = AgentTurnHandle()
+            assertTrue(withContext(Dispatchers.Main) { vm.retryFromMessage(userId, failed) })
+            val failure = withTimeout(15_000L) { failed.result.await() }
+            assertTrue(failure.toString(), failure is AgentTurnOutcome.Failed)
+
+            // While another turn runs, a retry is refused and says so at once.
+            provider.mode = "wait"
+            val running = withContext(Dispatchers.Main) { vm.submitPrompt("Keep the session busy") }
+            withTimeout(10_000L) { provider.waiting.await() }
+            val refused = AgentTurnHandle()
+            assertFalse(withContext(Dispatchers.Main) { vm.retryFromMessage(userId, refused) })
+            assertEquals(AgentTurnOutcome.Rejected("session_busy"), withTimeout(1_000L) { refused.result.await() })
+            running.cancel()
+            assertEquals(AgentTurnOutcome.Cancelled, withTimeout(10_000L) { running.result.await() })
+
+            // Cancelling the retry's own handle stops that retry and the stream exits.
+            val cancelled = AgentTurnHandle()
+            assertTrue(withContext(Dispatchers.Main) { vm.retryFromMessage(userId, cancelled) })
+            delay(500)
+            cancelled.cancel()
+            assertEquals(AgentTurnOutcome.Cancelled, withTimeout(10_000L) { cancelled.result.await() })
+            assertTrue(vm.awaitStreamExit(5_000L))
         }
     }
 

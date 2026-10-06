@@ -14,8 +14,10 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * Runs one IMMUTABLE objective through a sequence of FRESH child agents:
  * each round spawns a brand-new session that does not inherit this
- * conversation — only the shared workspace (authoritative state) and the
- * previous round's bounded handoff report. Context cost is therefore
+ * conversation — only the run's state directory and the previous round's
+ * bounded handoff report. Each session has its own /var/minis/workspace, so
+ * the state that crosses rounds lives in /var/minis/shared/ralph/<runId>
+ * (the cross-session shared area), not in a round's workspace. Context cost is therefore
  * bounded by the handoff size per round, not by the accumulated session.
  *
  * Report contract (validated, never silently truncated):
@@ -33,6 +35,7 @@ object RalphTool {
 
     const val DEFAULT_MAX_ROUNDS = 3
     const val MAX_ROUNDS_CEILING = 6
+    private const val GUEST_STATE_ROOT = "/var/minis/shared/ralph"
     private const val MAX_HANDOFF_CHARS = 8192
     private const val MAX_SUMMARY_CHARS = 2000
 
@@ -42,9 +45,10 @@ object RalphTool {
     fun definition(): AgentToolDefinition = AgentToolDefinition(
         name = NAME,
         description = "Run one immutable objective through a sequence of fresh child agents " +
-            "(a ralph loop). Each round spawns a brand-new agent with its own context; the shared " +
-            "workspace is the authoritative state and only the previous round's short handoff " +
-            "report crosses rounds, so even very long explorations cost bounded context. " +
+            "(a ralph loop). Each round spawns a brand-new agent with its own context and workspace; " +
+            "a per-run directory under /var/minis/shared/ralph/ is the authoritative state, and only " +
+            "the previous round's short handoff report crosses rounds, so even very long explorations " +
+            "cost bounded context. " +
             "The objective is immutable: do NOT edit it mid-run; if it changed, stop the loop and " +
             "start a new one. Use for long multi-step investigations that would otherwise flood " +
             "your context (reading many files, debugging across subsystems, big refactors). " +
@@ -84,6 +88,13 @@ object RalphTool {
             ?: return ToolExecutionResult("ralph: app not initialized", false, toolTitle = title)
 
         activeRuns.incrementAndGet()
+        // State that crosses rounds. Every round is a new session with its own workspace, so the only
+        // place a file written in round 1 is visible in round 2 is the cross-session shared area.
+        val runId = java.util.UUID.randomUUID().toString().take(8)
+        val stateDir = "$GUEST_STATE_ROOT/$runId"
+        runCatching {
+            java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostShared, "ralph/$runId").mkdirs()
+        }
         return try {
             var handoff = ""
             for (round in 1..maxRounds) {
@@ -96,6 +107,7 @@ object RalphTool {
                     maxRounds = maxRounds,
                     handoff = handoff,
                     title = title,
+                    stateDir = stateDir,
                 ) ?: return ToolExecutionResult(
                     "ralph: round $round failed with an invalid report (see child session). " +
                         "Rounds: ${round - 1}, objective unchanged.",
@@ -144,6 +156,7 @@ object RalphTool {
         maxRounds: Int,
         handoff: String,
         title: String,
+        stateDir: String,
     ): RalphReport? {
         val childId = AgentRunner.ensureSession(context)
         runCatching {
@@ -151,7 +164,7 @@ object RalphTool {
             app.chatRepository.dao.updateSource(childId, "ralph")
         }
 
-        val prompt = buildRoundPrompt(objective, round, maxRounds, handoff)
+        val prompt = buildRoundPrompt(objective, round, maxRounds, handoff, stateDir)
         val result = AgentRunner.prompt(
             context = context,
             sessionId = childId,
@@ -161,19 +174,27 @@ object RalphTool {
         )
 
         val answer = result.responseText?.trim().orEmpty()
-        if (answer.isEmpty() || result.timedOut || result.status != "completed") {
+        if (answer.isEmpty() || !result.completed) {
             Log.w(TAG, "round $round child did not complete (status=${result.status} timedOut=${result.timedOut})")
             return null
         }
         return parseReport(answer, childId)
     }
 
-    private fun buildRoundPrompt(objective: String, round: Int, maxRounds: Int, handoff: String): String = buildString {
+    private fun buildRoundPrompt(
+        objective: String,
+        round: Int,
+        maxRounds: Int,
+        handoff: String,
+        stateDir: String,
+    ): String = buildString {
         append("You are a fresh agent in round $round/$maxRounds of a ralph loop.\n\n")
         append("IMMUTABLE OBJECTIVE (do not change it; if it is no longer achievable, report blocked):\n")
         append(objective).append("\n\n")
-        append("The shared workspace (/var/minis/workspace) is the authoritative state between rounds. ")
-        append("Anything earlier rounds produced is on disk there — inspect it rather than assuming.\n\n")
+        append("$stateDir is the authoritative state between rounds: keep notes, produced files and ")
+        append("anything the next round needs there. Anything earlier rounds produced is on disk there — ")
+        append("inspect it rather than assuming. Your own /var/minis/workspace is new this round and ")
+        append("is NOT seen by the next round.\n\n")
         if (handoff.isNotBlank()) {
             append("HANDOFF FROM PREVIOUS ROUND (bounded report):\n").append(handoff).append("\n\n")
         }
@@ -188,15 +209,8 @@ object RalphTool {
     }
 
     private fun parseReport(answer: String, childId: String): RalphReport? {
-        // Extract the last JSON object in the reply (the round report).
-        val start = answer.lastIndexOf('{')
-        val end = answer.lastIndexOf('}')
-        if (start < 0 || end <= start) {
-            Log.w(TAG, "round child $childId produced no JSON report")
-            return null
-        }
-        val json = runCatching { JSONObject(answer.substring(start, end + 1)) }.getOrNull()
-            ?: run { Log.w(TAG, "round child $childId produced unparseable JSON"); return null }
+        val json = lastJsonObject(answer)
+            ?: run { Log.w(TAG, "round child $childId produced no parseable JSON report"); return null }
         val status = json.optString("status").trim()
         val summary = json.optString("summary").trim()
         if (status !in setOf("continue", "complete", "blocked") || summary.isEmpty()) {
@@ -216,6 +230,22 @@ object RalphTool {
             return null
         }
         return report
+    }
+
+    /**
+     * The last JSON object in [text] that ends at its last `}`. Tries each `{` from the end, so a brace
+     * inside a string value (`"evidence": "JSON starts with {"`) does not cut the report in half: that
+     * start fails to parse and an earlier one is tried.
+     */
+    internal fun lastJsonObject(text: String): JSONObject? {
+        val end = text.lastIndexOf('}')
+        if (end < 0) return null
+        var start = text.lastIndexOf('{', end)
+        while (start >= 0) {
+            runCatching { JSONObject(text.substring(start, end + 1)) }.getOrNull()?.let { return it }
+            start = text.lastIndexOf('{', start - 1)
+        }
+        return null
     }
 
     private fun reportFrom(handoff: String): RalphReport? {

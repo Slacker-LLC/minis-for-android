@@ -161,7 +161,14 @@ internal object AgentRunner {
         val streamExited: Boolean = true,
         val deletedMessageCount: Int = 0,
         val retriedMessageId: String? = null,
-    )
+    ) {
+        /**
+         * The request ran to completion. Busy, Dropped, Cancelled, NeedsAttention, Error, Timeout and
+         * the not-waited Running/Retrying states are all "not completed"; callers judge success here
+         * rather than comparing [status] strings of their own.
+         */
+        val completed: Boolean get() = status == "Completed" && !timedOut
+    }
 
     data class CompactResult(
         val status: String,

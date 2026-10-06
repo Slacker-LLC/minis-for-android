@@ -155,7 +155,9 @@ object ScheduledAgentRunner {
                 }
             }
             val preview = runPreview(app, result.responseText, tierDenials)
-            val ok = result.status != "Error" && result.status != "Timeout"
+            // Only a run that actually completed is a success: Busy (the session was mid-turn), Dropped,
+            // Cancelled and NeedsAttention did not do the task.
+            val ok = result.completed
             ScheduledTaskManager(app).markFired(task.id, sessionId, preview, ok = ok)
             postCompletionNotification(app, task, sessionId, preview)
             return RunOutcome(sessionId = sessionId)
@@ -175,7 +177,9 @@ object ScheduledAgentRunner {
                 }
             }
             val preview = runPreview(app, result.responseText, tierDenials)
-            val ok = result.status != "Error" && result.status != "Timeout"
+            // Only a run that actually completed is a success: Busy (the session was mid-turn), Dropped,
+            // Cancelled and NeedsAttention did not do the task.
+            val ok = result.completed
             ScheduledTaskManager(app).markFired(task.id, sessionId, preview, ok = ok)
             postCompletionNotification(app, task, sessionId, preview)
         }
