@@ -286,7 +286,7 @@ class ChatRepository(
     }
 
     suspend fun searchSessions(query: String): List<ChatSessionEntity> =
-        dao.searchSessions("%$query%")
+        dao.searchSessions(likeContains(query))
 
     fun observeMessages(sessionId: String): Flow<List<MessageEntity>> =
         dao.observeMessages(sessionId)
@@ -611,10 +611,10 @@ class ChatRepository(
         }
         if (!keywords.isNullOrEmpty()) {
             for (kw in keywords) {
-                val pat = "%$kw%"
+                val pat = likeContains(kw)
                 conditions +=
-                    "(s.title LIKE ? OR EXISTS (SELECT 1 FROM messages m " +
-                    "WHERE m.session_id = s.id AND m.parts_json LIKE ?))"
+                    "(s.title LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM messages m " +
+                    "WHERE m.session_id = s.id AND m.parts_json LIKE ? ESCAPE '\\'))"
                 args += pat
                 args += pat
             }
@@ -674,8 +674,8 @@ class ChatRepository(
         val args = mutableListOf<Any>()
 
         for (kw in keywords) {
-            conditions += "m.parts_json LIKE ?"
-            args += "%$kw%"
+            conditions += "m.parts_json LIKE ? ESCAPE '\\'"
+            args += likeContains(kw)
         }
         if (!sessionIds.isNullOrEmpty()) {
             conditions += "m.session_id IN (${sessionIds.joinToString(",") { "?" }})"
@@ -1047,3 +1047,11 @@ data class MessagePageItem(
     // requested cap and [text] is a prefix. Surfaced as "truncated": true.
     val truncated: Boolean = false,
 )
+
+/**
+ * LIKE pattern matching [text] literally anywhere. `%` and `_` are wildcards in SQL and
+ * binding a parameter does not change that, so they are escaped; every query using this
+ * says `ESCAPE '\'`.
+ */
+internal fun likeContains(text: String): String =
+    "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
