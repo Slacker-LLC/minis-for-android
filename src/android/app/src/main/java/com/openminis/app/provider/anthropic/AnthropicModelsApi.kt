@@ -121,7 +121,12 @@ object AnthropicModelsApi {
                 android.util.Log.i("AnthropicModels", "Parent-path fallback succeeded at level=$idx base=$candidate")
             }
             android.util.Log.d("AnthropicModels", "Response ${response.code}, body length: ${body.length}")
-            return@withContext parseAndCache(body, isCustomEndpoint, context, cacheKey)
+            // The list is cursor-paged. A page that says has_more must be followed, and if the walk
+            // cannot be finished the result is "no list" (the caller keeps its current catalog), not
+            // the first page presented as the whole catalog.
+            val completeBody = collectAllPages(request, client, body)
+                ?: return@withContext emptyList()
+            return@withContext parseAndCache(completeBody, isCustomEndpoint, context, cacheKey)
         }
 
         // All candidate bases failed.
@@ -182,6 +187,52 @@ object AnthropicModelsApi {
      * host-root /v1/models convention to keep deepseek.com/anthropic-style discovery
      * working; those bases never passed through effectiveBaseURL.
      */
+    private const val MAX_PAGES = 20
+
+    internal sealed interface PageNext {
+        data object Done : PageNext
+        data class Next(val url: String) : PageNext
+        /** The page claims more data but gives no cursor to reach it. */
+        data object Broken : PageNext
+    }
+
+    /** What to do after [page] of the model list fetched from [url]. */
+    internal fun pageNext(url: String, page: JSONObject): PageNext {
+        if (!page.optBoolean("has_more", false)) return PageNext.Done
+        val last = page.optString("last_id").ifEmpty { return PageNext.Broken }
+        val httpUrl = url.toHttpUrlOrNull() ?: return PageNext.Broken
+        return PageNext.Next(httpUrl.newBuilder().setQueryParameter("after_id", last).build().toString())
+    }
+
+    /**
+     * The first page's body when there is only one page, otherwise `{"data":[...]}` with every
+     * page's entries; null when the walk could not be completed.
+     */
+    private fun collectAllPages(first: Request, client: okhttp3.OkHttpClient, firstBody: String): String? {
+        val merged = org.json.JSONArray()
+        var body = firstBody
+        var pages = 1
+        while (true) {
+            val json = runCatching { JSONObject(body) }.getOrNull()
+                ?: return if (pages == 1) firstBody else null // unparsable first page: parseAndCache decides
+            json.optJSONArray("data")?.let { arr -> for (i in 0 until arr.length()) merged.put(arr.get(i)) }
+            when (val next = pageNext(first.url.toString(), json)) {
+                PageNext.Done -> return if (pages == 1) firstBody else JSONObject().put("data", merged).toString()
+                PageNext.Broken -> return null
+                is PageNext.Next -> {
+                    if (pages >= MAX_PAGES) return null
+                    val response = try {
+                        client.newCall(first.newBuilder().url(next.url).build()).execute()
+                    } catch (e: Exception) {
+                        return null
+                    }
+                    body = response.use { r -> if (r.isSuccessful) r.body?.string() else null } ?: return null
+                    pages++
+                }
+            }
+        }
+    }
+
     private fun buildURL(baseURL: String?, forceV1Discovery: Boolean = false): String {
         if (baseURL == null) return "https://api.anthropic.com/v1/models?limit=512"
         val base = baseURL.trimEnd('/')
