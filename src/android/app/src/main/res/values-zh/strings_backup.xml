@@ -67,6 +67,7 @@
     <string name="backup_history_included">包含：%1$s</string>
     <string name="backup_history_remove_note">这只会从列表中移除该记录。已保存到目的地的备份文件不会被删除。</string>
     <string name="backup_history_remove_title">删除这条备份记录？</string>
+    <string name="backup_history_delete_incomplete">部分副本未能删除（%1$s），因此保留了记录。请检查这些目的地，或仅移除记录。</string>
     <string name="backup_history_remove_record_only">仅删除记录</string>
     <string name="backup_history_remove_with_files">删除记录和文件</string>
     <string name="backup_history_remove_choice_note">「仅删除记录」只移除此条目，目的地上的备份文件会保留。「删除记录和文件」还会从每个目的地删除该备份包——此操作无法撤销。</string>

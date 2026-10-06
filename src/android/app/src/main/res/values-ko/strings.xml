@@ -623,6 +623,7 @@
     <string name="share_expired_toast">공유한 콘텐츠가 만료되었습니다. 다시 공유해 주세요.</string>
     <string name="share_attach_failed_toast">공유된 파일 일부를 첨부하지 못했습니다. 다시 공유해 주세요.</string>
     <string name="share_overflow_toast">대기 중인 공유 콘텐츠가 너무 많습니다. 일부는 삭제되었으니 채팅을 연 뒤 나머지를 다시 공유해 주세요.</string>
+    <string name="backup_history_delete_incomplete">일부 사본을 삭제하지 못해(%1$s) 기록을 유지했습니다. 해당 저장 위치를 확인하거나 기록만 제거하세요.</string>
     <string name="share_provider_json_message">이 JSON 파일은 내보낸 제공자 구성으로 보입니다. 어떻게 할까요?</string>
     <string name="share_provider_json_import">제공자 가져오기</string>
     <string name="share_provider_json_attach">채팅 첨부 파일로 추가</string>

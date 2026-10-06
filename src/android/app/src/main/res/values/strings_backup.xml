@@ -71,6 +71,7 @@
     <string name="backup_history_included">Included: %1$s</string>
     <string name="backup_history_remove_note">This removes the record from this list. The backup files already saved to your destinations are not deleted.</string>
     <string name="backup_history_remove_title">Delete this backup record?</string>
+    <string name="backup_history_delete_incomplete">Some copies could not be deleted (%1$s), so the record was kept. Check those destinations, or remove the record alone.</string>
     <string name="backup_history_remove_record_only">Delete Record Only</string>
     <string name="backup_history_remove_with_files">Delete Record and Files</string>
     <string name="backup_history_remove_choice_note">“Delete Record Only” removes this entry and leaves the backup files on your destinations. “Delete Record and Files” also deletes the package from each destination — that cannot be undone.</string>
