@@ -57,3 +57,37 @@ class MCPServerManagerTest {
         assertTrue(s.port == MCPServerManager.PORT)
     }
 }
+
+class ManagedTokenRotationScopeTest {
+    private val offered = setOf("a.read", "b.write", "c.confirm")
+    private val default = setOf("a.read", "b.write")
+
+    @Test
+    fun `a rotated token keeps the tools the user narrowed it to`() {
+        assertTrue(
+            MCPServerManager.rotatedScope(setOf("a.read"), offered, default) == setOf("a.read"),
+        )
+    }
+
+    @Test
+    fun `a confirm-level tool the user selected is kept, not dropped for the safe default`() {
+        assertTrue(
+            MCPServerManager.rotatedScope(setOf("a.read", "c.confirm"), offered, default) ==
+                setOf("a.read", "c.confirm"),
+        )
+    }
+
+    @Test
+    fun `tools that are no longer offered fall out of the scope`() {
+        assertTrue(
+            MCPServerManager.rotatedScope(setOf("a.read", "gone.tool"), offered, default) == setOf("a.read"),
+        )
+    }
+
+    @Test
+    fun `a first token or one with nothing left gets the default`() {
+        assertTrue(MCPServerManager.rotatedScope(null, offered, default) == default)
+        assertTrue(MCPServerManager.rotatedScope(emptySet(), offered, default) == default)
+        assertTrue(MCPServerManager.rotatedScope(setOf("gone.tool"), offered, default) == default)
+    }
+}
