@@ -262,6 +262,7 @@ object ScheduledReadOnlyPolicy {
             command == "sort" && args.any {
                 it == "-T" || it.startsWith("-T") || it == "--temporary-directory" || it.startsWith("--temp")
             } -> "sort temporary-directory option is denied"
+            command == "uniq" && uniqPositionals(args) > 1 -> "uniq's second file operand is an output file"
             else -> null
         }
         return if (reason == null) {
@@ -269,6 +270,23 @@ object ScheduledReadOnlyPolicy {
         } else {
             SegmentEvaluation(SegmentDecision(sanitizeSummary(parsed.source), allowed = false, reason), emptyList())
         }
+    }
+
+    /** File operands of `uniq [option]... [input [output]]`; the value after -f/-s/-w is not one. */
+    private fun uniqPositionals(args: List<String>): Int {
+        var count = 0
+        var skipValue = false
+        var optionsEnded = false
+        for (arg in args) {
+            when {
+                skipValue -> skipValue = false
+                !optionsEnded && arg == "--" -> optionsEnded = true
+                !optionsEnded && (arg == "-f" || arg == "-s" || arg == "-w") -> skipValue = true
+                !optionsEnded && arg.startsWith("-") && arg != "-" -> Unit
+                else -> count++
+            }
+        }
+        return count
     }
 
     private fun gitDenial(args: List<String>): String? {
