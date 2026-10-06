@@ -16,7 +16,7 @@ import org.junit.Test
  */
 class AutoGroupPromptSafetyTest {
 
-    private fun safe(s: String, max: Int = 40) = ChatViewModel.promptSafe(s, max)
+    private fun safe(s: String, max: Int = 40) = SessionTitleGenerator.promptSafe(s, max)
 
     @Test
     fun `ordinary names pass through unchanged`() {
