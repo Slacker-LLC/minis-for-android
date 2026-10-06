@@ -179,22 +179,20 @@ class SessionsOffloadHandler(
         val endMs = parseEndDate(args.get("end"))
 
         val (page, total) = runBlocking {
-            // Single coroutine block so the two reads see a consistent
-            // snapshot — ordering matters less than ensuring we don't
-            // surface a `total` that disagrees with the slice we
-            // returned (e.g. another session interleaving inserts mid-
-            // call). Room serializes via the suspending dispatcher so
-            // these run sequentially in the same coroutine.
+            // Two sequential reads, not a snapshot: a message appended in between
+            // (the exporting turn itself appends to this session) can make
+            // `total` one larger than the slice suggests. Paging is therefore
+            // by next_offset, which counts the stored rows this page read.
             // Both reads take the SAME date range on purpose: an unfiltered
             // count next to a filtered page would make `total` describe the
             // whole session while the slice covers only the matches, so
             // `hasMore` would lie. iOS 8f3189a73 calls this out explicitly.
-            repo.loadMessagePage(sessionId, offset, limit, maxChars, startMs, endMs) to
+            repo.loadMessagePageWithCursor(sessionId, offset, limit, maxChars, startMs, endMs) to
                 repo.messageCountInRange(sessionId, startMs, endMs)
         }
 
         val msgs = JSONArray()
-        for (m in page) {
+        for (m in page.items) {
             val obj = JSONObject()
                 .put("message_id", m.messageId)
                 .put("role", m.role)
@@ -211,8 +209,13 @@ class SessionsOffloadHandler(
             .put("limit", limit)
             .put("full", full)
             .put("max_chars", maxChars)
+            // total and offsets count stored rows; rows with nothing to show are skipped, so `count`
+            // can be below the rows read. Page on with next_offset, and stop when it reaches total.
             .put("total", total)
             .put("count", msgs.length())
+            .put("scanned", page.scannedRows)
+            .put("next_offset", page.nextOffset)
+            .put("has_more", page.nextOffset < total)
             .put("messages", msgs)
         return emit("messages", data, args)
     }
@@ -314,8 +317,11 @@ OPTIONS:
   --keywords <words>    Space-separated keywords (AND logic, required for search)
   --ids <id1,id2,...>   Filter by comma-separated session IDs (list/search)
   --id <session_id>     Session ID to read messages from (messages)
-  --full                (messages only) Return full message text up to 50000 chars
-  --offset <n>          Skip first n messages, 0-based (default: 0)
+  --full                (messages only) Full transcript: text, tool calls with their input and
+                        tool results, up to 50000 chars per message ("truncated": true past that)
+  --offset <n>          Skip first n stored messages, 0-based (default: 0). Continue from the
+                        reply's next_offset: rows with no visible text are skipped, so "count"
+                        can be below the rows read
   --start <YYYY-MM-DD>  Filter results after this date (inclusive)
   --end <YYYY-MM-DD>    Filter results before this date (inclusive, end of day)
   --limit <n>           Max results (default: 50, max: 100)
