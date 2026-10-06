@@ -1,7 +1,5 @@
 package com.openminis.app.tools
 
-import kotlin.math.abs
-
 /**
  * [T-eta-xposed-groups] Pulling a verification code out of a message body - and nothing else.
  *
@@ -32,12 +30,23 @@ object SmsCodeExtractionPolicy {
     fun clampMaxAgeMinutes(requested: Int?): Int =
         (requested ?: DEFAULT_MAX_AGE_MINUTES).coerceIn(MIN_MAX_AGE_MINUTES, MAX_MAX_AGE_MINUTES)
 
-    /** The code nearest the word that names it, or null when the message is not one of these. */
+    /**
+     * The code the message names, or null when it is not one of these.
+     *
+     * A code follows the word that names it ("验证码为 123456", "verification code: 4321"), so the
+     * nearest run AFTER the word wins, measured from the end of the word to the start of the run (not
+     * start to start: a long keyword pushes its own code further away than an amount written just
+     * before it). Only a message with nothing after the word falls back to the nearest run before it
+     * ("123456 is your verification code").
+     */
     fun codeIn(body: String): String? {
-        val contextMatch = OTP_CONTEXT.find(body) ?: return null
-        return OTP.findAll(body)
-            .minByOrNull { match -> abs(match.range.first - contextMatch.range.first) }
-            ?.groupValues
-            ?.get(1)
+        val context = OTP_CONTEXT.find(body) ?: return null
+        val runs = OTP.findAll(body).toList()
+        val after = runs.filter { it.range.first > context.range.last }
+            .minByOrNull { it.range.first - context.range.last }
+        val chosen = after
+            ?: runs.filter { it.range.last < context.range.first }
+                .minByOrNull { context.range.first - it.range.last }
+        return chosen?.groupValues?.get(1)
     }
 }

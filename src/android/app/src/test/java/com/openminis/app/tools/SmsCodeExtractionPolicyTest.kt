@@ -60,4 +60,26 @@ class SmsCodeExtractionPolicyTest {
         assertEquals(60, SmsCodeExtractionPolicy.clampMaxAgeMinutes(60))
         assertEquals(1_440, SmsCodeExtractionPolicy.clampMaxAgeMinutes(100_000))
     }
+
+    @Test
+    fun `an amount written just before the keyword does not beat the code after it`() {
+        // Start-to-start distance picked 1000 here (4 vs 5): the long keyword pushed its own code away.
+        assertEquals("123456", SmsCodeExtractionPolicy.codeIn("金额1000验证码为：123456"))
+        assertEquals(
+            "678901",
+            SmsCodeExtractionPolicy.codeIn("Order 12345 verification code 678901"),
+        )
+        assertEquals("246810", SmsCodeExtractionPolicy.codeIn("转账8888元，您的一次性密码 246810"))
+    }
+
+    @Test
+    fun `a code written before its keyword is still found when nothing follows`() {
+        assertEquals("123456", SmsCodeExtractionPolicy.codeIn("123456 is your verification code"))
+        assertEquals("4829", SmsCodeExtractionPolicy.codeIn("4829（验证码）"))
+    }
+
+    @Test
+    fun `runs after the keyword are preferred and the nearest of them wins`() {
+        assertEquals("1111", SmsCodeExtractionPolicy.codeIn("9999 验证码 1111 订单 2222"))
+    }
 }
