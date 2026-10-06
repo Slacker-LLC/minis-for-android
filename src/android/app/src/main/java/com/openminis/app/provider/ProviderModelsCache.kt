@@ -2,12 +2,12 @@ package com.openminis.app.provider
 
 import android.content.Context
 import com.openminis.app.data.model.LLMModel
+import com.openminis.app.util.Sha256
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.security.MessageDigest
 
 /**
  * Per-provider disk cache for `/v1/models`-style responses, keyed by a
@@ -31,10 +31,7 @@ internal class ProviderModelsCache(
         File(context.cacheDir, "models-cache/$namespace").apply { mkdirs() }
 
     private fun keyFile(context: Context, cacheKey: String): File {
-        val digest = MessageDigest.getInstance("SHA-256")
-            .digest(cacheKey.toByteArray(Charsets.UTF_8))
-        val hex = digest.joinToString("") { "%02x".format(it) }
-        return File(cacheDir(context), "$hex.json")
+        return File(cacheDir(context), "${Sha256.hex(cacheKey)}.json")
     }
 
     fun load(context: Context, cacheKey: String): List<LLMModel>? {

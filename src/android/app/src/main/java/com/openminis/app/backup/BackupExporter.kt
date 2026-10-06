@@ -7,6 +7,7 @@ import com.openminis.app.data.db.CompactMarkerEntity
 import com.openminis.app.data.db.FolderEntity
 import com.openminis.app.data.db.MessageEntity
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.util.Sha256
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonElement
@@ -792,7 +793,7 @@ class BackupExporter(
             .filter { it.isFile && it.name != "manifest.json" } // can't hash itself
             .associate { file ->
                 file.relativeTo(base).path.replace(File.separatorChar, '/') to
-                    BackupBlobStore.sha256OfFile(file)
+                    Sha256.hex(file)
             }
 
         return BackupManifest(

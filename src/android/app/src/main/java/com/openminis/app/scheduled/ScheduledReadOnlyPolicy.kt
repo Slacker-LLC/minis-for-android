@@ -1,5 +1,6 @@
 package com.openminis.app.scheduled
 
+import com.openminis.app.util.shellQuote
 import org.json.JSONObject
 import java.nio.file.InvalidPathException
 import java.nio.file.Paths
@@ -394,8 +395,6 @@ object ScheduledReadOnlyPolicy {
             null
         }
     }
-
-    private fun shellQuote(value: String): String = "'${value.replace("'", "'\"'\"'")}'"
 
     private fun temporaryRoots(): List<String> = listOf(TEMP_DIRECTORY, GUEST_TEMP_ALIAS)
 }

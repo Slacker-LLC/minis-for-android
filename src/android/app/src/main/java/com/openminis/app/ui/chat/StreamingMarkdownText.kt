@@ -108,6 +108,7 @@ import com.openminis.app.ui.DisplayBitmapLimits.limitDisplaySize
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.util.Sha256
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -2454,9 +2455,7 @@ private fun stageGuestMedia(context: Context, linuxPath: String, sessionId: Stri
         return null
     }
     val fileName = linuxPath.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
-    val digest = java.security.MessageDigest.getInstance("SHA-256")
-        .digest("${sessionId.orEmpty()}:$linuxPath".toByteArray(Charsets.UTF_8))
-        .joinToString("") { "%02x".format(java.util.Locale.US, it) }
+    val digest = Sha256.hex("${sessionId.orEmpty()}:$linuxPath")
     val cacheFile = File(File(context.cacheDir, "markdown-media"), "$digest-$fileName")
     return runCatching {
         WorkspaceFileClient.readToFileBlocking(sessionId.orEmpty(), linuxPath, cacheFile)

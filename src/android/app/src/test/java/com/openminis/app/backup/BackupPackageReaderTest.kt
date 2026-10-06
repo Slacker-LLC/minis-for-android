@@ -1,5 +1,6 @@
 package com.openminis.app.backup
 
+import com.openminis.app.util.Sha256
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -55,7 +56,7 @@ class BackupPackageReaderTest {
         File(root, "data").mkdirs()
         File(root, "data/good.jsonl").writeText("good")
         File(root, "data/bad.jsonl").writeText("tampered")
-        val goodSha = BackupBlobStore.sha256OfFile(File(root, "data/good.jsonl"))
+        val goodSha = Sha256.hex(File(root, "data/good.jsonl"))
 
         writeManifest(
             """

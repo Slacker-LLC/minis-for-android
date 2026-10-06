@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.openminis.app.BuildConfig
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.util.Sha256
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -377,7 +378,7 @@ object UpdateChecker {
             // returns from "install unknown apps" settings) can resume the
             // install without re-downloading. sha256 computed best-effort;
             // verify() falls back to size-only when null.
-            val sha = runCatching { PendingUpdateStore.sha256(outFile) }
+            val sha = runCatching { Sha256.hex(outFile) }
                 .onFailure { AppLogger.warning(TAG, "sha256 compute failed: ${it.message}") }
                 .getOrNull()
             if (versionName != null) {

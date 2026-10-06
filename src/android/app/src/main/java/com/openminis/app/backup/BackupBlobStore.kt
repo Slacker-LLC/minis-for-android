@@ -1,9 +1,8 @@
 package com.openminis.app.backup
 
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.util.Sha256
 import java.io.File
-import java.io.InputStream
-import java.security.MessageDigest
 
 /**
  * Content-addressed blob writer for the staging directory (§2), mirroring
@@ -122,7 +121,7 @@ class BackupBlobStore(stagingRoot: File, private val maxFileBytes: Long?) {
             return Outcome.SkippedTooLarge(size)
         }
 
-        val digest = file.inputStream().use { sha256(it) }
+        val digest = Sha256.hex(file)
         if (digest in seen) return Outcome.Duplicate(digest, size)
 
         val dest = blobFile(digest)
@@ -148,7 +147,7 @@ class BackupBlobStore(stagingRoot: File, private val maxFileBytes: Long?) {
             skippedPaths.add(SkippedPath(logicalPath, size))
             return Outcome.SkippedTooLarge(size)
         }
-        val digest = MessageDigest.getInstance("SHA-256").digest(data).toHex()
+        val digest = Sha256.hex(data)
         if (digest in seen) return Outcome.Duplicate(digest, size)
 
         val dest = blobFile(digest)
@@ -165,26 +164,6 @@ class BackupBlobStore(stagingRoot: File, private val maxFileBytes: Long?) {
 
     companion object {
         private const val TAG = "Backup"
-
-        /**
-         * Streaming SHA-256 — never loads the file into memory. Media offloads
-         * run to hundreds of MB, so this reads in 1MB chunks regardless of size.
-         */
-        fun sha256(input: InputStream): String {
-            val digest = MessageDigest.getInstance("SHA-256")
-            val buf = ByteArray(1024 * 1024)
-            while (true) {
-                val n = input.read(buf)
-                if (n < 0) break
-                digest.update(buf, 0, n)
-            }
-            return digest.digest().toHex()
-        }
-
-        fun sha256OfFile(file: File): String = file.inputStream().buffered().use { sha256(it) }
-
-        private fun ByteArray.toHex(): String =
-            joinToString("") { "%02x".format(it) }
 
         fun mimeType(path: String): String? =
             when (path.substringAfterLast('.', "").lowercase()) {

@@ -49,6 +49,7 @@ import com.openminis.app.provider.openai.OpenAIModelsApi
 import com.openminis.app.provider.openrouter.OpenRouterModelsApi
 import com.openminis.app.scheduled.ScheduledTaskManager
 import com.openminis.app.scheduled.ScheduledTaskBindingUpdate
+import com.openminis.app.util.Sha256
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.async
@@ -604,16 +605,7 @@ class ProviderRepository(private val context: Context) {
      * marker. SHA-256 hex so collisions are negligible. Returns null only
      * if [str] is null (caller normalizes).
      */
-    private fun hashJsonMirror(str: String): String {
-        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(str.toByteArray())
-        return buildString(digest.size * 2) {
-            for (b in digest) {
-                val v = b.toInt() and 0xFF
-                append(Character.forDigit(v shr 4, 16))
-                append(Character.forDigit(v and 0xF, 16))
-            }
-        }
-    }
+    private fun hashJsonMirror(str: String): String = Sha256.hex(str)
 
     /**
      * Atomically persist [config] to (DB) + (legacy JSON mirror), with

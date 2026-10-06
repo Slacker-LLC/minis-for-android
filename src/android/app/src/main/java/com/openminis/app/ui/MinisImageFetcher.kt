@@ -9,6 +9,7 @@ import coil.fetch.SourceResult
 import coil.key.Keyer
 import coil.request.Options
 import com.openminis.app.runtime.files.WorkspaceFileClient
+import com.openminis.app.util.Sha256
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import okio.buffer
@@ -42,9 +43,7 @@ class MinisImageFetcher(
             throw IllegalArgumentException("Session-scoped minis URI requires a session context: $linuxPath")
         }
         val fileName = linuxPath.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-            .digest(linuxPath.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(java.util.Locale.US, it) }
+        val digest = Sha256.hex(linuxPath)
         val cacheFile = File(File(options.context.cacheDir, "minis-image-cache"), "$digest-$fileName")
         WorkspaceFileClient.readToFile("", linuxPath, cacheFile)
 

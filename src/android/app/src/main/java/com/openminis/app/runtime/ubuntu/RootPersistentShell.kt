@@ -1,6 +1,7 @@
 package com.openminis.app.runtime.ubuntu
 
 import android.util.Log
+import com.openminis.app.util.shellQuote
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -151,7 +152,7 @@ internal class RootPersistentShell(private val sessionId: String) {
         }
         for ((key, value) in environment) {
             if (!validName.matches(key)) continue
-            commands += "export $key=${DirectRootRunner.shellQuote(value)}"
+            commands += "export $key=${shellQuote(value)}"
         }
         if (commands.isNotEmpty()) {
             val result = executeCommand(commands.joinToString("\n"), timeoutMs = 30_000L)

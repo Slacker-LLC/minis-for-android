@@ -1,5 +1,6 @@
 package com.openminis.app.data.model
 
+import com.openminis.app.util.Sha256
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -57,10 +58,7 @@ data class AgentToolDefinition(
      * Names that sanitize to punctuation only (`。。。` → `___`) are legal but carry
      * nothing to tell two tools apart, so they get the digest instead of the underscores.
      */
-    private fun nameDigest(): String = java.security.MessageDigest.getInstance("SHA-256")
-        .digest(name.toByteArray(Charsets.UTF_8))
-        .take(4)
-        .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+    private fun nameDigest(): String = Sha256.hex(name).take(DIGEST_CHARS)
 
     /** True when [candidate] matches canonical name, wire apiName, or normalized alphanumeric name. */
     fun matchesName(candidate: String): Boolean {

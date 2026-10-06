@@ -1,8 +1,8 @@
 package com.openminis.app.tools.android
 
+import com.openminis.app.util.Sha256
 import org.json.JSONArray
 import org.json.JSONObject
-import java.security.MessageDigest
 
 /** A short-lived target on one virtual display. Coordinates are display-local pixels. */
 internal data class VirtualScreenTarget(
@@ -238,9 +238,7 @@ internal object VirtualScreenObservationRegistry {
 
     internal fun fingerprint(parsed: JSONObject): String = digest(parsed.toString())
 
-    private fun digest(value: String): String = MessageDigest.getInstance("SHA-256")
-        .digest(value.toByteArray(Charsets.UTF_8))
-        .joinToString("") { "%02x".format(it) }
+    private fun digest(value: String): String = Sha256.hex(value)
 
     private fun isScanTruncated(json: JSONObject): Boolean {
         if (json.optBoolean("truncated")) return true

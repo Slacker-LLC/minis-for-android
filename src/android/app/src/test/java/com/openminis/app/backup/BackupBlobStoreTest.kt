@@ -1,5 +1,6 @@
 package com.openminis.app.backup
 
+import com.openminis.app.util.Sha256
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -151,7 +152,7 @@ class BackupBlobStoreTest {
         val f = file("abc.txt", "abc".toByteArray())
         assertEquals(
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-            BackupBlobStore.sha256OfFile(f),
+            Sha256.hex(f),
         )
     }
 }

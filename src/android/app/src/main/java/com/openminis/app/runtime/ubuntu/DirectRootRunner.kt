@@ -1,5 +1,6 @@
 package com.openminis.app.runtime.ubuntu
 
+import com.openminis.app.util.shellQuote
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -258,9 +259,6 @@ internal object DirectRootRunner {
             // Best-effort fallback when Root group cleanup could not complete.
         }
     }
-
-    fun shellQuote(value: String): String =
-        "'" + value.replace("'", "'\"'\"'") + "'"
 
     private class BoundedText(private val maxChars: Int) {
         private val text = StringBuilder()

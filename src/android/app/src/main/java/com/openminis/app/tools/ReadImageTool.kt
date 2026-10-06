@@ -11,11 +11,11 @@ import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.runtime.files.WorkspaceFileClient
+import com.openminis.app.util.Sha256
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
-import java.security.MessageDigest
 
 object ReadImageTool {
     const val NAME = "read_image"
@@ -78,9 +78,7 @@ object ReadImageTool {
             // resolver. A cache copy is used when a local path is required by
             // BitmapFactory or by the UI; it is never a path into rootfs/SAF.
             val imageFile = context?.let { ctx ->
-                val digest = MessageDigest.getInstance("SHA-256")
-                    .digest("$accessSession\u0000$path".toByteArray(Charsets.UTF_8))
-                    .joinToString("") { "%02x".format(it) }
+                val digest = Sha256.hex("$accessSession\u0000$path")
                 File(File(ctx.applicationContext.cacheDir, "minis-image-cache"), "read-$digest.img")
             }
             if (mediaUri != null) {

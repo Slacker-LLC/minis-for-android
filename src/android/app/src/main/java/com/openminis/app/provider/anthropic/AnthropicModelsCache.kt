@@ -2,12 +2,12 @@ package com.openminis.app.provider.anthropic
 
 import android.content.Context
 import com.openminis.app.data.model.LLMModel
+import com.openminis.app.util.Sha256
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.security.MessageDigest
 
 /**
  * On-disk cache for `/v1/models` results, keyed by a SHA-256 hash of the
@@ -26,10 +26,7 @@ internal object AnthropicModelsCache {
         File(context.cacheDir, "models-cache").apply { mkdirs() }
 
     private fun keyFile(context: Context, credential: String): File {
-        val digest = MessageDigest.getInstance("SHA-256")
-            .digest(credential.toByteArray(Charsets.UTF_8))
-        val hex = digest.joinToString("") { "%02x".format(it) }
-        return File(cacheDir(context), "$hex.json")
+        return File(cacheDir(context), "${Sha256.hex(credential)}.json")
     }
 
     /** Load cached models if the entry is fresh (<7d). Returns null otherwise. */

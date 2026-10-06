@@ -1,6 +1,6 @@
 package com.openminis.app.data.repository
 
-import java.security.MessageDigest
+import com.openminis.app.util.Sha256
 
 /**
  * Injection budget for persistent memory, ported from Eta's
@@ -30,9 +30,7 @@ internal object MemoryInjectionBudget {
      *  SHA-256 over the exact injected text. The injected fragment carries it so
      *  the model can tell "same memory, same bytes" from "the file changed",
      *  and so an unchanged file keeps the prompt cache prefix byte-stable. */
-    fun revision(content: String): String = MessageDigest.getInstance("SHA-256")
-        .digest(content.toByteArray(Charsets.UTF_8))
-        .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    fun revision(content: String): String = Sha256.hex(content)
 
     /** Markdown headings of [content], capped, so a trimmed file still shows
      *  its shape. Empty when the file has no headings. */

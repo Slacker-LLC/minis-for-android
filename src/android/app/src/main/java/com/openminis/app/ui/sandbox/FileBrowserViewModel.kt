@@ -5,6 +5,7 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.openminis.app.runtime.files.WorkspaceFileClient
+import com.openminis.app.util.Sha256
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +18,6 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import java.security.MessageDigest
 
 /** Mirrors iOS FileSortKey. */
 enum class FileSortKey { NAME, MODIFIED, SIZE, KIND }
@@ -549,9 +549,7 @@ class FileBrowserViewModel(
 
     private fun guestCacheFile(path: String, name: String): File {
         val cacheRoot = appContext?.cacheDir ?: rootPath
-        val digest = MessageDigest.getInstance("SHA-256")
-            .digest("${guestSessionId.orEmpty()}:$path".toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(Locale.US, it) }
+        val digest = Sha256.hex("${guestSessionId.orEmpty()}:$path")
         val safeName = name.replace(Regex("[^A-Za-z0-9._-]"), "_")
         return File(File(cacheRoot, "guest-file-browser"), "$digest-$safeName")
     }
