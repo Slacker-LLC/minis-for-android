@@ -3331,7 +3331,12 @@ class ChatViewModel(
                         append(role).append(": ").append(part.text.take(500)).append('\n')
                     }
                     is AgentContentPart.ToolUse -> {
-                        val preview = part.input.toString().take(200)
+                        // The summary is persisted, so a sensitive call contributes its name only.
+                        val preview = if (ToolSensitivePolicy.isSensitive(part.name)) {
+                            ToolSensitivePolicy.ARGUMENTS_PLACEHOLDER
+                        } else {
+                            part.input.toString().take(200)
+                        }
                         append(role).append(" [tool:").append(part.name).append("]: ")
                             .append(preview).append('\n')
                     }
@@ -3341,8 +3346,11 @@ class ChatViewModel(
                         // a plain 500-char head cut drops. prune() returns null under
                         // its threshold, so the preview budget below still applies to
                         // every smaller result.
-                        val preview = ToolResultPruner.prune(part.content)
-                            ?: part.content.take(500)
+                        val preview = if (ToolSensitivePolicy.isSensitive(part.name)) {
+                            ToolSensitivePolicy.RESULT_PLACEHOLDER
+                        } else {
+                            ToolResultPruner.prune(part.content) ?: part.content.take(500)
+                        }
                         append(role).append(" [result:").append(part.name).append("]: ")
                             .append(preview).append('\n')
                     }
@@ -9492,9 +9500,12 @@ class ChatViewModel(
                 // [C6-android-model-failure-discipline] From here on this round has
                 // produced a side effect: a later failure is terminal.
                 roundToolExecuted = true
-                android.util.Log.d("ToolChain[VM]", "[turn=$turn] executeTool START name=$name args=${argsStr.take(200)}")
+                // logcat can be captured to disk by the diagnostics logger, so a sensitive tool's
+                // arguments and output are not written here (see ToolSensitivePolicy).
+                val sensitiveTool = ToolSensitivePolicy.isSensitive(name)
+                android.util.Log.d("ToolChain[VM]", "[turn=$turn] executeTool START name=$name args=${if (sensitiveTool) "[redacted]" else argsStr.take(200)}")
                 val result = executeTool(name, argsStr, id, allToolBlocks, assistantId, accumulatedText)
-                android.util.Log.d("ToolChain[VM]", "[turn=$turn] executeTool END name=$name success=${result.success} title=${result.toolTitle} outputLen=${result.output.length} output=${result.output.take(200)}")
+                android.util.Log.d("ToolChain[VM]", "[turn=$turn] executeTool END name=$name success=${result.success} title=${result.toolTitle} outputLen=${result.output.length} output=${if (sensitiveTool) "[redacted]" else result.output.take(200)}")
 
                 // Record post-execution. WARNING text is appended to the tool
                 // result so the model sees it on its next turn. No block here —

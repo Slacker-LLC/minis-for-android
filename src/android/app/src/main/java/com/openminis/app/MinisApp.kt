@@ -449,6 +449,8 @@ class MinisApp : Application(), ImageLoaderFactory {
                 applicationContext,
                 sessionId,
             )
+            // The session's execution-intent sidecar lives outside the session tree.
+            com.openminis.app.tools.ToolCheckpointStore.clearSession(applicationContext, sessionId)
         }
         // DSH-style append-only session events use the same database as chat
         // snapshots. The hub performs writes asynchronously, so raw model
