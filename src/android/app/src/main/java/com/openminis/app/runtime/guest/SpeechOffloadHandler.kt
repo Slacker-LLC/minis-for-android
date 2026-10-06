@@ -155,8 +155,10 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
         val lang = args.get("language")
         val maxResults = args.getInt("max") ?: 3
         val durationSec = args.getInt("duration") ?: args.getInt("timeout") ?: 30
-        val text = recognize(lang, maxResults, durationSec.toLong())
-        return NativeOffloadResult(0, OffloadOutput.formatBody(text, args) + "\n")
+        val (text, succeeded) = recognize(lang, maxResults, durationSec.toLong())
+        // A recognizer that could not be created, reported an error or timed out is a failed call,
+        // not a transcript: a shell `&&` chain must not carry on as if it had succeeded.
+        return NativeOffloadResult(if (succeeded) 0 else 1, OffloadOutput.formatBody(text, args) + "\n")
     }
 
     /**
@@ -288,9 +290,14 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
         return null
     }
 
-    private fun recognize(language: String?, maxResults: Int, timeoutSec: Long): String {
+    /** The JSON body and whether it is a transcript (true) or an error (false). */
+    private fun recognize(language: String?, maxResults: Int, timeoutSec: Long): Pair<String, Boolean> {
         val latch = CountDownLatch(1)
         val resultRef = java.util.concurrent.atomic.AtomicReference("""{"error": "no result"}""")
+        val failed = java.util.concurrent.atomic.AtomicBoolean(true)
+        // Set when this call is over for any reason (result, timeout, interrupt): a creation task
+        // still waiting in the main-thread queue must then not start listening.
+        val finished = java.util.concurrent.atomic.AtomicBoolean(false)
         val mainHandler = Handler(Looper.getMainLooper())
 
         // [T-android-speech-error10] C4: every exit path must destroy the
@@ -313,6 +320,7 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
         }
 
         mainHandler.post {
+            if (finished.get()) return@post
             val recognizer = try {
                 // [T-android-speech-error10] Prefer the on-device recognizer
                 // on S+ (mirrors SystemSpeechRecognitionEngine): it avoids
@@ -329,6 +337,7 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
                     SpeechRecognizer.createSpeechRecognizer(context)
                 }
             } catch (e: Throwable) {
+                failed.set(true)
                 resultRef.set(
                     JSONObject().put("error", "recognizer_creation_failed")
                         .put("message", "Could not create SpeechRecognizer: ${e.message}")
@@ -359,6 +368,7 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
                         }
                         json.put("alternatives", alts)
                     }
+                    failed.set(false)
                     resultRef.set(json.toString(2))
                     destroyRecognizerOnce()
                     latch.countDown()
@@ -389,6 +399,7 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
                         13 -> "Language not currently available — model may need downloading (requested: $requestedLang)"
                         else -> "Unknown error ($error)"
                     }
+                    failed.set(true)
                     resultRef.set(JSONObject().put("error", msg).toString(2))
                     destroyRecognizerOnce()
                     latch.countDown()
@@ -405,14 +416,18 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
             recognizer.startListening(intent)
         }
 
-        if (!latch.await(timeoutSec, TimeUnit.SECONDS)) {
-            // [T-android-speech-error10] The timeout path previously leaked
-            // the recognizer (see destroyRecognizerOnce above). Destroy on
-            // the main handler — the thread that created it.
+        try {
+            if (!latch.await(timeoutSec, TimeUnit.SECONDS)) {
+                return """{"error": "speech recognition timed out after ${timeoutSec}s"}""" to false
+            }
+            return resultRef.get() to !failed.get()
+        } finally {
+            // Every way out ends here, including an interrupt when the guest command is cancelled
+            // (which used to leave the recognizer bound and listening). Destroy runs on the main
+            // looper, the thread that created it; it is idempotent, so a normal finish is harmless.
+            finished.set(true)
             mainHandler.post { destroyRecognizerOnce() }
-            return """{"error": "speech recognition timed out after ${timeoutSec}s"}"""
         }
-        return resultRef.get()
     }
 
     companion object {
