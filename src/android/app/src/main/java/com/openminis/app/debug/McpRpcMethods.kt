@@ -146,9 +146,9 @@ internal object McpRpcMethods {
         if ((url == null) == (command == null)) {
             throw RPCException(-32602, "Exactly one transport is required: 'url' or 'command'")
         }
-        val args = if (params.has("args")) stringList(params.optJSONArray("args")) else current?.args.orEmpty()
-        val headers = if (params.has("headers")) stringMap(params.optJSONObject("headers")) else current?.headers.orEmpty()
-        val env = if (params.has("env")) stringMap(params.optJSONObject("env")) else current?.env.orEmpty()
+        val args = RpcParams.stringList(params, "args") ?: current?.args.orEmpty()
+        val headers = RpcParams.stringMap(params, "headers") ?: current?.headers.orEmpty()
+        val env = RpcParams.stringMap(params, "env") ?: current?.env.orEmpty()
         val timeout = if (!params.has("startupTimeoutSeconds")) current?.startupTimeoutSeconds
             else if (params.isNull("startupTimeoutSeconds")) null
             else params.optInt("startupTimeoutSeconds").takeIf { it > 0 }
@@ -156,7 +156,7 @@ internal object McpRpcMethods {
         return MCPRepository.MCPServerConfig(
             id = id,
             note = optionalString("note", current?.note),
-            enabled = if (params.has("enabled")) params.optBoolean("enabled", true) else current?.enabled ?: true,
+            enabled = RpcParams.boolean(params, "enabled") ?: current?.enabled ?: true,
             url = url,
             headers = headers,
             command = command,
@@ -166,18 +166,6 @@ internal object McpRpcMethods {
             oauth = current?.oauth,
             createdAt = current?.createdAt ?: System.currentTimeMillis(),
         )
-    }
-
-    private fun stringMap(obj: JSONObject?): Map<String, String> {
-        if (obj == null) return emptyMap()
-        val out = linkedMapOf<String, String>()
-        for (key in obj.keys()) out[key] = obj.optString(key, "")
-        return out
-    }
-
-    private fun stringList(arr: JSONArray?): List<String> {
-        if (arr == null) return emptyList()
-        return (0 until arr.length()).map { arr.optString(it) }
     }
 
     private fun serverToJson(s: MCPRepository.MCPServerConfig): JSONObject = JSONObject().apply {
