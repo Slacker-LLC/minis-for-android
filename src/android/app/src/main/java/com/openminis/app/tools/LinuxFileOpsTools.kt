@@ -19,6 +19,8 @@ object LinuxFileOps {
     const val MAX_LIST_ENTRIES = 500
     const val MAX_GREP_RESULTS = 200
     const val MAX_SEARCH_RESULTS = 200
+    internal const val MAX_SCAN_ENTRIES = 5_000
+    private const val MAX_SKIPPED_REPORTED = 50
     const val MAX_HEAD_TAIL_LINES = 1000
     private const val MAX_TEXT_FILE_BYTES = 50L * 1024 * 1024
     private const val MAX_GREP_FILE_BYTES = 4L * 1024 * 1024
@@ -42,44 +44,72 @@ object LinuxFileOps {
         }
     }
 
+    /** What a bounded tree walk found, and whether it stopped before it had seen everything. */
+    internal class Walk(val entries: List<WorkspaceEntry>, val scanned: Int, val truncated: Boolean)
+
     private suspend fun entriesUnder(
         sessionId: String,
         rootPath: String,
         recursive: Boolean,
         maxEntries: Int,
-    ): List<WorkspaceEntry> {
+    ): List<WorkspaceEntry> = walkTree(sessionId, rootPath, recursive, scanBudget = maxEntries).entries
+
+    /**
+     * Breadth-first walk. [scanBudget] bounds how many entries are LOOKED AT and [maxMatches] how many
+     * are KEPT; only entries that pass [accept] count against [maxMatches], so a directory full of
+     * non-matching files can no longer use up the result limit before the target is reached. Every
+     * directory is read page by page. [Walk.truncated] is true whenever the walk stopped early.
+     */
+    internal suspend fun walkTree(
+        sessionId: String,
+        rootPath: String,
+        recursive: Boolean,
+        scanBudget: Int,
+        maxMatches: Int = Int.MAX_VALUE,
+        accept: (WorkspaceEntry) -> Boolean = { true },
+    ): Walk {
         if (ExternalMountAccess.isPath(rootPath)) {
-            return ExternalMountAccess.walk(rootPath, recursive, maxEntries).map {
+            val all = ExternalMountAccess.walk(rootPath, recursive, scanBudget).map {
                 WorkspaceEntry(it.path, it.name, it.type, it.size)
             }
+            val accepted = all.filter(accept)
+            return Walk(accepted.take(maxMatches), all.size, all.size >= scanBudget || accepted.size > maxMatches)
         }
         val queue = java.util.ArrayDeque<String>()
         queue.add(rootPath)
-        val result = mutableListOf<WorkspaceEntry>()
-        while (queue.isNotEmpty() && result.size < maxEntries) {
+        val matches = mutableListOf<WorkspaceEntry>()
+        var scanned = 0
+        while (queue.isNotEmpty()) {
             val current = queue.removeFirst()
-            val listing = WorkspaceFileClient.list(sessionId, current, MAX_LIST_ENTRIES, 0)
-            val items = listing.optJSONArray("entries") ?: continue
-            for (index in 0 until items.length()) {
-                val item = items.optJSONObject(index) ?: continue
-                val path = childPath(current, item.optString("name"))
-                val entry = WorkspaceEntry(
-                    path = path,
-                    name = item.optString("name"),
-                    type = item.optString("type"),
-                    size = item.optLong("size", 0),
-                )
-                result += entry
-                if (recursive && entry.type == "dir" && result.size < maxEntries) {
-                    queue.add(path)
+            var offset = 0
+            while (true) {
+                val listing = WorkspaceFileClient.list(sessionId, current, MAX_LIST_ENTRIES, offset)
+                val items = listing.optJSONArray("entries") ?: break
+                for (index in 0 until items.length()) {
+                    val item = items.optJSONObject(index) ?: continue
+                    val path = childPath(current, item.optString("name"))
+                    val entry = WorkspaceEntry(
+                        path = path,
+                        name = item.optString("name"),
+                        type = item.optString("type"),
+                        size = item.optLong("size", 0),
+                    )
+                    scanned++
+                    if (accept(entry)) {
+                        matches += entry
+                        if (matches.size >= maxMatches) return Walk(matches, scanned, true)
+                    }
+                    if (recursive && entry.type == "dir") queue.add(path)
+                    if (scanned >= scanBudget) return Walk(matches, scanned, true)
                 }
-                if (result.size >= maxEntries) break
+                if (items.length() < MAX_LIST_ENTRIES) break
+                offset += items.length()
             }
         }
-        return result
+        return Walk(matches, scanned, false)
     }
 
-    private data class WorkspaceEntry(
+    internal data class WorkspaceEntry(
         val path: String,
         val name: String,
         val type: String,
@@ -192,16 +222,15 @@ object LinuxFileOps {
         val needle = filename.lowercase()
         val ext = fileType?.lowercase()?.removePrefix(".")
         return try {
-            val entries = entriesUnder(
-                sessionId,
-                rootPath,
-                recursive,
-                limit.coerceIn(1, MAX_SEARCH_RESULTS),
-            )
-            val results = entries.filter { entry ->
+            val walk = walkTree(
+                sessionId, rootPath, recursive,
+                scanBudget = MAX_SCAN_ENTRIES,
+                maxMatches = limit.coerceIn(1, MAX_SEARCH_RESULTS),
+            ) { entry ->
                 entry.name.lowercase().contains(needle) &&
                     (ext == null || entry.name.substringAfterLast('.', "").lowercase() == ext)
             }
+            val results = walk.entries
             val arr = org.json.JSONArray()
             results.forEach { entry ->
                 arr.put(
@@ -217,6 +246,10 @@ object LinuxFileOps {
                     put("query", filename)
                     put("results", arr)
                     put("count", results.size)
+                    put("scanned", walk.scanned)
+                    // true: the walk stopped early (result limit or scan budget), so "not found"
+                    // would mean "not found in what was scanned".
+                    put("truncated", walk.truncated)
                 }.toString(2),
                 true,
             )
@@ -246,9 +279,11 @@ object LinuxFileOps {
             } else {
                 WorkspaceFileClient.info(sessionId, path)
             }
+            var scanTruncated = false
             val files = if (metadata.optString("type") == "dir") {
-                entriesUnder(sessionId, path, true, MAX_GREP_RESULTS * 10)
-                    .filter { it.type == "file" }
+                val walk = walkTree(sessionId, path, true, scanBudget = MAX_SCAN_ENTRIES) { it.type == "file" }
+                scanTruncated = walk.truncated
+                walk.entries
             } else {
                 listOf(
                     WorkspaceEntry(
@@ -260,13 +295,24 @@ object LinuxFileOps {
                 )
             }
             val hits = mutableListOf<JSONObject>()
+            val skipped = org.json.JSONArray()
+            var skippedCount = 0
+            fun skip(file: WorkspaceEntry, reason: String) {
+                skippedCount++
+                if (skipped.length() < MAX_SKIPPED_REPORTED) {
+                    skipped.put(JSONObject().put("file", file.path).put("reason", reason))
+                }
+            }
+            var hitLimitReached = false
             outer@ for (file in files) {
-                if (file.type != "file" || file.size > MAX_GREP_FILE_BYTES) continue
+                if (file.type != "file") continue
+                if (file.size > MAX_GREP_FILE_BYTES) { skip(file, "larger than ${MAX_GREP_FILE_BYTES / (1024 * 1024)} MiB"); continue }
                 val lines = try {
                     readBytes(sessionId, file.path, MAX_GREP_FILE_BYTES)
                         .toString(Charsets.UTF_8)
                         .lines()
-                } catch (_: Throwable) {
+                } catch (t: Throwable) {
+                    skip(file, "unreadable: ${t.message?.take(80)}")
                     continue
                 }
                 for (i in lines.indices) {
@@ -281,7 +327,7 @@ object LinuxFileOps {
                                 put("context", lines.subList(from, to + 1).joinToString("\n").take(2000))
                             },
                         )
-                        if (hits.size >= hitLimit) break@outer
+                        if (hits.size >= hitLimit) { hitLimitReached = true; break@outer }
                     }
                 }
             }
@@ -290,6 +336,12 @@ object LinuxFileOps {
                     put("pattern", pattern)
                     put("results", org.json.JSONArray(hits))
                     put("count", hits.size)
+                    // "count": 0 only means "no match" when nothing was left unread.
+                    put("complete", !scanTruncated && !hitLimitReached && skippedCount == 0)
+                    put("hit_limit_reached", hitLimitReached)
+                    put("scan_truncated", scanTruncated)
+                    put("skipped_count", skippedCount)
+                    if (skippedCount > 0) put("skipped", skipped)
                 }.toString(2),
                 true,
             )
