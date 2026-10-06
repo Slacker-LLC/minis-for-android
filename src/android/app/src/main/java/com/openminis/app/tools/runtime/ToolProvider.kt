@@ -57,13 +57,3 @@ object ProviderRouter {
     /** Test / re-init support (also called by MinisApp before re-registering). */
     fun reset() = providers.clear()
 }
-
-/**
- * Pass-through provider for prefixes without extra semantics yet
- * (06 §2 D12: android.* / root.* / system.*+agent.* / mcp.* / skill.*).
- * Real per-prefix gates land as their providers get built (P5+).
- */
-class PrefixProvider(
-    override val id: String,
-    override val prefixes: List<String>,
-) : ToolProvider

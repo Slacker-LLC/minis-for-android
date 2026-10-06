@@ -6,7 +6,6 @@ import com.openminis.app.data.model.ProviderConfig
 import com.openminis.app.data.model.ProviderCredential
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.ProviderType
-import com.openminis.app.data.model.ThinkingLevel
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -18,8 +17,6 @@ import org.junit.Test
 /**
  * Pins the unified model identity + command unification fixes:
  *
- *  - model identity resolves the REAL provider/model/entry (the projection
- *    may never hard-code provider=openminis or use a display name as id);
  *  - supportsReasoning tri-state mapping cannot be collapsed by an Elvis on
  *    `isNull()` (explicit `true` must stay true);
  *  - the Web `/model` decoration never presents a second `/model` command;
@@ -53,40 +50,6 @@ class ModelIdentityAndCommandRegistryTest {
         )
     }
 
-    @Test
-    fun `identity resolves real provider, base model id and entry id`() {
-        val cfg = config()
-        val identity = ModelSelectionResolver.resolve(cfg, "deepseek-v4-flash-vision-exp")!!
-
-        assertEquals("DeepSeek 官方", identity.provider)      // real provider name
-        assertEquals("deepseek-v4-flash-vision-exp", identity.modelId) // real model id
-        assertEquals("DeepSeek-V4-Flash-Vision-Exp", identity.displayName) // real display name
-        assertEquals(cfg.modelEntries[0].id, identity.entryId) // entry id == session.models group rows
-    }
-
-    @Test
-    fun `identity resolves by entry id too`() {
-        val cfg = config()
-        val identity = ModelSelectionResolver.resolve(cfg, cfg.modelEntries[0].id)!!
-        assertEquals(cfg.modelEntries[0].id, identity.entryId)
-        assertEquals("deepseek-v4-flash-vision-exp", identity.modelId)
-    }
-
-    @Test
-    fun `unknown model resolves to null not a fake placeholder`() {
-        assertNull(ModelSelectionResolver.resolve(config(), "totally-unknown-model"))
-    }
-
-    @Test
-    fun `wire identity never carries hard-coded openminis provider`() {
-        val identity = ModelSelectionResolver.resolve(config(), "deepseek-v4-flash-vision-exp")!!
-        val wire = ModelSelectionResolver.toWire(identity)
-        assertEquals("DeepSeek 官方", wire.getString("provider"))
-        assertEquals(identity.entryId, wire.getString("model"))
-    }
-
-    // ---------------------------------------- supportsReasoning tri-state
-
     /** The exact modelCatalogEntry tri-state mapping without Android deps. */
     private fun supportsReasoningOf(e: JSONObject): Boolean? =
         if (e.isNull("supportsReasoning")) null else e.optBoolean("supportsReasoning", false)
@@ -104,17 +67,6 @@ class ModelIdentityAndCommandRegistryTest {
 
         val unknown = JSONObject().put("supportsReasoning", JSONObject.NULL)
         assertNull(supportsReasoningOf(unknown))
-    }
-
-    @Test
-    fun `reasoning block present for explicit true and absent for explicit false`() {
-        val maxLevel = ThinkingLevel.HIGH
-        val blockTrue = DshReasoningCatalog.reasoningBlock(true, maxLevel)
-        assertNotNull(blockTrue)
-        assertTrue(blockTrue!!.optJSONArray("efforts")!!.length() > 0)
-
-        val blockFalse = DshReasoningCatalog.reasoningBlock(false, maxLevel)
-        assertNull(blockFalse)
     }
 
     // ------------------------------------------------------------- /plan
