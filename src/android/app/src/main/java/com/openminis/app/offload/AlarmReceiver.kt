@@ -54,6 +54,13 @@ class AlarmReceiver : BroadcastReceiver() {
             } catch (t: Throwable) {
                 AppLogger.warning(TAG, "scheduled-task rescheduleAll failed: ${t.message}")
             }
+            // Scheduled notifications (`android-notification schedule`) lose their alarms on
+            // reboot too; re-arm the future ones and deliver the ones that came due meanwhile.
+            try {
+                ScheduledNotificationReceiver.restoreAfterBoot(context)
+            } catch (t: Throwable) {
+                AppLogger.warning(TAG, "scheduled-notification restore failed: ${t.message}")
+            }
             // The floating pet is a foreground overlay the user enabled; bring
             // it back on boot too (startIfEnabled is a no-op when disabled).
             // Wrapped: OEM ROMs may reject the background FGS start, and the

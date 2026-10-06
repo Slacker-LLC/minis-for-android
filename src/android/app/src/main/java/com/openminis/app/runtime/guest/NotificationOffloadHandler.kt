@@ -228,17 +228,9 @@ class NotificationOffloadHandler(private val context: Context) : NativeOffloadHa
         }
 
         val id = args.get("id") ?: UUID.randomUUID().toString()
-        val requestCode = id.hashCode() and 0x7FFFFFFF
+        val requestCode = ScheduledNotificationReceiver.requestCodeFor(id)
 
-        val intent = Intent(context, ScheduledNotificationReceiver::class.java).apply {
-            putExtra(ScheduledNotificationReceiver.EXTRA_ID, id)
-            putExtra(ScheduledNotificationReceiver.EXTRA_TITLE, title)
-            putExtra(ScheduledNotificationReceiver.EXTRA_BODY, body)
-        }
-        val pi = PendingIntent.getBroadcast(
-            context, requestCode, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
+        val pi = ScheduledNotificationReceiver.alarmIntentFor(context, id, title, body)
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         try {
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pi)
@@ -298,10 +290,11 @@ class NotificationOffloadHandler(private val context: Context) : NativeOffloadHa
             ?: return NativeOffloadResult(2, "android-notification cancel: --id <id> or --all is required\n")
 
         val entry = store.get(id)
-        if (entry != null) {
-            cancelAlarmFor(id, entry.optInt("request_code"))
-            store.remove(id)
-        }
+        // The alarm token is derived from the id, so it is cancelled whether or not the store still
+        // has the entry (a query or an earlier sweep may have dropped it while the alarm was still
+        // armed); otherwise a cancelled reminder could still fire.
+        cancelAlarmFor(id, ScheduledNotificationReceiver.requestCodeFor(id))
+        if (entry != null) store.remove(id)
         // Also drop any delivered notification posted with the same id —
         // notifId = id.hashCode() & 0x7FFFFFFF, same convention as both
         // immediate-send and scheduled-fire.
