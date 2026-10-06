@@ -99,6 +99,34 @@ object SoulIcon {
         return EncodeResult.Success(encoded)
     }
 
+    /**
+     * The power-of-two sampling that keeps both sides of a [width] x [height] image at least [target]
+     * pixels (the icon is cropped square and shrunk to [STORED_PIXELS], so more than that is wasted
+     * memory). 1 for an image already at or below the target.
+     */
+    internal fun sampleSizeFor(width: Int, height: Int, target: Int = STORED_PIXELS): Int {
+        if (width <= 0 || height <= 0 || target <= 0) return 1
+        var sample = 1
+        val shortSide = minOf(width, height)
+        while (shortSide / (sample * 2) >= target) sample *= 2
+        return sample
+    }
+
+    /**
+     * Decode picked or imported image bytes for [encode] without allocating the full-size bitmap: read
+     * the dimensions first, then decode sampled. A 10000 x 10000 image is a 380 MiB bitmap at full size
+     * and a few hundred KiB here. Null when the bytes are not a decodable image.
+     */
+    fun decodeForIcon(bytes: ByteArray): Bitmap? = runCatching {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight)
+        }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+    }.getOrNull()
+
     /** Decode a stored data URI. Returns null for an emoji value or garbage. */
     fun decode(value: String): Bitmap? {
         if (!isDataUri(value)) return null
@@ -137,6 +165,29 @@ object SoulIcon {
         data class Unsupported(val reason: String) : Source()
     }
 
+    /** Decodes `%XX` escapes (UTF-8) once and leaves `+` alone; null for a malformed or non-UTF-8 escape. */
+    internal fun percentDecode(raw: String): String? {
+        if ('%' !in raw) return raw
+        val out = java.io.ByteArrayOutputStream()
+        var i = 0
+        while (i < raw.length) {
+            val c = raw[i]
+            if (c == '%') {
+                val hex = raw.substring(i + 1, minOf(i + 3, raw.length))
+                if (hex.length < 2 || hex.any { Character.digit(it, 16) < 0 }) return null
+                out.write(hex.toInt(16))
+                i += 3
+            } else {
+                out.write(c.toString().toByteArray(Charsets.UTF_8))
+                i++
+            }
+        }
+        val decoder = Charsets.UTF_8.newDecoder()
+            .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+            .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+        return runCatching { decoder.decode(java.nio.ByteBuffer.wrap(out.toByteArray())).toString() }.getOrNull()
+    }
+
     /** Classify a config value that is not an emoji and not empty. */
     fun classifySource(raw: String): Source {
         val v = raw.trim()
@@ -149,8 +200,15 @@ object SoulIcon {
             v.startsWith("minis://") -> {
                 // minis://attachments/x.png -> /var/minis/attachments/x.png
                 val rest = v.removePrefix("minis://").trimStart('/')
-                if (rest.isEmpty()) Source.Unsupported("empty minis:// path")
-                else Source.LinuxPath("/var/minis/$rest")
+                if (rest.isEmpty()) {
+                    Source.Unsupported("empty minis:// path")
+                } else {
+                    // minis:// addresses are percent-encoded (that is how the prompts tell the model to
+                    // write them); the file on disk has the decoded name. Decoded once, then the path
+                    // goes through the normal path checks, so %2e%2e is still refused there.
+                    percentDecode(rest)?.let { Source.LinuxPath("/var/minis/$it") }
+                        ?: Source.Unsupported("the minis:// path has an invalid percent-escape")
+                }
             }
             v.startsWith("data:") -> {
                 val comma = v.indexOf(',')
@@ -265,15 +323,24 @@ object SoulIcon {
         if (codePoints.isEmpty()) return false
 
         if (codePoints.size > 1) {
-            // A variation selector-16 or keycap makes an otherwise-text base
-            // render as emoji; a ZWJ or regional-indicator pair is emoji by
-            // construction.
-            if (codePoints.any { it == 0xFE0F || it == 0x20E3 || it == 0x200D }) return true
+            // Keycap: exactly base (0-9 # *), optional VS16, then U+20E3.
+            if (codePoints.last() == 0x20E3) {
+                val okShape = codePoints.size == 2 || (codePoints.size == 3 && codePoints[1] == 0xFE0F)
+                return okShape && (codePoints[0] in '0'.code..'9'.code || codePoints[0] == '#'.code || codePoints[0] == '*'.code)
+            }
             if (codePoints.all { it in 0x1F1E6..0x1F1FF }) return true
-            return codePoints.any { hasEmojiPresentation(it) }
+            // Everything else is a base (possibly joined by ZWJ, with VS16 / modifiers): each real
+            // scalar must itself be able to be an emoji, so a letter or digit followed by U+FE0F is
+            // still just a letter.
+            val core = codePoints.filter { it != 0xFE0F && it != 0x200D }
+            return core.isNotEmpty() && core.all { isEmojiish(it) }
         }
         return hasEmojiPresentation(codePoints[0])
     }
+
+    /** An emoji by default presentation, or a non-ASCII symbol that VS16 can turn into one (❤ ☺ ✔ ™). */
+    private fun isEmojiish(cp: Int): Boolean =
+        hasEmojiPresentation(cp) || (cp > 0x7F && !Character.isLetterOrDigit(cp))
 
     /**
      * Approximates Unicode's Emoji_Presentation property: code points that

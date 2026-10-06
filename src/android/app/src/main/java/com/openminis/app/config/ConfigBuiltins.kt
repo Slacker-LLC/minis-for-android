@@ -800,9 +800,7 @@ internal object ConfigBuiltins {
             }
         }
 
-        val bitmap = runCatching {
-            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-        }.getOrNull() ?: throw ConfigError.InvalidValue(
+        val bitmap = com.openminis.app.agent.SoulIcon.decodeForIcon(bytes) ?: throw ConfigError.InvalidValue(
             "that data isn't a decodable image (png / jpeg / webp / gif are supported; svg is not)",
         )
         return when (val result = icon.encode(bitmap)) {
