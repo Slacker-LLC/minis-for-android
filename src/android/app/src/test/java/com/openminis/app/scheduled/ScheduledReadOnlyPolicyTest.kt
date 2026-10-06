@@ -92,6 +92,16 @@ class ScheduledReadOnlyPolicyTest {
     }
 
     @Test
+    fun `uniq with an output operand is rejected but one input file is fine`() {
+        listOf(
+            "uniq in.txt out.txt", "uniq -c in.txt /workspace/out.txt", "uniq -f 1 in.txt out.txt",
+            "uniq -- in.txt out.txt", "uniq - out.txt extra",
+        ).forEach { command -> assertFalse("should reject: $command", allowed(command)) }
+        listOf("uniq in.txt", "uniq -c in.txt", "uniq -f 1 in.txt", "uniq -s 2 -w 5 in.txt", "sort in.txt | uniq -c")
+            .forEach { command -> assertTrue("should allow: $command", allowed(command)) }
+    }
+
+    @Test
     fun `read-only git invocation disables repository-configured executables`() {
         val hardened = ScheduledReadOnlyPolicy.hardenGitInvocation("git diff --stat")
         assertTrue(hardened.startsWith("GIT_CONFIG_NOSYSTEM=1"))
