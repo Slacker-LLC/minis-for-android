@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,6 +52,8 @@ fun OffloadPermissionScreen(
         .filter { it.key != OffloadPermissionManager.PermissionCategory.INTEGRATIONS }
 
     var showResetConfirm by remember { mutableStateOf(false) }
+    // Bumped by Reset All so every row re-reads the permission it first showed.
+    var resetEpoch by remember { mutableIntStateOf(0) }
     val configEnabled by com.openminis.app.config.MinisConfigPermissionStore.enabled.collectAsState()
     val context = LocalContext.current
 
@@ -92,6 +95,7 @@ fun OffloadPermissionScreen(
                     PermissionRow(
                         tool = tool,
                         showDivider = idx < tools.size - 1,
+                        resetEpoch = resetEpoch,
                     )
                 }
             }
@@ -109,6 +113,7 @@ fun OffloadPermissionScreen(
                 else R.string.perm_a11y_system_disabled,
             systemActionTitleRes = R.string.perm_a11y_open_settings,
             onSystemAction = { openAccessibilitySettings(context) },
+            resetEpoch = resetEpoch,
         )
 
         IntegrationSection(
@@ -122,6 +127,7 @@ fun OffloadPermissionScreen(
             systemActionTitleRes = shizukuActionTitleRes(shizukuSnap.state),
             onSystemAction = onOpenPrivilegedBackend,
             onStatusRowClick = onOpenPrivilegedBackend,
+            resetEpoch = resetEpoch,
         )
 
         // The virtual screen's tools are opt-in like the other integrations, so they are set here too.
@@ -130,7 +136,7 @@ fun OffloadPermissionScreen(
             .filter { it.toolName.startsWith("android.vscreen.") }
         if (vscreenTools.isNotEmpty()) {
             // One master switch; the five tools are its sub-items and only show while it is on.
-            var vscreenOn by remember {
+            var vscreenOn by remember(resetEpoch) {
                 mutableStateOf(vscreenTools.any { OffloadPermissionManager.isAllowed(it.toolName) })
             }
             SettingsSection(header = stringResource(R.string.settings_vscreen_entry)) {
@@ -153,7 +159,7 @@ fun OffloadPermissionScreen(
                 )
                 if (vscreenOn) {
                     vscreenTools.forEachIndexed { idx, tool ->
-                        PermissionRow(tool = tool, showDivider = idx < vscreenTools.size - 1)
+                        PermissionRow(tool = tool, showDivider = idx < vscreenTools.size - 1, resetEpoch = resetEpoch)
                     }
                 }
             }
@@ -185,6 +191,7 @@ fun OffloadPermissionScreen(
             confirmButton = {
                 MinisTextButton(onClick = {
                     OffloadPermissionManager.resetAll()
+                    resetEpoch++
                     com.openminis.app.config.MinisConfigPermissionStore.setEnabled(true)
                     AppLogger.info("PermissionsScreen", "user confirmed Reset All — all tool permissions cleared, minis-config switch reset to default")
                     showResetConfirm = false
@@ -213,6 +220,7 @@ private fun IntegrationSection(
     systemActionTitleRes: Int,
     onSystemAction: () -> Unit,
     onStatusRowClick: (() -> Unit)? = null,
+    resetEpoch: Int = 0,
 ) {
     SettingsSection(
         header = stringResource(sectionHeaderRes),
@@ -225,7 +233,7 @@ private fun IntegrationSection(
             showChevron = false,
         )
 
-        AgentPolicyRow(toolName = toolName, showDivider = true)
+        AgentPolicyRow(toolName = toolName, showDivider = true, resetEpoch = resetEpoch)
 
         SettingsRow(
             title = stringResource(R.string.perm_system_authorization),
@@ -257,8 +265,9 @@ private fun IntegrationSection(
 private fun AgentPolicyRow(
     toolName: String,
     showDivider: Boolean,
+    resetEpoch: Int,
 ) {
-    var allowed by remember { mutableStateOf(OffloadPermissionManager.isAllowed(toolName)) }
+    var allowed by remember(resetEpoch) { mutableStateOf(OffloadPermissionManager.isAllowed(toolName)) }
     SettingsSwitchRow(
         title = stringResource(R.string.perm_agent_policy),
         checked = allowed,
@@ -275,8 +284,9 @@ private fun AgentPolicyRow(
 private fun PermissionRow(
     tool: OffloadPermissionManager.ToolPermissionInfo,
     showDivider: Boolean,
+    resetEpoch: Int,
 ) {
-    var allowed by remember { mutableStateOf(OffloadPermissionManager.isAllowed(tool.toolName)) }
+    var allowed by remember(resetEpoch) { mutableStateOf(OffloadPermissionManager.isAllowed(tool.toolName)) }
     SettingsSwitchRow(
         title = toolTitle(tool),
         subtitle = tool.toolName,
