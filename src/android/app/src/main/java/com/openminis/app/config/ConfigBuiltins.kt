@@ -120,9 +120,10 @@ internal object ConfigBuiltins {
             ClosureField(
                 path = "session.thinkingLevel",
                 displayName = "Thinking level (current session)",
-                description = "off / low / medium / high / xhigh. Applied to the active chat.",
+                description = "off / low / medium / high / xhigh / max / ultra. Applied to the active chat.",
                 valueSchema = ConfigSchema.StrEnum(
-                    listOf("off", "low", "medium", "high", "xhigh")
+                    // Every token the reader can return, or a value that was read cannot be written back.
+                    thinkingTokens(),
                 ),
                 risk = ConfigRisk.NORMAL,
                 revertable = true,
@@ -184,7 +185,9 @@ internal object ConfigBuiltins {
                             }
                             val entry = cfg.modelEntries.find { it.id == uuid }
                                 ?: throw ConfigError.InvalidValue("Unknown model entry uuid: $uuid")
-                            """{"type":"entry","entryId":"$uuid"}""" to entry.baseModel.id
+                            // Built as JSON: an entry id may contain quotes or backslashes, which broke a
+                            // hand-assembled string.
+                            org.json.JSONObject().put("type", "entry").put("entryId", uuid).toString() to entry.baseModel.id
                         }
                         else -> throw ConfigError.InvalidValue(
                             "Expected `entry:<uuid>`, got '$s'"
@@ -205,7 +208,9 @@ internal object ConfigBuiltins {
 
     /** iOS uses lowercase tokens (`off`/`low`/…); Android `ThinkingLevel.name`
      *  is uppercase. Centralised so reader/writer round-trip identical strings. */
-    private fun thinkingLevelToToken(level: ThinkingLevel): String = when (level) {
+    internal fun thinkingTokens(): List<String> = ThinkingLevel.values().map(::thinkingLevelToToken)
+
+    internal fun thinkingLevelToToken(level: ThinkingLevel): String = when (level) {
         ThinkingLevel.OFF -> "off"
         ThinkingLevel.LOW -> "low"
         ThinkingLevel.MEDIUM -> "medium"
@@ -216,7 +221,7 @@ internal object ConfigBuiltins {
         ThinkingLevel.ULTRA -> "ultra"
     }
 
-    private fun thinkingLevelFromToken(token: String): ThinkingLevel? = when (token) {
+    internal fun thinkingLevelFromToken(token: String): ThinkingLevel? = when (token) {
         "off" -> ThinkingLevel.OFF
         "low" -> ThinkingLevel.LOW
         "medium" -> ThinkingLevel.MEDIUM
