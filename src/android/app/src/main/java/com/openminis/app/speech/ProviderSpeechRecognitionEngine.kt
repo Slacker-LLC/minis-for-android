@@ -499,6 +499,10 @@ class ProviderSpeechRecognitionEngine(private val appContext: Context) : SpeechR
     override fun cancel() {
         cancelled.set(true)
         recording.set(false)
+        // The capture loop of the default path belongs to the detector and watches its own flags,
+        // not [recording]; without this the microphone keeps reading after the UI shows idle.
+        detector?.let { runCatching { it.cancel() } }
+        detector = null
         transcribeJob?.cancel()
         holdFlushJob?.cancel()
         holdFlushJob = null
