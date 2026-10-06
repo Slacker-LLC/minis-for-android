@@ -433,20 +433,13 @@
     <string name="rootfs_actions_section">アクション</string>
     <string name="rootfs_install_label">Rootfsをインストール</string>
     <string name="rootfs_reset_label">Rootfsをリセット</string>
-    <string name="rootfs_reset_description">すべて削除して再インストール</string>
-    <string name="rootfs_reset_backup_label">リセットしてユーザーデータをバックアップ</string>
-    <string name="rootfs_reset_backup_description">リセット前に /root を保存</string>
-    <string name="rootfs_restore_label">ユーザーデータを復元</string>
-    <string name="rootfs_restore_description">以前バックアップした /root を復元</string>
+    <string name="rootfs_reset_description">Ubuntu システムを再インストール（ファイルは保持）</string>
     <string name="rootfs_progress_section">進捗</string>
     <string name="rootfs_result_section">結果</string>
     <string name="rootfs_info_section">情報</string>
     <string name="rootfs_about_title">Rootfsについて</string>
     <string name="rootfs_reset_confirm_title">Rootfsをリセットしますか？</string>
-    <string name="rootfs_reset_confirm_message">rootfs 全体を削除します。すべてのデータが失われます。</string>
-    <string name="rootfs_reset_backup_confirm_title">バックアップしてリセットしますか？</string>
-    <string name="rootfs_reset_backup_confirm_message">/root ディレクトリをバックアップしてからrootfsをリセットします。後でバックアップを復元できます。</string>
-    <string name="rootfs_reset_backup_confirm_button">リセット＆バックアップ</string>
+    <string name="rootfs_reset_confirm_message">アプリ内蔵のイメージから Ubuntu システムを再インストールします。ワークスペース、ホームフォルダ、スキル、メモリ、共有ファイル、セッションファイルは保持されます。apt でインストールしたパッケージなどシステムへの変更は削除されます。</string>
 
     <!-- T172 — components / onboarding / preview i18n -->
     <string name="common_back">戻る</string>
@@ -1655,22 +1648,16 @@
     <string name="mcp_copy_config_subtitle">Claude Desktop / Cursor 互換の mcpServers JSON</string>
     <string name="mcp_revoke_settings_token">設定トークンを取り消す</string>
     <string name="rootfs_about_body">rootfs はサンドボックスが使用する Ubuntu 24.04 ファイルシステムです。リセットで削除されるのは rootfs のみで、アプリ管理のワークスペース・メモリ・スキル・共有ファイルは保持されます。</string>
-    <string name="rootfs_reset_summary_body">リセット: Ubuntu rootfs を削除\nバックアップ／復元: アプリ管理のユーザーデータは別途管理されます</string>
+    <string name="rootfs_reset_summary_body">リセット：アプリ内蔵のイメージから Ubuntu システムを再インストール\n保持：ワークスペース、ホーム、スキル、メモリ、共有・セッションファイル（rootfs の外にあります）</string>
     <string name="rootfs_status_preparing">rootfs を準備中…</string>
     <string name="rootfs_status_extracting">rootfs を展開中… %1$d%%</string>
     <string name="rootfs_status_finalizing">仕上げ中…</string>
     <string name="rootfs_status_installing">rootfs をインストール中…</string>
     <string name="rootfs_install_failed">インストールに失敗しました: %1$s</string>
-    <string name="rootfs_status_backing_up">バックアップしてリセット中…</string>
     <string name="rootfs_status_resetting">rootfs をリセット中…</string>
     <string name="rootfs_reset_failed">リセットに失敗しました: %1$s</string>
-    <string name="rootfs_no_backup">利用できるバックアップがありません</string>
-    <string name="rootfs_status_restoring">ユーザーデータを復元中…</string>
-    <string name="rootfs_user_data_restored">ユーザーデータを復元しました</string>
-    <string name="rootfs_restore_failed">復元に失敗しました: %1$s</string>
     <string name="rootfs_installed_successfully">rootfs のインストールが完了しました</string>
     <string name="rootfs_install_failed_detail">インストールに失敗しました: %1$s — %2$s</string>
-    <string name="rootfs_reset_with_backup">rootfs をリセットし、バックアップを作成しました</string>
     <string name="rootfs_reset_complete">rootfs のリセットが完了しました</string>
     <string name="mcp_exposure_footer">Streamable HTTP は 127.0.0.1 のみで提供されます。LAN/TLS への公開はここでは有効にしません。新しい設定トークンは MCP_ALLOWED のツールのみで開始し、以下で明示的に追加・削除できます。</string>
     <string name="mcp_status_running">実行中 · %1$s</string>

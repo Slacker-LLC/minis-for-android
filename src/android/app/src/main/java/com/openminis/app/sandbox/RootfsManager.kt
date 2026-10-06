@@ -68,8 +68,12 @@ class RootfsManager private constructor(private val context: Context) {
         }
     }
 
-    suspend fun reset(keepUserData: Boolean = false): File? = withContext(Dispatchers.IO) {
-        if (keepUserData) Log.i(TAG, "reset: app-owned persistent user data will be preserved")
+    /**
+     * Replace the Root-owned Ubuntu rootfs with the packaged image. The user's data is App-owned and
+     * outside the rootfs (workspace, home, skills, memory, shared and session files), so it is kept;
+     * what is lost is what lived in the rootfs itself, such as packages installed with apt.
+     */
+    suspend fun reset() = withContext(Dispatchers.IO) {
         if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
         val reset = UbuntuRuntime.withRuntimeStopped { UbuntuKernel.resetRootfs() }
         if (!reset) {
@@ -78,16 +82,11 @@ class RootfsManager private constructor(private val context: Context) {
             throw IllegalStateException(detail)
         }
         _installState.value = RootfsInstallState.Idle
-        null
     }
 
     suspend fun getRootfsSize(): Long = withContext(Dispatchers.IO) {
         if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
         UbuntuKernel.measureRootfsSize()
-    }
-
-    suspend fun restoreUserData(backupDir: File) = withContext(Dispatchers.IO) {
-        Log.i(TAG, "restoreUserData ignored for ${backupDir.path}: persistent data is not stored in rootfs")
     }
 
     fun getSystemDnsServers(): List<String> {

@@ -953,20 +953,13 @@
     <string name="rootfs_actions_section">Actions</string>
     <string name="rootfs_install_label">Install Rootfs</string>
     <string name="rootfs_reset_label">Reset Rootfs</string>
-    <string name="rootfs_reset_description">Delete everything and reinstall</string>
-    <string name="rootfs_reset_backup_label">Reset &amp; Backup User Data</string>
-    <string name="rootfs_reset_backup_description">Save /root before resetting</string>
-    <string name="rootfs_restore_label">Restore User Data</string>
-    <string name="rootfs_restore_description">Restore previously backed up /root</string>
+    <string name="rootfs_reset_description">Reinstall the Ubuntu system; your files are kept</string>
     <string name="rootfs_progress_section">Progress</string>
     <string name="rootfs_result_section">Result</string>
     <string name="rootfs_info_section">Info</string>
     <string name="rootfs_about_title">About Rootfs</string>
     <string name="rootfs_reset_confirm_title">Reset Rootfs?</string>
-    <string name="rootfs_reset_confirm_message">This will delete the entire rootfs. All data will be lost.</string>
-    <string name="rootfs_reset_backup_confirm_title">Reset with Backup?</string>
-    <string name="rootfs_reset_backup_confirm_message">This will backup your /root directory, then reset the rootfs. You can restore the backup later.</string>
-    <string name="rootfs_reset_backup_confirm_button">Reset &amp; Backup</string>
+    <string name="rootfs_reset_confirm_message">This reinstalls the Ubuntu system from the app. Your workspace, home folder, skills, memory, shared and session files are kept. Packages you installed with apt and other changes to the system are removed.</string>
 
     <!-- T172-A providers / models / settings i18n -->
     <string name="provider_list_providers">Providers</string>
@@ -1990,22 +1983,16 @@
     <string name="mcp_copy_config_subtitle">Claude Desktop / Cursor-compatible mcpServers JSON</string>
     <string name="mcp_revoke_settings_token">Revoke Settings token</string>
     <string name="rootfs_about_body">The rootfs contains the Ubuntu 24.04 filesystem used by the sandbox. Resetting deletes only the rootfs; App-owned workspace, memory, skills, and shared files are preserved.</string>
-    <string name="rootfs_reset_summary_body">Reset: Delete the Ubuntu rootfs\nBackup/Restore: App-owned user data is managed separately</string>
+    <string name="rootfs_reset_summary_body">Reset: reinstalls the Ubuntu system from the app\nKept: workspace, home, skills, memory, shared and session files (they live outside the rootfs)</string>
     <string name="rootfs_status_preparing">Preparing rootfs…</string>
     <string name="rootfs_status_extracting">Extracting rootfs… %1$d%%</string>
     <string name="rootfs_status_finalizing">Finalizing…</string>
     <string name="rootfs_status_installing">Installing rootfs…</string>
     <string name="rootfs_install_failed">Installation failed: %1$s</string>
-    <string name="rootfs_status_backing_up">Backing up and resetting…</string>
     <string name="rootfs_status_resetting">Resetting rootfs…</string>
     <string name="rootfs_reset_failed">Reset failed: %1$s</string>
-    <string name="rootfs_no_backup">No backup available</string>
-    <string name="rootfs_status_restoring">Restoring user data…</string>
-    <string name="rootfs_user_data_restored">User data restored successfully</string>
-    <string name="rootfs_restore_failed">Restore failed: %1$s</string>
     <string name="rootfs_installed_successfully">Rootfs installed successfully</string>
     <string name="rootfs_install_failed_detail">Installation failed: %1$s — %2$s</string>
-    <string name="rootfs_reset_with_backup">Rootfs reset with backup created</string>
     <string name="rootfs_reset_complete">Rootfs reset complete</string>
     <string name="mcp_exposure_footer">Streamable HTTP on 127.0.0.1 only. LAN/TLS exposure is not enabled here. New Settings tokens start with only MCP_ALLOWED tools; you can explicitly add or remove exposed tools below.</string>
     <string name="mcp_status_running">Running · %1$s</string>

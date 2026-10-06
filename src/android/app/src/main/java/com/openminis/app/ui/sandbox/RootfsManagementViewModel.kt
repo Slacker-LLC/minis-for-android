@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.io.File
 
 data class RootfsManagementUiState(
     val isInstalled: Boolean = false,
@@ -23,7 +22,6 @@ data class RootfsManagementUiState(
     val lastOperationSuccess: Boolean = false,
     val rootfsSize: Long = 0L,
     val rootfsPath: String = "",
-    val hasBackup: Boolean = false,
     val rootfsHealthCode: RootfsHealthCode = RootfsHealthCode.UNKNOWN,
     val rootfsHealthDetail: String? = null,
     /** Current install phase + 0..1 progress (null when not installing). */
@@ -42,7 +40,6 @@ class RootfsManagementViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(RootfsManagementUiState())
     val uiState: StateFlow<RootfsManagementUiState> = _uiState.asStateFlow()
 
-    private var backupDir: File? = null
     private var progressJob: Job? = null
 
     /**
@@ -136,10 +133,10 @@ class RootfsManagementViewModel : ViewModel() {
         }
     }
 
-    fun resetRootfs(context: Context, keepUserData: Boolean) {
+    fun resetRootfs(context: Context) {
         _uiState.value = _uiState.value.copy(
             isProcessing = true,
-            statusMessage = context.getString(if (keepUserData) R.string.rootfs_status_backing_up else R.string.rootfs_status_resetting),
+            statusMessage = context.getString(R.string.rootfs_status_resetting),
             resultMessage = null,
             installProgress = 0f,
         )
@@ -148,18 +145,12 @@ class RootfsManagementViewModel : ViewModel() {
         observeInstallProgress(manager, context)
         viewModelScope.launch {
             try {
-                val backup = manager.reset(keepUserData)
+                manager.reset()
 
-                backupDir = backup
                 _uiState.value = _uiState.value.copy(
                     isProcessing = false,
                     lastOperationSuccess = true,
-                    hasBackup = backup != null && backup.exists(),
-                    resultMessage = if (keepUserData) {
-                        context.getString(R.string.rootfs_reset_with_backup)
-                    } else {
-                        context.getString(R.string.rootfs_reset_complete)
-                    },
+                    resultMessage = context.getString(R.string.rootfs_reset_complete),
                     installProgress = null,
                 )
                 refresh(context)
@@ -169,45 +160,6 @@ class RootfsManagementViewModel : ViewModel() {
                     lastOperationSuccess = false,
                     resultMessage = context.getString(R.string.rootfs_reset_failed, e.message ?: ""),
                     installProgress = null,
-                )
-            }
-        }
-    }
-
-    fun restoreBackup(context: Context) {
-        val backup = backupDir
-        if (backup == null || !backup.exists()) {
-            _uiState.value = _uiState.value.copy(
-                resultMessage = context.getString(R.string.rootfs_no_backup),
-                lastOperationSuccess = false,
-            )
-            return
-        }
-
-        _uiState.value = _uiState.value.copy(
-            isProcessing = true,
-            statusMessage = context.getString(R.string.rootfs_status_restoring),
-            resultMessage = null,
-        )
-
-        val manager = RootfsManager.getInstance(context)
-        viewModelScope.launch {
-            try {
-                manager.restoreUserData(backup)
-
-                backupDir = null
-                _uiState.value = _uiState.value.copy(
-                    isProcessing = false,
-                    lastOperationSuccess = true,
-                    hasBackup = false,
-                    resultMessage = context.getString(R.string.rootfs_user_data_restored),
-                )
-                refresh(context)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isProcessing = false,
-                    lastOperationSuccess = false,
-                    resultMessage = context.getString(R.string.rootfs_restore_failed, e.message ?: ""),
                 )
             }
         }
