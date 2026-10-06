@@ -24,6 +24,9 @@
     <string name="memory_revoke_result_not_found">Запись не найдена в недавних ежедневных журналах.</string>
     <string name="memory_revoke_result_io_error">Ошибка записи файла: %1$s</string>
     <string name="memory_save_toast">Сохранено</string>
+    <string name="memory_edit_load_failed">Не удалось прочитать файл; редактирование отключено, чтобы не перезаписать его</string>
+    <string name="memory_edit_changed_elsewhere">Файл изменился во время редактирования. Вернитесь и откройте его снова, чтобы увидеть актуальную версию; ваш текст не сохранён</string>
+    <string name="memory_save_error">Не удалось сохранить: %1$s</string>
     <string name="memory_global_footer">Постоянные инструкции и предпочтения, видимые агенту в каждой сессии. Агент не может изменять этот файл.</string>
     <string name="check_update_section_header">Обновление приложения</string>
     <string name="check_update_current_version">Текущая версия: %1$s</string>

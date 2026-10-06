@@ -341,6 +341,44 @@ class MemoryRepository {
         writeGuestFile(name, content)
     }
 
+    /** What the editor found when it opened a memory file. */
+    sealed interface EditRead {
+        data class Loaded(val text: String) : EditRead
+        /** The file does not exist yet: editing starts empty and saving creates it. */
+        object Missing : EditRead
+        /** It exists (or may) but could not be read: the editor must not offer to overwrite it. */
+        object Failed : EditRead
+    }
+
+    fun readFileForEdit(name: String): EditRead {
+        val path = guestPath(name) ?: return EditRead.Failed
+        return try {
+            EditRead.Loaded(WorkspaceFileClient.readAllBlocking("", path).toString(Charsets.UTF_8))
+        } catch (e: WorkspaceFileClient.Failure) {
+            if (e.code == "NOT_FOUND") EditRead.Missing else EditRead.Failed
+        } catch (_: Exception) {
+            EditRead.Failed
+        }
+    }
+
+    /**
+     * Saves [content] only if the file is still what the editor opened ([opened]); otherwise
+     * returns false and writes nothing. An Agent's `memory_write` can change the file while the
+     * editor is open, and a blind save would replace those entries with the old draft.
+     */
+    @Synchronized
+    fun saveFileIfUnchanged(name: String, content: String, opened: EditRead): Boolean {
+        val now = readFileForEdit(name)
+        val unchanged = when (opened) {
+            is EditRead.Loaded -> now is EditRead.Loaded && now.text == opened.text
+            EditRead.Missing -> now == EditRead.Missing
+            EditRead.Failed -> false
+        }
+        if (!unchanged) return false
+        writeGuestFile(name, content)
+        return true
+    }
+
     fun deleteFile(name: String): Boolean {
         if (name == GLOBAL_FILE) return false
         val path = guestPath(name) ?: return false

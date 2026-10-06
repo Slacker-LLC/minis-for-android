@@ -24,6 +24,9 @@
     <string name="memory_revoke_result_not_found">最近のログにエントリが見つかりません。</string>
     <string name="memory_revoke_result_io_error">ファイル書き込みエラー: %1$s</string>
     <string name="memory_save_toast">保存済み</string>
+    <string name="memory_edit_load_failed">このファイルを読み込めなかったため、上書きを避けるため編集を無効にしています</string>
+    <string name="memory_edit_changed_elsewhere">編集中にファイルが変更されました。戻って開き直すと最新の内容を確認できます。入力した内容は保存されていません</string>
+    <string name="memory_save_error">保存に失敗しました: %1$s</string>
     <string name="memory_global_footer">すべてのセッションでエージェントに表示される永続的な指示と設定です。エージェントはこのファイルを変更できません。</string>
     <string name="check_update_section_header">アプリ更新</string>
     <string name="check_update_current_version">現在のバージョン: %1$s</string>
