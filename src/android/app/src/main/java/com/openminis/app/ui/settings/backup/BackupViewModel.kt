@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.openminis.app.backup.BackupCategory
 import com.openminis.app.backup.BackupExporter
+import com.openminis.app.R
 import com.openminis.app.backup.BackupHistory
 import com.openminis.app.backup.BackupImporter
 import com.openminis.app.backup.BackupManifest
@@ -18,6 +19,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -319,7 +321,9 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
                     null
                 }
                 val remoteOutcomes = withContext(Dispatchers.IO) {
-                    deliverToRemotes(summary.packageFile, summary.backupId) { line ->
+                    // `isActive` here is the stop button: the blocking transfer cannot be interrupted
+                    // mid-flight, but no new destination starts and an unfinished upload is not committed.
+                    deliverToRemotes(summary.packageFile, summary.backupId, isCancelled = { !isActive }) { line ->
                         _statusText.value = line
                         note(line)
                         publishRunning(record, log)
@@ -463,11 +467,11 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
      * [T-backup-delete-files-too] Delete the package from every destination
      * that received it, then forget the record.
      *
-     * Best-effort per destination: one unreachable server must not stop the
-     * others being cleaned, and the record goes regardless — keeping it would
-     * leave the user an entry whose files are already half-gone, which is a
-     * worse state to reason about than no entry at all. Failures are logged
-     * rather than surfaced, since the screen is leaving anyway.
+     * Per destination: one unreachable server must not stop the others being cleaned. A destination
+     * is only touched if the saved server still is the one the package went to (same backend and
+     * folder); a name that now points elsewhere, or a server that was removed, is never used as a
+     * stand-in. If any copy could not be deleted the record is kept and the failure is shown, so the
+     * user still knows where the files are ("Remove Record" drops the record alone).
      */
     fun removeHistoryRecordWithFiles(id: String) {
         val record = history.records().firstOrNull { it.id == id }
@@ -477,11 +481,15 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
+            val notDeleted = withContext(Dispatchers.IO) {
+                val failed = mutableListOf<String>()
                 // The device copy first, and on its own: it must not depend on a server being reachable.
                 if (record.destinations.any { it.succeeded && it.kind == com.openminis.app.backup.BackupDeviceStorage.KIND }) {
                     runCatching { deviceStorage.delete(name) }
-                        .onFailure { AppLogger.error(TAG, "[Backup] deleting '$name' from the device failed: ${it.message}") }
+                        .onFailure {
+                            AppLogger.error(TAG, "[Backup] deleting '$name' from the device failed: ${it.message}")
+                            failed += com.openminis.app.backup.BackupDeviceStorage.NAME
+                        }
                 }
                 runCatching {
                     val store = com.openminis.app.backup.remote.RcloneRemoteStore(getApplication())
@@ -490,18 +498,36 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
                         com.openminis.app.backup.remote.RcloneChunkedUpload(getApplication())
                     for (outcome in record.destinations.filter { it.succeeded && it.kind != com.openminis.app.backup.BackupDeviceStorage.KIND }) {
                         val remote = store.remotes.firstOrNull { it.name == outcome.name }
-                            ?: continue
+                        if (remote == null || !BackupHistory.sameDestination(outcome, remote.backend, remote.path)) {
+                            AppLogger.warning(
+                                TAG,
+                                "[Backup] not deleting '$name' from '${outcome.name}': the saved server is gone or is a different destination now",
+                            )
+                            failed += outcome.name
+                            continue
+                        }
                         runCatching { uploader.deletePackage(remote, name) }
                             .onFailure {
                                 AppLogger.error(
                                     TAG,
                                     "[Backup] deleting '$name' from '${outcome.name}' failed: ${it.message}",
                                 )
+                                failed += outcome.name
                             }
                     }
+                }.onFailure {
+                    AppLogger.error(TAG, "[Backup] deleting '$name' from the servers failed: ${it.message}")
+                    failed += record.destinations.filter { d -> d.succeeded && d.kind != com.openminis.app.backup.BackupDeviceStorage.KIND }.map { d -> d.name }
                 }
+                failed.distinct()
             }
-            removeHistoryRecord(id)
+            if (notDeleted.isEmpty()) {
+                removeHistoryRecord(id)
+            } else {
+                _errorText.value = getApplication<Application>().getString(
+                    R.string.backup_history_delete_incomplete, notDeleted.joinToString(", "),
+                )
+            }
         }
     }
 
@@ -547,6 +573,7 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
     private fun deliverToRemotes(
         packageFile: File,
         backupId: String,
+        isCancelled: () -> Boolean = { false },
         onProgress: (String) -> Unit,
     ): List<BackupHistory.DestinationOutcome> {
         val store = com.openminis.app.backup.remote.RcloneRemoteStore(getApplication())
@@ -559,9 +586,10 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
         // was unanswerable while only errors were returned.
         val outcomes = mutableListOf<BackupHistory.DestinationOutcome>()
         for (remote in enabled) {
+            if (isCancelled()) break
             try {
                 onProgress("Sending to ${remote.name}…")
-                uploader.upload(packageFile, remote, backupId) { p ->
+                uploader.upload(packageFile, remote, backupId, isCancelled) { p ->
                     val pct = if (p.totalBytes > 0) (p.bytesSent * 100 / p.totalBytes) else 0
                     onProgress("Sending to ${remote.name}… $pct%")
                 }
@@ -615,7 +643,7 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
                     getApplication<Application>().contentResolver.openInputStream(uri)?.use { inp ->
                         zip.outputStream().use { inp.copyTo(it) }
                     } ?: throw IllegalStateException("Could not open the selected file.")
-                    extractAndInspect(zip)
+                    extractAndInspect(zip) { ensureActive() }
                 }
                 setPending(pending)
                 _statusText.value = null
@@ -630,7 +658,7 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Shared extract+manifest-read core, off the main thread. */
-    private fun extractAndInspect(zip: File): PendingRestore {
+    private fun extractAndInspect(zip: File, checkCancelled: () -> Unit): PendingRestore {
         val extracted = File(getApplication<Application>().cacheDir, "restore-extract")
             .apply { deleteRecursively(); mkdirs() }
         // [T-android-open-progress] `extract` already reported every entry it
@@ -639,15 +667,22 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
         // multi-GB package into a visible one.
         var files = 0
         var bytes = 0L
-        BackupZip.extract(zip, extracted) { name ->
-            files += 1
-            bytes += File(extracted, name).length()
-            _openProgress.value = OpenProgress(files, bytes, name.substringAfterLast('/'))
+        try {
+            BackupZip.extract(zip, extracted, { name ->
+                files += 1
+                bytes += File(extracted, name).length()
+                _openProgress.value = OpenProgress(files, bytes, name.substringAfterLast('/'))
+            }, checkCancelled)
+            val root = BackupZip.packageRoot(extracted)
+            val manifest = BackupPackageReader(root).readManifest()
+            val avail = manifest.categories.keys.mapNotNull(BackupCategory::fromKey).toSet()
+            return PendingRestore(extracted, manifest, avail)
+        } catch (e: Throwable) {
+            // A failed or cancelled open leaves a partial tree; it is not pending yet, so nothing
+            // else would remove it before the next open.
+            extracted.deleteRecursively()
+            throw e
         }
-        val root = BackupZip.packageRoot(extracted)
-        val manifest = BackupPackageReader(root).readManifest()
-        val avail = manifest.categories.keys.mapNotNull(BackupCategory::fromKey).toSet()
-        return PendingRestore(extracted, manifest, avail)
     }
 
     private fun setPending(pending: PendingRestore) {
@@ -933,7 +968,7 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         try {
-            val pending = withContext(Dispatchers.IO) { extractAndInspect(file) }
+            val pending = withContext(Dispatchers.IO) { extractAndInspect(file) { ensureActive() } }
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             setPending(pending)
             _serverPackages.value = emptyList()

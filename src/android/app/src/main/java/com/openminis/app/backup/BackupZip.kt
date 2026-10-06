@@ -58,6 +58,10 @@ object BackupZip {
      */
     private const val COPY_BUFFER_BYTES = 256 * 1024
 
+    /** Unzipping stops, rather than filling the device, when less than this is left. */
+    private const val FREE_SPACE_RESERVE_BYTES = 64L * 1024 * 1024
+    private const val SPACE_CHECK_INTERVAL_BYTES = 16L * 1024 * 1024
+
     /**
      * [T-android-zip-store-by-content] How much of a member to sniff.
      *
@@ -317,16 +321,35 @@ object BackupZip {
      * precedes the damage — the same tolerance iOS's forward-scan rescue path
      * provides.
      */
-    fun extract(zipFile: File, destination: File, onProgress: ((String) -> Unit)? = null) {
+    fun extract(
+        zipFile: File,
+        destination: File,
+        onProgress: ((String) -> Unit)? = null,
+        /** Called between chunks; throws (e.g. CancellationException) to stop the unzip. */
+        checkCancelled: () -> Unit = {},
+        maxTotalBytes: Long = MAX_MEMBER_BYTES,
+        maxEntries: Int = MAX_ENTRIES,
+        freeSpaceReserve: Long = FREE_SPACE_RESERVE_BYTES,
+    ) {
         destination.mkdirs()
         val root = destination.canonicalFile
         // [T-android-restore-gc-storm] One buffer for the whole archive, not
         // one per entry — see `archive` for the GC storm the per-entry
         // allocation caused during a large restore.
         val buf = ByteArray(COPY_BUFFER_BYTES)
+        // A package is untrusted until the importer has verified it, which happens after this
+        // unzip. The bounds are the format's own: a package this app wrote never exceeds them (see
+        // `archive`), so refusing past them cannot drop a legitimate member.
+        var entries = 0
+        var totalBytes = 0L
+        var sinceSpaceCheck = 0L
         ZipInputStream(zipFile.inputStream().buffered()).use { zis ->
             while (true) {
                 val entry = zis.nextEntry ?: break
+                checkCancelled()
+                if (++entries > maxEntries) {
+                    throw ZipException("The package holds more than $maxEntries entries.")
+                }
                 val out = safeResolve(root, entry.name)
                 if (entry.isDirectory) {
                     out.mkdirs()
@@ -336,7 +359,19 @@ object BackupZip {
                         while (true) {
                             val n = zis.read(buf)
                             if (n < 0) break
+                            totalBytes += n
+                            if (totalBytes > maxTotalBytes) {
+                                throw ZipException("The package expands to more than $maxTotalBytes bytes.")
+                            }
+                            sinceSpaceCheck += n
+                            if (sinceSpaceCheck >= SPACE_CHECK_INTERVAL_BYTES) {
+                                sinceSpaceCheck = 0
+                                if (root.usableSpace < freeSpaceReserve) {
+                                    throw ZipException("Not enough free storage to open this package.")
+                                }
+                            }
                             sink.write(buf, 0, n)
+                            checkCancelled()
                         }
                     }
                     onProgress?.invoke(entry.name)

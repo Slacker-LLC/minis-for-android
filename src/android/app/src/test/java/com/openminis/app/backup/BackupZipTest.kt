@@ -180,4 +180,84 @@ class BackupZipTest {
         val bytes = BackupZip.readEntry(wrapped, "manifest.json")
         assertEquals("""{"format":"minisbak/1"}""", bytes?.toString(Charsets.UTF_8))
     }
+
+    // -- Extraction budget (untrusted packages) ------------------------------------------------------
+
+    private fun zipOf(vararg entries: Pair<String, ByteArray>): File {
+        val zip = File(tmp, "in-${System.nanoTime()}.zip")
+        ZipOutputStream(zip.outputStream()).use { out ->
+            for ((name, bytes) in entries) {
+                out.putNextEntry(ZipEntry(name)); out.write(bytes); out.closeEntry()
+            }
+        }
+        return zip
+    }
+
+    @Test
+    fun `an ordinary package still extracts completely`() {
+        val zip = zipOf("a.txt" to "hello".toByteArray(), "d/b.bin" to ByteArray(1000) { 7 })
+        val dest = File(tmp, "out")
+        BackupZip.extract(zip, dest)
+        assertEquals("hello", File(dest, "a.txt").readText())
+        assertEquals(1000L, File(dest, "d/b.bin").length())
+    }
+
+    @Test
+    fun `a package that expands past the byte budget is refused while unzipping`() {
+        val zip = zipOf("big.bin" to ByteArray(2_000_000))
+        val dest = File(tmp, "out")
+        try {
+            BackupZip.extract(zip, dest, maxTotalBytes = 1_000_000)
+            org.junit.Assert.fail("expected a ZipException")
+        } catch (e: BackupZip.ZipException) {
+            assertTrue(e.message!!.contains("expands"))
+        }
+        assertTrue("stopped before writing it all", (File(dest, "big.bin").length()) <= 1_000_000 + 256 * 1024)
+    }
+
+    @Test
+    fun `the budget is a running total across members, not per member`() {
+        val zip = zipOf("m1" to ByteArray(300_000), "m2" to ByteArray(300_000), "m3" to ByteArray(300_000), "m4" to ByteArray(300_000))
+        try {
+            BackupZip.extract(zip, File(tmp, "out"), maxTotalBytes = 1_000_000)
+            org.junit.Assert.fail("expected a ZipException")
+        } catch (_: BackupZip.ZipException) {
+        }
+    }
+
+    @Test
+    fun `too many entries is refused`() {
+        val zip = zipOf(*(1..20).map { "f$it" to ByteArray(1) }.toTypedArray())
+        try {
+            BackupZip.extract(zip, File(tmp, "out"), maxEntries = 10)
+            org.junit.Assert.fail("expected a ZipException")
+        } catch (e: BackupZip.ZipException) {
+            assertTrue(e.message!!.contains("entries"))
+        }
+    }
+
+    @Test
+    fun `a cancellation raised between chunks stops the unzip`() {
+        val zip = zipOf("big.bin" to ByteArray(3_000_000))
+        var calls = 0
+        try {
+            BackupZip.extract(zip, File(tmp, "out"), checkCancelled = { if (++calls > 3) throw IllegalStateException("cancelled") })
+            org.junit.Assert.fail("expected the cancellation to propagate")
+        } catch (e: IllegalStateException) {
+            assertEquals("cancelled", e.message)
+        }
+        assertTrue("it did not run to the end", File(tmp, "out/big.bin").length() < 3_000_000)
+    }
+
+    @Test
+    fun `too little free storage stops the unzip`() {
+        val zip = zipOf("big.bin" to ByteArray(20_000_000))
+        try {
+            // A reserve larger than any disk: the first space check (after 16 MiB) must refuse.
+            BackupZip.extract(zip, File(tmp, "out"), freeSpaceReserve = Long.MAX_VALUE)
+            org.junit.Assert.fail("expected a ZipException")
+        } catch (e: BackupZip.ZipException) {
+            assertTrue(e.message!!.contains("storage"))
+        }
+    }
 }

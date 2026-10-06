@@ -171,6 +171,9 @@ class RcloneChunkedUpload(private val context: Context) {
                     poller?.interrupt()
                 }
 
+                // Stopped while the transfer ran: do not commit it (the catch below removes the scratch).
+                if (isCancelled()) throw CancelledException()
+
                 // The size check IS the success condition, not decoration.
                 val uploaded = remoteSize(fs, partial)
                 if (uploaded != size) {

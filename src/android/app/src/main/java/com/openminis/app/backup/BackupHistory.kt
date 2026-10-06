@@ -199,6 +199,14 @@ class BackupHistory private constructor(private val context: Context, private va
     companion object {
         private const val TAG = "Backup"
 
+        /**
+         * Whether a configured server is the place [outcome] was delivered to. A saved name can be
+         * reused after its server is removed, so the record's backend and folder must match too; a
+         * record that kept neither (written before they were stored) cannot be verified.
+         */
+        fun sameDestination(outcome: DestinationOutcome, backend: String, path: String): Boolean =
+            outcome.kind != null && outcome.path != null && outcome.kind == backend && outcome.path == path
+
         /** 30 days, matching iOS `BackupHistory.retention`. */
         const val RETENTION_MS: Long = 30L * 24 * 60 * 60 * 1000
 
