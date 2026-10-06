@@ -873,13 +873,11 @@ class PetOverlayService : Service() {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "Minis for Android", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Keeps the floating pet visible"
-                setShowBadge(false)
-            }
-            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        val channel = NotificationChannel(CHANNEL_ID, "Minis for Android", NotificationManager.IMPORTANCE_LOW).apply {
+            description = "Keeps the floating pet visible"
+            setShowBadge(false)
         }
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
     private fun startAsForeground() {

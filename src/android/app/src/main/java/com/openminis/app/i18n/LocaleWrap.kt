@@ -48,14 +48,9 @@ object LocaleWrap {
         val locale = parseLocale(code) ?: return base
         val config = Configuration(base.resources.configuration)
         Locale.setDefault(locale)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val list = LocaleList(locale)
-            LocaleList.setDefault(list)
-            config.setLocales(list)
-        } else {
-            @Suppress("DEPRECATION")
-            config.locale = locale
-        }
+        val list = LocaleList(locale)
+        LocaleList.setDefault(list)
+        config.setLocales(list)
         return base.createConfigurationContext(config)
     }
 

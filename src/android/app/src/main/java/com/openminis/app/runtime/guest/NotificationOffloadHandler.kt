@@ -58,11 +58,9 @@ class NotificationOffloadHandler(private val context: Context) : NativeOffloadHa
 
     private fun ensureChannel() {
         if (channelCreated) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT)
-            )
-        }
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT)
+        )
         channelCreated = true
     }
 
@@ -365,12 +363,10 @@ class NotificationOffloadHandler(private val context: Context) : NativeOffloadHa
             .put("notification_center_enabled", canPost)
             .put("critical_alert_enabled", false)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = nm.getNotificationChannel(CHANNEL_ID)
-            data.put("channel_id", CHANNEL_ID)
-            data.put("channel_importance", channel?.importance ?: -1)
-            data.put("channel_enabled", channel != null && channel.importance != NotificationManager.IMPORTANCE_NONE)
-        }
+        val channel = nm.getNotificationChannel(CHANNEL_ID)
+        data.put("channel_id", CHANNEL_ID)
+        data.put("channel_importance", channel?.importance ?: -1)
+        data.put("channel_enabled", channel != null && channel.importance != NotificationManager.IMPORTANCE_NONE)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
             val canSchedule = try { am?.canScheduleExactAlarms() == true } catch (_: Throwable) { false }

@@ -149,7 +149,6 @@ class BackgroundTaskNotifier(
      * cancel — and `cancelAll()` would also nuke the FG service banner.
      */
     fun cancelAllCompletedNotifications() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = ContextCompat.getSystemService(context, NotificationManager::class.java)
             ?: return
         try {
@@ -165,7 +164,6 @@ class BackgroundTaskNotifier(
     }
 
     private fun ensureChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = ContextCompat.getSystemService(context, NotificationManager::class.java)
             ?: return
         if (manager.getNotificationChannel(CHANNEL_ID) != null) return

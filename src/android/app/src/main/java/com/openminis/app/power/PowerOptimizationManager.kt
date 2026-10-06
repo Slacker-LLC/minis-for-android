@@ -40,12 +40,9 @@ object PowerOptimizationManager {
 
     /**
      * True iff the app has been added to the user's battery-optimisation
-     * exemption list. Always false below Android M (the API didn't
-     * exist) — but that's safe; the system also doesn't aggressively
-     * Doze on those versions.
+     * exemption list.
      */
     fun isIgnoringBatteryOptimizations(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
         val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return false
         return pm.isIgnoringBatteryOptimizations(context.packageName)
     }
@@ -62,8 +59,6 @@ object PowerOptimizationManager {
      * page was available on this device.
      */
     fun requestBatteryOptimizationExemption(activity: Activity): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
-
         val direct = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
             .setData(Uri.parse("package:${activity.packageName}"))
         if (tryStartActivity(activity, direct)) {

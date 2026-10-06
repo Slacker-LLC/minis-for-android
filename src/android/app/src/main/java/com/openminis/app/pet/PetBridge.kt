@@ -2,7 +2,6 @@ package com.openminis.app.pet
 
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 
 /** Small API used by OpenMinis runtime code without depending on overlay internals. */
@@ -53,8 +52,7 @@ object PetBridge {
 
     private fun startSafely(context: Context, intent: Intent) {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
-            else context.startService(intent)
+            context.startForegroundService(intent)
         } catch (e: Exception) {
             // Never let the optional pet runtime crash an agent turn on OEM ROMs
             // that reject an FGS start from a background transition.
