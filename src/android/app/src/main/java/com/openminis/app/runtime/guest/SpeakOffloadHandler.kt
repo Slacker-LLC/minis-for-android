@@ -9,6 +9,8 @@ import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
 import com.openminis.app.speech.TextToSpeechManager
+import com.openminis.app.speech.TtsInit
+import com.openminis.app.speech.awaitTtsInit
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
@@ -87,19 +89,23 @@ class SpeakOffloadHandler(private val context: Context) : NativeOffloadHandler {
         if (text.isBlank()) {
             return NativeOffloadResult(2, "android-speak: missing <text>\n$HELP")
         }
-        if (!waitForInit(2_000)) {
-            val body = JSONObject()
-                .put("error", "tts_unavailable")
-                .put(
-                    "message",
-                    "No usable text-to-speech engine is installed on this device " +
-                        "(common on Huawei HMS-only devices and some stripped China ROMs). " +
-                        "Ask the user to install a TTS engine — on most devices " +
-                        "'Google Text-to-speech' from the Play Store or an OEM equivalent works.",
-                )
-                .put("available_engines", JSONArray(probeEngineNames()))
-                .toString()
-            return NativeOffloadResult(1, OffloadOutput.formatBody(body, args) + "\n")
+        when (waitForInit(TextToSpeechManager.INIT_TIMEOUT_MS)) {
+            TtsInit.READY -> Unit
+            TtsInit.NOT_READY -> return notReady(args)
+            TtsInit.FAILED -> {
+                val body = JSONObject()
+                    .put("error", "tts_unavailable")
+                    .put(
+                        "message",
+                        "No usable text-to-speech engine is installed on this device " +
+                            "(common on Huawei HMS-only devices and some stripped China ROMs). " +
+                            "Ask the user to install a TTS engine — on most devices " +
+                            "'Google Text-to-speech' from the Play Store or an OEM equivalent works.",
+                    )
+                    .put("available_engines", JSONArray(probeEngineNames()))
+                    .toString()
+                return NativeOffloadResult(1, OffloadOutput.formatBody(body, args) + "\n")
+            }
         }
 
         // Voice / language: --voice takes precedence and is treated as a
@@ -154,26 +160,43 @@ class SpeakOffloadHandler(private val context: Context) : NativeOffloadHandler {
      *   - `Voice.features`        → no gender field, marked "unspecified"
      */
     private fun cmdVoices(args: OffloadArgs): NativeOffloadResult {
-        if (!waitForInit(2_000)) {
-            val body = JSONObject()
-                .put("error", "tts_unavailable")
-                .put("voices", JSONArray())
-                .put("count", 0)
-                .toString()
-            return NativeOffloadResult(1, OffloadOutput.formatBody(body, args) + "\n")
+        when (waitForInit(TextToSpeechManager.INIT_TIMEOUT_MS)) {
+            TtsInit.READY -> Unit
+            TtsInit.NOT_READY -> return notReady(args)
+            TtsInit.FAILED -> {
+                val body = JSONObject()
+                    .put("error", "tts_unavailable")
+                    .put("voices", JSONArray())
+                    .put("count", 0)
+                    .toString()
+                return NativeOffloadResult(1, OffloadOutput.formatBody(body, args) + "\n")
+            }
         }
         val languagePrefix = args.get("language")
         val items = JSONArray()
-        // Pull voices through a fresh probe — the long-lived
-        // [TextToSpeechManager] doesn't expose them, and a probe is cheap.
-        val probe = TextToSpeech(context.applicationContext, null)
+        // Voices come from a fresh probe (the long-lived manager does not expose them), and the probe
+        // has its own binding: it answers `voices` with null until ITS OnInitListener has fired, so
+        // wait for that rather than for the manager, and tell "could not bind" from "no voices".
+        val bound = java.util.concurrent.CountDownLatch(1)
+        val status = java.util.concurrent.atomic.AtomicInteger(TextToSpeech.ERROR)
+        val probe = TextToSpeech(context.applicationContext) { s ->
+            status.set(s)
+            bound.countDown()
+        }
         try {
-            // Voices are enumerable as soon as the engine is installed; a
-            // 200ms post-construction settle is enough on every device I've
-            // tested. waitForInit above already established this engine is
-            // alive globally, so the probe constructor inheriting the same
-            // engine binding shouldn't need a long wait.
-            Thread.sleep(200)
+            val answered = try {
+                bound.await(TextToSpeechManager.INIT_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                false
+            }
+            if (!answered || status.get() != TextToSpeech.SUCCESS) {
+                val body = JSONObject()
+                    .put("error", if (answered) "tts_unavailable" else "tts_not_ready")
+                    .put("message", "The speech engine could not be queried for its voices; this is not an empty list.")
+                    .toString()
+                return NativeOffloadResult(1, OffloadOutput.formatBody(body, args) + "\n")
+            }
             val voices: Set<Voice>? = probe.voices
             voices?.forEach { v ->
                 val tag = v.locale?.toLanguageTag() ?: ""
@@ -204,11 +227,23 @@ class SpeakOffloadHandler(private val context: Context) : NativeOffloadHandler {
         return NativeOffloadResult(0, OffloadOutput.formatBody(body, args) + "\n")
     }
 
+    private fun notReady(args: OffloadArgs): NativeOffloadResult {
+        val body = JSONObject()
+            .put("error", "tts_not_ready")
+            .put(
+                "message",
+                "The speech engine is still starting up. Try again in a moment; this does not mean " +
+                    "that no engine is installed.",
+            )
+            .toString()
+        return NativeOffloadResult(1, OffloadOutput.formatBody(body, args) + "\n")
+    }
+
     // ── Diagnostics (Android-only, no iOS analogue) ──────────────────────────
 
     private fun buildStatus(args: OffloadArgs): NativeOffloadResult {
         val engines = probeEngineNames()
-        val ready = waitForInit(500)
+        val ready = waitForInit(500) == TtsInit.READY
         val body = JSONObject()
             .put("ready", ready)
             .put("speaking", tts.isSpeaking.value)
@@ -218,13 +253,8 @@ class SpeakOffloadHandler(private val context: Context) : NativeOffloadHandler {
         return NativeOffloadResult(0, OffloadOutput.formatBody(body.toString(2), args) + "\n")
     }
 
-    private fun waitForInit(timeoutMs: Long): Boolean {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (!tts.isInitialized && System.currentTimeMillis() < deadline) {
-            try { Thread.sleep(50) } catch (_: InterruptedException) { break }
-        }
-        return tts.isInitialized
-    }
+    private fun waitForInit(timeoutMs: Long): TtsInit =
+        awaitTtsInit(timeoutMs, { tts.isInitialized }, { tts.initFailed })
 
     /** Best-effort: enumerate installed TTS engines via a throw-away TextToSpeech probe. */
     private fun probeEngineNames(): List<String> {
