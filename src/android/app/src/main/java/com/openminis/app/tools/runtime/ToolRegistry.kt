@@ -80,6 +80,7 @@ object ToolRegistry {
      * The arguments to hand the handler for a call made by [name]. Unchanged unless [name] is an
      * action alias and the arguments carry no action, in which case the alias becomes the action.
      */
+    @Synchronized
     fun argsForCall(name: String, argsJson: String): String {
         val alias = actionAliases.firstOrNull { it == name } ?: actionAliases.firstOrNull {
             it.equals(name, ignoreCase = true) || normalize(it) == normalize(name)
