@@ -44,7 +44,7 @@ HTTP/DNS 检查仍可用受控的 `curl`。
 
 小米 `24129PN74C` 真机已验证这些命令的 PATH 入口：`android-alarm`、`android-calendar`、`android-clipboard`、`android-contacts`、`android-device`、`android-location`、`android-notification`、`android-open`、`android-photos`、`android-player`、`android-speak`、`android-speech`、`android-weather`、`android-a11y-cli`、`android-shizuku-cli`、`minis-browser-use`、`minis-scheduled`、`minis-sessions-cli`、`minis-config`、`minis-model-use`、`minis-open` 及其浏览器别名；Debug APK 另有 `minis-debug`。`android-device info` 和多个 `--help`/`--version` 调用已获得实际输出。
 
-**仍未补齐：`minis-mcp-cli`。** 上游 Python 命令随旧资产树删除后，当前 Guest 没有同名入口；Android 原生 MCP client/server 不是 CLI 的等价替代。`MCPRepository.mcpPromptFragment()` 仍引导模型运行 `minis-mcp-cli tools/call`，实际会遇到命令不存在。
+**仍未补齐：`minis-mcp-cli`。** 上游 Python 命令随旧资产树删除后，当前 Guest 没有同名入口；Android 原生 MCP client/server 不是 CLI 的等价替代。提示词这一侧已经不再引导模型运行该命令：`MCPRepository.mcpPromptFragment()` 现在让模型直接调用 `mcp_<server>_<tool>` 工具。缺的只是 Guest 内的 CLI 入口本身。另外，原生 client 的 STDIO 服务目前在 Android 宿主进程里启动，而不是在 Ubuntu Guest 里，装在 Guest 里的 MCP 服务无法通过 STDIO 连接（2026-10-04 审计 F29，未修复）。
 
 旧 launcher 的 `apk add`/pip 自安装逻辑需要适配 Ubuntu，但 Python MCP 客户端并不天然依赖旧 PRoot。后续应补齐显式安装、依赖、App-owned 配置、权限与进程生命周期，再测试 `tools/list`、调用、配置重载和退出清理；不能把缺失的用户能力归为“旧架构所以不用保留”。本次文档整理只如实记录，不声称已经修复。
 

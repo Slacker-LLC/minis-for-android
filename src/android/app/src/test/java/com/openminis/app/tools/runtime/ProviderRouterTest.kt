@@ -30,6 +30,9 @@ class ProviderRouterTest {
             com.openminis.app.tools.ToolExecutionResult(output, true)
     }
 
+    /** A provider that only claims prefixes; routing is what these tests pin. */
+    private class ClaimingProvider(override val id: String, override val prefixes: List<String>) : ToolProvider
+
     @Before
     fun reset() {
         ProviderRouter.reset()
@@ -37,12 +40,12 @@ class ProviderRouterTest {
 
     @Test
     fun `prefix routing maps each tool name to its claiming provider`() {
-        ProviderRouter.register(PrefixProvider("android", listOf("android.")))
-        ProviderRouter.register(PrefixProvider("linux", listOf("linux.")))
-        ProviderRouter.register(PrefixProvider("core", listOf("system.", "agent.")))
-        ProviderRouter.register(PrefixProvider("mcp", listOf("mcp.")))
-        ProviderRouter.register(PrefixProvider("skill", listOf("skill.")))
-        ProviderRouter.register(PrefixProvider("root", listOf("root.")))
+        ProviderRouter.register(ClaimingProvider("android", listOf("android.")))
+        ProviderRouter.register(ClaimingProvider("linux", listOf("linux.")))
+        ProviderRouter.register(ClaimingProvider("core", listOf("system.", "agent.")))
+        ProviderRouter.register(ClaimingProvider("mcp", listOf("mcp.")))
+        ProviderRouter.register(ClaimingProvider("skill", listOf("skill.")))
+        ProviderRouter.register(ClaimingProvider("root", listOf("root.")))
 
         assertEquals("android", ProviderRouter.route("android.capabilities")?.id)
         assertEquals("linux", ProviderRouter.route("linux.shell")?.id)
@@ -61,7 +64,7 @@ class ProviderRouterTest {
 
     @Test
     fun `prefix boundary does not match without trailing dot`() {
-        ProviderRouter.register(PrefixProvider("android", listOf("android.")))
+        ProviderRouter.register(ClaimingProvider("android", listOf("android.")))
         assertNotNull(ProviderRouter.route("android.capabilities"))
         assertNull(ProviderRouter.route("androidx.foo"))
     }

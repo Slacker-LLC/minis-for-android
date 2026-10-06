@@ -821,30 +821,15 @@ class MinisApp : Application(), ImageLoaderFactory {
             aliasNames = listOf("ralph"),
         )
 
-        // P4 / 06 §1: register providers claiming tool-name prefixes.
-        // LinuxProvider gates linux.* on the Ubuntu runtime being available;
-        // the rest are pass-through PrefixProviders (semantics land in P5+).
+        // LinuxProvider gates linux.* on the Ubuntu runtime being available (file tools excepted,
+        // execution tools try to revive it). Other prefixes have no provider semantics, so their
+        // handlers run directly.
         com.openminis.app.tools.runtime.ProviderRouter.reset()
         com.openminis.app.tools.runtime.ProviderRouter.register(
             com.openminis.app.tools.runtime.LinuxProvider(
                 available = { UbuntuRuntime.snapshot.value.available },
                 revive = { UbuntuRuntime.ensureReady().running },
             ),
-        )
-        com.openminis.app.tools.runtime.ProviderRouter.register(
-            com.openminis.app.tools.runtime.PrefixProvider("android", listOf("android.")),
-        )
-        com.openminis.app.tools.runtime.ProviderRouter.register(
-            com.openminis.app.tools.runtime.PrefixProvider("root", listOf("root.")),
-        )
-        com.openminis.app.tools.runtime.ProviderRouter.register(
-            com.openminis.app.tools.runtime.PrefixProvider("core", listOf("system.", "agent.")),
-        )
-        com.openminis.app.tools.runtime.ProviderRouter.register(
-            com.openminis.app.tools.runtime.PrefixProvider("mcp", listOf("mcp.")),
-        )
-        com.openminis.app.tools.runtime.ProviderRouter.register(
-            com.openminis.app.tools.runtime.PrefixProvider("skill", listOf("skill.")),
         )
         com.openminis.app.tools.BotDelegationCoordinator.current()?.recoverAfterProcessStart()
 
