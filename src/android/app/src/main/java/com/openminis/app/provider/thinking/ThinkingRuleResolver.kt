@@ -495,13 +495,43 @@ object ThinkingRuleResolver {
                 null to null
             }
 
+            is ThinkingWireFormat.BooleanToggle -> {
+                putPath(body, format.path, ctx.level.isEnabled)
+                null to null
+            }
+
+            is ThinkingWireFormat.ExtraBodyToggle -> {
+                putPath(body, format.path, ctx.level.isEnabled)
+                null to null
+            }
+
+            is ThinkingWireFormat.CustomPath -> {
+                // The tier's own string when thinking is on; the rule's offValue (if any) when off.
+                // A tier the rule has no value for, or no offValue, leaves the field out.
+                val value = if (ctx.level.isEnabled) format.values[ctx.level] else format.offValue
+                if (value != null) putPath(body, format.path, value)
+                null to null
+            }
+
             else -> {
-                // Phase 1: declared for vocabulary completeness, never resolved to on this
-                // path. Reaching here means the registry named a format the OpenAI emitter
-                // cannot produce — a programmer error, not a runtime condition.
-                error("ThinkingWireFormat $format is not emitted on the OpenAI path in Phase 1")
+                // A format this emitter has no wire shape for (the Gemini/Anthropic ones live in
+                // their own providers). A saved rule must not make every request fail: send
+                // nothing for thinking and say so in the log.
+                android.util.Log.w("ThinkingRules", "ThinkingWireFormat $format has no OpenAI wire shape; sending no thinking parameter")
+                null to null
             }
         }
+    }
+
+    /** Sets `a.b.c` in [body] to [value], creating the intermediate objects. */
+    internal fun putPath(body: JSONObject, path: String, value: Any) {
+        val parts = path.split('.').filter { it.isNotEmpty() }
+        if (parts.isEmpty()) return
+        var node = body
+        for (part in parts.dropLast(1)) {
+            node = node.optJSONObject(part) ?: JSONObject().also { node.put(part, it) }
+        }
+        node.put(parts.last(), value)
     }
 
     // ---- Gemini / Anthropic (Phase 2 §1) ----
