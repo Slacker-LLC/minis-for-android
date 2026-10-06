@@ -341,6 +341,11 @@ class BackupExporter(
         // Android-only, preserved per §2.2 rule 4.
         put("editCount", JsonPrimitive(s.editCount))
         put("thinkingOverride", s.thinkingOverride?.let(::JsonPrimitive) ?: JsonNull)
+        // Android-only session identity: the bound character (card snapshot), the per-session
+        // settings and the owning bot. Stored verbatim; the importer validates them.
+        put("roleplayJson", s.roleplayJson?.let(::JsonPrimitive) ?: JsonNull)
+        put("sessionOverrides", s.sessionOverrides?.let(::JsonPrimitive) ?: JsonNull)
+        put("botId", s.botId?.let(::JsonPrimitive) ?: JsonNull)
     }
 
     /**
@@ -396,6 +401,8 @@ class BackupExporter(
         put("boundaryMessageId", c.boundaryMessageId?.let(::JsonPrimitive) ?: JsonNull)
         put("firstKeptMessageId", c.firstKeptMessageId?.let(::JsonPrimitive) ?: JsonNull)
         put("lastCompactedMessageId", c.lastCompactedMessageId?.let(::JsonPrimitive) ?: JsonNull)
+        // 2 = the anchor model the current compactor writes; a package without it is read as 1.
+        put("version", JsonPrimitive(c.version))
     }
 
     private fun folderRecord(f: FolderEntity): JsonElement = buildJsonObject {
