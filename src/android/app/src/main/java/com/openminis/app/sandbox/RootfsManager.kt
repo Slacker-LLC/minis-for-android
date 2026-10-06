@@ -154,8 +154,8 @@ class RootfsManager private constructor(private val context: Context) {
         internal const val MAX_MANAGED_CONFIG_BYTES = 64 * 1024
         private val MANAGED_ROOTFS_CONFIGS = setOf(
             "etc/apt/sources.list.d/ubuntu.sources",
-            "etc/pip/pip.conf",
-            "root/.npmrc",
+            "etc/pip.conf",
+            "etc/npmrc",
         )
         private val REQUIRED_LAYOUT = listOf(
             "etc/os-release",

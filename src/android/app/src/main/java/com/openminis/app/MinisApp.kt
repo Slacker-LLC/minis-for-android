@@ -486,6 +486,11 @@ class MinisApp : Application(), ImageLoaderFactory {
         // MCPProvider: Minis as MCP client — connect configured servers and
         // register their tools as mcp.<server>.<tool> (hot-reloadable).
         com.openminis.app.mcp.client.MCPProvider.init(mcpRepository, this) { envVarRepository.allAsDict() }
+        // A rootfs installed, repaired or reset from the packaged image has stock package-manager
+        // config; put the user's chosen mirrors back.
+        com.openminis.app.runtime.ubuntu.UbuntuKernel.onRootfsReplaced = {
+            com.openminis.app.ui.sandbox.MirrorSpeedTestViewModel.applyAllActiveMirrors(this)
+        }
         com.openminis.app.mcp.client.MCPProvider.reload()
         memoryRepository = MemoryRepository()
         webAppShortcutRepository = WebAppShortcutRepository(database.webAppShortcutDao())

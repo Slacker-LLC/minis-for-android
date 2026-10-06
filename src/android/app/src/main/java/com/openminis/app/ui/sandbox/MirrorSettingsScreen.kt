@@ -89,8 +89,10 @@ enum class MirrorCategory(
     val configPath: String,
 ) {
     UBUNTU_APT("apt", "Ubuntu APT", "etc/apt/sources.list.d/ubuntu.sources"),
-    PIP("pip", "Python pip", "etc/pip/pip.conf"),
-    NPM("npm", "Node.js npm", "root/.npmrc");
+    // pip reads /etc/pip.conf as its global file; npm on Ubuntu reads /etc/npmrc as its global config.
+    // (The guest runs as the App UID with HOME=/home/minis, so a /root/.npmrc is never read.)
+    PIP("pip", "Python pip", "etc/pip.conf"),
+    NPM("npm", "Node.js npm", "etc/npmrc");
 
     val icon: ImageVector
         get() = when (this) {

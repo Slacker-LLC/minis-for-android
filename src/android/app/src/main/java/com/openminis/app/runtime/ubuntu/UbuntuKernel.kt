@@ -36,6 +36,9 @@ internal object UbuntuKernel {
     /** Under the App-owned migration root: one empty file per legacy tree that finished copying. */
     private const val MIGRATION_PROGRESS_DIR = ".legacy-migration"
 
+    /** Guest PATH: the user's persistent tool directory, then the system directories. */
+    internal const val GUEST_PATH = "/home/minis/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
     data class Status(
         val ready: Boolean,
         val appUid: Int? = null,
@@ -291,8 +294,16 @@ internal object UbuntuKernel {
             )
         }
         GuestCommandBridge.invalidateGuestCli()
-        return inspectRootfsLocked()
+        val after = inspectRootfsLocked()
+        // A fresh tree carries the stock package-manager config: let the user's mirror choices be
+        // applied again. The callback only schedules work (it needs this lock to write).
+        if (after.healthy) onRootfsReplaced?.let { runCatching { it() } }
+        return after
     }
+
+    /** Called after the rootfs has been installed or replaced from the packaged image (install, repair, reset). */
+    @Volatile
+    var onRootfsReplaced: (() -> Unit)? = null
 
     suspend fun resetRootfs(): Boolean = lock.withLock {
         val rootfs = UbuntuPaths.HOST_ROOTFS
@@ -612,7 +623,9 @@ internal object UbuntuKernel {
             "LANG" to "C.UTF-8",
             "LC_ALL" to "C.UTF-8",
             "HOME" to "/home/minis",
-            "PATH" to "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            // ~/.local/bin first: `pip install --user` and similar put their console commands there,
+            // and the HOME is App-owned and persistent, so those tools must be found by name.
+            "PATH" to GUEST_PATH,
             "BROWSER" to "/usr/local/bin/minis-open",
             "TZ" to RuntimePathRegistry.posixTz(),
             "MINIS_CHAT_SESSION_ID" to sessionId.orEmpty(),
