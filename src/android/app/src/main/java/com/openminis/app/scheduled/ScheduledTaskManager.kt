@@ -47,6 +47,7 @@ class ScheduledTaskManager(private val context: Context) {
             require(ScheduledTaskPolicy.withinBotRoutineLimit(store.all(), task)) {
                 "Bot routine limit reached (${ScheduledTask.MAX_ROUTINES_PER_BOT} routines per Bot)"
             }
+            ScheduledTaskPolicy.schedulingProblem(task)?.let { throw IllegalArgumentException(it) }
             store.upsert(task)
             if (task.enabled) registerAlarm(task)
             task
@@ -73,6 +74,7 @@ class ScheduledTaskManager(private val context: Context) {
             require(ScheduledTaskPolicy.withinBotRoutineLimit(store.all(), task, excludingTaskId = task.id)) {
                 "Bot routine limit reached (${ScheduledTask.MAX_ROUTINES_PER_BOT} routines per Bot)"
             }
+            ScheduledTaskPolicy.schedulingProblem(task)?.let { throw IllegalArgumentException(it) }
             cancelAlarm(task.id)
             store.upsert(task)
             if (task.enabled) registerAlarm(task)

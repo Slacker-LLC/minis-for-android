@@ -1093,6 +1093,13 @@ class MinisApp : Application(), ImageLoaderFactory {
                         } catch (t: Throwable) {
                             Log.w("MinisApp", "broadcastTimezoneChange failed: ${t.message}")
                         }
+                        // Alarms hold an absolute time: "09:00 daily" registered under the old zone
+                        // would otherwise keep firing at the old zone's 09:00.
+                        try {
+                            com.openminis.app.scheduled.ScheduledTaskManager(this@MinisApp).rescheduleAll()
+                        } catch (t: Throwable) {
+                            Log.w("MinisApp", "rescheduleAll after timezone change failed: ${t.message}")
+                        }
                     }
                     android.net.Proxy.PROXY_CHANGE_ACTION -> scope.launch {
                         try {
