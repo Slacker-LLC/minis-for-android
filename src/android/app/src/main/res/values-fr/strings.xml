@@ -399,6 +399,7 @@
     <string name="storage_clear_session_footer">Supprime tous les fichiers générés par cette session. La conversation elle-même sera conservée.</string>
     <string name="storage_browse_files">Parcourir les fichiers</string>
     <string name="storage_clearing_status">Suppression…</string>
+    <string name="storage_clear_incomplete">Certains fichiers multimédias n\'ont pas pu être supprimés. Les tailles affichées correspondent à ce qui reste.</string>
     <string name="storage_clear_session_button">Effacer les fichiers de session</string>
     <string name="storage_clear_confirm_title">Effacer les fichiers de session ?</string>
     <string name="usage_title">Utilisation</string>

@@ -1550,6 +1550,7 @@
     <string name="storage_clear_session_footer">刪除此會話生成的所有檔案。對話內容本身將保留。</string>
     <string name="storage_browse_files">瀏覽檔案</string>
     <string name="storage_clearing_status">清除中…</string>
+    <string name="storage_clear_incomplete">部分媒體檔案未能刪除，顯示的是剩餘的大小。</string>
     <string name="storage_clear_session_button">清除會話檔案</string>
     <string name="storage_clear_confirm_title">清除會話檔案？</string>
     <string name="usage_title">用量</string>

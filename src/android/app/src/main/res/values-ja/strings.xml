@@ -399,6 +399,7 @@
     <string name="storage_clear_session_footer">このセッションで生成されたすべてのファイルを削除します。会話自体は保持されます。</string>
     <string name="storage_browse_files">ファイルを閲覧</string>
     <string name="storage_clearing_status">削除中…</string>
+    <string name="storage_clear_incomplete">一部のメディアファイルを削除できませんでした。表示されているのは残りのサイズです。</string>
     <string name="storage_clear_session_button">セッションファイルを削除</string>
     <string name="storage_clear_confirm_title">セッションファイルを削除しますか？</string>
     <string name="usage_title">使用量</string>

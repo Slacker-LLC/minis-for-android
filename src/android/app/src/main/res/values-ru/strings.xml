@@ -666,6 +666,7 @@
     <string name="storage_clear_session_footer">Удаляет все файлы, созданные этой сессией. Сам разговор будет сохранён.</string>
     <string name="storage_browse_files">Просмотр файлов</string>
     <string name="storage_clearing_status">Очистка…</string>
+    <string name="storage_clear_incomplete">Не удалось удалить некоторые медиафайлы. Показан размер оставшегося.</string>
     <string name="storage_clear_session_button">Очистить файлы сессии</string>
     <string name="storage_clear_confirm_title">Очистить файлы сессии?</string>
     <string name="usage_title">Использование</string>

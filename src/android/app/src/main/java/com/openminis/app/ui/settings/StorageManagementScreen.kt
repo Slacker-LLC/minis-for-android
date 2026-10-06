@@ -328,11 +328,19 @@ fun SessionStorageDetailScreen(
                                 SESSION_GUEST_ROOTS.forEach { root ->
                                     WorkspaceFileClient.deleteChildren(sessionId, root)
                                 }
+                                deleteSessionMedia(mediaDir, sessionId)
                             }
-                            deleteSessionMedia(mediaDir, sessionId)
-                        }.onSuccess {
-                            minisSize = 0L
-                            mediaSize = 0L
+                        }.onSuccess { mediaGone ->
+                            if (mediaGone) {
+                                minisSize = 0L
+                                mediaSize = 0L
+                            } else {
+                                // Some media files are still there: show what is left, not zero.
+                                reload()
+                                android.widget.Toast.makeText(
+                                    context, R.string.storage_clear_incomplete, android.widget.Toast.LENGTH_LONG,
+                                ).show()
+                            }
                         }.onFailure {
                             reload()
                         }
@@ -425,11 +433,14 @@ private fun mediaSizesBySession(mediaDir: File, sessionIds: Set<String>): Map<St
     return sizes
 }
 
-private fun deleteSessionMedia(mediaDir: File, sessionId: String) {
-    if (!mediaDir.exists()) return
-    mediaDir.walkTopDown().forEach { dir ->
-        if (dir.isDirectory && dir.name == sessionId) {
-            dir.deleteRecursively()
-        }
+/** Removes the session's media folders; false when any of them could not be removed completely. */
+internal fun deleteSessionMedia(mediaDir: File, sessionId: String): Boolean {
+    if (!mediaDir.exists()) return true
+    var allGone = true
+    // Collected first: deleting while walking would invalidate the walk.
+    val targets = mediaDir.walkTopDown().filter { it.isDirectory && it.name == sessionId }.toList()
+    for (dir in targets) {
+        if (dir.exists() && !dir.deleteRecursively()) allGone = false
     }
+    return allGone
 }
