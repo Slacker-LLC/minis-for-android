@@ -49,7 +49,7 @@
   },
   "nameCases": {
     "serverInput": "planner/service 2",
-    "serverSanitized": "planner_service_2",
+    "serverSanitized": "planner_service_2_0ff31d",
     "canonicalToolName": "mcp.planner-service.remote/tool 2",
     "providerWireName": "mcp_planner-service_remote_tool_2"
   }

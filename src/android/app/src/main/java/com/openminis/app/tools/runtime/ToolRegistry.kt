@@ -9,6 +9,11 @@ import com.openminis.app.util.shellQuote
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
+/**
+ * Every read and write holds the registry's monitor: MCP reloads register and unregister tools on an
+ * IO thread while a turn reads definitions and resolves names, and handlers and aliases must change
+ * together. Readers get snapshots, never the live maps.
+ */
 object ToolRegistry {
     private val handlers = linkedMapOf<String, ToolHandler>()
     private val aliases = linkedMapOf<String, String>()
@@ -24,18 +29,44 @@ object ToolRegistry {
         name.lowercase().filter { it.isLetterOrDigit() }
 
     /**
+     * Register [handler] under its name, its wire name and [aliasNames]. Registering the same name again
+     * replaces that handler. A name or wire name that already belongs to a DIFFERENT tool is a conflict:
+     * the call is refused and false returned, because silently re-pointing a name would send the model's
+     * call to the wrong tool (two MCP servers or tools whose names sanitize alike). An alias another tool
+     * already holds is left with that tool and skipped.
+     *
      * @param aliasesAreActions the aliases are action names of this handler; a call by alias gets
      *   `action=<alias>` when it does not carry an action itself.
      */
-    fun register(handler: ToolHandler, aliasNames: List<String> = emptyList(), aliasesAreActions: Boolean = false) {
+    @Synchronized
+    fun register(handler: ToolHandler, aliasNames: List<String> = emptyList(), aliasesAreActions: Boolean = false): Boolean {
         val defName = handler.definition.name
-        handlers[defName] = handler
         val apiName = handler.definition.apiName
+        fun ownerOf(name: String) = aliases[name] ?: name.takeIf { handlers.containsKey(it) }
+        // The tool's own names must be free: a collision there would send the model's call to
+        // the wrong tool. An alias is a convenience: one already held by another tool stays
+        // with it and only that alias is dropped, so the tool itself still registers.
+        val conflict = listOf(defName, apiName).distinct().firstOrNull { name ->
+            ownerOf(name).let { it != null && it != defName }
+        }
+        if (conflict != null) {
+            android.util.Log.w("ToolRegistry", "refused $defName: '$conflict' already names another tool")
+            return false
+        }
+        val freeAliases = aliasNames.filter { name ->
+            ownerOf(name).let { it == null || it == defName }
+        }
+        (aliasNames - freeAliases.toSet()).forEach {
+            android.util.Log.w("ToolRegistry", "alias '$it' of $defName stays with ${ownerOf(it)}")
+        }
+        handlers[defName] = handler
         if (apiName != defName) aliases[apiName] = defName
-        for (a in aliasNames) aliases[a] = defName
-        if (aliasesAreActions) actionAliases.addAll(aliasNames)
+        for (a in freeAliases) aliases[a] = defName
+        if (aliasesAreActions) actionAliases.addAll(freeAliases)
+        return true
     }
 
+    @Synchronized
     fun unregister(name: String) {
         val canonical = canonicalName(name) ?: return
         handlers.remove(canonical)
@@ -58,6 +89,7 @@ object ToolRegistry {
         return args.put("action", alias).toString()
     }
 
+    @Synchronized
     fun canonicalName(name: String): String? {
         if (handlers.containsKey(name)) return name
         aliases[name]?.let { return it }
@@ -82,9 +114,11 @@ object ToolRegistry {
         return null
     }
 
+    @Synchronized
     fun aliasesFor(canonicalName: String): List<String> =
         aliases.filterValues { it == canonicalName }.keys.toList()
 
+    @Synchronized
     fun allKnownNames(canonicalName: String): Set<String> {
         val canonical = canonicalName(canonicalName) ?: canonicalName
         val result = mutableSetOf(canonical)
@@ -95,9 +129,13 @@ object ToolRegistry {
         return result
     }
 
+    @Synchronized
     fun definition(name: String): AgentToolDefinition? = canonicalName(name)?.let { handlers[it]?.definition }
+    @Synchronized
     fun definitions(): List<AgentToolDefinition> = handlers.values.map { it.definition }
+    @Synchronized
     fun handler(name: String): ToolHandler? = canonicalName(name)?.let { handlers[it] }
+    @Synchronized
     fun contains(name: String): Boolean = canonicalName(name) != null
 
     fun definitionsForCaller(caller: String): List<AgentToolDefinition> {

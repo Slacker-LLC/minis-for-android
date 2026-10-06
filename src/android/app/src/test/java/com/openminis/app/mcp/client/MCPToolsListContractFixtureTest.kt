@@ -73,11 +73,9 @@ class MCPToolsListContractFixtureTest {
     fun `fixture pins server and provider wire sanitization`() {
         val names = fixture().getJSONObject("nameCases")
 
-        // MCPProvider.sanitizeId is private by design; reflection keeps this
-        // regression test production-neutral while asserting the current rule.
-        val sanitize = MCPProvider::class.java.getDeclaredMethod("sanitizeId", String::class.java)
-        sanitize.isAccessible = true
-        val sanitized = sanitize.invoke(MCPProvider, names.getString("serverInput")) as String
+        // An id that needs replacing keeps a short digest of the original, so two ids
+        // that sanitize alike (`docs one`, `docs_one`) stay distinct servers.
+        val sanitized = MCPProvider.sanitizeId(names.getString("serverInput"))
         assertEquals(names.getString("serverSanitized"), sanitized)
 
         val definition = AgentToolDefinition(

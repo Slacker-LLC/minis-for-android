@@ -556,7 +556,9 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileMoveHandler(), listOf("move_file"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileDeleteHandler(), listOf("delete_file"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileListHandler(), listOf("list_files"))
-        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileSearchHandler(), listOf("search_files"))
+        // No "search_files" alias here: that name belongs to android.media.files below (the registry
+        // used to let the later registration take it silently; it is now explicit).
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileSearchHandler())
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileGrepHandler(), listOf("file_grep"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileHeadTailHandler(), listOf("file_head_tail"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileInfoHandler(), listOf("file_info"))
