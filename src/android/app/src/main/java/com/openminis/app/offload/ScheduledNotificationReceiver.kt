@@ -74,6 +74,78 @@ class ScheduledNotificationReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         }
+
+        /** The alarm token for scheduled notification [id]; the same one for set, cancel and restore. */
+        fun alarmIntentFor(context: Context, id: String, title: String?, body: String?): PendingIntent {
+            val intent = Intent(context, ScheduledNotificationReceiver::class.java).apply {
+                putExtra(EXTRA_ID, id)
+                if (title != null) putExtra(EXTRA_TITLE, title)
+                if (body != null) putExtra(EXTRA_BODY, body)
+            }
+            return PendingIntent.getBroadcast(
+                context, requestCodeFor(id), intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
+
+        fun requestCodeFor(id: String): Int = id.hashCode() and 0x7FFFFFFF
+
+        /** Removes the pending entry for [id] and posts its notification. */
+        fun deliver(context: Context, id: String, title: String, body: String) {
+            // Drop the prefs entry so `pending` no longer surfaces it.
+            try {
+                ScheduledNotificationStore(context).remove(id)
+            } catch (e: Throwable) {
+                AppLogger.warning(TAG, "remove($id) failed: ${e.message}")
+            }
+
+            val notifId = requestCodeFor(id)
+            val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setAutoCancel(true)
+                .setContentIntent(contentIntentFor(context, notifId))
+                .build()
+            try {
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE)
+                    as android.app.NotificationManager
+                nm.notify(notifId, notification)
+            } catch (e: SecurityException) {
+                AppLogger.error(TAG, "post denied — POST_NOTIFICATIONS missing: ${e.message}")
+            }
+        }
+
+        /**
+         * After a reboot (the system drops every alarm) put the stored scheduled notifications back:
+         * future ones are re-armed, ones that came due while the device was off are delivered now,
+         * ones more than an hour overdue are dropped.
+         */
+        fun restoreAfterBoot(context: Context, now: Long = System.currentTimeMillis()) {
+            val store = ScheduledNotificationStore(context)
+            val all = store.loadAll()
+            val am = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            for (i in 0 until all.length()) {
+                val entry = all.getJSONObject(i)
+                val id = entry.optString("id")
+                if (id.isEmpty()) continue
+                val title = entry.optString("title")
+                val body = entry.optString("body")
+                when (ScheduledNotificationStore.restoreAction(entry, now)) {
+                    ScheduledNotificationStore.Companion.RestoreAction.RESCHEDULE -> try {
+                        am.setExactAndAllowWhileIdle(
+                            android.app.AlarmManager.RTC_WAKEUP,
+                            entry.optLong("trigger_at_ms"),
+                            alarmIntentFor(context, id, title, body),
+                        )
+                    } catch (e: SecurityException) {
+                        AppLogger.warning(TAG, "restore($id): exact alarm denied: ${e.message}")
+                    }
+                    ScheduledNotificationStore.Companion.RestoreAction.DELIVER_NOW -> deliver(context, id, title, body)
+                    ScheduledNotificationStore.Companion.RestoreAction.DROP -> store.remove(id)
+                }
+            }
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -81,28 +153,7 @@ class ScheduledNotificationReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "Minis"
         val body = intent.getStringExtra(EXTRA_BODY) ?: ""
         AppLogger.debug(TAG, "scheduled notification fired: id=$id title='$title'")
-
-        // Drop the prefs entry so `pending` no longer surfaces it.
-        try {
-            ScheduledNotificationStore(context).remove(id)
-        } catch (e: Throwable) {
-            AppLogger.warning(TAG, "remove($id) failed: ${e.message}")
-        }
-
-        val notifId = id.hashCode() and 0x7FFFFFFF
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
-            .setContentText(body)
-            .setAutoCancel(true)
-            .setContentIntent(contentIntentFor(context, notifId))
-            .build()
-        try {
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE)
-                as android.app.NotificationManager
-            nm.notify(notifId, notification)
-        } catch (e: SecurityException) {
-            AppLogger.error(TAG, "post denied — POST_NOTIFICATIONS missing: ${e.message}")
-        }
+        deliver(context, id, title, body)
     }
+
 }
