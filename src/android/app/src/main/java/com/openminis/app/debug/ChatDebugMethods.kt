@@ -124,6 +124,25 @@ internal object ChatDebugMethods {
         }
     }
 
+    /** Block types that carry a user attachment: the current `mediaRef` and the older inline kinds. */
+    internal fun isAttachmentPart(type: String): Boolean =
+        type == "mediaRef" || type == "image" || type == "file" || type == "attachment"
+
+    internal fun isToolPart(type: String): Boolean = type in TOOL_PART_TYPES
+
+    private val TOOL_PART_TYPES = setOf("toolUse", "tool_call", "tool_use", "toolResult", "tool_result")
+
+    internal fun visibleParts(parts: JSONArray, includeTools: Boolean): JSONArray {
+        if (includeTools) return parts
+        val out = JSONArray()
+        for (i in 0 until parts.length()) {
+            val block = parts.opt(i)
+            val type = (block as? JSONObject)?.optString("type").orEmpty()
+            if (!isToolPart(type)) out.put(block)
+        }
+        return out
+    }
+
     private fun messageToJson(m: MessageEntity, includeTools: Boolean, includeReasoning: Boolean): JSONObject {
         val obj = JSONObject().apply {
             put("id", m.id)
@@ -135,14 +154,17 @@ internal object ChatDebugMethods {
         // text-only consumption.
         val parts = try { org.json.JSONArray(m.partsJson) } catch (_: Exception) { null }
         if (parts != null) {
-            obj.put("parts", parts)
+            // includeTools=false drops the tool blocks from the raw parts as well, not only from
+            // the derived toolCalls/toolResults, so a text client really gets less.
+            obj.put("parts", visibleParts(parts, includeTools))
             val sb = StringBuilder()
             val attachments = JSONArray()
             for (i in 0 until parts.length()) {
                 val p = parts.optJSONObject(i) ?: continue
-                when (p.optString("type")) {
-                    "text" -> sb.append(p.optString("value", ""))
-                    "image", "file", "attachment" -> attachments.put(p)
+                val type = p.optString("type")
+                when {
+                    type == "text" -> sb.append(p.optString("value", ""))
+                    isAttachmentPart(type) -> attachments.put(p)
                 }
             }
             if (sb.isNotEmpty()) obj.put("content", sb.toString())
