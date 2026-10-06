@@ -101,7 +101,8 @@ object MCPProvider {
                         connected.session.close()
                         throw CancellationException("superseded MCP reload")
                     }
-                    ServerStatus(cfg.id, connected = true, toolCount = connected.tools.size)
+                    _status.value.firstOrNull { it.serverId == cfg.id }
+                        ?: ServerStatus(cfg.id, connected = true, toolCount = connected.tools.size)
                 }
 
                 if (!isActive || generation != reloadGeneration) return@launch
@@ -143,16 +144,29 @@ object MCPProvider {
         if (generation != reloadGeneration) return@synchronized false
         val sanitizedId = sanitizeId(cfg.id)
         val added = mutableListOf<String>()
+        val refused = mutableListOf<String>()
         try {
             connected.tools.forEach { tool ->
                 val handler = MCPToolHandler(sanitizedId, tool, connected.session, configId = cfg.id)
                 val fullName = "mcp.$sanitizedId.${tool.name}"
-                ToolRegistry.register(handler)
+                // A name (or wire name) another tool already holds is refused, not overwritten:
+                // `read.item` and `read_item` on one server share a wire name.
+                if (!ToolRegistry.register(handler)) {
+                    refused += tool.name
+                    return@forEach
+                }
                 registeredTools[fullName] = handler
                 added += fullName
             }
             sessions[cfg.id] = connected.session
-            val status = ServerStatus(cfg.id, connected = true, toolCount = connected.tools.size)
+            val status = ServerStatus(
+                cfg.id,
+                connected = true,
+                toolCount = added.size,
+                error = refused.takeIf { it.isNotEmpty() }?.let {
+                    "skipped ${it.size} tool(s) whose names collide with another tool: ${it.take(5).joinToString()}"
+                },
+            )
             _status.value = _status.value.filter { it.serverId != cfg.id } + status
             true
         } catch (t: Throwable) {
@@ -225,9 +239,17 @@ object MCPProvider {
         }
     }
 
-    /** Tool-name-safe server id (ToolRegistry names are dot-separated). */
-    private fun sanitizeId(id: String): String =
-        id.replace(Regex("[^a-zA-Z0-9_.-]"), "_")
+    /**
+     * Tool-name-safe server id (ToolRegistry names are dot-separated). An id that needs replacing gets a
+     * short digest of the original, so `docs one` and `docs_one` stay two servers instead of mapping
+     * to the same tool names.
+     */
+    internal fun sanitizeId(id: String): String {
+        val safe = id.replace(Regex("[^a-zA-Z0-9_.-]"), "_")
+        if (safe == id) return id
+        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(id.toByteArray(Charsets.UTF_8))
+        return safe + "_" + digest.take(3).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    }
 
     internal suspend fun <T, R> mapConcurrentBounded(
         items: List<T>,
