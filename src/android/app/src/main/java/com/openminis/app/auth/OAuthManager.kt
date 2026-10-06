@@ -255,9 +255,19 @@ abstract class OAuthManager(
             }
 
             val json = JSONObject(responseBody)
+            // A success without an access token is not a refreshed credential.
+            if (json.optString("access_token", "").isEmpty()) {
+                Log.e(TAG, "Token refresh returned no access_token; keeping the stored credential")
+                return@withContext false
+            }
             // Preserve refresh_token if not returned
             if (!json.has("refresh_token")) {
                 json.put("refresh_token", refreshToken)
+            }
+            // Signed out (or already refreshed by someone else) while the request was out.
+            if (!storedRefreshTokenIs(refreshToken)) {
+                Log.w(TAG, "Token refresh result discarded: the stored credential changed meanwhile")
+                return@withContext loadStoredTokens() != null
             }
             saveTokens(json)
             true
@@ -297,6 +307,15 @@ abstract class OAuthManager(
         val stored = loadStoredTokens() ?: return false
         return stored.optString("access_token", "").isNotEmpty()
     }
+
+    /**
+     * Compare-and-swap guard for refresh: true while the stored credential is still the one the
+     * refresh started from. After [logout] it is false, so a response that arrives late cannot
+     * write the credentials back; after another refresh rotated the token it is false too, so the
+     * older response cannot overwrite the newer one.
+     */
+    protected fun storedRefreshTokenIs(used: String): Boolean =
+        loadStoredTokens()?.optString("refresh_token", "") == used
 
     fun logout() {
         getEncryptedPrefs().edit()
