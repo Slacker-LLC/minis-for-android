@@ -122,6 +122,17 @@ class ChatRepository(
         dao.updateSessionTitleAndCategory(id, title, category, System.currentTimeMillis())
     }
 
+    /** [ChatDao.updateGeneratedTitleIfUnchanged]; false when the user changed the row first. */
+    suspend fun updateGeneratedTitle(
+        id: String,
+        title: String,
+        category: String?,
+        expectedTitle: String?,
+        expectedCategory: String?,
+    ): Boolean = dao.updateGeneratedTitleIfUnchanged(
+        id, title, category, expectedTitle, expectedCategory, System.currentTimeMillis(),
+    ) > 0
+
     suspend fun updateSessionModel(sessionId: String, modelId: String) {
         dao.updateSessionModel(sessionId, modelId)
     }

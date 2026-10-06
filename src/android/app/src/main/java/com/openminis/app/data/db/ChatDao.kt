@@ -123,6 +123,25 @@ interface ChatDao {
     @Query("UPDATE sessions SET title = :title, category = COALESCE(:category, category), updated_at = :updatedAt WHERE id = :id")
     suspend fun updateSessionTitleAndCategory(id: String, title: String, category: String?, updatedAt: Long)
 
+    /**
+     * Writes a generated title only if the row still carries the title and category the request
+     * started from, so a title the user typed in the meantime is never overwritten. Returns the
+     * number of rows changed (0 = superseded).
+     */
+    @Query(
+        "UPDATE sessions SET title = :title, category = COALESCE(:category, category), updated_at = :updatedAt " +
+            "WHERE id = :id AND IFNULL(title, '') = IFNULL(:expectedTitle, '') " +
+            "AND IFNULL(category, '') = IFNULL(:expectedCategory, '')",
+    )
+    suspend fun updateGeneratedTitleIfUnchanged(
+        id: String,
+        title: String,
+        category: String?,
+        expectedTitle: String?,
+        expectedCategory: String?,
+        updatedAt: Long,
+    ): Int
+
     @Query("UPDATE sessions SET updated_at = :updatedAt WHERE id = :id")
     suspend fun touchSession(id: String, updatedAt: Long)
 
