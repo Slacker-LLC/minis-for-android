@@ -270,6 +270,9 @@
     <string name="env_var_field_note_placeholder">Optionale Notiz</string>
     <string name="env_var_error_invalid_key">Muss mit einem Buchstaben beginnen, nur Buchstaben/Zahlen/Unterstriche</string>
     <string name="env_var_error_duplicate">Eine Variable mit diesem Namen existiert bereits</string>
+    <string name="env_var_error_invalid_value">Der Wert enthält Zeichen, die nicht gespeichert werden können (Steuerzeichen)</string>
+    <string name="env_var_error_load">Die gespeicherten Variablen konnten nicht gelesen werden; Bearbeiten ist zum Schutz deaktiviert</string>
+    <string name="env_var_error_save">Speichern fehlgeschlagen. Es wurde nichts geändert</string>
     <string name="log_title">Protokolle</string>
     <string name="log_section_logging">Protokollierung</string>
     <string name="log_section_logging_footer">Wenn aktiviert, werden alle Konsolenausgaben in tägliche Logdateien im privaten App-Speicher geschrieben.</string>

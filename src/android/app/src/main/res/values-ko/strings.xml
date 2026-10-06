@@ -270,6 +270,9 @@
     <string name="env_var_field_note_placeholder">선택 메모</string>
     <string name="env_var_error_invalid_key">문자로 시작하며 문자/숫자/밑줄만 사용 가능</string>
     <string name="env_var_error_duplicate">같은 이름의 변수가 이미 있습니다</string>
+    <string name="env_var_error_invalid_value">이 값에는 저장할 수 없는 문자(제어 문자)가 있습니다</string>
+    <string name="env_var_error_load">저장된 변수를 읽을 수 없습니다. 보호를 위해 편집이 꺼져 있습니다</string>
+    <string name="env_var_error_save">저장하지 못했습니다. 변경된 내용이 없습니다</string>
     <string name="log_title">로그</string>
     <string name="log_section_logging">로깅</string>
     <string name="log_section_logging_footer">활성화하면 모든 콘솔 출력이 앱의 비공개 저장소에 일일 로그 파일로 캡처됩니다.</string>

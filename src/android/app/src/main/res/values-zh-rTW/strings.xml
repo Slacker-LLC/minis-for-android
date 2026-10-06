@@ -1384,6 +1384,9 @@
     <string name="env_var_field_note_placeholder">可選備註</string>
     <string name="env_var_error_invalid_key">必須以字母開頭，只能使用字母、數字、下劃線</string>
     <string name="env_var_error_duplicate">同名變數已存在</string>
+    <string name="env_var_error_invalid_value">此值包含無法儲存的字元（控制字元）</string>
+    <string name="env_var_error_load">無法讀取已儲存的變數，為保護資料已停用編輯</string>
+    <string name="env_var_error_save">儲存失敗，未做任何變更</string>
     <string name="log_title">日誌</string>
     <string name="log_section_logging">日誌</string>
     <string name="log_section_logging_footer">啟用後，所有控制檯輸出將每天捕獲到應用私有儲存中的日誌檔案。</string>

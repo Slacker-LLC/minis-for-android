@@ -493,6 +493,9 @@
     <string name="env_var_field_note_placeholder">Необязательная заметка</string>
     <string name="env_var_error_invalid_key">Должно начинаться с буквы, использовать только буквы, цифры и подчёркивания</string>
     <string name="env_var_error_duplicate">Переменная с таким именем уже существует</string>
+    <string name="env_var_error_invalid_value">Значение содержит символы, которые нельзя сохранить (управляющие символы)</string>
+    <string name="env_var_error_load">Не удалось прочитать сохранённые переменные; редактирование отключено для их защиты</string>
+    <string name="env_var_error_save">Не удалось сохранить. Ничего не изменено</string>
     <string name="log_title">Журналы</string>
     <string name="log_section_logging">Журналирование</string>
     <string name="log_section_logging_footer">Когда включено, весь вывод консоли записывается в ежедневные файлы журналов в приватном хранилище приложения.</string>
