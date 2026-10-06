@@ -207,12 +207,19 @@ class BotDelegationCoordinator private constructor(
                 deliverReceipt(delegationRepository.get(delegation.id))
                 return ToolExecutionResult("Error: delegation_budget_exhausted", false)
             }
-            taskRepository.updateState(
+            // Conditional: if the user paused or cancelled the task after it was read above, that
+            // stop must stand. An unconditional write here turned PAUSED/CANCELLED back into ACTIVE.
+            val stillRunning = taskRepository.updateStateIfWakeable(
                 id = rootTask.id,
                 status = com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE,
                 phase = com.openminis.app.data.db.BotTaskEntity.PHASE_EXECUTING,
                 ownerSessionId = sourceSessionId,
             )
+            if (!stillRunning) {
+                delegationRepository.cancel(delegation.id, "task was stopped")
+                deliverReceipt(delegationRepository.get(delegation.id))
+                return ToolExecutionResult("Error: task_not_continuable", false)
+            }
         }
         return ToolExecutionResult(
             output = JSONObject().apply {
@@ -334,6 +341,16 @@ class BotDelegationCoordinator private constructor(
         // Deleting a source Bot clears its sessions, but queued rows remain in
         // Room for auditability. Refuse those rows before taking a target lock;
         // they must never become orphaned work on the next app start.
+        // A queued or waiting delegation of a task the user has since stopped must not start.
+        delegation.rootTaskId?.let { rootId ->
+            val root = taskRepository.get(rootId)
+            if (root != null && root.status in STOPPED_ROOT_STATUSES) {
+                if (delegationRepository.cancel(delegation.id, "task was stopped")) {
+                    deliverReceipt(delegationRepository.get(delegation.id))
+                }
+                return
+            }
+        }
         val sourceBot = botRepository.getBot(delegation.sourceBotId)
         if (sourceBot == null || !sourceBot.enabled) {
             if (delegationRepository.cancel(
@@ -538,6 +555,14 @@ class BotDelegationCoordinator private constructor(
         value.replace(Regex("[\\p{Cntrl}\\s]+"), " ").trim().take(maxChars)
 
     companion object {
+        /** A root task in one of these states must not start (more) member work. */
+        internal val STOPPED_ROOT_STATUSES = setOf(
+            com.openminis.app.data.db.BotTaskEntity.STATUS_PAUSED,
+            com.openminis.app.data.db.BotTaskEntity.STATUS_CANCELLED,
+            com.openminis.app.data.db.BotTaskEntity.STATUS_FAILED,
+            com.openminis.app.data.db.BotTaskEntity.STATUS_BUDGET_EXHAUSTED,
+            com.openminis.app.data.db.BotTaskEntity.STATUS_COMPLETED,
+        )
         private const val MAX_FANOUT_PER_RUN = 4
         private const val MAX_DISPATCH_BATCH = 32
 
