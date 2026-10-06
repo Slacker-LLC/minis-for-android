@@ -46,6 +46,19 @@ class WebViewHolder(
 
     private var mobileUserAgent: String = ""
 
+    /**
+     * The Activity hosting [view]. The WebView is built with the Application context (it outlives any
+     * one composition), so `view.context` is never an Activity; the window's root view is.
+     */
+    private fun activityFor(view: WebView?): android.app.Activity? {
+        var ctx: Context? = view?.rootView?.context ?: view?.context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is android.app.Activity) return ctx
+            ctx = ctx.baseContext
+        }
+        return null
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     val webView: WebView = WebView(appContext).apply {
         settings.javaScriptEnabled = true       // sandbox HTML demos rely on JS
@@ -96,6 +109,23 @@ class WebViewHolder(
             setAcceptThirdPartyCookies(wv, true)
         }
         webViewClient = object : WebViewClient() {
+            // Requests for file:// resources stay inside the guest's data folders (and the
+            // folder the preview was opened from). The page's scripts run with file access
+            // switched on, so without this they could read the app's own private files.
+            override fun shouldInterceptRequest(
+                view: WebView,
+                request: android.webkit.WebResourceRequest,
+            ): android.webkit.WebResourceResponse? {
+                val uri = request.url ?: return null
+                if (uri.scheme != "file") return null
+                if (PreviewFileJail.allows(uri.path.orEmpty(), PreviewFileJail.roots(initialUrl))) return null
+                AppLogger.warning(TAG, "preview blocked file request outside the allowed folders")
+                return android.webkit.WebResourceResponse(
+                    "text/plain", "utf-8", 403, "Forbidden", emptyMap(),
+                    java.io.ByteArrayInputStream(ByteArray(0)),
+                )
+            }
+
             override fun shouldOverrideUrlLoading(
                 view: WebView,
                 request: android.webkit.WebResourceRequest,
@@ -194,8 +224,7 @@ class WebViewHolder(
                 message: String?,
                 result: android.webkit.JsResult?,
             ): Boolean {
-                val ctx = view?.context ?: return false.also { result?.cancel() }
-                if (ctx !is android.app.Activity) { result?.cancel(); return true }
+                val ctx = activityFor(view) ?: return true.also { result?.cancel() }
                 android.app.AlertDialog.Builder(ctx)
                     .setMessage(message.orEmpty())
                     .setPositiveButton(android.R.string.ok) { _, _ -> result?.confirm() }
@@ -210,8 +239,7 @@ class WebViewHolder(
                 message: String?,
                 result: android.webkit.JsResult?,
             ): Boolean {
-                val ctx = view?.context ?: return false.also { result?.cancel() }
-                if (ctx !is android.app.Activity) { result?.cancel(); return true }
+                val ctx = activityFor(view) ?: return true.also { result?.cancel() }
                 android.app.AlertDialog.Builder(ctx)
                     .setMessage(message.orEmpty())
                     .setPositiveButton(android.R.string.ok) { _, _ -> result?.confirm() }
@@ -228,8 +256,7 @@ class WebViewHolder(
                 defaultValue: String?,
                 result: android.webkit.JsPromptResult?,
             ): Boolean {
-                val ctx = view?.context ?: return false.also { result?.cancel() }
-                if (ctx !is android.app.Activity) { result?.cancel(); return true }
+                val ctx = activityFor(view) ?: return true.also { result?.cancel() }
                 val input = android.widget.EditText(ctx).apply {
                     setText(defaultValue.orEmpty())
                     setSelection(text.length)
