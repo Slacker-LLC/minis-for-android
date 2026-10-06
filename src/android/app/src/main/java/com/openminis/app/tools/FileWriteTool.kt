@@ -71,7 +71,7 @@ object FileWriteTool {
             // Same-target mutations must see a serialized file state. This is
             // independent of whether the storage backend is Ubuntu workspace or
             // an explicitly exposed external mount.
-            FileMutationQueue.withKey("$sessionId\u0000$path") {
+            FileMutationQueue.withKey(FileMutationQueue.keyFor(sessionId, path)) {
                 val externalMountPath = ExternalMountAccess.isPath(path)
 
                 // Check the revision while holding the same per-file mutation

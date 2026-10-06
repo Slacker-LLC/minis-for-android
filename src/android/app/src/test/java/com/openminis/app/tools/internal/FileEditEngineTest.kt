@@ -39,6 +39,22 @@ class FileEditEngineTest {
         }
     }
 
+    @Test fun rejectsAMatchThatOverlapsItself() {
+        for ((text, needle) in listOf("ababa" to "aba", "aaa" to "aa")) {
+            try {
+                FileEditEngine.apply(text, listOf(FileEditEngine.Edit(needle, "X")), "x.txt")
+                fail("expected ambiguity rejection for $needle in $text")
+            } catch (e: IllegalArgumentException) {
+                assertTrue(e.message!!.contains("found 2 times"))
+            }
+        }
+    }
+
+    @Test fun aSingleOccurrenceStillEdits() {
+        val r = FileEditEngine.apply("abcab", listOf(FileEditEngine.Edit("bca", "X")), "x.txt")
+        assertEquals("aXb", r.newContent)
+    }
+
     @Test fun fuzzyMatchesSmartQuotesAndTrailingWhitespace() {
         val src = "val s = “hello”   \nnext\n"
         val r = FileEditEngine.apply(src, listOf(

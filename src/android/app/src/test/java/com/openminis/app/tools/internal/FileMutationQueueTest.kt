@@ -7,6 +7,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import kotlinx.coroutines.launch
 import org.junit.Test
 
 class FileMutationQueueTest {
@@ -40,5 +41,38 @@ class FileMutationQueueTest {
         } finally {
             release.countDown(); pool.shutdownNow(); f.delete()
         }
+    }
+
+    @Test fun aliasesOfOneSessionFileShareALockKey() = kotlinx.coroutines.runBlocking {
+        val a = FileMutationQueue.keyFor("s1", "/workspace/dir/x.txt")
+        assertEquals(a, FileMutationQueue.keyFor("s1", "/var/minis/workspace/dir/x.txt"))
+        assertEquals(a, FileMutationQueue.keyFor("s1", "dir/x.txt"))
+        // Another file, and the same name in another session, do not.
+        assertTrue(a != FileMutationQueue.keyFor("s1", "/workspace/dir/y.txt"))
+        assertTrue(a != FileMutationQueue.keyFor("s2", "/workspace/dir/x.txt"))
+    }
+
+    @Test fun suspendLocksAreDroppedWhenNobodyHoldsThem() = kotlinx.coroutines.runBlocking {
+        val before = FileMutationQueue.heldKeysForTest()
+        FileMutationQueue.withKey("reclaim-test") { }
+        assertEquals(before, FileMutationQueue.heldKeysForTest())
+    }
+
+    @Test fun sameKeyBlocksRunOneAtATime() = kotlinx.coroutines.runBlocking {
+        var inside = 0
+        var maxInside = 0
+        kotlinx.coroutines.coroutineScope {
+            repeat(6) {
+                launch(kotlinx.coroutines.Dispatchers.Default) {
+                    FileMutationQueue.withKey("serial-test") {
+                        inside++
+                        maxInside = maxOf(maxInside, inside)
+                        kotlinx.coroutines.delay(5)
+                        inside--
+                    }
+                }
+            }
+        }
+        assertEquals(1, maxInside)
     }
 }

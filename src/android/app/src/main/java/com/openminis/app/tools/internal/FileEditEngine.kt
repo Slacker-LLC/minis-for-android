@@ -108,7 +108,8 @@ object FileEditEngine {
             val idx = haystack.indexOf(needle, from)
             if (idx < 0) break
             out += idx
-            from = idx + needle.length.coerceAtLeast(1)
+            // One step, not a needle length: `aba` occurs twice in `ababa`.
+            from = idx + 1
         }
         return out
     }
