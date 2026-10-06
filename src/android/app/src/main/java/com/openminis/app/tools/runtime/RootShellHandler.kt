@@ -24,7 +24,9 @@ class RootShellHandler : ToolHandler {
         name = "root.shell",
         description = "Run one Android Root tool with structured tool and args. " +
             "The executable is resolved only from trusted Android system directories; " +
-            "arguments are passed without shell parsing. This tool is local-only and is not exposed to MCP.",
+            "arguments are passed without shell parsing. Shells, su, toybox/busybox, exec wrappers " +
+            "(env, xargs, nohup, …) and interpreters are refused. " +
+            "This tool is local-only and is not exposed to MCP.",
         parameters = mapOf(
             "tool" to AgentToolParam("string", "Executable name resolved only from trusted Android system directories"),
             "args" to AgentToolParam("array", "Arguments passed without shell parsing", items = AgentToolParam("string", "One argument")),
@@ -59,6 +61,9 @@ class RootShellHandler : ToolHandler {
                     add(value)
                 }
             }
+        }
+        PrivilegedCommandRunner.genericRootToolDenial(tool, args)?.let { reason ->
+            return ToolExecutionResult("Error: $reason", false)
         }
         val requestedMs = if (json.has("timeout_ms")) json.optLong("timeout_ms") else null
         val timeout = ToolTimeoutPolicy.resolve("root.shell", callerOverrideMs = requestedMs).timeoutMs
