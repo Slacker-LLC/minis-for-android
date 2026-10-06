@@ -5,7 +5,6 @@ import android.util.Log
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.runtime.terminal.PtyBackend
 import com.openminis.app.runtime.ubuntu.DirectRootRunner
-import com.openminis.app.runtime.ubuntu.RootNetworkProxy
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -104,32 +103,6 @@ class TerminalSession internal constructor(
         /** Weak registry for both booting and running terminals. */
         private val liveSessions = CopyOnWriteArrayList<WeakReference<TerminalSession>>()
         private val registryLock = Any()
-
-        fun broadcastTimezone(tz: String) {
-            val dead = mutableListOf<WeakReference<TerminalSession>>()
-            for (ref in liveSessions) {
-                val session = ref.get()
-                if (session == null) {
-                    dead += ref
-                    continue
-                }
-                if (session.isRunning) session.applyTimezone(tz)
-            }
-            liveSessions.removeAll(dead.toSet())
-        }
-
-        fun broadcastProxy(env: Map<String, String>) {
-            val dead = mutableListOf<WeakReference<TerminalSession>>()
-            for (ref in liveSessions) {
-                val session = ref.get()
-                if (session == null) {
-                    dead += ref
-                    continue
-                }
-                if (session.isRunning) session.applyEnvMap(env, RootNetworkProxy.PROXY_ENV_KEYS)
-            }
-            liveSessions.removeAll(dead.toSet())
-        }
 
         /** Stop every terminal before the rootfs, mounts, or proxy are changed. */
         fun stopAll() {
@@ -357,29 +330,6 @@ class TerminalSession internal constructor(
             run?.input?.cancel()
             run?.job?.cancel()
         }
-    }
-
-    private fun applyTimezone(tz: String) {
-        if (!isRunning) return
-        val escaped = tz.replace("'", "'\\''")
-        sendRawBytes("export TZ='$escaped'\r".toByteArray(Charsets.UTF_8))
-    }
-
-    private fun applyEnvMap(env: Map<String, String>, previousKeys: Set<String> = emptySet()) {
-        if (!isRunning) return
-        val commands = buildString {
-            for (key in previousKeys - env.keys) {
-                if (key.matches(Regex("^[A-Za-z_][A-Za-z0-9_]*$"))) {
-                    append("unset ").append(key).append("\r")
-                }
-            }
-            for ((key, value) in env) {
-                if (!key.matches(Regex("^[A-Za-z_][A-Za-z0-9_]*$"))) continue
-                val escaped = value.replace("'", "'\\''")
-                append("export ").append(key).append("='").append(escaped).append("'\r")
-            }
-        }
-        sendRawBytes(commands.toByteArray(Charsets.UTF_8))
     }
 
     fun clearOutput() { _clearVersion.value += 1 }

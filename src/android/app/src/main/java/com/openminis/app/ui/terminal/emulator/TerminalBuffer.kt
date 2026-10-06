@@ -96,7 +96,8 @@ class TerminalBuffer(
 
     // ── Scroll ─────────────────────────────────────────────────────────────
     fun scrollUp(n: Int) {
-        repeat(n) {
+        // Past the region's height every extra step only moves blank lines: bound the work by it.
+        repeat(n.coerceIn(0, scrollBottom - scrollTop + 1)) {
             if (scrollbackEnabled) {
                 scrollback.addLast(grid[scrollTop])
                 while (scrollback.size > maxScrollback) scrollback.removeFirst()
@@ -108,7 +109,7 @@ class TerminalBuffer(
     }
 
     fun scrollDown(n: Int) {
-        repeat(n) {
+        repeat(n.coerceIn(0, scrollBottom - scrollTop + 1)) {
             for (r in scrollBottom downTo scrollTop + 1) grid[r] = grid[r - 1]
             grid[scrollTop] = blankLine()
         }

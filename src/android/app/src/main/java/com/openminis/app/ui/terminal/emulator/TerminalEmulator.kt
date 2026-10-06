@@ -266,7 +266,7 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
             }
             's' -> buf.saveCursor(cursorStyle)
             'u' -> cursorStyle.copyFrom(buf.restoreCursor())
-            'I' -> repeat(maxOf(1, params.getOrElse(0) { 1 })) { buf.tabForward() }
+            'I' -> repeat(params.getOrElse(0) { 1 }.coerceIn(1, cols)) { buf.tabForward() }
             'q' -> if (intermediate == ' ') {
                 when (params.getOrElse(0) { 1 }) {
                     0, 1, 2 -> cursorShape = CursorShape.BLOCK
