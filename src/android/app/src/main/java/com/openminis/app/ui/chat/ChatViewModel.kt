@@ -43,7 +43,6 @@ import com.openminis.app.data.BPETokenizer
 import com.openminis.app.data.CompactBudget
 import com.openminis.app.data.ContextOffload
 import com.openminis.app.data.ContextPolicy
-import com.openminis.app.data.CompactSplitPredicate
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.data.FileMentionIndex
 import com.openminis.app.data.db.CompactMarkerEntity
@@ -80,7 +79,6 @@ import com.openminis.app.tools.RalphTool
 import com.openminis.app.tools.ToolCheckpointStore
 import com.openminis.app.tools.ToolSensitivePolicy
 import com.openminis.app.tools.ToolExecutionResult
-import com.openminis.app.tools.internal.ToolResultPruner
 import com.openminis.app.tools.runtime.ToolCallValidator
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.service.SessionActivityTracker
@@ -112,7 +110,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
-import java.util.concurrent.atomic.AtomicInteger
 
 // [T-android-split-chat] StreamingDelta / ChatMessage / QueuedPrompt /
 // ToolBlockStatus / SlashCommand / AssistantBlock moved verbatim to ChatModels.kt.
@@ -173,29 +170,6 @@ class ChatViewModel(
 
         internal fun compactTimeoutMsFor(transcriptChars: Int): Long =
             CompactBudget.timeoutMsFor(transcriptChars)
-
-        /**
-         * Decide whether reducing the request size could plausibly fix an
-         * unsuccessful summary call. Quota, authentication, transport and
-         * cancellation failures are independent of payload size and must not
-         * fan one failure out into a long sequence of smaller calls.
-         */
-        internal fun shouldSplitOnError(error: Throwable): Boolean {
-            if (error is CancellationException) return false
-            if (error is LLMError) {
-                return when (error) {
-                    is LLMError.Cancelled,
-                    is LLMError.NetworkError,
-                    is LLMError.RateLimited,
-                    is LLMError.TransientError,
-                    is LLMError.InvalidApiKey,
-                    -> false
-                    else -> true
-                }
-            }
-            if (error is java.io.IOException) return false
-            return true
-        }
 
 
         // [T-preflight-tool-title-nonblocking] Fields kept in each tool's
@@ -918,12 +892,13 @@ class ChatViewModel(
     private val _isCompacting = MutableStateFlow(false)
     val isCompacting: StateFlow<Boolean> = _isCompacting.asStateFlow()
 
-    /**
-     * Number of summary requests issued by the current compaction run. The
-     * splitter suspends between calls, so the counter must remain correct even
-     * when coroutines resume on different IO threads.
-     */
-    private val compactCallsIssued = AtomicInteger(0)
+    private val compactionSummarizer = CompactionSummarizer(
+        provider = { currentProvider },
+        modelContextWindow = { currentModel?.contextWindow },
+        onProgress = { depth, calls ->
+            _compactProgress.value = _compactProgress.value?.copy(depth = depth, callsIssued = calls)
+        },
+    )
 
     /** Job for the active manual/context compaction run. */
     private var compactJob: Job? = null
@@ -935,34 +910,6 @@ class ChatViewModel(
         AppLogger.info(TAG, "[Compact] cancelled by user")
         job.cancel(CancellationException("compact cancelled by user"))
     }
-
-    private class CompactCallBudgetExceeded : IllegalStateException(
-        "Compaction call budget exhausted",
-    )
-
-    /**
-     * [C3-android-compaction-guards] A summarizer response failed Eta's summary
-     * gate. Carries the upstream failure code and its actionable message so the
-     * caller can surface the text without writing anything back — history and
-     * marker are left exactly as they were.
-     */
-    private class CompactRejectedSummary(
-        val code: String,
-        message: String,
-    ) : IllegalStateException(message)
-
-    /**
-     * [C3-android-compaction-guards] One summarizer response: its text plus the
-     * provider's stop reason, so the summary gate can reject a truncated answer
-     * even when the text itself looks usable. Half-summaries are no longer
-     * merged locally: Eta's overflow recovery chains them as `previous` and
-     * gates each half on its own, so this is a plain carrier.
-     */
-    private data class SummaryDraft(val text: String, val stopReason: String?)
-
-    /** [C3] The summary priced the way the model will receive it. */
-    private fun summaryAsMessage(summary: String): LLMMessage =
-        LLMMessage(role = LLMMessage.Role.ASSISTANT, content = summary)
 
     /** Current auto-retry attempt number (0 = not retrying, 1..MAX = nth retry in flight). */
     private val _autoRetryAttempt = MutableStateFlow(0)
@@ -2068,171 +2015,35 @@ class ChatViewModel(
             appendSystemInfo("Nothing to compact — the session is empty.", "compact")
             return
         }
-        // ─── v2 unified anchor model ───────────────────────────────────
-        //
-        // anchor = last active agentHistory entry. The compacted range is
-        // `[prev marker anchor + 1, anchor]` (or `[0, anchor]` if no prev),
-        // so each compact "extends" the latest summary forward to cover all
-        // new turns. effectiveAgentHistory then re-injects the LAST N
-        // user-text turns LEADING UP TO the anchor as fresh context, so the
-        // model still sees recent verbatim content alongside the summary.
-        //
-        // Mirrors iOS post-Phase-v2: anchor = last active message, no
-        // "auto-keep tail" baked into the compacted range — that's a
-        // read-side decoration done by effectiveAgentHistory.
-        //
-        // anchor must be a persisted entry (have a non-null dbMessageId).
-        // The strict iOS check also requires id ∈ rawMessages DB, but DAO
-        // is suspend and we'd have to relocate range calculation into the
-        // launch below. As a compromise we do the dbMessageId-non-empty
-        // pre-check here (catches most stale-id cases at this stage), and
-        // do the rawDbIds-membership check inside the launch before the
-        // marker is written. Mirrors iOS AIChatViewModel+Compaction.swift:
-        // 644-657 "walk back through agentHistory looking for dbMessageId
-        // AND allRaw.contains" — split across two phases to honor suspend
-        // boundaries.
-        val anchorIdx: Int = if (anchorIdxOverride != null) {
-            // compactBefore() supplied a specific anchor — walk back from
-            // there to the closest entry with a dbMessageId (mirrors the
-            // tail-walk-back logic but bounded to [0..override]).
-            var i = anchorIdxOverride.coerceIn(0, history.lastIndex)
-            while (i >= 0 && history[i].dbMessageId.isNullOrEmpty()) i -= 1
-            i
-        } else {
-            // compactAll() — walk back from the tail to the closest
-            // persisted entry. iOS compactAll calls compactBefore with the
-            // last active UI message; we go through agentHistory directly
-            // since Android's agentHistory and UI list are tighter-coupled.
-            var i = history.lastIndex
-            while (i >= 0 && history[i].dbMessageId.isNullOrEmpty()) i -= 1
-            i
-        }
-        if (anchorIdx < 0) {
-            appendSystemInfo("Cannot compact: no persisted messages yet.", "compact")
-            return
-        }
-
-        // Slice to compact = (prev marker's anchor + 1) … anchorIdx inclusive.
-        // For v2 prev markers, lastCompactedMessageId IS the prev anchor —
-        // start at prevIdx + 1. For v1 prev markers, firstKeptMessageId points
-        // at "first kept" — start AT prevIdx (it was exclusive on right edge).
-        val prev = _cachedLatestMarker
-        val effectiveStartIdx: Int = if (prev == null) {
-            0
-        } else {
-            val prevAnchorOrFirstKept: String? = if (prev.version >= 2) {
-                prev.lastCompactedMessageId?.takeIf { it.isNotEmpty() }
-            } else {
-                prev.firstKeptMessageId?.takeIf { it.isNotEmpty() }
-                    ?: prev.boundaryMessageId?.takeIf { it.isNotEmpty() }
-            }
-            val prevIdx = prevAnchorOrFirstKept?.let { id ->
-                history.indexOfFirst { it.dbMessageId == id }
-            } ?: -1
-            if (prevIdx < 0) 0   // prev anchor not in current history — restart from top
-            else if (prev.version >= 2) prevIdx + 1
-            else prevIdx
-        }
-        if (effectiveStartIdx > anchorIdx) {
-            appendSystemInfo("Already compacted up to this point.", "compact")
-            return
-        }
-        // [C3-android-compaction-guards] The range START has to sit on a batch
-        // boundary too: planRange only guards the end, and a marker anchor can
-        // be moved by the Phase-2.5 heal (applyCompactMarkerGraying), which
-        // re-anchors by createdAt without knowing about tool batches. A summary
-        // that opens with a tool_result whose tool_use it dropped is the same
-        // split the end guard refuses, so clamp back to the nearest safe
-        // boundary (0 = summarize the whole prefix, always structurally safe).
-        val startIdx = if (effectiveStartIdx <= 0 ||
-            AgentContextCompactor.canSplit(history, effectiveStartIdx)
-        ) {
-            effectiveStartIdx
-        } else {
-            val clamped = (effectiveStartIdx - 1 downTo 1)
-                .firstOrNull { AgentContextCompactor.canSplit(history, it) } ?: 0
-            AppLogger.warning(
-                TAG,
-                "[Compact] start index $effectiveStartIdx is inside a tool batch — clamped to $clamped",
-            )
-            clamped
-        }
-        // [C3-android-compaction-guards] Fail-closed range selection, ported
-        // from Eta's AgentContextCompactor.planRange: the range may only end
-        // between complete tool batches, the newest user turn (and every batch
-        // after it) stays verbatim, and the tail keeps its RECENT_MESSAGES
-        // floor plus the stricter of RECENT_RATIO x window and the existing
-        // OutgoingHistory.COMPACT_KEEP_RECENT_TOKENS budget. A rejection leaves history and
-        // marker untouched and surfaces an actionable message instead of
-        // compacting something unsafe.
         val contextWindow = effectiveContextWindowTokens()
             ?: currentModel?.contextWindow?.takeIf { it > 0 }
-        val recentTokenLimit = contextWindow
-            ?.let { minOf((it * AgentContextBudget.RECENT_RATIO).toInt(), OutgoingHistory.COMPACT_KEEP_RECENT_TOKENS) }
-        val plan = AgentContextCompactor.planRange(
-            history = history,
-            startIndex = startIdx,
-            anchorIndex = anchorIdx,
-            contextWindow = contextWindow,
-            recentTokenLimit = recentTokenLimit,
-        )
-        if (plan is AgentContextCompactor.Plan.Rejected) {
-            AppLogger.info(
-                TAG,
-                "[Compact] rejected ${plan.code}: ${plan.message} " +
-                    "(history=${history.size} start=$startIdx anchor=$anchorIdx)",
-            )
-            appendSystemInfo(text = plan.message, iconKind = "compact")
-            return
-        }
-        val range = plan as AgentContextCompactor.Plan.Compactable
-        val compactEndIdx = range.endExclusive - 1
-        val toCompact = history.subList(range.startIndex, range.endExclusive)
-        if (toCompact.isEmpty()) {
-            appendSystemInfo("Nothing to compact.", "compact")
-            return
-        }
-        // [C3-android-compaction-guards] Eta packs the range into complete-batch
-        // groups and then summarizes group by group. The plan is no longer a
-        // pre-flight: the chunks below ARE the summary calls — one call per
-        // chunk, each receiving the previous chunk's summary (Eta
-        // AgentContextCompactor.summarize(chunk, previous, maxChars)). A single
-        // complete batch that does not fit the summarizer is still refused
-        // outright (CONTEXT_ITEM_TOO_LARGE) instead of being shredded at a
-        // non-batch boundary.
-        //
-        // The previous summary is read once here and reused for the planning,
-        // the carry-in of the first chunk and the reduction math, so the plan
-        // and the calls it drives always price the same `previous`.
-        val existingSummary = _compactSummary.value?.takeIf { it.isNotBlank() }
-        val summaryCharCap = AgentContextCompactor.summaryCharCap(contextWindow)
-        val summaryMaxInputTokens = AgentContextCompactor.summaryMaxInputTokens(contextWindow)
-        val chunks = when (
-            val chunkPlan = AgentContextCompactor.chunkForSummary(
-                messages = toCompact,
-                maxInputTokens = summaryMaxInputTokens,
-                previousSummary = existingSummary.orEmpty(),
+        val ready = when (
+            val outcome = CompactionPlanner.plan(
+                history = history,
+                anchorIdxOverride = anchorIdxOverride,
+                prev = _cachedLatestMarker,
+                existingSummary = _compactSummary.value?.takeIf { it.isNotBlank() },
+                contextWindow = contextWindow,
             )
         ) {
-            is AgentContextCompactor.ChunkPlan.Rejected -> {
-                AppLogger.info(TAG, "[Compact] rejected ${chunkPlan.code}: ${chunkPlan.message}")
-                appendSystemInfo(text = chunkPlan.message, iconKind = "compact")
+            is CompactionPlanner.Outcome.Reject -> {
+                appendSystemInfo(text = outcome.message, iconKind = "compact")
                 return
             }
-            is AgentContextCompactor.ChunkPlan.Chunks -> {
-                AppLogger.info(
-                    TAG,
-                    "[Compact] range ${toCompact.size} messages → ${chunkPlan.chunks.size} summary chunk(s)",
-                )
-                chunkPlan.chunks
-            }
+            is CompactionPlanner.Outcome.Ready -> outcome
         }
+        val toCompact = ready.toCompact
+        val compactEndIdx = ready.compactEndIdx
+        val chunks = ready.chunks
+        val existingSummary = ready.existingSummary
+        val summaryCharCap = ready.summaryCharCap
+        val summaryMaxInputTokens = ready.summaryMaxInputTokens
         // Past every precondition — from here the launch below owns the
         // onFinished callback.
         markStarted()
         _isCompacting.value = true
-        compactCallsIssued.set(0)
-        val transcriptChars = buildConversationTextForSummary(toCompact).length
+        compactionSummarizer.resetCalls()
+        val transcriptChars = compactionSummarizer.buildConversationTextForSummary(toCompact).length
         val compactTimeoutMs = compactTimeoutMsFor(transcriptChars)
         _compactProgress.value = CompactProgress(
             startedAtMs = System.currentTimeMillis(),
@@ -2255,7 +2066,7 @@ class ChatViewModel(
                 // generateCompactSummaryWithSplitting, bounded by the same
                 // MAX_OVERFLOW_ATTEMPTS depth cap as before.
                 val draft = withTimeout(compactTimeoutMs) {
-                    summarizeCompactionChunks(
+                    compactionSummarizer.summarizeCompactionChunks(
                         chunks = chunks,
                         previousSummary = existingSummary,
                         summaryCharCap = summaryCharCap,
@@ -2263,7 +2074,7 @@ class ChatViewModel(
                     )
                 }
                 val rawSummary = draft.text.trim()
-                val summary = appendAuthoritativeFileActivity(
+                val summary = compactionSummarizer.appendAuthoritativeFileActivity(
                     summary = rawSummary,
                     previousSummary = existingSummary,
                     messages = toCompact,
@@ -2272,7 +2083,7 @@ class ChatViewModel(
                 // the decorated text that actually reaches the marker: it only
                 // becomes a summary when the model finished normally, the
                 // result is present, bounded and free of tool calls.
-                requireValidSummary(summary, draft.stopReason, summaryCharCap)
+                compactionSummarizer.requireValidSummary(summary, draft.stopReason, summaryCharCap)
                 // [C3-android-compaction-guards] Eta's CONTEXT_NO_REDUCTION
                 // gate, priced on both sides with the ported estimator: what is
                 // replaced is the summarized range plus the previous summary it
@@ -2315,18 +2126,7 @@ class ChatViewModel(
                     Log.w(TAG, "[Compact] loadMessages for raw-id verify failed: ${e.message}")
                     emptySet()
                 }
-                val verifiedAnchorIdx: Int = if (rawDbIds.isEmpty()) {
-                    // DB read failed; trust the in-memory walk-back result.
-                    compactEndIdx
-                } else {
-                    var i = compactEndIdx
-                    while (i >= 0) {
-                        val id = history[i].dbMessageId
-                        if (!id.isNullOrEmpty() && id in rawDbIds) break
-                        i -= 1
-                    }
-                    i
-                }
+                val verifiedAnchorIdx = CompactionPlanner.verifiedAnchorIndex(history, compactEndIdx, rawDbIds)
                 if (verifiedAnchorIdx < 0) {
                     Log.w(TAG, "[Compact] No agentHistory entry has a DB-persisted dbMessageId; aborting")
                     withContext(Dispatchers.Main) {
@@ -2390,56 +2190,9 @@ class ChatViewModel(
                 // Mirrors iOS `cachedLatestMarker = marker`.
                 _cachedLatestMarker = marker
                 withContext(Dispatchers.Main) {
-                    // Gray out everything in the compacted range; the kept
-                    // tail (last N user turns + tool/assistant follow-ups)
-                    // stays full opacity. Determined by walking _messages
-                    // until we pass the row whose id == lastCompactedDbId.
-                    //
-                    // Also drop any prior compact-divider system rows — a
-                    // session shows at most one divider (the latest marker).
-                    // Those old dividers are stored as system messages with
-                    // a "compact" iconKind in toolBlocks[0].toolName.
-                    val cutoffId: String = lastCompactedDbId
-                    var passedCutoff = false   // anchor is guaranteed non-null in v2
-                    val cleaned = _messages.value
-                        .filterNot { msg ->
-                            // Drop prior compact-divider rows; appendSystemInfo
-                            // below will re-add the new one.
-                            msg.role == "system" &&
-                                msg.toolBlocks.firstOrNull()?.toolName == "compact"
-                        }
-                        .map { msg ->
-                            if (msg.role == "system") msg
-                            else if (passedCutoff) msg
-                            else {
-                                val grayed = if (msg.isCompactedHistory) msg
-                                    else msg.copy(isCompactedHistory = true)
-                                if (msg.id == cutoffId) passedCutoff = true
-                                grayed
-                            }
-                        }
-                    // T84: count UI bubbles in this pass's compacted range.
-                    // Filters: role != system (dividers/notices don't count).
-                    // Range: everything up to and including the cutoff row,
-                    // since the kept-tail starts immediately after.
-                    // Falls back to "all non-system" when cutoffId is null
-                    // (compact-everything path), matching iOS dividerInsertIdx
-                    // == messages.count behavior.
-                    //
-                    // We deliberately do NOT exclude `isCompactedHistory` rows.
-                    // Back-to-back compacts (or compact after restoring a prior
-                    // marker on session reload) leave the in-range rows already
-                    // grayed; excluding them produced "0 messages compacted"
-                    // even though `toCompact.size` was nonzero. The divider's
-                    // count should reflect the size of THIS pass's range, not
-                    // the delta of newly-grayed rows.
-                    val cutoffIdx = cleaned.indexOfLast { it.id == cutoffId }
-                    val compactedUICount = if (cutoffIdx < 0) {
-                        cleaned.count { it.role != "system" }
-                    } else {
-                        cleaned.take(cutoffIdx + 1).count { it.role != "system" }
-                    }
-                    _messages.value = cleaned
+                    val divided = CompactionPlanner.markCompacted(_messages.value, lastCompactedDbId)
+                    val compactedUICount = divided.compactedUiCount
+                    _messages.value = divided.messages
                     AppLogger.info(TAG, "[Compact] divider: $compactedUICount UI bubbles compacted (history entries: ${toCompact.size})")
                     appendSystemInfo(
                         text = "$compactedUICount messages compacted",
@@ -2801,411 +2554,6 @@ class ChatViewModel(
     private var _cachedLatestMarker: com.openminis.app.data.db.CompactMarkerEntity? = null
 
     /**
-     * Format the agent history as a plain-text transcript for the
-     * summarisation LLM. Keeps role prefixes and bounds long tool arg / output
-     * bodies so we stay well under any context window: a tool result above
-     * [ToolResultPruner.THRESHOLD_CHARS] is pruned to head + omission marker +
-     * tail instead of a plain head cut, so the summary still sees the outcome
-     * of a long output. Mirrors iOS `buildConversationTextForSummary`.
-     */
-    private fun buildConversationTextForSummary(history: List<LLMMessage>): String = buildString {
-        for (msg in history) {
-            val role = msg.role.name.lowercase()
-            val text = msg.content.take(500)
-            if (text.isNotEmpty()) {
-                append(role).append(": ").append(text).append('\n')
-            }
-            for (part in msg.contentParts) {
-                when (part) {
-                    is AgentContentPart.Text -> {
-                        append(role).append(": ").append(part.text.take(500)).append('\n')
-                    }
-                    is AgentContentPart.ToolUse -> {
-                        // The summary is persisted, so a sensitive call contributes its name only.
-                        val preview = if (ToolSensitivePolicy.isSensitive(part.name)) {
-                            ToolSensitivePolicy.ARGUMENTS_PLACEHOLDER
-                        } else {
-                            part.input.toString().take(200)
-                        }
-                        append(role).append(" [tool:").append(part.name).append("]: ")
-                            .append(preview).append('\n')
-                    }
-                    is AgentContentPart.ToolResult -> {
-                        // Oversized results keep their head AND their tail: the
-                        // outcome of a long shell/log output lives at the end, which
-                        // a plain 500-char head cut drops. prune() returns null under
-                        // its threshold, so the preview budget below still applies to
-                        // every smaller result.
-                        val preview = if (ToolSensitivePolicy.isSensitive(part.name)) {
-                            ToolSensitivePolicy.RESULT_PLACEHOLDER
-                        } else {
-                            ToolResultPruner.prune(part.content) ?: part.content.take(500)
-                        }
-                        append(role).append(" [result:").append(part.name).append("]: ")
-                            .append(preview).append('\n')
-                    }
-                    is AgentContentPart.ImageData -> {
-                        append(role).append(" [image: ").append(part.mimeType).append("]\n")
-                    }
-                }
-            }
-        }
-    }
-
-    private data class FileActivity(val read: LinkedHashSet<String>, val modified: LinkedHashSet<String>)
-
-    /**
-     * Deterministic file-operation inventory carried across compactions. Pi
-     * keeps readFiles/modifiedFiles outside the LLM summary; Android stores the
-     * same information as a machine-readable tail on the summary so it survives
-     * DB persistence and later compaction passes without a schema migration.
-     */
-    private fun appendAuthoritativeFileActivity(
-        summary: String,
-        previousSummary: String?,
-        messages: List<LLMMessage>,
-    ): String {
-        val activity = FileActivity(linkedSetOf(), linkedSetOf())
-        parseFileActivity(previousSummary.orEmpty(), activity)
-        for (msg in messages) {
-            for (part in msg.contentParts) {
-                if (part !is AgentContentPart.ToolUse) continue
-                val path = part.input.optString("path", "").trim()
-                if (path.isEmpty()) continue
-                when (part.name) {
-                    "file_read", "read_image" -> activity.read.add(path)
-                    "file_write", "file_edit" -> activity.modified.add(path)
-                }
-            }
-        }
-        if (activity.read.isEmpty() && activity.modified.isEmpty()) return summary
-
-        val cleaned = summary.replace(
-            Regex("(?s)\n?<file-activity>.*?</file-activity>\\s*$"),
-            "",
-        ).trimEnd()
-        return buildString {
-            append(cleaned)
-            append("\n\n<file-activity>\n")
-            append("read:\n")
-            for (path in activity.read) append("- ").append(path).append('\n')
-            append("modified:\n")
-            for (path in activity.modified) append("- ").append(path).append('\n')
-            append("</file-activity>")
-        }
-    }
-
-    private fun parseFileActivity(summary: String, out: FileActivity) {
-        val block = Regex("(?s)<file-activity>(.*?)</file-activity>").find(summary)?.groupValues?.getOrNull(1) ?: return
-        var mode = ""
-        for (raw in block.lines()) {
-            val line = raw.trim()
-            when (line) {
-                "read:" -> mode = "read"
-                "modified:" -> mode = "modified"
-                else -> if (line.startsWith("- ")) {
-                    val path = line.removePrefix("- ").trim()
-                    if (path.isNotEmpty()) {
-                        if (mode == "read") out.read.add(path) else if (mode == "modified") out.modified.add(path)
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * [C3-android-compaction-guards] Eta's summary gate applied to any summary
-     * text that is about to be carried forward or written back: normal finish,
-     * non-empty, not the literal "null", inside the character cap and free of
-     * tool-call syntax. Rejection throws [CompactRejectedSummary] so the
-     * fail-closed path is identical everywhere — history and marker untouched.
-     */
-    private fun requireValidSummary(summary: String, stopReason: String?, maxChars: Int) {
-        val check = AgentContextCompactor.validateSummary(
-            summary = summary,
-            stopReason = stopReason,
-            maxChars = maxChars,
-            hasToolCalls = AgentContextCompactor.containsToolCallSyntax(summary),
-        )
-        if (check is AgentContextCompactor.SummaryCheck.Rejected) {
-            throw CompactRejectedSummary(check.code, check.message)
-        }
-    }
-
-    /**
-     * [C3-android-compaction-guards] Eta's summary loop, ported from
-     * AgentContextCompactor.compact(): walk the chunk plan, summarize one chunk
-     * per call, and hand the previous chunk's summary to the next call as
-     * `previous` (`summarize(chunk, previous, maxChars)`). Chunks come from
-     * [AgentContextCompactor.chunkForSummary], so a chunk is always a run of
-     * complete tool batches and a single oversized batch was already refused
-     * before any call was issued.
-     *
-     * Every chunk answer passes the summary gate before it becomes the
-     * `previous` of the next chunk, which is upstream's behaviour (its
-     * summarize() validates on the way out) and the reason a truncated chunk
-     * can no longer be folded into the final text unnoticed.
-     *
-     * Each planned chunk is re-packed against the summary that will really
-     * precede it before the call is issued. The pre-flight plan was priced on
-     * the previous session summary, while every call after the first carries a
-     * summary the model just wrote, which can be longer — Eta packs inside its
-     * own loop for the same reason. Re-packing reuses the same complete-batch
-     * walk, so a chunk still never splits a tool batch, and a batch that only
-     * fits alone is rejected instead of being shredded.
-     */
-    private suspend fun summarizeCompactionChunks(
-        chunks: List<List<LLMMessage>>,
-        previousSummary: String?,
-        summaryCharCap: Int,
-        summaryMaxInputTokens: Int,
-    ): SummaryDraft {
-        var runningSummary = previousSummary?.takeIf { it.isNotBlank() }
-        var lastStopReason: String? = null
-        for ((index, planned) in chunks.withIndex()) {
-            val packed = when (
-                val repack = AgentContextCompactor.chunkForSummary(
-                    messages = planned,
-                    maxInputTokens = summaryMaxInputTokens,
-                    previousSummary = runningSummary.orEmpty(),
-                )
-            ) {
-                is AgentContextCompactor.ChunkPlan.Rejected -> {
-                    throw CompactRejectedSummary(repack.code, repack.message)
-                }
-                is AgentContextCompactor.ChunkPlan.Chunks -> repack.chunks
-            }
-            for (chunk in packed) {
-                val draft = generateCompactSummaryWithSplitting(
-                    messages = chunk,
-                    previousSummary = runningSummary,
-                    summaryCharCap = summaryCharCap,
-                    depth = 0,
-                )
-                val text = draft.text.trim()
-                requireValidSummary(text, draft.stopReason, summaryCharCap)
-                runningSummary = text
-                lastStopReason = draft.stopReason
-            }
-            AppLogger.info(
-                TAG,
-                "[Compact] chunk ${index + 1}/${chunks.size} summarized in ${packed.size} call(s) " +
-                    "(${runningSummary?.length ?: 0} chars carried)",
-            )
-        }
-        return SummaryDraft(runningSummary.orEmpty(), lastStopReason)
-    }
-
-    /**
-     * Summarize [messages], recursively halving when the input exceeds the
-     * model's context window. Mirrors iOS
-     * `generateCompactSummaryWithSplitting` (AIChatViewModel+Compaction.swift:820).
-     *
-     * The depth cap is [AgentContextBudget.MAX_OVERFLOW_ATTEMPTS] (matches iOS'
-     * `<3` levels and Eta's `overflowShrinks >= MAX_OVERFLOW_ATTEMPTS`) so a
-     * pathologically large conversation still terminates instead of fanning out
-     * indefinitely. At each split we choose a structurally safe message
-     * boundary and carry the running summary across the halves. The call budget
-     * and outer timeout bound the total work even when a provider keeps
-     * returning size-related failures.
-     *
-     * [C3-android-compaction-guards] The split point comes from Eta's group
-     * halving (AgentContextCompactor.halfSplitBoundary) so an overflow retry
-     * cuts between complete tool batches, exactly like the range ends above.
-     * CompactSplitPredicate stays as the structural fallback for the text-only
-     * histories where no complete batch boundary exists.
-     */
-    private suspend fun generateCompactSummaryWithSplitting(
-        messages: List<LLMMessage>,
-        previousSummary: String?,
-        summaryCharCap: Int,
-        depth: Int = 0,
-    ): SummaryDraft {
-        val callNumber = compactCallsIssued.incrementAndGet()
-        if (callNumber > MAX_COMPACT_LLM_CALLS) {
-            throw CompactCallBudgetExceeded()
-        }
-        _compactProgress.value = _compactProgress.value?.copy(
-            depth = depth,
-            callsIssued = callNumber,
-        )
-        AppLogger.info(
-            TAG,
-            "[Compact] summary call $callNumber/$MAX_COMPACT_LLM_CALLS (messages=${messages.size}, depth=$depth)",
-        )
-        val transcript = buildConversationTextForSummary(messages)
-        val conversationText = if (previousSummary.isNullOrBlank()) {
-            transcript
-        } else {
-            "Previous context summary:\n$previousSummary\n\n" +
-                "New conversation to merge:\n$transcript"
-        }
-        return try {
-            generateCompactSummary(conversationText)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            if (
-                e is CompactCallBudgetExceeded ||
-                !isSegmentRetryableError(e) ||
-                messages.size < 2 ||
-                // [C3-android-compaction-guards] Ported overflow bound: Eta
-                // stops re-splitting once overflowShrinks reaches
-                // AgentContextBudget.MAX_OVERFLOW_ATTEMPTS. Minis counts the
-                // same recursion as a per-call depth (the existing iOS-aligned
-                // "<3 levels" limit) and bounds the run-wide fan-out with
-                // MAX_COMPACT_LLM_CALLS instead.
-                depth >= AgentContextBudget.MAX_OVERFLOW_ATTEMPTS ||
-                compactCallsIssued.get() + 2 > MAX_COMPACT_LLM_CALLS
-            ) {
-                throw e
-            }
-            val split = AgentContextCompactor.halfSplitBoundary(messages)
-                ?: CompactSplitPredicate.findSafeSplit(messages, messages.size / 2)
-                ?: throw e
-            val firstHalf = messages.subList(0, split).toList()
-            val secondHalf = messages.subList(split, messages.size).toList()
-            AppLogger.info(
-                TAG,
-                "[Compact] Splitting ${messages.size} messages at $split into " +
-                    "${firstHalf.size} + ${secondHalf.size} (depth=$depth)",
-            )
-            // [C3-android-compaction-guards] Eta's overflow recovery: re-
-            // summarize each half with the running summary carried forward —
-            // the first half inherits `previousSummary`, the second half
-            // inherits the first half's gated summary. This replaces the old
-            // local concatenation of two independently built halves, which
-            // could not reject a truncated half before it entered the merged
-            // text.
-            val firstHalfSummary = generateCompactSummaryWithSplitting(
-                messages = firstHalf,
-                previousSummary = previousSummary,
-                summaryCharCap = summaryCharCap,
-                depth = depth + 1,
-            )
-            requireValidSummary(
-                firstHalfSummary.text.trim(),
-                firstHalfSummary.stopReason,
-                summaryCharCap,
-            )
-            return generateCompactSummaryWithSplitting(
-                messages = secondHalf,
-                previousSummary = firstHalfSummary.text.trim(),
-                summaryCharCap = summaryCharCap,
-                depth = depth + 1,
-            )
-        }
-    }
-
-    /**
-     * Single-shot LLM call that turns [conversationText] into a structured
-     * summary. Throws on provider error so the splitter above can detect
-     * context-too-large failures and retry with halved input. Returns the text
-     * together with the provider's stop reason: the caller's summary gate
-     * rejects a truncated answer, so it must not be dropped here.
-     */
-    private suspend fun generateCompactSummary(conversationText: String): SummaryDraft {
-        // Wrap the transcript in explicit BEGIN/END framing so the model
-        // treats it as material to summarize rather than as a chat turn to
-        // continue. Mirrors iOS AIChatViewModel+Compaction.swift
-        // `compactUserMessage` construction. Without this wrapper, fast models
-        // (e.g. deepseek-v4-flash) tend to "answer" whatever the last user
-        // turn in the transcript said — producing a single-line continuation
-        // instead of a structured summary.
-        val userMessage = buildString {
-            append("Compact this conversation into a context summary:\n\n")
-            append(conversationText)
-            append("\n\n---\nEND OF CONVERSATION TO COMPACT.\n\n")
-            append(
-                "Now generate a structured context summary following the system prompt " +
-                    "instructions. Do NOT continue the conversation above — summarize it. " +
-                    "Write everything in past tense, framed as \"what was discussed / what " +
-                    "was done\", NOT as an ongoing goal or todo list."
-            )
-        }
-        val model = currentModel
-        val contextWindow = model?.contextWindow ?: 128_000
-        val estimatedInput = userMessage.length / 4
-        val maxOut = maxOf(1024, minOf(8192, contextWindow - estimatedInput))
-        val provider = currentProvider
-            ?: throw IllegalStateException("No LLM provider available for compaction")
-        val response = com.openminis.app.provider.LLMRetryPolicy.withRetry {
-            provider.sendMessage(
-                messages = listOf(
-                    LLMMessage(role = LLMMessage.Role.USER, content = userMessage)
-                ),
-                systemPrompt = compactSummarySystemPrompt,
-                maxTokens = maxOut,
-                // Mirror iOS AIChatViewModel.swift:12926 — null lets the
-                // provider/model use its default. gpt-5.x family rejects any
-                // temperature != 1 with HTTP 400, and Android
-                // OpenAIProvider.buildRequestBody omits the field entirely when
-                // temperature is null.
-                temperature = null,
-                imageParts = emptyList(),
-                tools = emptyList(),
-                thinkingLevel = ThinkingLevel.OFF,
-            )
-        }
-        // [C3-android-compaction-guards] The stop reason travels with the text
-        // to the summary gate: upstream treats "did not finish normally" as one
-        // of the CONTEXT_SUMMARY_INVALID conditions, and a truncated answer must
-        // never be stored as the summary.
-        return SummaryDraft(response.text, response.stopReason)
-    }
-
-    /**
-     * Should a failed summary attempt be retried by splitting the input in half?
-     *
-     * Ported from iOS `isSegmentRetryableError`
-     * (AIChatViewModel+Compaction.swift:1010, T-compact-segment-retry-any-error).
-     *
-     * Everything EXCEPT the two cases where a smaller request cannot help:
-     *   - cancellation — the user (or a session switch) stopped the work, so a
-     *     retry would fight that and immediately throw again;
-     *   - network/offline — the request never reached a model, so payload size
-     *     is irrelevant and splitting just doubles the failed round-trips.
-     *
-     * This deliberately REPLACES [isContextTooLargeError] on the split path.
-     * That substring allow-list tried to enumerate how every provider words an
-     * over-length refusal and was provably incomplete — OpenMinis#133's
-     * `[context_length_exceeded] Your input exceeds the context window of this
-     * model` slipped past several variants — and every miss silently disabled
-     * splitting, so compaction failed outright instead of retrying smaller.
-     *
-     * Splitting on an unclassified error is safe: the worst case is two smaller
-     * calls reaching the same failure, bounded by depth < 3 (≤8 leaf calls). A
-     * summary built from halves is never worse than no summary at all, so the
-     * burden of proof is inverted — retry unless retrying is provably pointless.
-     */
-    private fun isSegmentRetryableError(error: Throwable): Boolean {
-        return shouldSplitOnError(error)
-    }
-
-    /**
-     * Match provider error text against the substring set iOS
-     * `isContextTooLargeError` used before T-compact-segment-retry-any-error.
-     *
-     * NO LONGER gates segment retry — [isSegmentRetryableError] does, for the
-     * reasons documented there. Retained only for user-facing wording, where
-     * guessing wrong costs a less specific message rather than a failed
-     * compaction.
-     */
-    @Suppress("unused")
-    private fun isContextTooLargeError(error: Throwable): Boolean {
-        val desc = (error.message ?: error.toString()).lowercase()
-        return desc.contains("too many tokens") ||
-            desc.contains("context length") ||
-            desc.contains("max_tokens") ||
-            desc.contains("content is too long") ||
-            desc.contains("exceeds the model") ||
-            desc.contains("request too large") ||
-            desc.contains("prompt is too long") ||
-            desc.contains("token limit") ||
-            desc.contains("context window")
-    }
-
-    /**
      * Consult [ContextPolicy] before sending. Returns true to proceed. The
      * Android MVP doesn't surface a "Compact before send" dialog (iOS does),
      * so we only warn via [appendSystemInfo] at the `needsCompact` /
@@ -3445,32 +2793,6 @@ class ChatViewModel(
                 }
             }
         }
-
-    /**
-     * System prompt for the single-shot summarisation call. Matches iOS
-     * wording so cross-device summaries stay stylistically aligned.
-     */
-    private val compactSummarySystemPrompt: String = """
-        You are a context compaction engine. Your summary will REPLACE the original messages in the conversation context window. The agent will read your summary as past context, then proceed based on the user's NEXT message — your summary is background, not a standing work order. Write the summary in the same language the user used in the conversation.
-
-        MUST PRESERVE (never omit or shorten):
-        - All file paths, directory names, URLs, UUIDs, and identifiers — copy verbatim
-        - Commands executed and their outcomes (success/failure/output)
-        - What was requested and what was done (record as past events, not as ongoing goals)
-        - Key decisions made and their rationale
-        - Errors encountered and how they were resolved
-        - Important constraints, rules, or user preferences mentioned
-        - Any tool calls and their results that affect current state
-
-        STRUCTURE:
-        1. Start with a one-line description of what the conversation was about (use past tense — "User asked X, agent did Y", NOT "Goal: X").
-        2. Then a concise narrative of what happened, preserving technical details.
-        3. End with a "What had been done so far" section listing completed work — NOT a "todo" or "pending" list. Do not invent ongoing objectives or carry-over tasks from old turns; if the user wants to continue, they will say so in their next message.
-
-        PRIORITIZE recent context over older history — recent decisions and recent file/path references are most useful for continuity.
-
-        Do NOT translate or alter code snippets, file paths, identifiers, or error messages. Be concise but never lose information the agent needs.
-    """.trimIndent()
 
     // T203 part 2: these MUST be declared before `init { loadSession() }` below.
     // viewModelScope.launch defaults to Dispatchers.Main.immediate, which runs
