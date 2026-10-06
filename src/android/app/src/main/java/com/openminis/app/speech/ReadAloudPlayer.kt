@@ -629,19 +629,19 @@ class ReadAloudPlayer(context: Context) {
             return true
         }
         val budgetMs = (text.length * 600L + 10_000L).coerceAtMost(180_000L)
-        val deadline = System.currentTimeMillis() + budgetMs
-        var timedOut = false
-        while (system.isSpeaking.value) {
-            if (System.currentTimeMillis() > deadline) {
-                AppLogger.error(
-                    TAG,
-                    "system TTS completion never reported (len=${text.length}, " +
-                        "waited ${budgetMs}ms) — engine's progress listener is broken; moving on",
-                )
-                timedOut = true
-                break
-            }
-            kotlinx.coroutines.delay(POLL_MS)
+        val timedOut = awaitUtteranceEnd(
+            budgetMs = budgetMs,
+            isSpeaking = { system.isSpeaking.value },
+            isPaused = { system.isPausedState.value },
+            pollMs = POLL_MS,
+            pause = { kotlinx.coroutines.delay(it) },
+        ) == UtteranceEnd.TIMED_OUT
+        if (timedOut) {
+            AppLogger.error(
+                TAG,
+                "system TTS completion never reported (len=${text.length}, " +
+                    "waited ${budgetMs}ms) — engine's progress listener is broken; moving on",
+            )
         }
         if (timedOut) {
             // Do NOT system.stop() here. The engine is very likely still

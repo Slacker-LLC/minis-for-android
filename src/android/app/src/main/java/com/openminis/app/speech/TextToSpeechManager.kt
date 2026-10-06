@@ -75,7 +75,12 @@ class TextToSpeechManager : TextToSpeech.OnInitListener {
     private val _isSpeaking = MutableStateFlow(false)
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
 
-    private var isPaused = false
+    private val _isPaused = MutableStateFlow(false)
+    /** True while the user has speech paused; a paused utterance is not a finished one. */
+    val isPausedState: StateFlow<Boolean> = _isPaused.asStateFlow()
+    private var isPaused: Boolean
+        get() = _isPaused.value
+        set(value) { _isPaused.value = value }
     private var pendingTexts = mutableListOf<String>()
     private var pausedAtIndex = 0
 
