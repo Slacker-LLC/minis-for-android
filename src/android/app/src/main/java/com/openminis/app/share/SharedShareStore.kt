@@ -108,6 +108,22 @@ object SharedShareStore {
      * takes the discard path and deletes A's files out from under it, leaving
      * broken attachments. Callers that know about a live buffer now exclude it.
      */
+    /**
+     * Removes just the staged files named in [names] — the ones a share that has been handed over
+     * owned. Another share may be mid-copy into the same directory or waiting in a confirmation
+     * dialog; wiping the folder would delete its file out from under it.
+     */
+    fun deleteSharedFiles(context: Context, names: Collection<String>) =
+        deleteFilesIn(sharedFileDirectory(context), names)
+
+    internal fun deleteFilesIn(dir: java.io.File, names: Collection<String>) {
+        for (name in names) {
+            // A staged file is a direct child; anything with a separator is not ours to delete.
+            if (name.isEmpty() || name.contains('/') || name.contains('\\') || name == "." || name == "..") continue
+            runCatching { java.io.File(dir, name).takeIf { it.isFile }?.delete() }
+        }
+    }
+
     fun cleanSharedFiles(context: Context, keep: Set<String> = emptySet()) {
         val dir = sharedFileDirectory(context)
         dir.listFiles()?.forEach { f ->

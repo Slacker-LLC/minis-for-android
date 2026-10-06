@@ -619,7 +619,8 @@ fun ChatScreen(
             }
         }
         viewModel.markShareInjected()
-        com.openminis.app.share.SharedShareStore.cleanSharedFiles(context)
+        // Only this share's own files: another share may be mid-copy or awaiting confirmation.
+        com.openminis.app.share.SharedShareStore.deleteSharedFiles(context, pending.attachmentFileNames())
     }
 
     // T311: publish "this is the active chat" while ChatScreen is composed,

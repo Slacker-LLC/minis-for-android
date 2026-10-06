@@ -21,6 +21,10 @@ data class PendingShare(val items: List<Item>, val timestampMs: Long) {
         }
     }
 
+    /** Names of the staged files this share carries. */
+    fun attachmentFileNames(): Set<String> =
+        items.filter { it.kind == Item.Kind.ATTACHMENT }.map { it.value }.toSet()
+
     fun toJson(): JSONObject {
         val arr = JSONArray()
         for (item in items) {

@@ -114,7 +114,7 @@ object ShareCoordinator {
         val ageMs = System.currentTimeMillis() - buf.bufferedAtMs
         if (ageMs > BUFFER_TTL_MS) {
             AppLogger.info(TAG, "[Share] consumeBuffer: expired (age=${ageMs}ms)")
-            SharedShareStore.cleanSharedFiles(context)
+            SharedShareStore.deleteSharedFiles(context, buf.share.attachmentFileNames())
             notifyExpired(context)
             return null
         }
