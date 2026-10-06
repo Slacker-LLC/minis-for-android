@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Application
 import android.content.BroadcastReceiver
 import android.content.Context
+import androidx.core.content.edit
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
@@ -1164,60 +1165,48 @@ class MinisApp : Application(), ImageLoaderFactory {
             prefs.edit().remove("alarms_json").apply()
             return
         }
-        val now = System.currentTimeMillis()
-        var migrated = 0
-        var skipped = 0
-        for (i in 0 until arr.length()) {
-            val entry = arr.optJSONObject(i) ?: continue
-            val triggerAt = entry.optLong("triggerAtMs", 0L)
-            if (triggerAt in 1L..now && entry.optString("type") == "timer") {
-                skipped++; continue  // Past timer — nothing to recover.
-            }
-            if (triggerAt in 1L..now && entry.optString("repeatMode", "ONCE") == "ONCE") {
-                skipped++; continue  // Past one-shot alarm.
-            }
-            val migrationOk = runCatching {
-                if (entry.optString("type") == "timer") {
-                    val secs = entry.optInt("durationSec", -1)
-                    val remaining = ((triggerAt - now) / 1000L).toInt()
-                    if (remaining <= 0 && secs <= 0) return@runCatching false
-                    val intent = android.content.Intent(android.provider.AlarmClock.ACTION_SET_TIMER).apply {
-                        putExtra(android.provider.AlarmClock.EXTRA_LENGTH, if (remaining > 0) remaining else secs)
-                        putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, entry.optString("label", "Timer"))
-                        putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
-                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    startActivity(intent)
-                    true
-                } else {
-                    val intent = android.content.Intent(android.provider.AlarmClock.ACTION_SET_ALARM).apply {
-                        putExtra(android.provider.AlarmClock.EXTRA_HOUR, entry.optInt("hour", 0))
-                        putExtra(android.provider.AlarmClock.EXTRA_MINUTES, entry.optInt("minute", 0))
-                        putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, entry.optString("label", "Alarm"))
-                        putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
-                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    startActivity(intent)
-                    true
-                }
-            }.getOrDefault(false)
-            if (migrationOk) migrated++ else skipped++
+        val outcome = com.openminis.app.offload.GhostAlarmMigration.run(arr, System.currentTimeMillis()) { entry ->
+            submitGhostAlarm(entry)
         }
-        // Clear the blob ONLY when every entry was either migrated or is a
-        // genuinely expired ghost. Entries that were skipped because the
-        // migration call failed (e.g. startActivity blocked by Android's
-        // background-activity limits when the process was pulled up by a
-        // BOOT_COMPLETED broadcast) must be kept so a later foreground
-        // launch can retry them — clearing them here would permanently
-        // delete alarms the user never got.
-        if (skipped == 0) {
+        // Keep only the entries whose hand-over failed (e.g. startActivity blocked by Android's
+        // background-activity limits when the process was pulled up by BOOT_COMPLETED), so a later
+        // foreground launch retries exactly those. Handed-over and expired entries are gone for good.
+        if (outcome.remaining.length() == 0) {
             prefs.edit().remove("alarms_json").apply()
-            Log.i("MinisApp", "T268 ghost alarm migration: migrated=$migrated skipped=$skipped (prefs cleared)")
+            Log.i("MinisApp", "T268 ghost alarm migration: migrated=${outcome.migrated} expired=${outcome.expired} (prefs cleared)")
         } else {
-            // Try again on the next process start; the log makes the
-            // pending-retry state visible.
-            Log.w("MinisApp", "T268 ghost alarm migration: migrated=$migrated skipped=$skipped (kept for retry)")
+            prefs.edit { putString("alarms_json", outcome.remaining.toString()) }
+            Log.w(
+                "MinisApp",
+                "T268 ghost alarm migration: migrated=${outcome.migrated} expired=${outcome.expired} " +
+                    "failed=${outcome.failed} (failed entries kept for retry)",
+            )
         }
+    }
+
+    /** Hands one pre-T266 entry to the system Clock; false when it could not be started. */
+    private fun submitGhostAlarm(entry: org.json.JSONObject): Boolean {
+        val now = System.currentTimeMillis()
+        val triggerAt = entry.optLong("triggerAtMs", 0L)
+        val intent = if (entry.optString("type") == "timer") {
+            val secs = entry.optInt("durationSec", -1)
+            val remaining = ((triggerAt - now) / 1000L).toInt()
+            if (remaining <= 0 && secs <= 0) return false
+            android.content.Intent(android.provider.AlarmClock.ACTION_SET_TIMER).apply {
+                putExtra(android.provider.AlarmClock.EXTRA_LENGTH, if (remaining > 0) remaining else secs)
+                putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, entry.optString("label", "Timer"))
+            }
+        } else {
+            android.content.Intent(android.provider.AlarmClock.ACTION_SET_ALARM).apply {
+                putExtra(android.provider.AlarmClock.EXTRA_HOUR, entry.optInt("hour", 0))
+                putExtra(android.provider.AlarmClock.EXTRA_MINUTES, entry.optInt("minute", 0))
+                putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, entry.optString("label", "Alarm"))
+            }
+        }
+        intent.putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
+        return true
     }
 
     /**
