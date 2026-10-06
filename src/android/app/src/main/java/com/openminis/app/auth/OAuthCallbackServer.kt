@@ -29,6 +29,40 @@ class OAuthCallbackServer(
         }
 
         private const val TAG = "OAuthCallbackServer"
+        private const val MAX_LINE_CHARS = 8 * 1024
+        private const val MAX_HEADER_LINES = 64
+
+        /**
+         * Key/value pairs of a raw (still percent-encoded) query. Each is form-decoded exactly once,
+         * after splitting: decoding first turns `code=a%26b` into `code=a&b`, and decoding twice turns
+         * `a%2Bb` into `a b`.
+         */
+        internal fun parseQuery(rawQuery: String?): Map<String, String> {
+            if (rawQuery.isNullOrEmpty()) return emptyMap()
+            val out = LinkedHashMap<String, String>()
+            for (pair in rawQuery.split('&')) {
+                if (pair.isEmpty()) continue
+                val kv = pair.split('=', limit = 2)
+                val key = runCatching { java.net.URLDecoder.decode(kv[0], "UTF-8") }.getOrNull() ?: continue
+                val value = if (kv.size > 1) {
+                    runCatching { java.net.URLDecoder.decode(kv[1], "UTF-8") }.getOrNull() ?: continue
+                } else ""
+                out.putIfAbsent(key, value)
+            }
+            return out
+        }
+
+        /** A line of at most [MAX_LINE_CHARS] characters, or null at end of stream; throws past the limit. */
+        internal fun readBoundedLine(reader: java.io.Reader): String? {
+            val sb = StringBuilder()
+            while (true) {
+                val c = reader.read()
+                if (c < 0) return if (sb.isEmpty()) null else sb.toString()
+                if (c == '\n'.code) return sb.toString().removeSuffix("\r")
+                if (sb.length >= MAX_LINE_CHARS) throw java.io.IOException("request line too long")
+                sb.append(c.toChar())
+            }
+        }
     }
 
     private var serverSocket: ServerSocket? = null
@@ -76,6 +110,8 @@ class OAuthCallbackServer(
                 }
                 if (!bound) {
                     Log.e(TAG, "All ports unavailable: $portsToTry")
+                    // Tell whoever is waiting for a code that none can arrive.
+                    stop()
                     return@Thread
                 }
                 Log.d(TAG, "Listening on port $boundPort")
@@ -88,7 +124,7 @@ class OAuthCallbackServer(
                     try {
                         socket.soTimeout = 10_000
                         val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-                        val requestLine = reader.readLine() ?: continue
+                        val requestLine = readBoundedLine(reader) ?: continue
                         Log.d(TAG, "Request: ${loggableRequestLine(requestLine)}")
 
                         // CORS preflight for providers (e.g. xAI) that
@@ -100,9 +136,11 @@ class OAuthCallbackServer(
                         // only echo back permissive CORS for known xAI hosts.
                         if (requestLine.startsWith("OPTIONS")) {
                             var origin: String? = null
+                            var headerLines = 0
                             while (true) {
-                                val h = reader.readLine() ?: break
+                                val h = readBoundedLine(reader) ?: break
                                 if (h.isEmpty()) break
+                                if (++headerLines > MAX_HEADER_LINES) throw java.io.IOException("too many header lines")
                                 val lower = h.lowercase()
                                 if (lower.startsWith("origin:")) {
                                     origin = h.substringAfter(":").trim()
@@ -129,10 +167,7 @@ class OAuthCallbackServer(
                         val parts = requestLine.split(" ")
                         if (parts.size >= 2) {
                             val uri = URI("http://localhost${ parts[1] }")
-                            val params = uri.query?.split("&")?.associate {
-                                val kv = it.split("=", limit = 2)
-                                kv[0] to (if (kv.size > 1) java.net.URLDecoder.decode(kv[1], "UTF-8") else "")
-                            } ?: emptyMap()
+                            val params = parseQuery(uri.rawQuery)
 
                             val code = params["code"]
                             val state = params["state"]
@@ -156,6 +191,13 @@ class OAuthCallbackServer(
 
                             if (code != null) {
                                 onCode(code, state)
+                                stop()
+                                return@Thread
+                            }
+                            // The provider reported a failure (the user pressed Deny): no code will
+                            // follow, so end the wait instead of listening until it times out.
+                            if (params["error"] != null) {
+                                Log.w(TAG, "Authorization ended with error=${params["error"]}")
                                 stop()
                                 return@Thread
                             }
