@@ -45,6 +45,16 @@ class BackupImporter(
     private val db: AppDatabase,
 ) {
 
+    /**
+     * Session → bot links written by this restore's chats pass. Bots are restored after chats, so the
+     * links are checked once the bots are in: a link to a bot this device does not end up with is
+     * removed and counted as ignored rather than left dangling.
+     */
+    private val restoredBotLinks = mutableMapOf<String, String>()
+
+    /** Records the chats pass refused (invalid session identity fields); reported as `ignored`. */
+    private var ignoredInChats = 0
+
     data class Options(
         /** null = every category present in the package. */
         val categories: Set<BackupCategory>? = null,
@@ -238,6 +248,10 @@ class BackupImporter(
                     AppLogger.error(TAG, "[Restore] category ${category.key} failed: ${e.message}")
                     CategoryReport(category.key, failed = e.message ?: e.toString())
                 }
+                if (ignoredInChats > 0) {
+                    report.extras.merge("ignored", ignoredInChats, Int::plus)
+                    ignoredInChats = 0
+                }
                 if (categoryReport != null && categoryReport.failed == null) {
                     try {
                         when (category) {
@@ -424,11 +438,17 @@ class BackupImporter(
                     editCount = s.int("editCount") ?: 0,
                     thinkingOverride = s.str("thinkingOverride"),
                     folderId = s.str("folderId"),
-                    // Not carried by the package: keep what this device has.
-                    roleplayJson = existing?.roleplayJson,
-                    sessionOverrides = existing?.sessionOverrides,
-                    botId = existing?.botId,
+                    // A package written before these fields existed does not carry them: keep what
+                    // this device has. A package that carries them states them (null included).
+                    roleplayJson = if ("roleplayJson" in s) restorableRoleplay(s.str("roleplayJson")) else existing?.roleplayJson,
+                    sessionOverrides = if ("sessionOverrides" in s) {
+                        restorableOverrides(s.str("sessionOverrides"))
+                    } else {
+                        existing?.sessionOverrides
+                    },
+                    botId = if ("botId" in s) s.str("botId")?.takeIf { it.isNotBlank() } else existing?.botId,
                 )
+            record.botId?.let { restoredBotLinks[id] = it }
             if (existing == null) {
                 dao.insertSession(record)
                 newlyInsertedSessionIds.add(id)
@@ -580,6 +600,8 @@ class BackupImporter(
                         boundaryMessageId = c.str("boundaryMessageId"),
                         firstKeptMessageId = c.str("firstKeptMessageId"),
                         lastCompactedMessageId = c.str("lastCompactedMessageId"),
+                        // Absent in older packages, which only ever held v1 markers.
+                        version = c.int("version") ?: 1,
                     )
                 )
                 report.imported += 1
@@ -1262,6 +1284,8 @@ class BackupImporter(
 
         val botDao = db.botDao()
         var bots = 0
+        // The 12-bot limit holds for a restore as it does for creating one; only new ids use it up.
+        var botCount = botDao.countBots()
         val botRecords = readJsonlList(dataDir, BackupRoleplayMapping.BOT_FILE)
         if (botRecords.size > BackupRoleplayMapping.MAX_ITEMS) ignored += botRecords.size - BackupRoleplayMapping.MAX_ITEMS
         for (env in botRecords.take(BackupRoleplayMapping.MAX_ITEMS)) {
@@ -1272,7 +1296,9 @@ class BackupImporter(
             if (bot == null) { ignored++; continue }
             val local = botDao.getBot(bot.id)
             if (local == null) {
+                if (botCount >= com.openminis.app.data.repository.BotRepository.MAX_BOTS) { ignored++; continue }
                 botDao.insertBot(bot)
+                botCount++
                 bots++
             } else if (BackupRoleplayMapping.isNewer(bot.updatedAt, local.updatedAt)) {
                 botDao.updateBotProfile(bot.id, bot.name, bot.systemPrompt, bot.modelBinding, bot.updatedAt)
@@ -1281,8 +1307,32 @@ class BackupImporter(
             }
         }
         if (bots > 0) report.extras["bots"] = bots
+
+        // A restored session bound to a bot this device does not have (refused above, or never in the
+        // package) becomes an ordinary chat, and the report says something was left out.
+        val chatDao = db.chatDao()
+        for ((sessionId, botId) in restoredBotLinks) {
+            if (botDao.getBot(botId) != null) continue
+            val session = chatDao.getSession(sessionId) ?: continue
+            if (session.botId != botId) continue
+            chatDao.updateSessionBot(sessionId, null, session.updatedAt)
+            ignored++
+        }
+        restoredBotLinks.clear()
         if (ignored > 0) report.extras.merge("ignored", ignored, Int::plus)
     }
+
+    /** The bound character as stored by this app, or null (counted as ignored) when it is not one. */
+    private fun restorableRoleplay(raw: String?): String? {
+        if (raw.isNullOrBlank()) return null
+        val binding = com.openminis.app.roleplay.CharacterBinding.fromJson(raw)
+        if (binding == null) ignoredInChats++
+        return binding?.toJson()
+    }
+
+    /** Per-session settings re-encoded through the app's own parser, so only known, valid knobs survive. */
+    private fun restorableOverrides(raw: String?): String? =
+        com.openminis.app.data.model.SessionOverrides.fromJson(raw).toJsonOrNull()
 
     companion object {
         private const val TAG = "Restore"
