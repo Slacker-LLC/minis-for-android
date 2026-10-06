@@ -1071,20 +1071,16 @@ class SessionListViewModel(
     fun duplicateSession(id: String) {
         viewModelScope.launch {
             val session = chatRepository.getSession(id) ?: return@launch
-            val messages = chatRepository.loadMessages(id)
-            val newSession = chatRepository.createSession(
-                modelId = session.modelId,
-                title = context.getString(R.string.session_fork_copy_title, session.title ?: context.getString(R.string.chat_default_title)),
+            // The full copy (category, model binding, memory switch, overrides, thinking level and
+            // compact markers); the list used its own shorter one that dropped all of those, so a
+            // copy of a memory-off session had memory on.
+            com.openminis.app.data.SessionForkManager(context, chatRepository).duplicateSession(
+                id,
+                title = context.getString(
+                    R.string.session_fork_copy_title,
+                    session.title ?: context.getString(R.string.chat_default_title),
+                ),
             )
-            for (msg in messages) {
-                chatRepository.appendMessage(
-                    sessionId = newSession.id,
-                    role = msg.role,
-                    partsJson = msg.partsJson,
-                    tokenUsage = msg.tokenUsage,
-                    reasoningContent = msg.reasoningContent,
-                )
-            }
         }
     }
 
