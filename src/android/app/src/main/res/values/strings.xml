@@ -976,6 +976,8 @@
     <!-- [T-android-json-open-provider-import-prompt] Shown when a JSON opened/shared into Minis looks like a Provider export. -->
     <string name="share_provider_json_title">Provider configuration detected</string>
     <string name="share_expired_toast">Shared content expired. Please share again.</string>
+    <string name="share_attach_failed_toast">Some shared files could not be attached. Please share them again.</string>
+    <string name="share_overflow_toast">Too much shared content is waiting. Some items were dropped; open a chat and share the rest again.</string>
     <string name="share_provider_json_message">This JSON file looks like an exported provider. What would you like to do?</string>
     <string name="share_provider_json_import">Import Provider</string>
     <string name="share_provider_json_attach">Add as chat attachment</string>

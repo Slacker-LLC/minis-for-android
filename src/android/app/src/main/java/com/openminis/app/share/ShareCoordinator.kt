@@ -68,21 +68,33 @@ object ShareCoordinator {
         // exact "shared two screenshots, only the second arrived" report.
         val now = System.currentTimeMillis()
         val existing = buffer
-        val mergedShare = if (existing != null && now - existing.bufferedAtMs <= BUFFER_TTL_MS) {
-            val seen = LinkedHashMap<Pair<PendingShare.Item.Kind, String>, PendingShare.Item>()
-            for (item in existing.share.items + pending.items) {
-                seen[item.kind to item.value] = item
-            }
-            AppLogger.info(
+        val live = existing != null && now - existing.bufferedAtMs <= BUFFER_TTL_MS
+        val dir = SharedShareStore.sharedFileDirectory(context)
+        val merged = ShareIntakePolicy.merge(
+            existing = if (live) existing!!.share.items else emptyList(),
+            incoming = pending.items,
+            sizeOf = { item ->
+                if (item.kind == PendingShare.Item.Kind.ATTACHMENT) java.io.File(dir, item.value).length() else 0L
+            },
+        )
+        if (merged.rejected.isNotEmpty()) {
+            AppLogger.warning(
                 TAG,
-                "[Share] processPendingShare: merging ${existing.share.items.size} + " +
-                    "${pending.items.size} -> ${seen.size} item(s)",
+                "[Share] processPendingShare: queue full, dropping ${merged.rejected.size} item(s)",
             )
-            PendingShare(seen.values.toList(), pending.timestampMs)
-        } else {
-            AppLogger.info(TAG, "[Share] processPendingShare: buffering ${pending.items.size} item(s)")
-            pending
+            SharedShareStore.deleteSharedFiles(
+                context,
+                merged.rejected.filter { it.kind == PendingShare.Item.Kind.ATTACHMENT }.map { it.value },
+            )
+            notifyOverflow(context)
         }
+        if (merged.accepted.isEmpty()) return
+        AppLogger.info(
+            TAG,
+            "[Share] processPendingShare: buffering ${merged.accepted.size} item(s) " +
+                "(incoming ${pending.items.size}, previously ${if (live) existing!!.share.items.size else 0})",
+        )
+        val mergedShare = PendingShare(merged.accepted, pending.timestampMs)
         // bufferedAt renews on merge so the combined buffer gets a full TTL.
         buffer = Buffered(mergedShare, now)
         _bufferVersion.value = _bufferVersion.value + 1
@@ -127,13 +139,17 @@ object ShareCoordinator {
      * consumeBuffer is reachable from a composition/IO context, and Toast
      * requires a Looper-backed thread.
      */
-    private fun notifyExpired(context: Context) {
+    private fun notifyOverflow(context: Context) = toastOnMain(context, com.openminis.app.R.string.share_overflow_toast)
+
+    private fun notifyExpired(context: Context) = toastOnMain(context, com.openminis.app.R.string.share_expired_toast)
+
+    private fun toastOnMain(context: Context, message: Int) {
         runCatching {
             android.os.Handler(android.os.Looper.getMainLooper()).post {
                 runCatching {
                     android.widget.Toast.makeText(
                         context.applicationContext,
-                        context.getString(com.openminis.app.R.string.share_expired_toast),
+                        context.getString(message),
                         android.widget.Toast.LENGTH_LONG,
                     ).show()
                 }

@@ -256,6 +256,8 @@
     <string name="provider_list_import_provider">匯入提供商</string>
     <string name="share_provider_json_title">偵測到服務商設定</string>
     <string name="share_expired_toast">分享內容已過期，請重新分享。</string>
+    <string name="share_attach_failed_toast">部分分享的檔案無法加入，請重新分享。</string>
+    <string name="share_overflow_toast">等待處理的分享內容過多，部分已被捨棄。請開啟聊天後重新分享其餘內容。</string>
     <string name="share_provider_json_message">這個 JSON 檔案看起來是匯出的服務商設定。你想怎麼處理？</string>
     <string name="share_provider_json_import">匯入為服務商</string>
     <string name="share_provider_json_attach">作為聊天附件加入</string>

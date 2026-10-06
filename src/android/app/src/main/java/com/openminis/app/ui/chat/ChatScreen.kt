@@ -603,6 +603,7 @@ fun ChatScreen(
         // last one survived — a two-text share landed as just the second one
         // even after the store-level merge delivered both.
         var draft = inputText
+        var failedAttachments = 0
         for (item in pending.items) {
             when (item.kind) {
                 com.openminis.app.share.PendingShare.Item.Kind.INLINE_TEXT -> {
@@ -614,13 +615,22 @@ fun ChatScreen(
                     viewModel.setInputText(draft)
                 }
                 com.openminis.app.share.PendingShare.Item.Kind.ATTACHMENT -> {
-                    viewModel.addAttachmentFromStagedShare(java.io.File(sharedDir, item.value))
+                    if (viewModel.addAttachmentFromStagedShare(java.io.File(sharedDir, item.value)) == null) {
+                        failedAttachments++
+                    }
                 }
             }
         }
         viewModel.markShareInjected()
         // Only this share's own files: another share may be mid-copy or awaiting confirmation.
         com.openminis.app.share.SharedShareStore.deleteSharedFiles(context, pending.attachmentFileNames())
+        if (failedAttachments > 0) {
+            android.widget.Toast.makeText(
+                context,
+                context.getString(R.string.share_attach_failed_toast),
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+        }
     }
 
     // T311: publish "this is the active chat" while ChatScreen is composed,
