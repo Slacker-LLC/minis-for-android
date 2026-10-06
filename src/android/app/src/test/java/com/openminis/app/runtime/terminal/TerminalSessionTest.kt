@@ -71,10 +71,9 @@ class TerminalSessionTest {
         oldReader.complete(Unit)
         runCurrent()
         assertEquals(TerminalSession.State.RUNNING, session.state.value)
-        TerminalSession.broadcastTimezone("UTC")
         repeat(32) { backend.reads.trySend(-11) }
         runCurrent()
-        assertTrue(backend.written.toString().contains("export TZ='UTC'\r"))
+        assertEquals("a running terminal is never fed text it did not ask for", "", backend.written.toString())
         assertEquals(listOf(11), backend.closed)
         session.stop()
         runCurrent()
@@ -83,37 +82,16 @@ class TerminalSessionTest {
     }
 
     @Test
-    fun `proxy broadcast clears stale helper variables`() = runTest {
-        val readStarted = CompletableDeferred<Unit>()
-        val releaseRead = CompletableDeferred<Unit>()
-        val backend = FakePty().apply {
-            var firstRead = true
-            readHook = {
-                if (firstRead) {
-                    firstRead = false
-                    readStarted.complete(Unit)
-                    withContext(NonCancellable) {
-                        releaseRead.await()
-                    }
-                    -11
-                } else {
-                    reads.receive()
-                }
-            }
-        }
+    fun `a running terminal is not fed environment updates as keystrokes`() = runTest {
+        val backend = FakePty()
         val session = TerminalSession(this, { launch }, backend)
         session.start()
         runCurrent()
-        readStarted.await()
-
-        TerminalSession.broadcastProxy(mapOf("http_proxy" to "http://127.0.0.1:18787"))
-        TerminalSession.broadcastProxy(emptyMap())
-        releaseRead.complete(Unit)
-        repeat(1024) { backend.reads.trySend(-11) }
+        // The proxy helper's credentials and the timezone reach new terminals through their launch
+        // environment; nothing may be typed into a live one (an editor, ssh, a stdin reader).
+        repeat(32) { backend.reads.trySend(-11) }
         runCurrent()
-
-        assertTrue(backend.written.toString().contains("export http_proxy='http://127.0.0.1:18787'\r"))
-        assertTrue(backend.written.toString().contains("unset http_proxy\r"))
+        assertEquals("", backend.written.toString())
         session.stop()
         runCurrent()
     }

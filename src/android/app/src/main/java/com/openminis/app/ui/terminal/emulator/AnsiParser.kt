@@ -173,7 +173,9 @@ class AnsiParser {
     private fun processCsiParam(byte: Int, action: (ParsedAction) -> Unit) {
         when (byte) {
             in 0x30..0x39 -> {
-                currentParam = currentParam * 10 + (byte - 0x30)
+                // A parameter is a count or a coordinate; nothing real needs more than this, and
+                // an unbounded run of digits would overflow Int and drive huge loops downstream.
+                if (currentParam < MAX_CSI_PARAM) currentParam = currentParam * 10 + (byte - 0x30)
                 hasParam = true
             }
             0x3B -> {
@@ -262,11 +264,20 @@ class AnsiParser {
     private fun decodeUtf8(buf: ByteArray, len: Int): Int {
         // buf[0..len-1] is a complete UTF-8 sequence
         val b0 = buf[0].toInt() and 0xFF
-        return when {
-            len == 2 -> ((b0 and 0x1F) shl 6) or (buf[1].toInt() and 0x3F)
-            len == 3 -> ((b0 and 0x0F) shl 12) or ((buf[1].toInt() and 0x3F) shl 6) or (buf[2].toInt() and 0x3F)
-            len == 4 -> ((b0 and 0x07) shl 18) or ((buf[1].toInt() and 0x3F) shl 12) or ((buf[2].toInt() and 0x3F) shl 6) or (buf[3].toInt() and 0x3F)
-            else -> -1
+        val cp = when (len) {
+            2 -> ((b0 and 0x1F) shl 6) or (buf[1].toInt() and 0x3F)
+            3 -> ((b0 and 0x0F) shl 12) or ((buf[1].toInt() and 0x3F) shl 6) or (buf[2].toInt() and 0x3F)
+            4 -> ((b0 and 0x07) shl 18) or ((buf[1].toInt() and 0x3F) shl 12) or ((buf[2].toInt() and 0x3F) shl 6) or (buf[3].toInt() and 0x3F)
+            else -> return -1
         }
+        // Overlong forms, surrogates and anything past U+10FFFF are not characters; the renderer
+        // builds a String from the code point and throws on them. Show U+FFFD instead.
+        val minimum = when (len) { 2 -> 0x80; 3 -> 0x800; else -> 0x10000 }
+        return if (cp < minimum || cp > 0x10FFFF || cp in 0xD800..0xDFFF) REPLACEMENT else cp
+    }
+
+    companion object {
+        internal const val MAX_CSI_PARAM = 65_535
+        private const val REPLACEMENT = 0xFFFD
     }
 }

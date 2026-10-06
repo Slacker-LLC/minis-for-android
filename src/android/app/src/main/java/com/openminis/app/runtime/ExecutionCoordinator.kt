@@ -274,7 +274,9 @@ object ExecutionCoordinator {
                 Log.d(TAG, "[$sessionId] timezone update failed: ${error.message}")
             }
         }
-        TerminalSession.broadcastTimezone(tz)
+        // Interactive terminals are not updated from here: their foreground program may be an
+        // editor, ssh or a stdin reader, and `export …` typed into it is input, not configuration.
+        // A new terminal starts with the current values.
     }
 
     suspend fun broadcastProxyChange() {
@@ -303,6 +305,5 @@ object ExecutionCoordinator {
                 Log.d(TAG, "[$sessionId] proxy update failed: ${error.message}")
             }
         }
-        TerminalSession.broadcastProxy(env)
     }
 }
