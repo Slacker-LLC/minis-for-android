@@ -50,6 +50,22 @@ class SessionsOffloadHandler(
         }
 
         val sub = args.positional.firstOrNull() ?: "list"
+        // A date that was given but is not a date must be an error: treated as "not given" it widened
+        // the query to the whole history while reporting success.
+        for (name in listOf("start", "end")) {
+            val raw = args.get(name)
+            if (!raw.isNullOrBlank() && parseStrictDate(raw) == null) {
+                val err = errorEnvelope(
+                    sub,
+                    "INVALID_ARGS",
+                    "--$name must be a date like 2025-03-31 (got '$raw').",
+                )
+                return NativeOffloadResult(
+                    EXIT_INVALID_ARGS,
+                    OffloadOutput.formatBody(err.toString(2), args) + "\n",
+                )
+            }
+        }
         return try {
             when (sub) {
                 "list" -> cmdList(args)
@@ -94,8 +110,8 @@ class SessionsOffloadHandler(
         for (m in metas) {
             val s = JSONObject()
                 .put("session_id", m.id)
-                .put("started_at", DATE_FMT.format(Date(m.startedAt)))
-                .put("last_active", DATE_FMT.format(Date(m.lastActive)))
+                .put("started_at", formatTime(m.startedAt))
+                .put("last_active", formatTime(m.lastActive))
                 .put("message_count", m.messageCount)
             // Optional fields — only emit when non-null so the JSON
             // matches iOS's `(optional)` shape rather than carrying
@@ -139,7 +155,7 @@ class SessionsOffloadHandler(
                     .put("session_id", m.sessionId)
                     .put("message_id", m.messageId)
                     .put("role", m.role)
-                    .put("created_at", DATE_FMT.format(Date(m.createdAt)))
+                    .put("created_at", formatTime(m.createdAt))
                     .put("snippet", m.snippet),
             )
         }
@@ -196,7 +212,7 @@ class SessionsOffloadHandler(
             val obj = JSONObject()
                 .put("message_id", m.messageId)
                 .put("role", m.role)
-                .put("created_at", DATE_FMT.format(Date(m.createdAt)))
+                .put("created_at", formatTime(m.createdAt))
                 .put("text", m.text)
             // Only present when the stored text exceeded the cap, so normal
             // messages serialize byte-identically to before (iOS parity).
@@ -239,12 +255,7 @@ class SessionsOffloadHandler(
 
     private fun parseDate(raw: String?): Long? {
         if (raw.isNullOrBlank()) return null
-        return runCatching {
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            sdf.timeZone = TimeZone.getDefault()
-            sdf.isLenient = false
-            sdf.parse(raw)?.time
-        }.getOrNull()
+        return parseStrictDate(raw)
     }
 
     /**
@@ -299,9 +310,26 @@ class SessionsOffloadHandler(
         // for invalid CLI args, distinct from exit 1 for runtime errors.
         private const val EXIT_INVALID_ARGS = 2
 
-        private val DATE_FMT = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply {
-            timeZone = TimeZone.getDefault()
+        /**
+         * `yyyy-MM-dd` in the current time zone, consuming the whole string: "2025-03-31xyz" and
+         * "2025-02-30" are not dates. null when it is not one.
+         */
+        internal fun parseStrictDate(raw: String, zone: TimeZone = TimeZone.getDefault()): Long? {
+            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            sdf.timeZone = zone
+            sdf.isLenient = false
+            val pos = java.text.ParsePosition(0)
+            val text = raw.trim()
+            val date = sdf.parse(text, pos) ?: return null
+            return if (pos.index == text.length) date.time else null
         }
+
+        /**
+         * A fresh formatter per call: SimpleDateFormat is not thread-safe (the guest bridge serves
+         * requests on separate threads) and a shared one kept the time zone it was created with.
+         */
+        internal fun formatTime(ms: Long, zone: TimeZone = TimeZone.getDefault()): String =
+            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply { timeZone = zone }.format(Date(ms))
 
         private const val HELP_TEXT = """minis-sessions-cli - Query historical chat sessions and messages
 

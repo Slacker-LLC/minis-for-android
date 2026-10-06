@@ -156,7 +156,9 @@ class ChatRepository(
     suspend fun deleteSession(id: String) {
         com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(id)
         com.openminis.app.tools.android.AndroidDebugSessionStore.clear(id)
-        dao.deleteMessages(id)
+        // One statement: messages, compact markers and events go with the session through their
+        // ON DELETE CASCADE foreign keys. Deleting the messages first, as a separate commit, left a
+        // message-less session behind if the second step was interrupted.
         dao.deleteSession(id)
         withContext(Dispatchers.IO) {
             runCatching { onSessionDeleted(id) }
