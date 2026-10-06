@@ -270,6 +270,9 @@
     <string name="env_var_field_note_placeholder">Note facultative</string>
     <string name="env_var_error_invalid_key">Doit commencer par une lettre, n\'utiliser que lettres/chiffres/underscores</string>
     <string name="env_var_error_duplicate">Une variable avec ce nom existe déjà</string>
+    <string name="env_var_error_invalid_value">Cette valeur contient des caractères impossibles à enregistrer (caractères de contrôle)</string>
+    <string name="env_var_error_load">Impossible de lire les variables enregistrées ; la modification est désactivée pour les protéger</string>
+    <string name="env_var_error_save">Échec de l’enregistrement. Rien n’a été modifié</string>
     <string name="log_title">Journaux</string>
     <string name="log_section_logging">Journalisation</string>
     <string name="log_section_logging_footer">Lorsque activé, toutes les sorties console sont enregistrées dans des fichiers journaliers privés.</string>

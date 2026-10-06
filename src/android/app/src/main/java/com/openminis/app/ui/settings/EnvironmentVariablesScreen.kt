@@ -279,10 +279,23 @@ private fun EnvVarFormSheet(
     var noteText by remember { mutableStateOf(editEntry?.note ?: prefillNote) }
     val ioScope = rememberCoroutineScope()
 
+    // The stored value loads in the background. Until it has, the field is locked and Save is off:
+    // otherwise typing is overwritten by the late result, and saving only the note would write the
+    // still-empty field back over the real secret.
+    var valueLoaded by remember { mutableStateOf(editEntry == null) }
+    var loadFailed by remember { mutableStateOf(false) }
+    var saveFailed by remember { mutableStateOf(false) }
     LaunchedEffect(editEntry?.id) {
         editEntry?.let { entry ->
-            valueText = withContext(Dispatchers.IO) {
-                envVarRepository.getValue(entry.key).orEmpty()
+            try {
+                valueText = withContext(Dispatchers.IO) {
+                    envVarRepository.getValue(entry.key).orEmpty()
+                }
+                valueLoaded = true
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                loadFailed = true
             }
         }
     }
@@ -291,11 +304,16 @@ private fun EnvVarFormSheet(
     val normalizedKey = keyText.trim().uppercase()
     val isValid = envVarRepository.isValidKey(normalizedKey)
     val isDuplicate = envVarRepository.isDuplicateKey(normalizedKey, excludeId = editEntry?.id)
-    val canSave = isValid && !isDuplicate && keyText.isNotBlank()
+    val valueOk = envVarRepository.isValidValue(valueText)
+    val canSave = isValid && !isDuplicate && keyText.isNotBlank() &&
+        valueLoaded && valueOk && envVarRepository.isReadable
 
     val errorText = when {
         keyText.isNotBlank() && !isValid -> stringResource(R.string.env_var_error_invalid_key)
         isDuplicate -> stringResource(R.string.env_var_error_duplicate)
+        loadFailed || !envVarRepository.isReadable -> stringResource(R.string.env_var_error_load)
+        !valueOk -> stringResource(R.string.env_var_error_invalid_value)
+        saveFailed -> stringResource(R.string.env_var_error_save)
         else -> null
     }
 
@@ -348,7 +366,8 @@ private fun EnvVarFormSheet(
             Spacer(Modifier.height(6.dp))
             DialogTextField(
                 value = valueText,
-                onValueChange = { valueText = it },
+                onValueChange = { valueText = it; saveFailed = false },
+                enabled = valueLoaded,
                 singleLine = false,
                 maxLines = 3,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
@@ -389,8 +408,8 @@ private fun EnvVarFormSheet(
                             } else {
                                 envVarRepository.add(key, value, note)
                             }
-                            if (success) {
-                                withContext(Dispatchers.Main.immediate) { onDismiss() }
+                            withContext(Dispatchers.Main.immediate) {
+                                if (success) onDismiss() else saveFailed = true
                             }
                         }
                     },

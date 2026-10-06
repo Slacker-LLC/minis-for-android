@@ -724,6 +724,9 @@
     <string name="env_var_field_note_placeholder">Optional note</string>
     <string name="env_var_error_invalid_key">Must start with a letter, use only letters/numbers/underscores</string>
     <string name="env_var_error_duplicate">A variable with this name already exists</string>
+    <string name="env_var_error_invalid_value">This value has characters that cannot be stored (control characters)</string>
+    <string name="env_var_error_load">Could not read the saved variables; editing is off to protect them</string>
+    <string name="env_var_error_save">Could not save. Nothing was changed</string>
     <string name="log_title">Logs</string>
     <string name="log_section_logging">Logging</string>
     <string name="log_section_logging_footer">When enabled, all console output is captured to daily log files in the app\'s private storage.</string>

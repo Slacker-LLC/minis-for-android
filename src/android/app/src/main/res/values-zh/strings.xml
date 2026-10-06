@@ -360,6 +360,9 @@
     <string name="env_var_field_note_placeholder">可选备注</string>
     <string name="env_var_error_invalid_key">必须以字母开头，只能使用字母、数字、下划线</string>
     <string name="env_var_error_duplicate">同名变量已存在</string>
+    <string name="env_var_error_invalid_value">该值包含无法保存的字符（控制字符）</string>
+    <string name="env_var_error_load">无法读取已保存的变量，为保护数据已禁用编辑</string>
+    <string name="env_var_error_save">保存失败，未做任何更改</string>
     <string name="log_title">日志</string>
     <string name="log_section_logging">日志</string>
     <string name="log_section_logging_footer">启用后，所有控制台输出将每天捕获到应用私有存储中的日志文件。</string>

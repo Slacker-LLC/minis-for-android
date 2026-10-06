@@ -38,6 +38,13 @@ class EnvVarRepository(private val context: Context) {
         val createdAt: Long = System.currentTimeMillis(),
     )
 
+    /**
+     * True when the metadata file exists but could not be read. The list is then empty only
+     * because loading failed, so writing a new list would overwrite the real one: edits are refused.
+     */
+    @Volatile
+    private var metadataUnreadable = false
+
     private val _entries = MutableStateFlow<List<EnvVarEntry>>(emptyList())
     val entries: StateFlow<List<EnvVarEntry>> = _entries.asStateFlow()
 
@@ -57,12 +64,15 @@ class EnvVarRepository(private val context: Context) {
 
     fun isValidKey(key: String): Boolean = KEY_REGEX.matches(key)
 
-    // Keep printable ASCII (0x20-0x7E) and tab (0x09); iOS paste can inject
-    // invisible control scalars (e.g. \u009B) that break shell env injection.
-    private fun sanitizeValue(value: String): String =
-        value.filter { ch ->
-            val c = ch.code
-            (c in 0x20..0x7E) || c == 0x09
+    /**
+     * A value is stored exactly as given or not at all. Unicode text, tabs and newlines (a PEM, a
+     * path with CJK characters) are fine: the shell receives them single-quoted. What cannot travel
+     * is NUL and the other control characters, which can break shell env injection; those are
+     * refused rather than silently dropped.
+     */
+    fun isValidValue(value: String): Boolean =
+        value.none { ch ->
+            Character.isISOControl(ch) && ch != '\t' && ch != '\n'
         }
 
     fun isDuplicateKey(key: String, excludeId: String? = null): Boolean =
@@ -70,54 +80,75 @@ class EnvVarRepository(private val context: Context) {
 
     // -- CRUD --
 
-    fun add(key: String, value: String, note: String = ""): Boolean {
+    fun add(key: String, value: String, note: String = ""): Boolean = synchronized(this) {
         val normalizedKey = key.trim().uppercase()
         if (!isValidKey(normalizedKey)) return false
         if (isDuplicateKey(normalizedKey)) return false
+        if (!isValidValue(value) || metadataUnreadable) return false
 
+        val before = _entries.value
         val entry = EnvVarEntry(key = normalizedKey, note = note.trim())
-        _entries.value = _entries.value + entry
-        encryptedPrefs.edit().putString(normalizedKey, sanitizeValue(value)).apply()
-        saveMetadata()
+        _entries.value = before + entry
+        if (!encryptedPrefs.edit().putString(normalizedKey, value).commit() || !saveMetadata()) {
+            // Neither half may survive alone: a value without its metadata is invisible, metadata
+            // without its value is an empty variable.
+            _entries.value = before
+            encryptedPrefs.edit().remove(normalizedKey).commit()
+            return false
+        }
         Log.i(TAG, "Added env var: $normalizedKey")
         return true
     }
 
-    fun update(id: String, newKey: String, newValue: String, newNote: String = ""): Boolean {
+    fun update(id: String, newKey: String, newValue: String, newNote: String = ""): Boolean = synchronized(this) {
         val normalizedKey = newKey.trim().uppercase()
         if (!isValidKey(normalizedKey)) return false
+        if (!isValidValue(newValue) || metadataUnreadable) return false
 
         val current = _entries.value.find { it.id == id } ?: return false
 
         // Check for duplicate (excluding self)
         if (isDuplicateKey(normalizedKey, excludeId = id)) return false
 
-        // Delete old Keychain entry if key changed
-        if (current.key != normalizedKey) {
-            encryptedPrefs.edit().remove(current.key).apply()
-        }
-
-        // Update metadata
-        _entries.value = _entries.value.map {
+        val before = _entries.value
+        val previousValue = encryptedPrefs.getString(current.key, null)
+        _entries.value = before.map {
             if (it.id == id) it.copy(key = normalizedKey, note = newNote.trim()) else it
         }
-
-        // Save new value
-        encryptedPrefs.edit().putString(normalizedKey, sanitizeValue(newValue)).apply()
-        saveMetadata()
+        val editor = encryptedPrefs.edit()
+        if (current.key != normalizedKey) editor.remove(current.key)
+        editor.putString(normalizedKey, newValue)
+        if (!editor.commit() || !saveMetadata()) {
+            _entries.value = before
+            val restore = encryptedPrefs.edit()
+            if (current.key != normalizedKey) restore.remove(normalizedKey)
+            if (previousValue != null) restore.putString(current.key, previousValue) else restore.remove(current.key)
+            restore.commit()
+            return false
+        }
         Log.i(TAG, "Updated env var: ${current.key} → $normalizedKey")
         return true
     }
 
-    fun delete(id: String) {
-        val entry = _entries.value.find { it.id == id } ?: return
-        encryptedPrefs.edit().remove(entry.key).apply()
-        _entries.value = _entries.value.filter { it.id != id }
-        saveMetadata()
+    fun delete(id: String): Boolean = synchronized(this) {
+        val entry = _entries.value.find { it.id == id } ?: return false
+        if (metadataUnreadable) return false
+        val before = _entries.value
+        val previousValue = encryptedPrefs.getString(entry.key, null)
+        _entries.value = before.filter { it.id != id }
+        if (!saveMetadata()) {
+            _entries.value = before
+            return false
+        }
+        encryptedPrefs.edit().remove(entry.key).commit()
         Log.i(TAG, "Deleted env var: ${entry.key}")
+        return true
     }
 
     fun getValue(key: String): String? = encryptedPrefs.getString(key, null)
+
+    /** False when the saved list could not be read; the editor shows that instead of an empty list. */
+    val isReadable: Boolean get() = !metadataUnreadable
 
     /**
      * Returns all env vars as a Map<String, String> for sandbox injection.
@@ -136,8 +167,8 @@ class EnvVarRepository(private val context: Context) {
 
     // -- Metadata Persistence --
 
-    private fun saveMetadata() {
-        try {
+    private fun saveMetadata(): Boolean {
+        return try {
             val array = JSONArray()
             for (entry in _entries.value) {
                 val obj = JSONObject()
@@ -147,9 +178,17 @@ class EnvVarRepository(private val context: Context) {
                 obj.put("createdAt", entry.createdAt)
                 array.put(obj)
             }
-            metadataFile.writeText(array.toString())
+            // Write beside the file and rename, so an interrupted write leaves the old list.
+            val temp = File(metadataFile.parentFile, METADATA_FILE + ".tmp")
+            temp.writeText(array.toString())
+            if (!temp.renameTo(metadataFile)) {
+                temp.delete()
+                throw java.io.IOException("cannot replace $METADATA_FILE")
+            }
+            true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save metadata: ${e.message}")
+            false
         }
     }
 
@@ -169,6 +208,7 @@ class EnvVarRepository(private val context: Context) {
             }
             _entries.value = entries
         } catch (e: Exception) {
+            metadataUnreadable = true
             Log.e(TAG, "Failed to load metadata: ${e.message}")
         }
     }
