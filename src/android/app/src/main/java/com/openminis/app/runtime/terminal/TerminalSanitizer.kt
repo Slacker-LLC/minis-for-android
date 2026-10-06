@@ -31,21 +31,15 @@ object TerminalSanitizer {
         // Pass 3: Remove null bytes and non-printable control chars (except \n \t)
         val cleaned = stripped.filter { it == '\n' || it == '\t' || it.code >= 0x20 }
 
-        // Pass 4: Remove "null" artifacts from shell/pipe issues
-        // - Lines that are entirely "null"
-        // - Runs of repeated "null" (e.g., "nullnullnull" → "")
-        // - Lines that are just "null" appended to a prefix (e.g., "file:nullnullnull")
-        val noNullLines = cleaned.lines()
-            .filter { it.trim() != "null" }
-            .joinToString("\n")
-            .replace(Regex("(?:null){2,}"), "") // Remove runs of 2+ consecutive "null"
+        // The text "null" is ordinary output (a JSON `null`, `nullnull` in a source file); it is
+        // not removed. Real NUL bytes are already gone in the pass above.
 
-        // Pass 5: Collapse excessive blank lines (3+ consecutive → 2).
+        // Pass 4: Collapse excessive blank lines (3+ consecutive → 2).
         // Trim only line-feeds, NOT spaces: an erase-to-end (ESC[K) or a
         // carriage-return overwrite can legitimately leave trailing spaces
         // that the column model produced (e.g. "complete   "), and trimming
         // them would lie about the terminal state.
-        return noNullLines.replace(Regex("\n{3,}"), "\n\n").trim('\n')
+        return cleaned.replace(Regex("\n{3,}"), "\n\n").trim('\n')
     }
 
     /**
@@ -70,10 +64,9 @@ object TerminalSanitizer {
      *    with spaces, matching what the terminal actually renders.
      *  - Other ANSI sequences are skipped here (their content never reaches
      *    the buffer) and stripped again in the regex pass for safety.
-     * The buffer is capped at [MAX_COLS] columns so hostile output cannot
-     * blow up memory.
+     * The buffer is as wide as the line is long (a column never exceeds the number of characters
+     * read), so a long line with a colour code keeps all of its text, exactly like a long plain line.
      */
-    private const val MAX_COLS = 4096
 
     private fun foldCarriageReturns(text: String): String {
         val lines = text.split('\n')
@@ -89,7 +82,7 @@ object TerminalSanitizer {
         // Fast path: no CR and no ESC means nothing to fold.
         if ('\r' !in line && '\u001B' !in line) return line
 
-        val cols = CharArray(MAX_COLS) { ' ' }
+        val cols = CharArray(line.length) { ' ' }
         var col = 0
         var maxWritten = 0
         var i = 0
@@ -98,21 +91,22 @@ object TerminalSanitizer {
                 '\r' -> col = 0
                 '\u001B' -> {
                     val m = ANSI_REGEX.find(line, i)
-                    if (m == null) {
+                    // Only a sequence that starts HERE is skipped. `find` also finds a later one, and
+                    // jumping to it would swallow the ordinary text between this ESC and that match.
+                    if (m == null || m.range.first != i) {
                         i++
                         continue
                     }
                     if (m.value == "\u001B[K") {
                         // Erase to end of line: fill the written region with
                         // spaces so a shorter redraw fully covers the old text.
-                        val end = maxWritten.coerceAtMost(MAX_COLS)
-                        for (c in col until end) cols[c] = ' '
+                        for (c in col until maxWritten) cols[c] = ' '
                     }
                     i = m.range.last + 1
                     continue
                 }
                 else -> {
-                    if (ch != '\n' && col < MAX_COLS) {
+                    if (ch != '\n' && col < cols.size) {
                         cols[col] = ch
                         if (col + 1 > maxWritten) maxWritten = col + 1
                     }
