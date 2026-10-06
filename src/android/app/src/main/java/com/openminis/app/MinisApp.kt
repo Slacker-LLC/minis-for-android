@@ -478,7 +478,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         mcpRepository = MCPRepository(this)
         // MCPProvider: Minis as MCP client — connect configured servers and
         // register their tools as mcp.<server>.<tool> (hot-reloadable).
-        com.openminis.app.mcp.client.MCPProvider.init(mcpRepository)
+        com.openminis.app.mcp.client.MCPProvider.init(mcpRepository, this) { envVarRepository.allAsDict() }
         com.openminis.app.mcp.client.MCPProvider.reload()
         memoryRepository = MemoryRepository()
         webAppShortcutRepository = WebAppShortcutRepository(database.webAppShortcutDao())

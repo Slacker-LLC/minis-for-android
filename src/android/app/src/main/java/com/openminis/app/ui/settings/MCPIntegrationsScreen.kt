@@ -75,7 +75,8 @@ fun MCPIntegrationsScreen(
     mcpRepository: MCPRepository,
     onBack: () -> Unit,
     // [T-mcp-env-var-picker-android] App env vars, for the STDIO env field's
-    // "insert app var" picker ($$VAR references resolve at runtime in the guest).
+    // "insert app var" picker ($$VAR references resolve when MCPProvider connects; see
+    // MCPConnectionConfig).
     // Null when the caller hasn't wired it — the picker affordance hides.
     envVarRepository: com.openminis.app.data.repository.EnvVarRepository? = null,
 ) {
@@ -403,9 +404,9 @@ private fun MCPFormTab(
 
         if (isUrlTransport) {
             // [T-mcp-http-headers-env-picker-android] Offer the same $$VAR App
-            // env-var picker on the URL + Custom Headers value fields (runtime
-            // expansion of $$VAR / $VAR in url/headers already works in the
-            // shared CLI). Selecting a var appends `$$KEY` to the field so it
+            // env-var picker on the URL + Custom Headers value fields ($$VAR is
+            // resolved at connection time by MCPConnectionConfig; an unset variable
+            // fails the connection by name). Selecting a var appends `$$KEY` to the field so it
             // lands as a value (e.g. after `Authorization: ` in a header line).
             Row(verticalAlignment = Alignment.CenterVertically) {
                 FieldLabel(stringResource(R.string.mcp_form_url))
@@ -521,6 +522,8 @@ private fun MCPFormTab(
                                 if (sid.isNotEmpty()) {
                                     com.openminis.app.mcp.oauth.MCPOAuthStore.signOut(context, sid)
                                     oauthAuthorized = false
+                                    // Reconnect so the server stops receiving the signed-out token.
+                                    com.openminis.app.mcp.client.MCPProvider.reload()
                                 }
                             },
                         ) {
@@ -558,6 +561,8 @@ private fun MCPFormTab(
                                         when (result) {
                                             is com.openminis.app.mcp.oauth.MCPOAuthController.Result.Success -> {
                                                 oauthAuthorized = true
+                                                // Reconnect so the new token is used right away.
+                                                com.openminis.app.mcp.client.MCPProvider.reload()
                                                 android.widget.Toast.makeText(
                                                     context,
                                                     context.getString(R.string.mcp_form_oauth_authorized),

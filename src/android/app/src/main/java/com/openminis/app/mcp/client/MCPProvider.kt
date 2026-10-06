@@ -63,6 +63,14 @@ object MCPProvider {
     @Volatile
     private var repository: MCPRepository? = null
 
+    /** For OAuth tokens; null in hosts that never signed a server in (tests). */
+    @Volatile
+    private var appContext: android.content.Context? = null
+
+    /** The App environment variables `$$VAR` references resolve from. */
+    @Volatile
+    private var environment: () -> Map<String, String> = { emptyMap() }
+
     @Volatile
     private var reloadGeneration: Long = 0
 
@@ -74,9 +82,15 @@ object MCPProvider {
      * after init for the initial connection set. Re-init detaches the previous
      * Repository so a stale object cannot trigger reloads against the new one.
      */
-    fun init(repository: MCPRepository) {
+    fun init(
+        repository: MCPRepository,
+        context: android.content.Context? = null,
+        environment: () -> Map<String, String> = { emptyMap() },
+    ) {
         this.repository?.onServerConfigsChanged = null
         this.repository = repository
+        this.appContext = context?.applicationContext
+        this.environment = environment
         repository.onServerConfigsChanged = ::reload
     }
 
@@ -124,7 +138,10 @@ object MCPProvider {
     }
 
     private suspend fun connectOne(cfg: MCPRepository.MCPServerConfig): ConnectedServer {
-        val session = MCPClientSession(cfg)
+        // Resolved for this connection only: `$$VAR` references and the signed-in OAuth token.
+        val resolved = MCPConnectionConfig.expand(cfg, environment())
+        val token = appContext?.let { MCPConnectionConfig.accessToken(it, cfg) }
+        val session = MCPClientSession(resolved, token)
         try {
             session.connect()
             return ConnectedServer(session, session.listTools())
