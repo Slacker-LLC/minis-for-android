@@ -119,8 +119,7 @@ object ExecutionCoordinator {
                 checkGeneration(generation, session, sessionGeneration)
                 Log.i(TAG, "[$sessionId] direct ubuntu shell ${command.take(80)}")
                 val ran = shell.executeCommand(command, timeout, lineCallback)
-                val sanitized = TerminalSanitizer.sanitize(ran.output)
-                val truncated = TerminalSanitizer.truncateIfNeeded(sanitized)
+                val truncated = shellOutputForModel(ran.output)
                 val output = if (ran.exitCode != 0 && ran.exitCode != 124 && ran.exitCode != 130) {
                     "$truncated\n(exit code: ${ran.exitCode})"
                 } else {
@@ -260,6 +259,17 @@ object ExecutionCoordinator {
         shells.clear()
         lastInjectedKeys.clear()
     }
+
+    /**
+     * What a command's output becomes before the model sees it: terminal escapes removed, the
+     * user's environment-variable values masked when Privacy Mode is on (it is by default, and the
+     * `minis-config` text promises it), then the size cap. Masking comes before truncation so a
+     * value is never cut in half and left readable.
+     */
+    internal fun shellOutputForModel(
+        raw: String,
+        redact: (String) -> String = { com.openminis.app.data.EnvVarRedactor.redactIfEnabled(it).first },
+    ): String = TerminalSanitizer.truncateIfNeeded(redact(TerminalSanitizer.sanitize(raw)))
 
     suspend fun broadcastTimezoneChange() {
         val tz = RuntimePathRegistry.posixTz()
