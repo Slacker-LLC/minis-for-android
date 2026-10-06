@@ -158,10 +158,16 @@ fun FilePreviewScreen(
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch(Dispatchers.IO) {
             val ok = try {
-                context.contentResolver.openOutputStream(uri)?.use { out ->
-                    item.file.inputStream().use { it.copyTo(out) }
+                // Success means a stream was obtained AND the copy ran; a provider that answers null
+                // saved nothing and used to be reported as saved.
+                val out = context.contentResolver.openOutputStream(uri)
+                if (out == null) {
+                    AppLogger.warning("FilePreview", "Save-As: the provider gave no output stream")
+                    false
+                } else {
+                    out.use { stream -> item.file.inputStream().use { it.copyTo(stream) } }
+                    true
                 }
-                true
             } catch (e: Exception) {
                 AppLogger.warning("FilePreview", "Save-As failed: ${e.message}")
                 false
@@ -702,17 +708,9 @@ private fun CsvPreview(item: FileItem) {
         withContext(Dispatchers.IO) {
             try {
                 val sep = if (item.file.extension.equals("tsv", true)) '\t' else ','
-                val parsed = mutableListOf<List<String>>()
-                item.file.bufferedReader(Charsets.UTF_8).use { br ->
-                    var read = 0
-                    var line: String?
-                    while (br.readLine().also { line = it } != null) {
-                        if (read >= 200) { truncated = true; break }
-                        parsed.add(parseCsvLine(line!!, sep))
-                        read++
-                    }
-                }
-                rows = parsed
+                val page = item.file.bufferedReader(Charsets.UTF_8).use { br -> parseCsv(br, sep, 200) }
+                truncated = page.truncated
+                rows = page.rows
             } catch (e: Exception) {
                 error = e.message ?: "Failed to parse CSV"
             }

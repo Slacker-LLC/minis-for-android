@@ -216,3 +216,71 @@ fun parseCsvLine(line: String, sep: Char): List<String> {
     out.add(cur.toString())
     return out
 }
+
+/** The first records of a CSV/TSV, and whether more followed. */
+class CsvPage(val rows: List<List<String>>, val truncated: Boolean)
+
+/**
+ * Parses CSV/TSV by LOGICAL record: a quoted field may contain the separator, doubled quotes and
+ * line breaks, so a record can span several physical lines. (Parsing line by line turned
+ * `alice,"first\nsecond"` into two broken rows and counted the cap in physical lines.)
+ * At most [maxRecords] records are returned; [CsvPage.truncated] says whether input remained.
+ */
+fun parseCsv(input: java.io.Reader, sep: Char, maxRecords: Int): CsvPage {
+    val reader = if (input.markSupported()) input else java.io.BufferedReader(input)
+    val rows = mutableListOf<List<String>>()
+    var record = mutableListOf<String>()
+    val field = StringBuilder()
+    var inQuotes = false
+    var sawAny = false // something is pending for the current record
+
+    fun endRecord() {
+        record.add(field.toString())
+        field.setLength(0)
+        rows.add(record)
+        record = mutableListOf()
+        sawAny = false
+    }
+
+    while (true) {
+        val code = reader.read()
+        if (code < 0) break
+        val c = code.toChar()
+        if (!inQuotes && rows.size >= maxRecords) {
+            // A new record would start here; there is more input than we keep.
+            return CsvPage(rows, truncated = true)
+        }
+        sawAny = true
+        when {
+            inQuotes && c == '"' -> {
+                reader.mark(1)
+                val next = reader.read()
+                if (next == '"'.code) field.append('"')
+                else {
+                    inQuotes = false
+                    if (next >= 0) reader.reset()
+                }
+            }
+            c == '"' -> inQuotes = true
+            c == sep && !inQuotes -> { record.add(field.toString()); field.setLength(0) }
+            (c == '\n' || c == '\r') && !inQuotes -> {
+                if (c == '\r') {
+                    reader.mark(1)
+                    val next = reader.read()
+                    if (next != '\n'.code && next >= 0) reader.reset()
+                }
+                endRecord()
+            }
+            c == '\r' && inQuotes -> {
+                // Line breaks inside a field are kept as \n whatever the file used.
+                reader.mark(1)
+                val next = reader.read()
+                if (next != '\n'.code && next >= 0) reader.reset()
+                field.append('\n')
+            }
+            else -> field.append(c)
+        }
+    }
+    if (sawAny) endRecord()
+    return CsvPage(rows, truncated = false)
+}
