@@ -112,7 +112,13 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
         // [T-eta-media-search] Same name filter Eta's search_media/search_audio apply, so a
         // photo, video and audio listing can all be narrowed by file name.
         val nameFilter = MediaQueryPolicy.nameFilter(args.get("query"))
-        val (startMs, endMs) = resolveDateRange(args)
+        val (startMs, endMs) = try {
+            resolveDateRange(args)
+        } catch (e: IllegalArgumentException) {
+            // An explicit date that is not a date must stop the call: dropped, it widened the query
+            // to the whole library and reported success.
+            return NativeOffloadResult(2, "android-photos list: ${e.message}\n")
+        }
         AppLogger.info(TAG, "list: type=$type limit=$limit range=${startMs?.let { formatIso(it) }}..${endMs?.let { formatIso(it) }}")
         val arr = JSONArray()
         if (type == "photo" || type == "all") {
@@ -652,6 +658,14 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
             }
             if (srcUri != null) break
         }
+        if (mediaType == "video" && size != "original") {
+            // Only photos can be resized here; a "thumb" of a video used to be the whole video under a
+            // .jpg name with format=jpeg.
+            return NativeOffloadResult(
+                2,
+                "android-photos export: --size $size is only available for photos; use --size original for a video\n",
+            )
+        }
         val src = srcUri ?: return NativeOffloadResult(
             1,
             OffloadOutput.formatBody(
@@ -1016,29 +1030,17 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
             }
             return cal.timeInMillis to System.currentTimeMillis()
         }
-        val startMs = args.get("start")?.let { parseDate(it) }
-        val endMs = args.get("end")?.let { parseDate(it) }
+        val startRaw = args.get("start")?.takeIf { it.isNotBlank() }
+        val endRaw = args.get("end")?.takeIf { it.isNotBlank() }
+        val startMs = startRaw?.let { parseDate(it) ?: throw IllegalArgumentException("--start is not a date: '$it'") }
+        val endMs = endRaw?.let { parseDate(it) ?: throw IllegalArgumentException("--end is not a date: '$it'") }
+        if (startMs != null && endMs != null && endMs < startMs) {
+            throw IllegalArgumentException("--end is before --start")
+        }
         return startMs to endMs
     }
 
-    private fun parseDate(s: String): Long? {
-        val patterns = listOf(
-            "yyyy-MM-dd'T'HH:mm:ssXXX",
-            "yyyy-MM-dd'T'HH:mm:ss'Z'",
-            "yyyy-MM-dd'T'HH:mm:ss",
-            "yyyy-MM-dd'T'HH:mm",
-            "yyyy-MM-dd",
-        )
-        for (p in patterns) {
-            try {
-                val sdf = SimpleDateFormat(p, Locale.US).apply {
-                    timeZone = if (p.endsWith("'Z'")) TimeZone.getTimeZone("UTC") else TimeZone.getDefault()
-                }
-                return sdf.parse(s)?.time
-            } catch (_: Throwable) {}
-        }
-        return null
-    }
+    private fun parseDate(s: String): Long? = parseStrictInstant(s)
 
     private fun formatIso(ms: Long): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
@@ -1153,6 +1155,31 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
     }
 
     companion object {
+        /**
+         * An ISO date or date-time that consumes the whole string with calendar-valid fields:
+         * "2025-02-30" and "2025-03-31xyz" are not dates. null when it is none.
+         */
+        internal fun parseStrictInstant(raw: String, zone: TimeZone = TimeZone.getDefault()): Long? {
+            val text = raw.trim()
+            val patterns = listOf(
+                "yyyy-MM-dd'T'HH:mm:ssXXX",
+                "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                "yyyy-MM-dd'T'HH:mm:ss",
+                "yyyy-MM-dd'T'HH:mm",
+                "yyyy-MM-dd",
+            )
+            for (p in patterns) {
+                val sdf = SimpleDateFormat(p, Locale.US).apply {
+                    timeZone = if (p.endsWith("'Z'")) TimeZone.getTimeZone("UTC") else zone
+                    isLenient = false
+                }
+                val pos = java.text.ParsePosition(0)
+                val date = sdf.parse(text, pos)
+                if (date != null && pos.index == text.length) return date.time
+            }
+            return null
+        }
+
         private const val TAG = "PhotosOffload"
         private const val HELP = """android-photos — query and manage device photos & videos
                               (mirrors apple-photos)
