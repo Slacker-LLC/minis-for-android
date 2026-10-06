@@ -1577,6 +1577,7 @@
     <string name="mount_add_failed_unsupported_uri">Dieser Ort lässt sich nicht einhängen. Bitte einen Ordner im internen Speicher oder auf der SD-Karte wählen.</string>
     <string name="mount_add_failed_unresolvable_path">Der echte Pfad dieses Ordners ließ sich nicht ermitteln.</string>
     <string name="mount_add_failed_commit">Der Einhängepunkt konnte nicht gespeichert werden. Bitte erneut versuchen.</string>
+    <string name="mount_detail_change_failed">Die Änderung konnte nicht angewendet werden. Der Name wird möglicherweise schon verwendet.</string>
     <string name="mount_add_grant_action">Zugriff erteilen</string>
     <string name="common_menu">Menü</string>
     <string name="common_more">Mehr</string>

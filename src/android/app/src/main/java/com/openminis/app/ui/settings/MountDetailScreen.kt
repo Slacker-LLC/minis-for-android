@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
 import com.openminis.app.R
 import com.openminis.app.data.MountedFoldersStore
 import com.openminis.app.ui.components.SectionDesign
@@ -76,6 +77,7 @@ fun MountDetailScreen(
     onBrowseFiles: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
     val entries by store.entries.collectAsState()
     val entry = entries.firstOrNull { it.id == mountId }
 
@@ -106,9 +108,13 @@ fun MountDetailScreen(
                 enabled = canSave,
                 onClick = {
                     scope.launch(Dispatchers.IO) {
-                        if (nameChanged) store.rename(entry.id, nameTrimmed)
-                        if (allowWriteChanged) store.setUserAllowWrite(entry.id, allowWrite)
-                        withContext(Dispatchers.Main.immediate) { onBack() }
+                        // Stop at the first refusal: leaving would hide it, and applying the write
+                        // switch after a refused rename would save only half of what was asked.
+                        val ok = (!nameChanged || store.rename(entry.id, nameTrimmed)) &&
+                            (!allowWriteChanged || store.setUserAllowWrite(entry.id, allowWrite))
+                        withContext(Dispatchers.Main.immediate) {
+                            if (ok) onBack() else Toast.makeText(context, R.string.mount_detail_change_failed, Toast.LENGTH_LONG).show()
+                        }
                     }
                 },
             ) {
@@ -199,8 +205,10 @@ fun MountDetailScreen(
                 MinisTextButton(onClick = {
                     showUnmountConfirm = false
                     scope.launch(Dispatchers.IO) {
-                        store.remove(entry.id)
-                        withContext(Dispatchers.Main.immediate) { onBack() }
+                        val removed = store.remove(entry.id)
+                        withContext(Dispatchers.Main.immediate) {
+                            if (removed) onBack() else Toast.makeText(context, R.string.mount_detail_change_failed, Toast.LENGTH_LONG).show()
+                        }
                     }
                 }) {
                     Text(

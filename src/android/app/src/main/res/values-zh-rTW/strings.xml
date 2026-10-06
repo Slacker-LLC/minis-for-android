@@ -1129,6 +1129,7 @@
     <string name="mount_add_failed_unsupported_uri">這個位置不能掛載。請在「內部儲存空間」或記憶卡裡選一個資料夾。</string>
     <string name="mount_add_failed_unresolvable_path">無法解析這個資料夾在本機的真實路徑。</string>
     <string name="mount_add_failed_commit">掛載沒有儲存成功，請重試。</string>
+    <string name="mount_detail_change_failed">無法套用此變更。名稱可能已被使用。</string>
     <string name="mount_add_grant_action">去授權</string>
     <string name="app_name">Minis for Android</string>
     <string name="new_chat">新對話</string>

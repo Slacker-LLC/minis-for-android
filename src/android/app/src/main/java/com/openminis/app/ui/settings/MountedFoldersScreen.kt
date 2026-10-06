@@ -110,6 +110,8 @@ fun MountedFoldersScreen(
     val isAtCapacity = entries.size >= MountedFoldersStore.MAX_MOUNTS
 
     var pendingPickedUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingGrantTakenHere by remember { mutableStateOf(false) }
+    var addInFlight by remember { mutableStateOf(false) }
     var pendingDefaultName by remember { mutableStateOf("") }
     var addError by remember { mutableStateOf<String?>(null) }
     // [T-android-mount-add-reasons] The refusal that has a fix on this screen gets a button,
@@ -186,9 +188,13 @@ fun MountedFoldersScreen(
             ).show()
             return@rememberLauncherForActivityResult
         }
+        // Remember whether the grant is ours: a cancelled or refused add must give back only a
+        // grant it took itself, never one a mount or another feature already relies on.
+        val alreadyHeld = SafMountHelper.holdsGrant(context, uri)
         if (!SafMountHelper.handlePickerResult(context, uri)) {
             return@rememberLauncherForActivityResult
         }
+        pendingGrantTakenHere = !alreadyHeld
         pendingPickedUri = uri
         pendingDefaultName = defaultMountName(uri)
     }
@@ -254,12 +260,23 @@ fun MountedFoldersScreen(
         AddMountSheet(
             sourceUri = pickedUri,
             initialName = pendingDefaultName,
-            onDismiss = { pendingPickedUri = null },
+            onDismiss = {
+                // While the add is running the grant is in use; the add itself gives it back if it fails.
+                if (!addInFlight) {
+                    SafMountHelper.releaseAbandonedGrant(context, pickedUri, pendingGrantTakenHere, store.entries.value)
+                }
+                pendingPickedUri = null
+            },
                             onConfirm = { name, allowWrite ->
+                addInFlight = true
                 scope.launch(Dispatchers.IO) {
                     val result = store.add(pickedUri, name, allowWrite)
                     withContext(Dispatchers.Main.immediate) {
+                        addInFlight = false
                         if (result is MountedFoldersStore.AddResult.Rejected) {
+                            SafMountHelper.releaseAbandonedGrant(
+                                context, pickedUri, pendingGrantTakenHere, store.entries.value,
+                            )
                             addError = context.getString(result.failure.messageRes())
                             addErrorNeedsAllFilesAccess =
                                 result.failure == MountedFoldersStore.AddFailure.MISSING_ALL_FILES_ACCESS
