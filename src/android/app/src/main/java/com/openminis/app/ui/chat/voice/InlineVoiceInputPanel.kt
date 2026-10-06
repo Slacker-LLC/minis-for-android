@@ -288,6 +288,10 @@ fun InlineVoiceInputPanel(
             }
             val suggestion = engine.correct(text, context = convoContext)
             isCorrecting = false
+            // The draft changed while we waited (edited, cleared, or recording
+            // went on): the answer is about text that is no longer there, and
+            // applying it would overwrite what the user has now.
+            if (transcript.trim() != text) return@launch
             when {
                 suggestion.hasChange -> {
                     setTranscript(suggestion.corrected)
