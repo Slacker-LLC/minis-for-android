@@ -47,6 +47,15 @@ data class ApkArtifact(
 
 /** APK path resolution, Gradle-output discovery, and archive metadata parsing. */
 object AndroidApkInspector {
+
+    /**
+     * Name stem for a staged copy of a guest APK. The session is part of it: the same path
+     * (`/workspace/app.apk`) in two chats is two different files, and a copy staged for one must
+     * not be installed for the other just because size and mtime happen to match.
+     */
+    internal fun stagedApkKey(sessionId: String?, linuxPath: String, size: Long, modified: Long): String =
+        Sha256.hex("${sessionId.orEmpty()}\u0000$linuxPath\u0000$size\u0000$modified")
+
     private const val MAX_DISCOVERY_DIRECTORIES = 4_000
     private const val MAX_DISCOVERY_DEPTH = 10
 
@@ -226,7 +235,7 @@ object AndroidApkInspector {
         }
         val modified = info.optLong("modified", 0L)
         val name = linuxPath.substringAfterLast('/').ifBlank { "artifact.apk" }
-        val digest = Sha256.hex("$linuxPath\u0000$size\u0000$modified")
+        val digest = stagedApkKey(sessionId, linuxPath, size, modified)
         val target = File(context.cacheDir, "android-deploy/guest/$digest-$name")
         target.parentFile?.mkdirs()
         if (!target.isFile || target.length() != size) {

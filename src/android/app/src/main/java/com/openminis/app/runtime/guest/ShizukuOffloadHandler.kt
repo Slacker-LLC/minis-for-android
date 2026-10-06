@@ -1099,6 +1099,8 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
             val uid = Regex("""userId=(\d+)""").find(stdout)?.groupValues?.get(1)?.toIntOrNull()
             return uid?.takeIf { it >= 1000 }?.toString()
         }
+
+        /**
          * The argument for `input text`: it reads `%s` as a space (a bare `%` is not one), and
          * the text travels as an argv element, so nothing else — apostrophes included — needs to
          * change.
