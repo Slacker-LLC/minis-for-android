@@ -389,10 +389,8 @@ class ChatViewModel(
         /** Pi-style recent-context retention target after compaction. Rather
          * than keeping a fixed number of user turns, keep as many complete
          * recent rounds as fit inside this token budget. */
-        private const val COMPACT_KEEP_RECENT_TOKENS = 20_000
         /** Hard message cap prevents a pathological tool-heavy round from
          * defeating compaction even when token estimation is optimistic. */
-        private const val COMPACT_KEEP_RECENT_MESSAGE_CAP = 100
         /// Max per-tool-call retained `accumulated` JSON snapshots from
         /// `ToolInputDelta`. Drained on preflight failure for diagnosis.
         private const val TOOL_INPUT_CHUNK_RING_MAX = 10
@@ -2164,13 +2162,13 @@ class ChatViewModel(
         // between complete tool batches, the newest user turn (and every batch
         // after it) stays verbatim, and the tail keeps its RECENT_MESSAGES
         // floor plus the stricter of RECENT_RATIO x window and the existing
-        // COMPACT_KEEP_RECENT_TOKENS budget. A rejection leaves history and
+        // OutgoingHistory.COMPACT_KEEP_RECENT_TOKENS budget. A rejection leaves history and
         // marker untouched and surfaces an actionable message instead of
         // compacting something unsafe.
         val contextWindow = effectiveContextWindowTokens()
             ?: currentModel?.contextWindow?.takeIf { it > 0 }
         val recentTokenLimit = contextWindow
-            ?.let { minOf((it * AgentContextBudget.RECENT_RATIO).toInt(), COMPACT_KEEP_RECENT_TOKENS) }
+            ?.let { minOf((it * AgentContextBudget.RECENT_RATIO).toInt(), OutgoingHistory.COMPACT_KEEP_RECENT_TOKENS) }
         val plan = AgentContextCompactor.planRange(
             history = history,
             startIndex = startIdx,
@@ -2759,7 +2757,11 @@ class ChatViewModel(
      * cannot fix.
      */
     private fun effectiveAgentHistory(): List<LLMMessage> =
-        injectUnknownOutcomes(dropOrphanedToolParts(effectiveAgentHistoryUncounted()))
+        injectUnknownOutcomes(
+            OutgoingHistory.dropOrphanedToolParts(
+                OutgoingHistory.effective(agentHistory.toList(), _compactSummary.value, _cachedLatestMarker),
+            ),
+        )
 
     /**
      * Recover interrupted tool executions (DSH session-checkpoint-policy
@@ -2792,501 +2794,11 @@ class ChatViewModel(
         }
     }
 
-    private fun effectiveAgentHistoryUncounted(): List<LLMMessage> {
-        val summary = _compactSummary.value
-        val marker = _cachedLatestMarker
-        // No compact in play → return full history untouched.
-        if (summary.isNullOrBlank() || marker == null) return agentHistory.toList()
-
-        val summaryWrappedText = "<context-summary>\n" +
-            "The following is a summary of the earlier conversation that was compacted to save context space.\n" +
-            "Treat it as background context only. The user's most recent message (below or in the next turn) takes precedence — if it changes the task, the goal, or any numbers/scope, follow the new instruction and do not resume the old plan from this summary. Do not re-run discovery (reading memory, scanning skills, re-reading files) unless the new instruction requires it.\n\n" +
-            summary +
-            "\n</context-summary>"
-
-        // ─── v2 markers (id-only anchor model) ─────────────────────────
-        //
-        // anchor = lastCompactedMessageId. What we send to the model:
-        //   1. as many complete recent user-text rounds as fit inside
-        //      [COMPACT_KEEP_RECENT_TOKENS] before the anchor — verbatim warm-up
-        //   2. the summary, INLINED as a `<context-summary>` text part
-        //      prepended to the first user message AFTER anchor (preserves
-        //      strict role alternation — no synthetic standalone user turn)
-        //   3. all messages strictly after anchor (the kept-tail "active"
-        //      region — typically empty right after compact, populated as
-        //      the user sends new prompts)
-        //
-        // If anchor unresolvable, degrade to full history (over-inform
-        // beats summary-only; the M-Team session bug taught us that a lone
-        // summary message paired with hot tools makes the model loop).
-        if (marker.version >= 2) {
-            val anchorId = marker.lastCompactedMessageId?.takeIf { it.isNotEmpty() }
-            val anchorIdx = anchorId?.let { id ->
-                agentHistory.indexOfLast { it.dbMessageId == id }
-            } ?: -1
-            if (anchorIdx < 0) {
-                Log.w(TAG, "[Compact] effectiveAgentHistory v2: anchorId=${anchorId?.take(8) ?: "nil"} not in agentHistory(size=${agentHistory.size}) — degrading to full history (no summary)")
-                return agentHistory.toList()
-            }
-
-            // Step 1: walk back from anchor collecting complete user rounds. Stop
-            // when adding the next round would exceed the recent token budget,
-            // or when preAnchor would grow beyond the hard message cap. Decisions
-            // happen only at user-message boundaries so we never split a
-            // user/assistant/tool round in half (which would orphan a
-            // tool_use with no matching tool_result).
-            //
-            // [T-compact-preanchor-prune, port iOS 8b76cd74]
-            val keepTokenBudget = COMPACT_KEEP_RECENT_TOKENS
-            val walkBack = walkBackRecentTokenBudget(
-                anchorIdx = anchorIdx,
-                tokenBudget = keepTokenBudget,
-                maxMessages = COMPACT_KEEP_RECENT_MESSAGE_CAP,
-            )
-            val priorIdxResolved: Int? = walkBack.priorIdx
-            val priorIdx = walkBack.priorIdx ?: (anchorIdx + 1) // empty preAnchor sentinel
-            if (walkBack.stopReason != "budgetFilled" && walkBack.stopReason != "reachedStart") {
-                AppLogger.info(TAG, "[CompactDiag] eAH v2 token walk-back stopped: reason=${walkBack.stopReason} priorIdx=$priorIdx estimatedTokens=${walkBack.estimatedTokens} preAnchorMsgs=${walkBack.messageCount}")
-            }
-
-            // PRE-ANCHOR PRUNE (tool-heavy session fix):
-            // The walk-back-N-user-text strategy pulls in everything between
-            // the Nth-last and last user-text turn — in a heavy tool-call
-            // session that can be many messages of tool_result / tool_use,
-            // tens of thousands of tokens that the summary already covers.
-            // Drop any tool_result > 1000 chars in the preAnchor slice and
-            // strip the matching tool_use part (same id) from the assistant
-            // message so the model never sees a dangling tool_use/result.
-            val preAnchorRaw: List<LLMMessage> =
-                if (priorIdx <= anchorIdx) agentHistory.subList(priorIdx, anchorIdx + 1).toList()
-                else emptyList()
-
-            val droppedToolIds = mutableSetOf<String>()
-            var droppedToolResultCount = 0
-            for (msg in preAnchorRaw) {
-                for (part in msg.contentParts) {
-                    if (part is AgentContentPart.ToolResult && part.content.length > 1000) {
-                        droppedToolIds.add(part.id)
-                        droppedToolResultCount += 1
-                    }
-                }
-            }
-
-            val preAnchorPruned: MutableList<LLMMessage> = ArrayList(preAnchorRaw.size)
-            for (msg in preAnchorRaw) {
-                if (msg.contentParts.isEmpty()) {
-                    // Plain text-only message — nothing to prune.
-                    preAnchorPruned.add(msg)
-                    continue
-                }
-                val kept = msg.contentParts.filter { part ->
-                    when (part) {
-                        is AgentContentPart.ToolUse -> !droppedToolIds.contains(part.id)
-                        is AgentContentPart.ToolResult -> !droppedToolIds.contains(part.id)
-                        else -> true
-                    }
-                }
-                if (kept.isEmpty()) continue // skip empty shells
-                preAnchorPruned.add(msg.copy(contentParts = kept))
-            }
-
-            if (droppedToolResultCount > 0) {
-                AppLogger.info(TAG, "[CompactDiag] eAH v2 preAnchor prune: dropped $droppedToolResultCount toolResult(>1kc) + paired toolUse, ${preAnchorRaw.size - preAnchorPruned.size} messages emptied; pruned slice=${preAnchorPruned.size}")
-            }
-
-            // ROLE ALIGNMENT: the API requires the first message to be `user`.
-            // After clamp (cap may land on assistant) and after prune (the
-            // head user may have been emptied), peel any leading non-user
-            // messages so preAnchor starts on a user turn.
-            while (preAnchorPruned.isNotEmpty() && preAnchorPruned.first().role != LLMMessage.Role.USER) {
-                preAnchorPruned.removeAt(0)
-            }
-
-            // Step 2 & 3: copy the lookback window (post-prune), then splice
-            // in the summary as parts[0] of the first post-anchor user msg.
-            val result = mutableListOf<LLMMessage>()
-            result.addAll(preAnchorPruned)
-
-            val postAnchor = if (anchorIdx + 1 < agentHistory.size) {
-                agentHistory.subList(anchorIdx + 1, agentHistory.size)
-            } else {
-                emptyList()
-            }
-
-            // DIAG: explain how the slice was sized using post-prune /
-            // post-alignment counts so the log reflects what actually
-            // reaches the model.
-            val preAnchorRawCount = maxOf(0, anchorIdx - priorIdx + 1)
-            val priorIdxSource =
-                if (priorIdxResolved == null) "fallback=empty(tokenBudget=$keepTokenBudget or cap hit)"
-                else "tokenBudgetWalkBack(${walkBack.estimatedTokens}/$keepTokenBudget tokens)"
-            AppLogger.info(TAG, "[CompactDiag] eAH v2 slice: priorIdx=$priorIdx anchorIdx=$anchorIdx agentHistory.size=${agentHistory.size} → preAnchorRaw=$preAnchorRawCount preAnchorSent=${preAnchorPruned.size} postAnchor=${postAnchor.size} summaryChars=${summary.length} priorIdxSource=$priorIdxSource markerId=${marker.id.take(8)}")
-
-            val firstUserOffset = postAnchor.indexOfFirst { it.role == LLMMessage.Role.USER }
-            if (firstUserOffset >= 0) {
-                if (firstUserOffset > 0) {
-                    result.addAll(postAnchor.subList(0, firstUserOffset))
-                }
-                val target = postAnchor[firstUserOffset]
-                // Prepend `<context-summary>...` to the user content. We
-                // edit `content` directly because Android LLMMessage uses
-                // `content: String` as the canonical text payload; any
-                // contentParts the message also carries get preserved.
-                val injected = target.copy(
-                    content = summaryWrappedText + "\n\n" + target.content,
-                )
-                result.add(injected)
-                if (firstUserOffset + 1 < postAnchor.size) {
-                    result.addAll(postAnchor.subList(firstUserOffset + 1, postAnchor.size))
-                }
-            } else {
-                // Rare: no user message after anchor. Append everything
-                // post-anchor (typically empty) then a standalone summary
-                // user turn. Safe — no later user follows it to break
-                // alternation.
-                result.addAll(postAnchor)
-                result.add(LLMMessage(role = LLMMessage.Role.USER, content = summaryWrappedText))
-            }
-            return result
-        }
-
-        // ─── v1 (legacy) markers ──────────────────────────────────────
-        //
-        // Original behavior preserved unchanged so old markers keep
-        // rendering / sending data the same way they always did.
-        val summaryHead = LLMMessage(role = LLMMessage.Role.USER, content = summaryWrappedText)
-        val firstKeptId = (marker.firstKeptMessageId?.takeIf { it.isNotEmpty() })
-            ?: (marker.boundaryMessageId?.takeIf { it.isNotEmpty() })
-
-        if (firstKeptId != null) {
-            val keepStart = agentHistory.indexOfFirst { it.dbMessageId == firstKeptId }
-            if (keepStart >= 0) {
-                return buildList(agentHistory.size - keepStart + 1) {
-                    add(summaryHead)
-                    addAll(agentHistory.subList(keepStart, agentHistory.size))
-                }
-            }
-            // Fall through to safety net.
-        } else {
-            val lcmId = marker.lastCompactedMessageId?.takeIf { it.isNotEmpty() }
-            val lcmIdx = lcmId?.let { id ->
-                agentHistory.indexOfLast { it.dbMessageId == id }
-            } ?: -1
-            val postCompactStart = lcmIdx + 1
-            return buildList(agentHistory.size - postCompactStart + 1) {
-                add(summaryHead)
-                if (postCompactStart < agentHistory.size) {
-                    addAll(agentHistory.subList(postCompactStart, agentHistory.size))
-                }
-            }
-        }
-
-        Log.w(TAG, "[Compact] effectiveAgentHistory: marker ${marker.id.take(8)} unresolvable in agentHistory (size=${agentHistory.size}); returning full history")
-        return agentHistory.toList()
-    }
-
-    /**
-     * [T-android-compact-orphan-toolcall] Last line of defence before a history
-     * slice becomes a provider request: every ToolResult (function_call_output)
-     * must have a matching ToolUse (function_call) in the same slice, and vice
-     * versa.
-     *
-     * An unmatched pair is a hard 400 on OpenAI-compatible APIs —
-     *     No tool call found for function call output with call_id …
-     * — and because the slice is recomputed deterministically, it repeats on
-     * every retry AND every fallback model, wedging the conversation until the
-     * user clears the session. Port of iOS `dropOrphanedToolParts`
-     * (AIChatViewModel+Persistence.swift, c7f6a299e).
-     *
-     * Any orphan reaching here is an upstream bug (the walk-back boundary is
-     * supposed to preserve pairing), so this logs loudly rather than silently
-     * papering over it:
-     *   - orphaned result → drop it; its call is gone from the slice and
-     *     nothing can reconstruct it.
-     *   - orphaned call → synthesise an error result rather than deleting the
-     *     call, because deleting would silently discard the assistant's own
-     *     reasoning. The placeholder keeps the turn intact and tells the model
-     *     that round failed.
-     * Messages emptied by the drop are removed — a parts-less message is itself
-     * invalid on several providers.
-     */
-    private fun dropOrphanedToolParts(history: List<LLMMessage>): List<LLMMessage> {
-        val toolUseIds = HashSet<String>()
-        val toolResultIds = HashSet<String>()
-        for (msg in history) {
-            for (part in msg.contentParts) {
-                when (part) {
-                    is AgentContentPart.ToolUse -> toolUseIds.add(part.id)
-                    is AgentContentPart.ToolResult -> toolResultIds.add(part.id)
-                    else -> {}
-                }
-            }
-        }
-        val orphanedResults = toolResultIds - toolUseIds
-        val orphanedUses = HashSet(toolUseIds - toolResultIds)
-
-        // [T-android-compact-orphan-toolcall] IN-FLIGHT EXEMPTION (iOS
-        // 5d346dc2e). The tool_uses in the FINAL assistant message are not
-        // orphans while the loop sits between "model asked for tools" and
-        // "results appended" — agentHistory legitimately looks unpaired for
-        // that whole window (the assistant turn is appended at ~7500 and its
-        // tool results only at ~7517). Any snapshot taken inside that gap would
-        // otherwise carry fabricated "interrupted" results for tools that were
-        // about to run normally, telling the model its tools had failed.
-        // Trailing unanswered calls need no repair anyway: a request ending on
-        // an assistant tool_use is exactly what the API expects mid-round.
-        val last = history.lastOrNull()
-        if (last != null && last.role == LLMMessage.Role.ASSISTANT) {
-            for (part in last.contentParts) {
-                if (part is AgentContentPart.ToolUse) orphanedUses.remove(part.id)
-            }
-        }
-
-        if (orphanedResults.isEmpty() && orphanedUses.isEmpty()) return history
-
-        AppLogger.warning(
-            TAG,
-            "[CompactDiag] orphan tool parts in OUTGOING history — repairing. " +
-                "orphanedOutputs=${orphanedResults.size} [${orphanedResults.sorted().take(3).joinToString(",")}] " +
-                "orphanedCalls=${orphanedUses.size} [${orphanedUses.sorted().take(3).joinToString(",")}] " +
-                "historyCount=${history.size}",
-        )
-
-        val cleaned = ArrayList<LLMMessage>(history.size)
-        for (msg in history) {
-            val kept = msg.contentParts.filter { part ->
-                if (part is AgentContentPart.ToolResult) !orphanedResults.contains(part.id) else true
-            }
-            // Only drop the message when it HAD parts and lost them all. A
-            // plain text message legitimately carries no contentParts and must
-            // survive untouched.
-            if (kept.isEmpty() && msg.contentParts.isNotEmpty()) continue
-            cleaned.add(if (kept.size == msg.contentParts.size) msg else msg.copy(contentParts = kept))
-
-            // Follow an assistant turn holding orphaned calls with the
-            // placeholder results it never got, so the pair is complete.
-            if (msg.role != LLMMessage.Role.ASSISTANT) continue
-            val unanswered = kept.filterIsInstance<AgentContentPart.ToolUse>()
-                .filter { orphanedUses.contains(it.id) }
-            if (unanswered.isNotEmpty()) {
-                cleaned.add(
-                    LLMMessage(
-                        role = LLMMessage.Role.USER,
-                        content = "",
-                        contentParts = unanswered.map {
-                            AgentContentPart.ToolResult(
-                                id = it.id,
-                                name = it.name,
-                                content = "Tool execution was interrupted by an unexpected error.",
-                                isError = true,
-                            )
-                        },
-                    ),
-                )
-            }
-        }
-        return cleaned
-    }
-
     /** Latest in-memory compact marker, used by [effectiveAgentHistory] to
      * resolve boundaries the same way iOS `cachedLatestMarker` does. Refreshed
      * on every compactAll write and on session reload. */
     @Volatile
     private var _cachedLatestMarker: com.openminis.app.data.db.CompactMarkerEntity? = null
-
-    /**
-     * Result of a bounded walk-back. `priorIdx` is the agentHistory index
-     * the caller should use as the start of preAnchor; `null` means even
-     * the first user turn including anchor would exceed `maxMessages`, so
-     * preAnchor should be empty.
-     *
-     * Mirrors iOS `WalkBackResult` in AIChatViewModel.swift (8b76cd74).
-     */
-    private data class WalkBackResult(
-        val priorIdx: Int?,
-        val userTextTurnsFound: Int,
-        val messageCount: Int,
-        /** "userTextTargetMet" | "messageCapWouldExceed" | "reachedStart" | "invalidAnchor" */
-        val stopReason: String,
-    )
-
-    private data class TokenWalkBackResult(
-        val priorIdx: Int?,
-        val estimatedTokens: Int,
-        val messageCount: Int,
-        /** budgetFilled | messageCapWouldExceed | reachedStart | invalidAnchor */
-        val stopReason: String,
-    )
-
-    /**
-     * Pi-style compact look-back: retain complete recent user rounds according
-     * to a token budget instead of a fixed turn count. Boundaries are only
-     * accepted at real user-text messages (never tool-result pseudo-user
-     * messages), which keeps tool_use/tool_result pairs intact.
-     */
-    private fun walkBackRecentTokenBudget(
-        anchorIdx: Int,
-        tokenBudget: Int,
-        maxMessages: Int,
-    ): TokenWalkBackResult {
-        if (anchorIdx !in agentHistory.indices) return TokenWalkBackResult(null, 0, 0, "invalidAnchor")
-        var accepted: Int? = null
-        var acceptedTokens = 0
-        var acceptedMessages = 0
-        var i = anchorIdx
-        while (i >= 0) {
-            val msg = agentHistory[i]
-            val isUserBoundary = msg.role == LLMMessage.Role.USER &&
-                msg.contentParts.none { it is AgentContentPart.ToolResult } &&
-                (msg.content.isNotBlank() || msg.contentParts.any { it is AgentContentPart.Text && it.text.isNotBlank() })
-            if (!isUserBoundary) { i -= 1; continue }
-            val count = anchorIdx - i + 1
-            if (count > maxMessages) {
-                return TokenWalkBackResult(accepted, acceptedTokens, acceptedMessages, "messageCapWouldExceed")
-            }
-            val tokens = estimatePrunedRecentSliceTokens(i, anchorIdx)
-            if (tokens > tokenBudget && accepted != null) {
-                return TokenWalkBackResult(accepted, acceptedTokens, acceptedMessages, "budgetFilled")
-            }
-            // Always keep at least the most recent complete user round even if
-            // one pathological round alone is over budget; later pre-anchor
-            // pruning will strip oversized tool outputs from it.
-            accepted = i
-            acceptedTokens = tokens
-            acceptedMessages = count
-            if (tokens >= tokenBudget) return TokenWalkBackResult(accepted, tokens, count, "budgetFilled")
-            i -= 1
-        }
-        return TokenWalkBackResult(accepted, acceptedTokens, acceptedMessages, "reachedStart")
-    }
-
-    /** Estimate the token footprint of the exact pre-anchor form we will send.
-     * Large tool results (>1k chars) and their paired tool_use parts are pruned
-     * later, so exclude them here too; otherwise one 50k build log would consume
-     * the whole 20k recent budget and leave only a tiny post-prune warm-up. */
-    private fun estimatePrunedRecentSliceTokens(startIdx: Int, endIdx: Int): Int {
-        val droppedToolIds = mutableSetOf<String>()
-        for (idx in startIdx..endIdx) {
-            for (part in agentHistory[idx].contentParts) {
-                if (part is AgentContentPart.ToolResult && part.content.length > 1000) droppedToolIds += part.id
-            }
-        }
-        var total = 0
-        for (idx in startIdx..endIdx) total += estimateMessageTokens(agentHistory[idx], droppedToolIds)
-        return total
-    }
-
-    private fun estimateMessageTokens(msg: LLMMessage, ignoredToolIds: Set<String> = emptySet()): Int {
-        // Most agent messages mirror their text/images into contentParts, so
-        // counting both msg.content + all parts would double-count ordinary
-        // turns. Prefer structured parts, but still include msg.content when no
-        // Text part exists (defensive for synthetic/tool-only messages).
-        var tokens = 0
-        if (msg.contentParts.isNotEmpty()) {
-            var hasTextPart = false
-            var hasImagePart = false
-            for (part in msg.contentParts) {
-                if (part is AgentContentPart.ToolUse && part.id in ignoredToolIds) continue
-                if (part is AgentContentPart.ToolResult && part.id in ignoredToolIds) continue
-                tokens += countPartTokens(part)
-                if (part is AgentContentPart.Text) hasTextPart = true
-                if (part is AgentContentPart.ImageData) hasImagePart = true
-            }
-            if (!hasTextPart && msg.content.isNotBlank()) tokens += BPETokenizer.countTokens(msg.content)
-            if (!hasImagePart) for (image in msg.imageParts) tokens += BPETokenizer.countImageTokens(image.data)
-        } else {
-            tokens += BPETokenizer.countTokens(msg.content)
-            for (image in msg.imageParts) tokens += BPETokenizer.countImageTokens(image.data)
-        }
-        msg.reasoningContent?.takeIf { it.isNotBlank() }?.let { tokens += BPETokenizer.countTokens(it) }
-        // Audio tokenization is provider-specific. Base64 chars / 4 is a
-        // conservative budget estimate that prevents huge audio turns from
-        // defeating compaction without pretending to know provider billing.
-        for (audio in msg.audioParts) tokens += (audio.base64Data.length / 4).coerceAtLeast(1)
-        return tokens
-    }
-
-    /**
-     * Walk back from `anchorIdx` toward 0, deciding ONLY at user-message
-     * boundaries whether to include the next round. Stops when:
-     * - we've collected `maxUserTextTurns` user-text turns (success), OR
-     * - including the next user round would push total messages over
-     *   `maxMessages` (cap reason — don't split a user/assistant/tool round
-     *   in the middle, otherwise a tool_use would be orphaned without its
-     *   tool_result), OR
-     * - we hit index 0 (start of history).
-     *
-     * Port of iOS `walkBackUserTurnsBounded` (AIChatViewModel.swift, 8b76cd74).
-     */
-    private fun walkBackUserTurnsBounded(
-        anchorIdx: Int,
-        maxUserTextTurns: Int,
-        maxMessages: Int,
-    ): WalkBackResult {
-        if (anchorIdx < 0 || anchorIdx >= agentHistory.size) {
-            return WalkBackResult(null, 0, 0, "invalidAnchor")
-        }
-        var acceptedPriorIdx: Int? = null
-        var acceptedUserTextTurns = 0
-        var acceptedMessageCount = 0
-
-        var i = anchorIdx
-        while (i >= 0) {
-            val msg = agentHistory[i]
-            if (msg.role != LLMMessage.Role.USER) {
-                i -= 1
-                continue
-            }
-            // [T-android-compact-orphan-toolcall] A user message CARRYING a
-            // tool result is the second half of a round, not the start of one.
-            // This walk-back's whole premise is that `role == USER` marks a
-            // round boundary — but tool results are themselves persisted as
-            // USER messages (see the agentHistory.add at the end of the tool
-            // dispatch loop), so stopping on one cuts between an assistant's
-            // tool_use and its own tool_result. The call is then discarded with
-            // pre-history while the result survives in preAnchor and goes out
-            // alone, which every OpenAI-compatible provider answers with
-            //     400 No tool call found for function call output with call_id …
-            // and, since the slice is recomputed identically on every retry and
-            // fallback, the session wedges permanently. Port of iOS c7f6a299e.
-            if (msg.contentParts.any { it is AgentContentPart.ToolResult }) {
-                i -= 1
-                continue
-            }
-            val candidateMessageCount = anchorIdx - i + 1
-            if (candidateMessageCount > maxMessages) {
-                return WalkBackResult(
-                    priorIdx = acceptedPriorIdx,
-                    userTextTurnsFound = acceptedUserTextTurns,
-                    messageCount = acceptedMessageCount,
-                    stopReason = "messageCapWouldExceed",
-                )
-            }
-            // Accept this user as the new tentative priorIdx.
-            acceptedPriorIdx = i
-            acceptedMessageCount = candidateMessageCount
-            val hasText = msg.content.isNotBlank() ||
-                msg.contentParts.any { it is AgentContentPart.Text && it.text.isNotBlank() }
-            if (hasText) {
-                acceptedUserTextTurns += 1
-                if (acceptedUserTextTurns >= maxUserTextTurns) {
-                    return WalkBackResult(
-                        priorIdx = acceptedPriorIdx,
-                        userTextTurnsFound = acceptedUserTextTurns,
-                        messageCount = acceptedMessageCount,
-                        stopReason = "userTextTargetMet",
-                    )
-                }
-            }
-            i -= 1
-        }
-        return WalkBackResult(
-            priorIdx = acceptedPriorIdx,
-            userTextTurnsFound = acceptedUserTextTurns,
-            messageCount = acceptedMessageCount,
-            stopReason = "reachedStart",
-        )
-    }
 
     /**
      * Format the agent history as a plain-text transcript for the
@@ -7484,20 +6996,6 @@ class ChatViewModel(
         return (totalChars / 3.5).toInt() + imageTokens
     }
 
-    /**
-     * Approximate token count for a single agent content part. Used to rank
-     * offload candidates by size. Matches iOS `BPETokenizer.countPartTokens`
-     * — text uses BPE, images use the grid-cell heuristic.
-     */
-    private fun countPartTokens(part: AgentContentPart): Int = when (part) {
-        is AgentContentPart.Text -> BPETokenizer.countTokens(part.text)
-        is AgentContentPart.ToolUse -> BPETokenizer.countTokens(part.input.toString())
-        is AgentContentPart.ToolResult -> {
-            BPETokenizer.countTokens(part.content) +
-                (part.imageData?.let { BPETokenizer.countImageTokens(it) } ?: 0)
-        }
-        is AgentContentPart.ImageData -> BPETokenizer.countImageTokens(part.data)
-    }
 
     /**
      * Offload candidate descriptor. `msgIdx` and `partIdx` index back into
@@ -7599,7 +7097,7 @@ class ChatViewModel(
                             skippedTooSmall++
                             continue
                         }
-                        val tokens = countPartTokens(part)
+                        val tokens = OutgoingHistory.countPartTokens(part)
                         val bytes = part.content.toByteArray(Charsets.UTF_8).size +
                             (part.imageData?.size ?: 0)
                         candidates.add(OffloadCandidate(msgIdx, partIdx, tokens, bytes, part.id, part.name))
@@ -7608,7 +7106,7 @@ class ChatViewModel(
                         if (part.name != "file_write" && part.name != "file_edit") continue
                         val content = part.input.optString("content", "")
                         if (content.length <= 500) continue
-                        val tokens = countPartTokens(part)
+                        val tokens = OutgoingHistory.countPartTokens(part)
                         val bytes = content.toByteArray(Charsets.UTF_8).size
                         candidates.add(OffloadCandidate(msgIdx, partIdx, tokens, bytes, part.id, part.name))
                     }
@@ -7617,7 +7115,7 @@ class ChatViewModel(
                             skippedTooSmall++
                             continue
                         }
-                        val tokens = countPartTokens(part)
+                        val tokens = OutgoingHistory.countPartTokens(part)
                         // Synthesize a tool id since bare images don't carry one.
                         val synthId = "img${msgIdx}_$partIdx"
                         candidates.add(OffloadCandidate(msgIdx, partIdx, tokens, part.data.size, synthId, "image"))
