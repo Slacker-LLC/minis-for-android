@@ -24,6 +24,9 @@
     <string name="memory_revoke_result_not_found">在最近的日志中未找到该条目。</string>
     <string name="memory_revoke_result_io_error">写入文件出错：%1$s</string>
     <string name="memory_save_toast">已保存</string>
+    <string name="memory_edit_load_failed">无法读取此文件，为避免覆盖已禁用编辑</string>
+    <string name="memory_edit_changed_elsewhere">编辑期间该文件已被修改。请返回并重新打开以查看最新版本；你的内容未被保存</string>
+    <string name="memory_save_error">保存失败：%1$s</string>
     <string name="memory_global_footer">每个会话中对智能体可见的持久指令和偏好。智能体无法修改此文件。</string>
     <string name="check_update_section_header">应用更新</string>
     <string name="check_update_current_version">当前版本：%1$s</string>

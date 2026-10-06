@@ -292,8 +292,19 @@ fun MemoryFileEditScreen(
     // detail editor's SavedToast so the wording stays consistent.
     val savedToastText = stringResource(R.string.memory_save_toast)
 
+    // What the file looked like when this editor opened it. Save is only offered once that is
+    // known (a read failure used to show an empty editor whose Save replaced the real file),
+    // and it is refused if the file changed meanwhile.
+    var opened by remember { mutableStateOf<MemoryRepository.EditRead?>(null) }
+    val loadFailedText = stringResource(R.string.memory_edit_load_failed)
+    val changedText = stringResource(R.string.memory_edit_changed_elsewhere)
     LaunchedEffect(fileName) {
-        content = withContext(Dispatchers.IO) { memoryRepository.readFile(fileName) }
+        val read = withContext(Dispatchers.IO) { memoryRepository.readFileForEdit(fileName) }
+        when (read) {
+            is MemoryRepository.EditRead.Loaded -> { content = read.text; opened = read }
+            MemoryRepository.EditRead.Missing -> { content = ""; opened = read }
+            MemoryRepository.EditRead.Failed -> saveError = loadFailedText
+        }
     }
 
     Scaffold(
@@ -304,19 +315,26 @@ fun MemoryFileEditScreen(
             actions = {
                     // [T-global-memory-save-always-visible] Always render Save —
                     // no hasChanges gate (see KDoc above).
-                    MinisTextButton(onClick = {
+                    MinisTextButton(enabled = opened != null, onClick = {
                         val pending = content
+                        val base = opened ?: return@MinisTextButton
                         scope.launch {
                             try {
-                                withContext(Dispatchers.IO) {
-                                    memoryRepository.saveFile(fileName, pending)
+                                val saved = withContext(Dispatchers.IO) {
+                                    memoryRepository.saveFileIfUnchanged(fileName, pending, base)
                                 }
-                                saveError = null
-                                android.widget.Toast.makeText(
-                                    context,
-                                    savedToastText,
-                                    android.widget.Toast.LENGTH_SHORT,
-                                ).show()
+                                if (saved) {
+                                    // The saved text is the new baseline for the next save.
+                                    opened = MemoryRepository.EditRead.Loaded(pending)
+                                    saveError = null
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        savedToastText,
+                                        android.widget.Toast.LENGTH_SHORT,
+                                    ).show()
+                                } else {
+                                    saveError = changedText
+                                }
                             } catch (e: Exception) {
                                 saveError = e.message
                             }

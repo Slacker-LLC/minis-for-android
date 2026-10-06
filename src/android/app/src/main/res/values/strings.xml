@@ -26,6 +26,9 @@
     <string name="memory_revoke_result_not_found">Entry not found in recent daily logs.</string>
     <string name="memory_revoke_result_io_error">Error writing file: %1$s</string>
     <string name="memory_save_toast">Saved</string>
+    <string name="memory_edit_load_failed">Could not read this file, so editing is off to avoid overwriting it</string>
+    <string name="memory_edit_changed_elsewhere">This file changed while you were editing. Go back and reopen it to see the latest version; your text was not saved</string>
+    <string name="memory_save_error">Save failed: %1$s</string>
     <string name="memory_global_footer">Persistent instructions and preferences visible to the agent in every session. The agent cannot modify this file.</string>
 
     <!-- Check Update -->

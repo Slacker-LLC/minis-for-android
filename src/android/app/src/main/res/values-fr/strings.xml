@@ -24,6 +24,9 @@
     <string name="memory_revoke_result_not_found">Entrée introuvable dans les journaux récents.</string>
     <string name="memory_revoke_result_io_error">Erreur d\'écriture du fichier : %1$s</string>
     <string name="memory_save_toast">Enregistré</string>
+    <string name="memory_edit_load_failed">Impossible de lire ce fichier ; la modification est désactivée pour éviter de l’écraser</string>
+    <string name="memory_edit_changed_elsewhere">Ce fichier a changé pendant votre modification. Revenez en arrière et rouvrez-le pour voir la dernière version ; votre texte n’a pas été enregistré</string>
+    <string name="memory_save_error">Échec de l\'enregistrement : %1$s</string>
     <string name="memory_global_footer">Instructions et préférences persistantes visibles par l\'agent dans chaque session. L\'agent ne peut pas modifier ce fichier.</string>
     <string name="check_update_section_header">Mise à jour de l\'application</string>
     <string name="check_update_current_version">Version actuelle : %1$s</string>

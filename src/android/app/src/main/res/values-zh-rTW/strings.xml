@@ -1152,6 +1152,9 @@
     <string name="memory_revoke_result_not_found">在最近的日誌中未找到該條目。</string>
     <string name="memory_revoke_result_io_error">寫入檔案出錯：%1$s</string>
     <string name="memory_save_toast">已儲存</string>
+    <string name="memory_edit_load_failed">無法讀取此檔案，為避免覆寫已停用編輯</string>
+    <string name="memory_edit_changed_elsewhere">編輯期間此檔案已被修改。請返回並重新開啟以查看最新版本；你的內容未被儲存</string>
+    <string name="memory_save_error">儲存失敗：%1$s</string>
     <string name="memory_global_footer">每個會話中對智慧體可見的持久指令和偏好。智慧體無法修改此檔案。</string>
     <string name="check_update_section_header">應用更新</string>
     <string name="check_update_current_version">當前版本：%1$s</string>
