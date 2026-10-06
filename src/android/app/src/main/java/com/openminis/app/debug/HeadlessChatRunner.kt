@@ -1,6 +1,7 @@
 package com.openminis.app.debug
 
 import android.content.Context
+import com.openminis.app.agent.AgentTurnHandle
 import com.openminis.app.agent.AgentTurnOutcome
 import androidx.lifecycle.ViewModelProvider
 import com.openminis.app.MinisApp
@@ -217,35 +218,54 @@ internal object HeadlessChatRunner {
             request.result.await()
             true
         } == true
-        // Restrict the response to rows after this request's user message.
-        // A rejected/failed send must never return an earlier successful reply.
-        val msgs = app(context).chatRepository.dao.loadMessages(sessionId)
-        val userIndex = request.userMessageId?.let { id -> msgs.indexOfFirst { it.id == id } } ?: -1
-        val responseText = if (userIndex >= 0) {
-            msgs.drop(userIndex + 1).takeWhile { it.role != "user" || extractText(it.partsJson).isNullOrBlank() }
-                .lastOrNull { it.role == "assistant" }?.let { extractText(it.partsJson) }
-        } else null
-        val status = when (outcome) {
-            AgentTurnOutcome.Completed -> "Completed"
-            AgentTurnOutcome.Cancelled -> "Cancelled"
-            is AgentTurnOutcome.Failed -> "Error"
-            is AgentTurnOutcome.NeedsAttention -> "NeedsAttention"
-            is AgentTurnOutcome.Rejected -> "Dropped"
-            null -> "Timeout"
-        }
-        val reason = when (outcome) {
-            is AgentTurnOutcome.Failed -> outcome.reason
-            is AgentTurnOutcome.NeedsAttention -> outcome.reason
-            is AgentTurnOutcome.Rejected -> outcome.reason
-            else -> null
-        }
         if (outcome is AgentTurnOutcome.Rejected) vm.chatOnlyForNextTurn = false
         PromptResult(
-            status = status,
-            responseText = reason ?: responseText,
+            status = statusOf(outcome),
+            responseText = reasonOf(outcome) ?: responseAfter(context, sessionId, request.userMessageId),
             timedOut = outcome == null,
             streamExited = streamExited,
         )
+    }
+
+    /** The wire status of one request's outcome; null means the wait timed out. */
+    private fun statusOf(outcome: AgentTurnOutcome?): String = when (outcome) {
+        AgentTurnOutcome.Completed -> "Completed"
+        AgentTurnOutcome.Cancelled -> "Cancelled"
+        is AgentTurnOutcome.Failed -> "Error"
+        is AgentTurnOutcome.NeedsAttention -> "NeedsAttention"
+        is AgentTurnOutcome.Rejected -> "Dropped"
+        null -> "Timeout"
+    }
+
+    private fun reasonOf(outcome: AgentTurnOutcome?): String? = when (outcome) {
+        is AgentTurnOutcome.Failed -> outcome.reason
+        is AgentTurnOutcome.NeedsAttention -> outcome.reason
+        is AgentTurnOutcome.Rejected -> outcome.reason
+        else -> null
+    }
+
+    /**
+     * The last assistant text after [userMessageId], up to the next user turn. Restricted to rows after
+     * this request's user message, so a rejected or failed request never returns an earlier reply.
+     */
+    private suspend fun responseAfter(context: Context, sessionId: String, userMessageId: String?): String? {
+        val msgs = app(context).chatRepository.dao.loadMessages(sessionId)
+        val userIndex = userMessageId?.let { id -> msgs.indexOfFirst { it.id == id } } ?: -1
+        if (userIndex < 0) return null
+        return msgs.drop(userIndex + 1).takeWhile { it.role != "user" || extractText(it.partsJson).isNullOrBlank() }
+            .lastOrNull { it.role == "assistant" }?.let { extractText(it.partsJson) }
+    }
+
+    /**
+     * Wait for one accepted retry/rerun [request]. On timeout the request is cancelled and its exit
+     * awaited, so a Timeout result never leaves the turn running behind the caller.
+     */
+    private suspend fun awaitRequest(request: AgentTurnHandle, timeoutMs: Long): Pair<AgentTurnOutcome?, Boolean> {
+        val outcome = withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { request.result.await() }
+        if (outcome != null) return outcome to true
+        request.cancel()
+        val exited = withTimeoutOrNull(5_000L) { request.result.await(); true } == true
+        return null to exited
     }
 
     suspend fun retry(
@@ -285,36 +305,33 @@ internal object HeadlessChatRunner {
                 retriedMessageId = targetMsgId,
             )
         }
-        vm.retryFromMessage(targetMsgId)
+        // The retry's own completion, never the session's shared busy flag: a refused retry, another
+        // turn finishing, or a failure must not read as this retry completing.
+        val request = AgentTurnHandle()
+        if (!vm.retryFromMessage(targetMsgId, request)) {
+            return@withContext PromptResult(
+                status = "Dropped",
+                responseText = (if (request.result.isCompleted) reasonOf(request.result.await()) else null) ?: "retry_rejected",
+                timedOut = false,
+                streamExited = true,
+                retriedMessageId = targetMsgId,
+            )
+        }
         if (!wait) {
             return@withContext PromptResult(
                 status = "Retrying",
                 responseText = null,
                 timedOut = false,
+                streamExited = false,
                 deletedMessageCount = deletedCount,
                 retriedMessageId = targetMsgId,
             )
         }
-        val finished = withTimeoutOrNull(timeoutMs) {
-            if (vm.isStreaming.value) {
-                vm.isStreaming.first { !it }
-            }
-            true
-        } ?: run {
-            // Timeout: cancel the underlying stream so it does not keep running
-            // after the caller gave up waiting.
-            vm.cancelStream()
-            vm.awaitStreamExit(timeoutMs = 5_000L)
-            false
-        }
-        val streamExited = vm.awaitStreamExit(timeoutMs = 5_000L)
-        val msgs = app.chatRepository.dao.loadMessages(sessionId)
-        val lastAssistant = msgs.lastOrNull { it.role == "assistant" }
-        val responseText = lastAssistant?.let { extractText(it.partsJson) }
+        val (outcome, streamExited) = awaitRequest(request, timeoutMs)
         PromptResult(
-            status = if (finished) "Completed" else "Timeout",
-            responseText = responseText,
-            timedOut = !finished,
+            status = statusOf(outcome),
+            responseText = reasonOf(outcome) ?: responseAfter(context, sessionId, targetMsgId),
+            timedOut = outcome == null,
             streamExited = streamExited,
             deletedMessageCount = deletedCount,
             retriedMessageId = targetMsgId,
@@ -359,11 +376,12 @@ internal object HeadlessChatRunner {
         // caller-supplied id (covers a freshly-reloaded session whose bubble id
         // IS the DB row id).
         val liveAssistantId = vm.assistantMessageIdForToolBlock(blockId) ?: assistantMessageId
-        val accepted = vm.rerunFromToolBlock(liveAssistantId, blockId)
-        if (!accepted) {
+        val request = AgentTurnHandle()
+        if (!vm.rerunFromToolBlock(liveAssistantId, blockId, request)) {
             return@withContext PromptResult(
                 status = "Error",
-                responseText = "rerun_rejected (streaming / not_found / not_tool_block)",
+                responseText = "rerun_rejected: " +
+                    ((if (request.result.isCompleted) reasonOf(request.result.await()) else null) ?: "streaming / not_found / not_tool_block"),
                 timedOut = false,
                 deletedMessageCount = 0,
                 retriedMessageId = assistantMessageId,
@@ -374,20 +392,19 @@ internal object HeadlessChatRunner {
                 status = "Rerunning",
                 responseText = null,
                 timedOut = false,
+                streamExited = false,
                 deletedMessageCount = 0,
                 retriedMessageId = assistantMessageId,
             )
         }
-        val finished = withTimeoutOrNull(timeoutMs) {
-            if (vm.isStreaming.value) vm.isStreaming.first { !it }
-            true
-        } ?: false
+        // Timeout cancels this rerun and waits for it to exit, so streamExited is a measured fact.
+        val (outcome, streamExited) = awaitRequest(request, timeoutMs)
         val msgs = app.chatRepository.dao.loadMessages(sessionId)
-        val lastAssistant = msgs.lastOrNull { it.role == "assistant" }
         PromptResult(
-            status = if (finished) "Completed" else "Timeout",
-            responseText = lastAssistant?.let { extractText(it.partsJson) },
-            timedOut = !finished,
+            status = statusOf(outcome),
+            responseText = reasonOf(outcome) ?: msgs.lastOrNull { it.role == "assistant" }?.let { extractText(it.partsJson) },
+            timedOut = outcome == null,
+            streamExited = streamExited,
             deletedMessageCount = (before - msgs.size).coerceAtLeast(0),
             retriedMessageId = assistantMessageId,
         )

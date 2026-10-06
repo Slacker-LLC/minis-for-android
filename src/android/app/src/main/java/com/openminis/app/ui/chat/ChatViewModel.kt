@@ -5364,18 +5364,21 @@ class ChatViewModel(
      * item with the same `!isStreaming` rule, but the guard here is the source
      * of truth.
      */
-    fun rerunFromToolBlock(assistantMessageId: String, blockId: String): Boolean {
-        if (_isStreaming.value) return false
+    fun rerunFromToolBlock(assistantMessageId: String, blockId: String): Boolean =
+        rerunFromToolBlock(assistantMessageId, blockId, null)
+
+    internal fun rerunFromToolBlock(assistantMessageId: String, blockId: String, request: AgentTurnHandle?): Boolean {
+        if (_isStreaming.value) { request?.reject("session_busy"); return false }
         val messages = _messages.value
         val asstIdx = messages.indexOfFirst { it.id == assistantMessageId }
-        if (asstIdx < 0) return false
+        if (asstIdx < 0) { request?.reject("message_not_loaded"); return false }
         val asstMsg = messages[asstIdx]
         val blockIdx = asstMsg.toolBlocks.indexOfFirst { it.id == blockId }
-        if (blockIdx < 0) return false
+        if (blockIdx < 0) { request?.reject("tool_block_not_found"); return false }
         val targetBlock = asstMsg.toolBlocks[blockIdx]
         // Only a real tool_use block anchors a block cut — its id is the
         // tool_use id we match against in agentHistory / parts_json.
-        if (targetBlock.kind != "tool_use" || targetBlock.id.isBlank()) return false
+        if (targetBlock.kind != "tool_use" || targetBlock.id.isBlank()) { request?.reject("not_a_tool_block"); return false }
         // [T-android-tool-autoscroll] Start-of-turn snap — see resume().
         _forceScrollToBottom.tryEmit(Unit)
         val targetToolUseId = targetBlock.id
@@ -5404,15 +5407,15 @@ class ChatViewModel(
             val userMsg = (asstIdx - 1 downTo 0).asSequence()
                 .map { messages[it] }
                 .firstOrNull { it.role == "user" && it.content.isNotBlank() }
-                ?: return false
+                ?: run { request?.reject("no_preceding_user_message"); return false }
             Log.i(TAG, "rerunFromToolBlock degenerate → retryFromMessage(precedingUser) tuId=${targetToolUseId.take(12)}")
-            retryFromMessage(userMsg.id)
-            return true
+            return retryFromMessage(userMsg.id, request)
         }
 
         val initialProvider = currentProvider
         if (initialProvider == null) {
             _error.value = "No provider configured"
+            request?.reject("no_provider")
             return false
         }
         _canResume.value = false
@@ -5547,11 +5550,12 @@ class ChatViewModel(
                     agentHistory.add(entity.toLLMMessage())
                 }
 
-                streamLaunched = runRerunStreamTail(initialProvider, "rerunFromToolBlock")
+                streamLaunched = runRerunStreamTail(initialProvider, "rerunFromToolBlock", request)
             } finally {
                 if (!streamLaunched) {
                     AppLogger.info(TAG_STREAM, "rerunFromToolBlock _isStreaming=false (setup aborted)")
                     _isStreaming.value = false
+                    request?.reject("rerun_setup_failed")
                 }
             }
         }
@@ -5699,13 +5703,19 @@ class ChatViewModel(
      * (including the assistant response), rebuild agent history, and resend.
      * Mirrors iOS's edit/retry behavior — no duplicate user messages.
      */
-    fun retryFromMessage(messageId: String): Boolean {
-        if (deferUntilMediaCommitted { retryFromMessage(messageId) }) return true
-        if (_isStreaming.value) return false
+    /**
+     * @param request when given, the retry's own completion: rejected when the retry does not start,
+     *   otherwise bound to the stream job it launches (see [runRerunStreamTail]).
+     */
+    fun retryFromMessage(messageId: String): Boolean = retryFromMessage(messageId, null)
+
+    internal fun retryFromMessage(messageId: String, request: AgentTurnHandle?): Boolean {
+        if (deferUntilMediaCommitted { retryFromMessage(messageId, request) }) return true
+        if (_isStreaming.value) { request?.reject("session_busy"); return false }
         _canResume.value = false
         val messages = _messages.value
         val index = messages.indexOfFirst { it.id == messageId }
-        if (index < 0) return false
+        if (index < 0) { request?.reject("message_not_loaded"); return false }
         val message = messages[index]
         // [T-android-tool-autoscroll] Start-of-turn snap — see resume().
         _forceScrollToBottom.tryEmit(Unit)
@@ -5714,10 +5724,12 @@ class ChatViewModel(
             if (message.role == "user" && message.content.isNotBlank() && initialProvider == null) {
                 _error.value = "No provider configured"
             }
+            request?.reject(if (initialProvider == null) "no_provider" else "message_not_retryable")
             return false
         }
 
-        val provider: LLMProvider = initialProvider ?: return false
+        val provider: LLMProvider = initialProvider ?: run { request?.reject("no_provider"); return false }
+        request?.userMessageId = messageId
         _error.value = null
 
         // T149: snapshot messages about to be truncated so we can revoke any
@@ -5815,11 +5827,12 @@ class ChatViewModel(
                 agentHistory.add(entity.toLLMMessage())
             }
 
-            streamLaunched = runRerunStreamTail(provider, "retryFromMessage")
+            streamLaunched = runRerunStreamTail(provider, "retryFromMessage", request)
             } finally {
                 if (!streamLaunched) {
                     AppLogger.info(TAG_STREAM, "retry _isStreaming=false (setup aborted)")
                     _isStreaming.value = false
+                    request?.reject("retry_setup_failed")
                 }
             }
         }
@@ -5839,6 +5852,7 @@ class ChatViewModel(
     private suspend fun runRerunStreamTail(
         initialProvider: LLMProvider,
         label: String,
+        request: AgentTurnHandle? = null,
     ): Boolean {
         var provider = initialProvider
         // Refresh OAuth token if needed
@@ -5896,11 +5910,14 @@ class ChatViewModel(
                         )
                     }
                     botTurnSucceeded = outcome == AgentTurnOutcome.Completed
+                    request?.record(outcome)
                     AppLogger.info(TAG_STREAM, "$label runAgentLoop RETURN normal")
                 } catch (e: CancellationException) {
+                    request?.record(AgentTurnOutcome.Cancelled)
                     AppLogger.info(TAG_STREAM, "$label runAgentLoop CANCELLED")
                     Log.d(TAG, "Agent loop cancelled")
                 } catch (e: Exception) {
+                    request?.record(AgentTurnOutcome.Failed(e.message ?: "Unknown error"))
                     AppLogger.error(TAG_STREAM, "$label runAgentLoop EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                     Log.e(TAG, "Agent loop error ($label)", e)
                     setInlineError(e.message ?: "Unknown error")
@@ -5925,6 +5942,7 @@ class ChatViewModel(
                     AppLogger.info(TAG_STREAM, "$label streamJob FINALLY exit")
                 }
             } catch (e: CancellationException) {
+                request?.record(AgentTurnOutcome.Cancelled)
                 AppLogger.info(TAG_STREAM, "$label streamJob CANCELLED waiting for slot")
                 Log.d(TAG, "Cancelled while waiting for concurrency slot")
                 // A source Bot turn can be cancelled while waiting for the
@@ -5947,6 +5965,7 @@ class ChatViewModel(
             }
             AppLogger.info(TAG_STREAM, "$label streamJob EXIT")
         }
+        streamJob?.let { request?.bind(it) }
         return true
     }
 
