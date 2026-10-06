@@ -32,7 +32,7 @@ import java.util.UUID
  * the user still cares about, and an idle month leaves nothing stale behind.
  * Same 30-day window as iOS.
  */
-class BackupHistory private constructor(private val context: Context) {
+class BackupHistory private constructor(private val context: Context, private val storeOverride: File? = null) {
 
     /**
      * Terminal state of a run.
@@ -109,7 +109,7 @@ class BackupHistory private constructor(private val context: Context) {
     // MARK: - Storage
 
     private val storeFile: File
-        get() = File(context.filesDir, "backup-history").apply { mkdirs() }
+        get() = storeOverride ?: File(context.filesDir, "backup-history").apply { mkdirs() }
             .let { File(it, "records.json") }
 
     @Volatile
@@ -122,41 +122,55 @@ class BackupHistory private constructor(private val context: Context) {
         val loaded = runCatching {
             storeFile.takeIf { it.exists() }?.readText()
                 ?.let { JSON.decodeFromString(RECORD_LIST, it) }
-        }.getOrNull() ?: emptyList()
+        }.getOrElse {
+            // Unreadable is not the same as empty: setAside keeps the file, so the next write
+            // does not destroy what might still be recovered.
+            setAsideUnreadable()
+            null
+        } ?: emptyList()
         val cutoff = System.currentTimeMillis() - RETENTION_MS
         val kept = loaded.filter { it.startedAt >= cutoff }.sortedByDescending { it.startedAt }
         if (kept.size != loaded.size) persist(kept)
-        cache = kept
-        return kept
+        cache = cache ?: kept
+        return cache!!
     }
 
+    /** Moves an unparseable records file to `records.json.corrupt` (replacing an older one). */
+    private fun setAsideUnreadable() {
+        val f = storeFile
+        if (!f.exists()) return
+        val aside = File(f.parentFile, f.name + ".corrupt")
+        val moved = runCatching { aside.delete(); f.renameTo(aside) }.getOrDefault(false)
+        AppLogger.error(TAG, "[Backup] history file unreadable; ${if (moved) "kept as ${aside.name}" else "could not be set aside"}")
+    }
+
+    /**
+     * Commits [list] to disk and only then publishes it, so what the screen shows is what a restart
+     * will find. False (and nothing changes) when the write failed.
+     */
     @Synchronized
-    private fun persist(list: List<Record>) {
-        cache = list
-        runCatching { storeFile.writeText(JSON.encodeToString(RECORD_LIST, list)) }
-            .onFailure { AppLogger.error(TAG, "[Backup] history write failed: ${it.message}") }
+    private fun persist(list: List<Record>): Boolean {
+        val saved = com.openminis.app.util.atomicWriteText(storeFile, JSON.encodeToString(RECORD_LIST, list))
+        if (saved) cache = list else AppLogger.error(TAG, "[Backup] history write failed; keeping the previous list")
+        return saved
     }
 
     // MARK: - Mutation
 
     /** Insert a record, or replace the one carrying the same id. */
     @Synchronized
-    fun upsert(record: Record) {
+    fun upsert(record: Record): Boolean {
         val cur = records().toMutableList()
         val i = cur.indexOfFirst { it.id == record.id }
         if (i >= 0) cur[i] = record else cur.add(0, record)
-        persist(cur.sortedByDescending { it.startedAt })
+        return persist(cur.sortedByDescending { it.startedAt })
     }
 
     @Synchronized
-    fun remove(id: String) {
-        persist(records().filterNot { it.id == id })
-    }
+    fun remove(id: String): Boolean = persist(records().filterNot { it.id == id })
 
     @Synchronized
-    fun clear() {
-        persist(emptyList())
-    }
+    fun clear(): Boolean = persist(emptyList())
 
     /**
      * Mark any record still flagged RUNNING as failed.
@@ -200,6 +214,9 @@ class BackupHistory private constructor(private val context: Context) {
 
         @Volatile
         private var instance: BackupHistory? = null
+
+        /** A store backed by [file], for JVM tests (no Android files directory needed). */
+        internal fun forFile(context: Context, file: File): BackupHistory = BackupHistory(context, file)
 
         fun get(context: Context): BackupHistory =
             instance ?: synchronized(this) {
