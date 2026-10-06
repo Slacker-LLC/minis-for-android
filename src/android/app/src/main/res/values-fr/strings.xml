@@ -1473,6 +1473,7 @@
     <string name="mount_add_failed_unsupported_uri">Cet emplacement ne peut pas être monté. Choisissez un dossier dans le stockage interne ou la carte SD.</string>
     <string name="mount_add_failed_unresolvable_path">Le chemin réel de ce dossier n\'a pas pu être résolu.</string>
     <string name="mount_add_failed_commit">Le montage n\'a pas pu être enregistré. Réessayez.</string>
+    <string name="mount_detail_change_failed">La modification n\'a pas pu être appliquée. Le nom est peut-être déjà utilisé.</string>
     <string name="mount_add_grant_action">Autoriser</string>
     <string name="common_menu">Menu</string>
     <string name="common_more">Plus</string>

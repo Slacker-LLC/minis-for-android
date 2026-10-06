@@ -1574,6 +1574,7 @@
     <string name="mount_add_failed_unsupported_uri">この場所はマウントできません。「内部ストレージ」または SD カード内のフォルダーを選んでください。</string>
     <string name="mount_add_failed_unresolvable_path">このフォルダーの実際のパスを解決できませんでした。</string>
     <string name="mount_add_failed_commit">マウントを保存できませんでした。もう一度お試しください。</string>
+    <string name="mount_detail_change_failed">変更を適用できませんでした。名前がすでに使われている可能性があります。</string>
     <string name="mount_add_grant_action">許可する</string>
     <string name="common_menu">メニュー</string>
     <string name="common_more">その他</string>

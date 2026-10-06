@@ -1758,6 +1758,7 @@
     <string name="mount_add_failed_unsupported_uri">这个位置不能挂载。请在「内部存储」或存储卡里选一个文件夹。</string>
     <string name="mount_add_failed_unresolvable_path">无法解析这个文件夹在本机的真实路径。</string>
     <string name="mount_add_failed_commit">挂载没有保存成功，请重试。</string>
+    <string name="mount_detail_change_failed">无法应用此更改。名称可能已被使用。</string>
     <string name="mount_add_grant_action">去授权</string>
     <string name="check_update_no_apk_asset">%1$s 已发布，但没有附带 APK。</string>
     <string name="mcp_form_startup_timeout">启动超时（秒）</string>

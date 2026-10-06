@@ -1792,6 +1792,7 @@
     <string name="mount_add_failed_unsupported_uri">Это место нельзя смонтировать. Выберите папку во внутреннем хранилище или на карте памяти.</string>
     <string name="mount_add_failed_unresolvable_path">Не удалось определить реальный путь этой папки.</string>
     <string name="mount_add_failed_commit">Не удалось сохранить точку монтирования. Попробуйте ещё раз.</string>
+    <string name="mount_detail_change_failed">Не удалось применить изменение. Возможно, такое имя уже используется.</string>
     <string name="mount_add_grant_action">Разрешить</string>
     <string name="common_menu">Меню</string>
     <string name="common_more">Ещё</string>

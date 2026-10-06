@@ -1909,6 +1909,7 @@
     <string name="mount_add_failed_unsupported_uri">That location cannot be mounted. Pick a folder under Internal storage or the SD card.</string>
     <string name="mount_add_failed_unresolvable_path">That folder\'s real path on this device could not be resolved.</string>
     <string name="mount_add_failed_commit">The mount could not be saved. Try again.</string>
+    <string name="mount_detail_change_failed">The change could not be applied. The name may already be in use.</string>
     <string name="mount_add_grant_action">Grant access</string>
     <string name="common_menu">Menu</string>
     <string name="common_more">More</string>

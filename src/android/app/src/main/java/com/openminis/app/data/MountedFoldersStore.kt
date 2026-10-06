@@ -222,7 +222,7 @@ class MountedFoldersStore(private val context: Context) {
         // Reconcile first. Only after the replacement is live do we remove
         // the persisted record and release the URI grant.
         if (!commitSnapshot(after)) return@withLock false
-        before.firstOrNull { it.id == id }?.let { e ->
+        before.firstOrNull { it.id == id }?.takeIf { grantReleasable(after, it.treeUri) }?.let { e ->
             runCatching {
                 context.contentResolver.releasePersistableUriPermission(
                     Uri.parse(e.treeUri),
@@ -433,8 +433,10 @@ class MountedFoldersStore(private val context: Context) {
         // closes the old-snapshot relaunch window.
         return RuntimePathRegistry.withMountMutationLock {
             if (onSnapshotChange?.invoke(after) == false) return@withMountMutationLock false
+            // The disk is part of the commit: publishing first and ignoring a failed write left
+            // memory and the file saying different things until the next restart.
+            if (!saveToDisk(after)) return@withMountMutationLock false
             _entries.value = after
-            saveToDisk(after)
             true
         }
     }
@@ -478,10 +480,10 @@ class MountedFoldersStore(private val context: Context) {
         }
     }
 
-    private suspend fun saveToDisk(list: List<Entry>) = withContext(Dispatchers.IO) {
-        runCatching {
-            storeFile.writeText(JSON.encodeToString(list))
-        }
+    private suspend fun saveToDisk(list: List<Entry>): Boolean = withContext(Dispatchers.IO) {
+        val saved = writeTextAtomically(storeFile, JSON.encodeToString(list))
+        if (!saved) AppLogger.warning(TAG, "saveToDisk: could not write ${storeFile.name}")
+        saved
     }
 
     private fun sanitizeName(raw: String): String {
@@ -500,6 +502,34 @@ class MountedFoldersStore(private val context: Context) {
         private val JSON = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     }
 }
+
+/**
+ * Writes [text] to [file] through a temporary sibling and a rename, so a failure or a kill midway
+ * leaves the previous content intact. False when anything failed.
+ */
+internal fun writeTextAtomically(file: File, text: String): Boolean {
+    val tmp = File(file.parentFile, file.name + ".tmp")
+    return try {
+        tmp.writeText(text)
+        java.nio.file.Files.move(
+            tmp.toPath(),
+            file.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+            java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+        )
+        true
+    } catch (_: Exception) {
+        runCatching { tmp.delete() }
+        false
+    }
+}
+
+/**
+ * A persisted URI grant belongs to the URI, not to a mount: two mounts of one tree share it, and
+ * releasing it for one would break the other. It may go only when no mount still uses the URI.
+ */
+internal fun grantReleasable(entries: List<MountedFoldersStore.Entry>, treeUri: String): Boolean =
+    entries.none { it.treeUri == treeUri }
 
 /** Accept an opaque StorageVolume UUID string while keeping the /storage fallback path safe. */
 internal fun isSafeStorageVolumeId(value: String): Boolean =
@@ -532,6 +562,29 @@ object SafMountHelper {
         )
         true
     }.getOrDefault(false)
+
+    /** Whether this app already holds a persisted grant on [treeUri] (taken by a mount or another feature). */
+    fun holdsGrant(context: Context, treeUri: Uri): Boolean =
+        context.contentResolver.persistedUriPermissions.any { it.uri == treeUri }
+
+    /**
+     * Gives back a grant taken for a pick that did not become a mount. Only a grant this flow took
+     * itself ([newlyTaken]) is released, and never while a mount uses the URI.
+     */
+    fun releaseAbandonedGrant(
+        context: Context,
+        treeUri: Uri,
+        newlyTaken: Boolean,
+        entries: List<MountedFoldersStore.Entry>,
+    ) {
+        if (!newlyTaken || !grantReleasable(entries, treeUri.toString())) return
+        runCatching {
+            context.contentResolver.releasePersistableUriPermission(
+                treeUri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        }
+    }
 
     /** Sugar over [DocumentsContract.getTreeDocumentId] for display purposes. */
     fun treeDisplayPath(uri: Uri): String =
