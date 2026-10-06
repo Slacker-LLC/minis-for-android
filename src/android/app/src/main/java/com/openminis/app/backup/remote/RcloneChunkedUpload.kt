@@ -238,7 +238,7 @@ class RcloneChunkedUpload(private val context: Context) {
             val e = list.optJSONObject(i) ?: continue
             if (e.optBoolean("IsDir")) continue
             val name = e.optString("Name")
-            if (!name.endsWith(".$PARTIAL_SUFFIX")) continue
+            if (!isMinisScratchName(name)) continue
             val path = remote.join(name)
             if (path == keeping) continue // this run reuses its own
             bytes += e.optLong("Size")
@@ -663,6 +663,15 @@ class RcloneChunkedUpload(private val context: Context) {
          * — see the note in [upload].
          */
         const val PARTIAL_SUFFIX = "partial"
+
+        /**
+         * Whether [name] is a scratch object this feature creates: `<package>.minisbak.partial`.
+         * A bare `.partial` suffix proves nothing about who wrote the file, and the destination can
+         * be a shared folder, so anything else is left alone.
+         */
+        internal fun isMinisScratchName(name: String): Boolean =
+            name.endsWith(".${BackupFormat.FILE_EXTENSION}.$PARTIAL_SUFFIX") &&
+                name.length > ".${BackupFormat.FILE_EXTENSION}.$PARTIAL_SUFFIX".length
 
         /**
          * Legacy chunked-upload directory. READ-ONLY: retained so packages an

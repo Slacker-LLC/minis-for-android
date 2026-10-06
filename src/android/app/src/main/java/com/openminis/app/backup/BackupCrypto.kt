@@ -51,6 +51,9 @@ object BackupCrypto {
 
     const val SCHEME = "minisbak-enc/1"
     const val PBKDF2_ITERATIONS = 600_000
+
+    /** Most iterations an imported package may ask for: a few times the current cost, far below a CPU burn. */
+    const val MAX_KDF_ITERATIONS = 3_000_000
     const val SALT_BYTES = 16
 
     /** 4 MiB plaintext per independently sealed segment (§5.3). */
@@ -126,14 +129,22 @@ object BackupCrypto {
             throw CorruptMemberException("manifest.encryption.kdf.salt")
         }
         return when (kdf.alg) {
-            "pbkdf2-hmac-sha256" -> {
-                val iterations = kdf.iterations ?: PBKDF2_ITERATIONS
-                Keys(pbkdf2(passphrase, salt, iterations))
-            }
+            "pbkdf2-hmac-sha256" -> Keys(pbkdf2(passphrase, salt, checkedIterations(kdf)))
             // "argon2id" would come from a future build that vendors Argon2;
             // refusing loudly is correct — see the header comment.
             else -> throw UnsupportedKDFException(kdf.alg)
         }
+    }
+
+    /**
+     * The iteration count a package asks for, checked before any work is done: it is read from the
+     * manifest, which is not yet authenticated (that needs the key this derives), so an unbounded
+     * value would let a crafted package burn CPU on the user's device before it is rejected.
+     */
+    internal fun checkedIterations(kdf: BackupManifest.Encryption.KDF): Int {
+        val iterations = kdf.iterations ?: PBKDF2_ITERATIONS
+        if (iterations !in 1..MAX_KDF_ITERATIONS) throw CorruptMemberException("manifest.encryption.kdf.iterations")
+        return iterations
     }
 
     /** The KDF descriptor to write into a new package. */
