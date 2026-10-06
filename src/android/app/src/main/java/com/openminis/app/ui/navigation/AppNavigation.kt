@@ -289,6 +289,11 @@ fun AppNavigation(
 
     // Handle initial deep link after composition
     LaunchedEffect(initialDeepLink) {
+        // A launch link is delivered once. At the first frame the start destination is still
+        // STARTED, where safeNavigate would drop it and nothing would retry.
+        if (initialDeepLink != null && initialDeepLink !is DeepLinkAction.Unknown) {
+            navController.awaitResumed()
+        }
         when (initialDeepLink) {
             is DeepLinkAction.OpenTerminal -> {
                 navController.safeNavigate(Routes.terminal(initialDeepLink.initCommand))
@@ -451,6 +456,9 @@ fun AppNavigation(
             navController.safeNavigate(Routes.chat("__new__${java.util.UUID.randomUUID()}")) {
                 popUpTo(Routes.SESSION_LIST) { inclusive = false }
             }
+        } else if (shareNeedsFreshChat(current)) {
+            // Home, settings, files...: keep the page underneath so Back returns to it.
+            navController.safeNavigate(Routes.chat("__new__${java.util.UUID.randomUUID()}"))
         }
     }
 

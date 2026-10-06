@@ -971,7 +971,12 @@ private fun ChatPhoneDrawerScaffold(
     // Reported by the visible ChatScreen; lets the drawer's "New chat" reuse a blank draft.
     var blankDraftProbe by remember { mutableStateOf<(() -> Boolean)?>(null) }
 
+    // Applied once per launch target. After a recreation the saved selection is the chat the
+    // user switched to; re-applying the launch target would put them back on the old one.
+    var launchTargetApplied by rememberSaveable(initialSessionId) { mutableStateOf(false) }
     LaunchedEffect(initialSessionId) {
+        if (launchTargetApplied) return@LaunchedEffect
+        launchTargetApplied = true
         if (initialSessionId == null) {
             val latest = chatRepository.dao.listSessions().firstOrNull()
             if (latest != null) {

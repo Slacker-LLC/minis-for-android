@@ -28,6 +28,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.openminis.app.offload.OffloadPermissionManager
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import androidx.navigation.NavHostController
@@ -40,6 +41,7 @@ import com.openminis.app.service.SessionActivityTracker
 import com.openminis.app.ui.navigation.AppNavigation
 import com.openminis.app.ui.navigation.Routes
 import com.openminis.app.ui.navigation.safeNavigate
+import com.openminis.app.ui.navigation.visibleChatSessionId
 import com.openminis.app.ui.NewerDatabaseGuidanceScreen
 import com.openminis.app.ui.settings.KEY_ACCENT_COLOR
 import com.openminis.app.ui.settings.KEY_FONT_APP_BASE
@@ -584,9 +586,18 @@ class MainActivity : ComponentActivity() {
                 // docs/parity/android-keep-alive-audit.md).
                 DisposableEffect(navController) {
                     val job = lifecycleScope.launch {
-                        navController.currentBackStackEntryFlow.collect { entry ->
+                        // The mounted ChatScreen knows which chat is on screen even when the drawer or
+                        // a split pane switched it without changing the outer route.
+                        combine(
+                            navController.currentBackStackEntryFlow,
+                            com.openminis.app.ui.chat.ChatViewModelStore.mountedSessionId,
+                        ) { entry, mounted ->
                             val isChatRoute = entry.destination.route == Routes.CHAT
-                            val sid = entry.arguments?.getString("sessionId").takeIf { isChatRoute }
+                            visibleChatSessionId(
+                                mountedChat = mounted,
+                                routeChat = entry.arguments?.getString("sessionId").takeIf { isChatRoute },
+                            )
+                        }.collect { sid ->
                             val previous = currentChatSessionId
                             if (sid != previous) {
                                 if (previous != null) {
