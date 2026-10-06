@@ -125,7 +125,7 @@ fi
 printf 'minis\n' > "$STAGE/etc/hostname"
 
 cat > "$STAGE/etc/profile.d/minis.sh" <<'EOF'
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/bin"
+export PATH="$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/bin"
 export LANG="${LANG:-C.UTF-8}"
 export LC_ALL="${LC_ALL:-C.UTF-8}"
 export NO_COLOR=1
