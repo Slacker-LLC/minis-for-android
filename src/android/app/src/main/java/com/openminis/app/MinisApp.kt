@@ -859,9 +859,7 @@ class MinisApp : Application(), ImageLoaderFactory {
             com.openminis.app.runtime.ubuntu.UbuntuRuntime.reconcileExternalMounts(candidate)
         }
 
-        // Register native_offload handlers and start the server eagerly. Reply
-        // files live in App-owned workspace/offloads; each session launch binds
-        // its own offloads directory to guest /tmp.
+        // Register the guest command handlers (the abstract-socket listener is retired).
         NativeOffloadServer.register("android-alarm", AlarmOffloadHandler(this))
         NativeOffloadServer.register("android-calendar", CalendarOffloadHandler(this))
         NativeOffloadServer.register("android-clipboard", ClipboardOffloadHandler(this))
@@ -919,7 +917,8 @@ class MinisApp : Application(), ImageLoaderFactory {
             )
         }
 
-        NativeOffloadServer.start(java.io.File(UbuntuPaths.hostWorkspace, "offloads"))
+        // The abstract-socket listener is retired; clear what it left behind.
+        Thread { NativeOffloadServer.deleteLegacyReplyFiles() }.apply { isDaemon = true }.start()
 
         // Initialize session activity tracker for foreground service management
         SessionActivityTracker.init(this)
@@ -1300,8 +1299,6 @@ class MinisApp : Application(), ImageLoaderFactory {
         }.onFailure { Log.w("MinisApp", "Ubuntu runtime stop failed: ${it.message}") }
         runCatching { networkMonitor.stop() }
             .onFailure { Log.w("MinisApp", "Network monitor stop failed: ${it.message}") }
-        runCatching { NativeOffloadServer.stop() }
-            .onFailure { Log.w("MinisApp", "Native offload stop failed: ${it.message}") }
         runCatching { com.openminis.app.runtime.guest.GuestCommandBridge.stop() }
             .onFailure { Log.w("MinisApp", "Guest bridge stop failed: ${it.message}") }
         // onTerminate is called only on emulators or when the system
