@@ -92,7 +92,10 @@ internal class JiebaEngine(context: Context) {
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val extractedVersion = prefs.getInt(KEY_DICT_VERSION, -1)
 
-        val allPresent = DICT_FILES.all { File(targetDir, it).exists() }
+        // The native loader aborts the whole process on a dictionary it cannot
+        // parse (no exception reaches Kotlin), so only a real, non-empty file
+        // counts as present; anything else is extracted again.
+        val allPresent = DICT_FILES.all { File(targetDir, it).let { f -> f.isFile && f.length() > 0 } }
         if (extractedVersion == DICT_VERSION && allPresent) {
             return targetDir
         }
@@ -101,7 +104,9 @@ internal class JiebaEngine(context: Context) {
             throw java.io.IOException("Cannot create dict dir: $targetDir")
         }
         for (name in DICT_FILES) {
-            copyAsset("jieba/$name", File(targetDir, name))
+            val dest = File(targetDir, name)
+            if (dest.isDirectory) dest.deleteRecursively()
+            copyAsset("jieba/$name", dest)
         }
         prefs.edit().putInt(KEY_DICT_VERSION, DICT_VERSION).apply()
         return targetDir
@@ -109,10 +114,17 @@ internal class JiebaEngine(context: Context) {
 
     /** Stream-copy one Asset to [dest] (Assets can't be read by path). */
     private fun copyAsset(assetPath: String, dest: File) {
+        // Write beside the target and rename, so an interrupted copy never
+        // leaves a half-written dictionary under the real name.
+        val partial = File(dest.parentFile, dest.name + ".part")
         appContext.assets.open(assetPath).use { input ->
-            dest.outputStream().use { output ->
+            partial.outputStream().use { output ->
                 input.copyTo(output, bufferSize = 64 * 1024)
             }
+        }
+        if (!partial.renameTo(dest)) {
+            partial.delete()
+            throw java.io.IOException("Cannot move $partial to $dest")
         }
     }
 
