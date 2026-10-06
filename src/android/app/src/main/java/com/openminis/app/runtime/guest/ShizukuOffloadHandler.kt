@@ -236,13 +236,12 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
 
     private fun packageClear(pkg: String?, args: OffloadArgs): NativeOffloadResult {
         if (pkg.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "package clear <packageName>", args)
-        val cmd: MutableList<String> = if (args.hasFlag("cache-only")) {
-            mutableListOf("pm", "trim-caches", "1G")
-        } else {
-            mutableListOf("pm", "clear").apply {
-                args.get("user")?.let { addAll(listOf("--user", it)) }
-                add(pkg)
-            }
+        // `pm trim-caches` is a device-wide "free N bytes" operation with no package argument, so it
+        // cannot stand in for a per-package cache clear; `pm clear --cache-only` targets the package.
+        val cmd: MutableList<String> = mutableListOf("pm", "clear").apply {
+            args.get("user")?.let { addAll(listOf("--user", it)) }
+            if (args.hasFlag("cache-only")) add("--cache-only")
+            add(pkg)
         }
         val r = ShizukuManager.runProcess(cmd.toTypedArray(), timeoutMs = 15_000)
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("cleared", pkg), args)
@@ -646,27 +645,43 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     }
 
     private fun networkRestrict(pkg: String?, args: OffloadArgs, restrict: Boolean): NativeOffloadResult {
-        if (pkg.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "network ${if (restrict) "restrict" else "allow"} <pkg>", args)
-        val results = JSONObject()
+        val verb = if (restrict) "restrict" else "allow"
+        if (pkg.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "network $verb <pkg>", args)
+        if (args.hasFlag("wifi")) {
+            // restrict-background-whitelist exempts a UID from Data Saver on metered networks; it is
+            // neither Wi-Fi specific nor, for "restrict", the right direction. No Wi-Fi-only switch
+            // exists here, so say so rather than do something else.
+            return errEnvelope(
+                "UNSUPPORTED",
+                "--wifi is not supported: there is no Wi-Fi-only network policy. Use --background or --data.",
+                args,
+            )
+        }
         val all = args.hasFlag("all")
-        if (args.hasFlag("background") || all) {
+        val wantBackground = args.hasFlag("background") || all
+        val wantData = args.hasFlag("data") || all
+        if (!wantBackground && !wantData) {
+            return errEnvelope("INVALID_ARGS", "network $verb <pkg> needs --background, --data or --all", args)
+        }
+        val results = JSONObject()
+        var failed = false
+        if (wantBackground) {
             // RUN_ANY_IN_BACKGROUND appop
             val mode = if (restrict) "ignore" else "allow"
             val r = ShizukuManager.runProcess(arrayOf("appops", "set", pkg, "RUN_ANY_IN_BACKGROUND", mode))
             results.put("background", r.exitCode == 0)
+            if (r.exitCode != 0) failed = true
         }
-        if (args.hasFlag("wifi") || all) {
-            // cmd netpolicy is the modern surface; older devices use `cmd netpolicy set restrict-background`
+        if (wantData) {
+            val uid = pkgUid(pkg)
+                ?: return errEnvelope("NOT_FOUND", "cannot determine the UID of '$pkg'; nothing was changed for --data", args)
             val r = ShizukuManager.runProcess(arrayOf("cmd", "netpolicy",
-                if (restrict) "add" else "remove", "restrict-background-whitelist", pkgUid(pkg)))
-            results.put("wifi", r.exitCode == 0)
-        }
-        if (args.hasFlag("data") || all) {
-            val r = ShizukuManager.runProcess(arrayOf("cmd", "netpolicy",
-                if (restrict) "add" else "remove", "restrict-background-blacklist", pkgUid(pkg)))
+                if (restrict) "add" else "remove", "restrict-background-blacklist", uid))
             results.put("data", r.exitCode == 0)
+            if (r.exitCode != 0) failed = true
         }
-        return okEnvelope(results, args)
+        return if (failed) errEnvelope("OPERATION_FAILED", "network $verb failed: $results", args)
+        else okEnvelope(results, args)
     }
 
     private fun networkStats(pkg: String?, args: OffloadArgs): NativeOffloadResult {
@@ -674,16 +689,17 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         // dumpsys netstats detail; surface the per-uid block.
         val r = ShizukuManager.runProcess(arrayOf("dumpsys", "netstats", "detail"), timeoutMs = 10_000)
         if (r.exitCode != 0) return errEnvelope("OPERATION_FAILED", failMessage(r), args)
-        val uid = pkgUid(pkg).toIntOrNull() ?: -1
+        val uid = pkgUid(pkg)?.toIntOrNull()
+            ?: return errEnvelope("NOT_FOUND", "cannot determine the UID of '$pkg'", args)
         val (rx, tx) = parseNetstats(r.stdout, uid)
         val obj = JSONObject().put("package", pkg).put("uid", uid).put("rx_bytes", rx).put("tx_bytes", tx)
         return okEnvelope(obj, args)
     }
 
-    private fun pkgUid(pkg: String): String {
+    /** The package's UID, or null when it cannot be established (never a guessed 0). */
+    private fun pkgUid(pkg: String): String? {
         val r = ShizukuManager.runProcess(arrayOf("dumpsys", "package", pkg), timeoutMs = 6_000)
-        val m = Regex("""userId=(\d+)""").find(r.stdout)
-        return m?.groupValues?.get(1) ?: "0"
+        return parsePackageUid(r.stdout, r.exitCode)
     }
 
     // ─── Group: input ─────────────────────────────────────────────────────
@@ -1076,6 +1092,16 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     }
 
     companion object {
+        /**
+         * `userId=<n>` from `dumpsys package` output. A failed command, a missing field or a UID
+         * below the app range is "unknown": acting on UID 0 would target the wrong thing entirely.
+         */
+        internal fun parsePackageUid(stdout: String, exitCode: Int): String? {
+            if (exitCode != 0) return null
+            val uid = Regex("""userId=(\d+)""").find(stdout)?.groupValues?.get(1)?.toIntOrNull()
+            return uid?.takeIf { it >= 1000 }?.toString()
+        }
+
         private const val TAG = "ShizukuOffload"
 
         private const val HELP = """android-shizuku-cli — privileged Android system control via Shizuku.
@@ -1213,8 +1239,8 @@ Usage:
         private const val NETWORK_HELP = """network — net policy & stats.
 
 Usage:
-  android-shizuku-cli network restrict <pkg> [--background|--wifi|--data|--all]
-  android-shizuku-cli network allow <pkg> [--background|--wifi|--data|--all]
+  android-shizuku-cli network restrict <pkg> [--background|--data|--all]
+  android-shizuku-cli network allow <pkg> [--background|--data|--all]
   android-shizuku-cli network stats <pkg>
 """
 
