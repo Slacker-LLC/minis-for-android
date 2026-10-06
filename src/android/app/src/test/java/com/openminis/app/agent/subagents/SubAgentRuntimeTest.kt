@@ -372,6 +372,20 @@ class SubAgentRuntimeTest {
     }
 
     @Test
+    fun `a brief too long to be stored for a restart is refused up front`() = runBlocking {
+        val port = FakePort()
+        val rt = runtime(port)
+        val reply = rt.execute(
+            args("task" to "do it", "context" to "x".repeat(PrefsSubAgentJobStore.MAX_STORED_BRIEF_CHARS + 1)),
+            "chat-A",
+        )
+        assertFalse(reply.ok)
+        assertEquals("brief_too_long", json(reply).getString("error"))
+        assertTrue("nothing was started or queued", rt.registry.jobsOf("chat-A").isEmpty())
+        assertTrue(port.created.isEmpty())
+    }
+
+    @Test
     fun `a sub agent's own session cannot delegate`() = runBlocking {
         val port = FakePort()
         val rt = runtime(port)

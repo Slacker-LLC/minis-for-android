@@ -116,6 +116,18 @@ class SubAgentRuntime(
                 "No usable model for sub agent '${def.name}': its pinned model is gone or no provider is configured.",
             )
         val title = args.title.ifBlank { args.task.take(40) }
+        val brief = SubAgentTask.childBrief(def, args.task, args.context)
+        // The brief is what a restarted job runs from, and the job store keeps a bounded copy. A
+        // brief that would be cut there is refused now, rather than accepted and silently shortened
+        // when the app restarts mid-run.
+        if (brief.length > PrefsSubAgentJobStore.MAX_STORED_BRIEF_CHARS) {
+            return fail(
+                "brief_too_long",
+                "The task and context total ${brief.length} characters; at most " +
+                    "${PrefsSubAgentJobStore.MAX_STORED_BRIEF_CHARS} can be kept for a restart. Shorten them, " +
+                    "or put the long material in a file and refer to it by path.",
+            )
+        }
         return when (val admission = registry.submit(
             parentSessionId = parentSessionId,
             agentName = def.name,
@@ -126,7 +138,7 @@ class SubAgentRuntime(
             modelLabel = model.label,
             modelEntryId = model.entryId,
             thinking = def.thinkingLevelOverride,
-            brief = SubAgentTask.childBrief(def, args.task, args.context),
+            brief = brief,
             progress = if (args.wait) "none" else args.progressReport,
         )) {
             is SubAgentAdmission.Rejected ->

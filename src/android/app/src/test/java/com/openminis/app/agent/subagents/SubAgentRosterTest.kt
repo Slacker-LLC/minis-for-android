@@ -106,3 +106,39 @@ class SubAgentRosterTest {
         assertNull(def("a").copy(modelBinding = """{"type":"group","groupId":"g"}""").pinnedEntryId)
     }
 }
+
+class SubAgentRosterClampCollisionTest {
+    private fun custom(id: String, name: String, updatedAt: Long = 1) = SubAgentDefinition(id = id, name = name, description = "d", instructions = "x", updatedAt = updatedAt)
+
+    @org.junit.Test
+    fun `two long names that only differ after the clamp are one name`() {
+        val a = "a".repeat(SubAgentLimits.NAME_MAX_LENGTH) + "1"
+        val b = "a".repeat(SubAgentLimits.NAME_MAX_LENGTH) + "2"
+        val roster = SubAgentRoster.normalize(listOf(custom("1", a), custom("2", b)))
+        val customs = roster.filter { !it.isBuiltIn }
+        org.junit.Assert.assertEquals("the second collides with the first after clamping", 1, customs.size)
+        org.junit.Assert.assertEquals("a".repeat(SubAgentLimits.NAME_MAX_LENGTH), customs.single().name)
+    }
+
+    @org.junit.Test
+    fun `normalize stays idempotent`() {
+        val a = "a".repeat(SubAgentLimits.NAME_MAX_LENGTH) + "1"
+        val b = "b".repeat(SubAgentLimits.NAME_MAX_LENGTH + 5)
+        val once = SubAgentRoster.normalize(listOf(custom("1", a), custom("2", b)))
+        org.junit.Assert.assertEquals(once, SubAgentRoster.normalize(once))
+    }
+
+    @org.junit.Test
+    fun `a backup merge counts only what survives and skips a clamp collision`() {
+        val a = "a".repeat(SubAgentLimits.NAME_MAX_LENGTH) + "1"
+        val b = "a".repeat(SubAgentLimits.NAME_MAX_LENGTH) + "2"
+        val merge = SubAgentRoster.mergeBackup(
+            local = SubAgentRoster.normalize(emptyList()),
+            incoming = listOf(custom("1", a), custom("2", b)),
+        )
+        org.junit.Assert.assertEquals(1, merge.written)
+        org.junit.Assert.assertEquals(1, merge.skipped)
+        org.junit.Assert.assertEquals(1, merge.roster.count { !it.isBuiltIn })
+        org.junit.Assert.assertEquals("what is reported saved is what saving keeps", merge.roster, SubAgentRoster.normalize(merge.roster))
+    }
+}

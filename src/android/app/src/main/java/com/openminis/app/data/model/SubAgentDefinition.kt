@@ -174,7 +174,7 @@ object SubAgentRoster {
         }
 
         val out = mutableListOf(builtIn.clamped().copy(sortOrder = 0))
-        val seenNames = mutableSetOf(nameKey(builtIn.name))
+        val seenNames = mutableSetOf(nameKey(builtIn.clamped().name))
         var next = 1
         for (def in custom) {
             // A custom definition must not claim the built-in flag or its id: isBuiltIn drives
@@ -183,9 +183,12 @@ object SubAgentRoster {
             // A nameless definition cannot be addressed: the name IS the enum value the model emits
             // and the key resolve() matches on.
             if (def.name.isBlank()) continue
-            // Two rows sharing a name make resolution ambiguous.
-            if (!seenNames.add(nameKey(def.name))) continue
-            out.add(def.clamped().copy(sortOrder = next))
+            // Two rows sharing a name make resolution ambiguous. The comparison is on the name as it
+            // will be STORED: two 41-character names that differ only in the last character are the
+            // same name once clamped to 40, and keeping both would give one of them no way to be picked.
+            val stored = def.clamped()
+            if (!seenNames.add(nameKey(stored.name))) continue
+            out.add(stored.copy(sortOrder = next))
             next += 1
         }
         return out
@@ -239,7 +242,9 @@ object SubAgentRoster {
                 if (r.updatedAt > out[at].updatedAt) { out[at] = r.copy(isBuiltIn = false); written++ } else skipped++
                 continue
             }
-            if (out.any { nameKey(it.name) == nameKey(r.name) }) {
+            // Compared as it will be stored (clamped), so the merge result survives normalize unchanged.
+            val storedName = r.clamped().name
+            if (out.any { nameKey(it.clamped().name) == nameKey(storedName) }) {
                 log?.invoke("backup sub agent '${r.name}' skipped: a local agent already has that name")
                 skipped++
                 continue
