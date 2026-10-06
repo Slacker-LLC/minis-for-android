@@ -1,6 +1,6 @@
 package com.openminis.app.roleplay
 
-import java.security.MessageDigest
+import com.openminis.app.util.Sha256
 
 /** [T-eta-character-cards] A character's story memory as it stands, with the revision that identifies it. */
 data class CharacterMemorySnapshot(
@@ -74,10 +74,7 @@ object CharacterMemoryDocument {
         lineCount = lineCount(content),
     )
 
-    fun revisionOf(content: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(content.toByteArray(Charsets.UTF_8))
-        return digest.joinToString("") { byte -> "%02x".format(byte) }
-    }
+    fun revisionOf(content: String): String = Sha256.hex(content)
 
     fun clampMaxReadChars(raw: Int?): Int = (raw ?: DEFAULT_MAX_READ_CHARS).coerceIn(MIN_MAX_READ_CHARS, MAX_CHARS)
 

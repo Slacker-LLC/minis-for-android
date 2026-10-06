@@ -21,6 +21,7 @@ import com.openminis.app.provider.HostedCallEventPolicy
 import com.openminis.app.provider.RequestBodyMerge
 import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.safeOptString
+import com.openminis.app.util.Sha256
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -3393,9 +3394,7 @@ class OpenAIProvider private constructor(
     private fun capChatToolCallId(id: String): String {
         val callHalf = id.substringBefore('|')
         if (callHalf.length <= 64) return callHalf
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-            .digest(callHalf.toByteArray(Charsets.UTF_8))
-        val hex = digest.joinToString("") { "%02x".format(it) }
+        val hex = Sha256.hex(callHalf)
         // "call_" + 56 hex chars = 61 chars, safely under 64 and clearly a call id.
         return "call_${hex.take(56)}"
     }
@@ -3416,10 +3415,7 @@ class OpenAIProvider private constructor(
                 .joinToString("") { it.text }
                 .ifEmpty { msg.content }
             if (text.isNotEmpty()) {
-                val digest = java.security.MessageDigest.getInstance("SHA-256")
-                    .digest(text.toByteArray(Charsets.UTF_8))
-                val hex = digest.joinToString("") { "%02x".format(it) }
-                return "minis-${hex.take(32)}"
+                return "minis-${Sha256.hex(text).take(32)}"
             }
         }
         return "minis-${java.util.UUID.randomUUID().toString().lowercase()}"

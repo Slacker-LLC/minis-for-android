@@ -7,6 +7,7 @@ import com.openminis.app.runtime.ubuntu.UbuntuPaths
 import com.openminis.app.runtime.ubuntu.RootfsHealth
 import com.openminis.app.runtime.ubuntu.RootfsHealthCode
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
+import com.openminis.app.util.shellQuote
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -299,9 +300,6 @@ class RootfsManager private constructor(private val context: Context) {
             commands += "echo 'MINIS_ROOTFS:REPAIRED'"
             return commands.joinToString("\n")
         }
-
-        internal fun shellQuote(value: String): String =
-            "'" + value.replace("'", "'\"'\"'") + "'"
 
         /**
          * Check every component of a required rootfs entry without following a

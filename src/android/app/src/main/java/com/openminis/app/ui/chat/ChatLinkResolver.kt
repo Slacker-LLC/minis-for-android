@@ -8,6 +8,7 @@ import com.openminis.app.deeplink.DeepLinkHandler
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.ui.sandbox.FileItem
+import com.openminis.app.util.Sha256
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
@@ -170,9 +171,7 @@ object ChatLinkResolver {
     private suspend fun stageGuestFile(context: Context, path: String, sessionId: String?): File? {
         if (sessionId == null && isSessionScopedGuestPath(path)) return null
         val fileName = path.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-            .digest("${sessionId.orEmpty()}:$path".toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(java.util.Locale.US, it) }
+        val digest = Sha256.hex("${sessionId.orEmpty()}:$path")
         val cacheFile = File(File(context.cacheDir, "chat-link-media"), "$digest-$fileName")
         return try {
             WorkspaceFileClient.readToFile(sessionId.orEmpty(), path, cacheFile)

@@ -10,6 +10,7 @@ import com.openminis.app.runtime.guest.GuestCommandBridge
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.sandbox.RootfsManager
 import com.openminis.app.sandbox.TerminalSession
+import com.openminis.app.util.shellQuote
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -97,18 +98,18 @@ internal object UbuntuKernel {
         val group = "$rootfs/etc/group"
         val passwdEntry = "minis:x:${identity.uid}:${identity.gid}:Minis:/home/minis:/bin/bash"
         val groupEntry = "minis:x:${identity.gid}:"
-        val passwdQuoted = DirectRootRunner.shellQuote(passwd)
-        val groupQuoted = DirectRootRunner.shellQuote(group)
+        val passwdQuoted = shellQuote(passwd)
+        val groupQuoted = shellQuote(group)
         return listOf(
             "[ -f $passwdQuoted ] && [ ! -L $passwdQuoted ] || exit 76",
             "[ -f $groupQuoted ] && [ ! -L $groupQuoted ] || exit 76",
             "if ! /system/bin/grep -q '^minis:x:${identity.uid}:${identity.gid}:' $passwdQuoted; then " +
                 "/system/bin/sed -i '/^minis:/d' $passwdQuoted; " +
-                "printf '%s\\n' ${DirectRootRunner.shellQuote(passwdEntry)} >> $passwdQuoted; " +
+                "printf '%s\\n' ${shellQuote(passwdEntry)} >> $passwdQuoted; " +
                 "fi",
             "if ! /system/bin/grep -q '^minis:x:${identity.gid}:' $groupQuoted; then " +
                 "/system/bin/sed -i '/^minis:/d' $groupQuoted; " +
-                "printf '%s\\n' ${DirectRootRunner.shellQuote(groupEntry)} >> $groupQuoted; " +
+                "printf '%s\\n' ${shellQuote(groupEntry)} >> $groupQuoted; " +
                 "fi",
         )
     }
@@ -148,8 +149,8 @@ internal object UbuntuKernel {
                 "test -x /system/bin/mount && " +
                 "test -x /system/bin/chroot && " +
                 "test -x /system/bin/setsid && " +
-                "test -x ${DirectRootRunner.shellQuote(rootfs + "/usr/bin/setpriv")} && " +
-                "/system/bin/chroot ${DirectRootRunner.shellQuote(rootfs)} /usr/bin/setpriv --no-new-privs /usr/bin/true",
+                "test -x ${shellQuote(rootfs + "/usr/bin/setpriv")} && " +
+                "/system/bin/chroot ${shellQuote(rootfs)} /usr/bin/setpriv --no-new-privs /usr/bin/true",
             ROOT_TIMEOUT_MS,
         )
         if (!backendProbe.success) {
@@ -295,7 +296,7 @@ internal object UbuntuKernel {
         val rootfs = UbuntuPaths.HOST_ROOTFS
         if (rootfs != "/data/adb/minis/rootfs") return@withLock false
         val result = DirectRootRunner.runScript(
-            "rm -rf -- ${DirectRootRunner.shellQuote(rootfs)}",
+            "rm -rf -- ${shellQuote(rootfs)}",
             ROOTFS_TIMEOUT_MS,
         )
         if (result.success) GuestCommandBridge.invalidateGuestCli()
@@ -349,11 +350,11 @@ internal object UbuntuKernel {
         val parentDirs = listOf(root, parent)
         return buildString {
             appendLine("set -eu")
-            appendLine("TARGET=${DirectRootRunner.shellQuote(target)}")
-            appendLine("PARENT=${DirectRootRunner.shellQuote(parent)}")
+            appendLine("TARGET=${shellQuote(target)}")
+            appendLine("PARENT=${shellQuote(parent)}")
             appendLine("TEMP=\"\$TARGET.minis-dns-tmp.\$\$\"")
             parentDirs.forEach { directory ->
-                val quoted = DirectRootRunner.shellQuote(directory)
+                val quoted = shellQuote(directory)
                 appendLine("[ -d $quoted ] && [ ! -L $quoted ] || exit 72")
             }
             // A symlink may be the distro's conventional resolv.conf entry.
@@ -362,7 +363,7 @@ internal object UbuntuKernel {
             appendLine("if [ -L \"\$TARGET\" ]; then rm -f -- \"\$TARGET\"; fi")
             appendLine("if [ -e \"\$TARGET\" ] && [ ! -f \"\$TARGET\" ]; then exit 73; fi")
             appendLine("rm -f -- \"\$TEMP\"")
-            appendLine("umask 077; printf %s ${DirectRootRunner.shellQuote(content)} > \"\$TEMP\"")
+            appendLine("umask 077; printf %s ${shellQuote(content)} > \"\$TEMP\"")
             appendLine("chmod 644 \"\$TEMP\"; chown 0:0 \"\$TEMP\"; mv -f -- \"\$TEMP\" \"\$TARGET\"")
         }
     }
@@ -386,13 +387,13 @@ internal object UbuntuKernel {
         val parentDirs = noSymlinkParentDirectories(rootfs, relativePath)
         return buildString {
             appendLine("set -eu")
-            appendLine("ROOTFS=${DirectRootRunner.shellQuote(rootfs)}")
-            appendLine("TARGET=${DirectRootRunner.shellQuote(target)}")
-            appendLine("PARENT=${DirectRootRunner.shellQuote(parent)}")
-            appendLine("BACKUP=${DirectRootRunner.shellQuote(backup)}")
+            appendLine("ROOTFS=${shellQuote(rootfs)}")
+            appendLine("TARGET=${shellQuote(target)}")
+            appendLine("PARENT=${shellQuote(parent)}")
+            appendLine("BACKUP=${shellQuote(backup)}")
             appendLine("TEMP=\"\$TARGET.minis-tmp.\$\$\"")
             parentDirs.forEach { directory ->
-                val quoted = DirectRootRunner.shellQuote(directory)
+                val quoted = shellQuote(directory)
                 appendLine("[ -d $quoted ] && [ ! -L $quoted ] || exit 72")
             }
             appendLine("[ -d \"\$PARENT\" ] || exit 72")
@@ -402,7 +403,7 @@ internal object UbuntuKernel {
             appendLine("if [ -e \"\$BACKUP\" ] && [ ! -f \"\$BACKUP\" ]; then exit 74; fi")
             appendLine("if [ ! -e \"\$BACKUP\" ] && [ -f \"\$TARGET\" ]; then cp -f -- \"\$TARGET\" \"\$BACKUP\"; chmod 644 \"\$BACKUP\"; chown 0:0 \"\$BACKUP\"; fi")
             appendLine("rm -f -- \"\$TEMP\"")
-            appendLine("umask 077; printf %s ${DirectRootRunner.shellQuote(content)} > \"\$TEMP\"")
+            appendLine("umask 077; printf %s ${shellQuote(content)} > \"\$TEMP\"")
             appendLine("chmod 644 \"\$TEMP\"; chown 0:0 \"\$TEMP\"; mv -f -- \"\$TEMP\" \"\$TARGET\"")
         }
     }
@@ -415,12 +416,12 @@ internal object UbuntuKernel {
         val parentDirs = noSymlinkParentDirectories(rootfs, relativePath)
         return buildString {
             appendLine("set -eu")
-            appendLine("ROOTFS=${DirectRootRunner.shellQuote(rootfs)}")
-            appendLine("TARGET=${DirectRootRunner.shellQuote(target)}")
-            appendLine("PARENT=${DirectRootRunner.shellQuote(parent)}")
-            appendLine("BACKUP=${DirectRootRunner.shellQuote(backup)}")
+            appendLine("ROOTFS=${shellQuote(rootfs)}")
+            appendLine("TARGET=${shellQuote(target)}")
+            appendLine("PARENT=${shellQuote(parent)}")
+            appendLine("BACKUP=${shellQuote(backup)}")
             parentDirs.forEach { directory ->
-                val quoted = DirectRootRunner.shellQuote(directory)
+                val quoted = shellQuote(directory)
                 appendLine("[ -d $quoted ] && [ ! -L $quoted ] || exit 72")
             }
             appendLine("[ -d \"\$PARENT\" ] || exit 72")
@@ -450,11 +451,11 @@ internal object UbuntuKernel {
         val root = rootfs.trimEnd('/')
         val components = guestPath.trim('/').split('/').filter { it.isNotEmpty() }
         return buildList {
-            add("[ -d ${DirectRootRunner.shellQuote(root)} ] && [ ! -L ${DirectRootRunner.shellQuote(root)} ] || exit 72")
+            add("[ -d ${shellQuote(root)} ] && [ ! -L ${shellQuote(root)} ] || exit 72")
             var current = root
             for (component in components) {
                 current = "$current/$component"
-                val quoted = DirectRootRunner.shellQuote(current)
+                val quoted = shellQuote(current)
                 add("[ ! -L $quoted ] || exit 73")
                 add("if [ -e $quoted ] && [ ! -d $quoted ]; then exit 74; fi")
             }
@@ -586,7 +587,7 @@ internal object UbuntuKernel {
         val rootfs = UbuntuPaths.HOST_ROOTFS
         val commands = mutableListOf<String>()
         commands += "set -eu"
-        commands += "ROOTFS=${DirectRootRunner.shellQuote(rootfs)}"
+        commands += "ROOTFS=${shellQuote(rootfs)}"
         commands += buildGuestIdentityCommands(rootfs, identity)
         // Android's toybox mount has no GNU --make-rprivate subcommand. The
         // two-path bind form carries the same MS_PRIVATE|MS_REC operation and
@@ -596,11 +597,11 @@ internal object UbuntuKernel {
         for (bind in binds) {
             val target = rootfs + bind.guest
             commands += noSymlinkMountTargetGuards(rootfs, bind.guest)
-            commands += "mkdir -p ${DirectRootRunner.shellQuote(target)}"
-            commands += "[ -d ${DirectRootRunner.shellQuote(target)} ] && [ ! -L ${DirectRootRunner.shellQuote(target)} ] || exit 75"
-            commands += "/system/bin/mount -o bind ${DirectRootRunner.shellQuote(bind.host)} ${DirectRootRunner.shellQuote(target)}"
+            commands += "mkdir -p ${shellQuote(target)}"
+            commands += "[ -d ${shellQuote(target)} ] && [ ! -L ${shellQuote(target)} ] || exit 75"
+            commands += "/system/bin/mount -o bind ${shellQuote(bind.host)} ${shellQuote(target)}"
             if (bind.readOnly) {
-                commands += "/system/bin/mount -o remount,bind,ro ${DirectRootRunner.shellQuote(target)}"
+                commands += "/system/bin/mount -o remount,bind,ro ${shellQuote(target)}"
             }
         }
 
@@ -620,7 +621,7 @@ internal object UbuntuKernel {
         )
         env.putAll(RootNetworkProxy.proxyEnv())
         val envArgs = env.entries.joinToString(" ") {
-            DirectRootRunner.shellQuote("${it.key}=${it.value}")
+            shellQuote("${it.key}=${it.value}")
         }
         val shellArgs = if (interactive) "/bin/bash -l" else "/bin/bash --noprofile --norc"
         commands += buildGuestSetprivExec(identity.uid, identity.gid, envArgs, shellArgs)
@@ -633,10 +634,10 @@ internal object UbuntuKernel {
         val pidDir = File(DirectRootRunner.ROOT_STATE_DIR, "shells")
         val pidFile = File(pidDir, "shell-${UUID.randomUUID()}.pid")
         val child = "umask 077; " +
-            "mkdir -p ${DirectRootRunner.shellQuote(pidDir.absolutePath)} || exit 126; " +
-            "chmod 711 ${DirectRootRunner.shellQuote(pidDir.absolutePath)} || exit 126; " +
-            "printf '%s\\n%s\\n' \"\$\$\" ${DirectRootRunner.shellQuote(shellMarkerToken)} > ${DirectRootRunner.shellQuote(pidFile.absolutePath)} || exit 126; " +
-            "exec /system/bin/unshare -m /system/bin/sh -c ${DirectRootRunner.shellQuote(inner)}"
+            "mkdir -p ${shellQuote(pidDir.absolutePath)} || exit 126; " +
+            "chmod 711 ${shellQuote(pidDir.absolutePath)} || exit 126; " +
+            "printf '%s\\n%s\\n' \"\$\$\" ${shellQuote(shellMarkerToken)} > ${shellQuote(pidFile.absolutePath)} || exit 126; " +
+            "exec /system/bin/unshare -m /system/bin/sh -c ${shellQuote(inner)}"
         // forkpty() has already made the interactive child a session leader
         // with the PTY as its controlling terminal. Calling setsid here would
         // deliberately detach that terminal; toybox `setsid -c` can only set
@@ -654,7 +655,7 @@ internal object UbuntuKernel {
         } else {
             "/system/bin/setsid /system/bin/sh -c"
         }
-        return "exec $launcher ${DirectRootRunner.shellQuote(child)}"
+        return "exec $launcher ${shellQuote(child)}"
     }
 
     private suspend fun migrateRootOwnedUserDataLocked(ctx: Context): Boolean {
@@ -710,7 +711,7 @@ internal object UbuntuKernel {
         return buildString {
             appendLine("set -eu")
             parentDirectories.forEach { directory ->
-                val quoted = DirectRootRunner.shellQuote(directory)
+                val quoted = shellQuote(directory)
                 appendLine(
                     "if [ ! -d $quoted ]; then " +
                         "echo 'legacy migration parent missing: $directory' >&2; exit 72; fi",
@@ -736,7 +737,7 @@ internal object UbuntuKernel {
                     "}"
             )
             mappings.forEach { (source, destination) ->
-                appendLine("copy_tree ${DirectRootRunner.shellQuote(source)} ${DirectRootRunner.shellQuote(destination)}")
+                appendLine("copy_tree ${shellQuote(source)} ${shellQuote(destination)}")
             }
         }
     }

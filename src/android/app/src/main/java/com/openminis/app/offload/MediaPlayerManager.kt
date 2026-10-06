@@ -4,8 +4,8 @@ import android.content.Context
 import android.media.MediaPlayer
 import android.util.Log
 import com.openminis.app.runtime.files.WorkspaceFileClient
+import com.openminis.app.util.Sha256
 import java.io.File
-import java.security.MessageDigest
 
 /**
  * Manages multiple concurrent MediaPlayer sessions keyed by session ID.
@@ -57,9 +57,7 @@ object MediaPlayerManager {
             isExternalMountPath(filePath) -> {
                 val context = appContext
                     ?: return "Error: media player is not initialized"
-                val digest = MessageDigest.getInstance("SHA-256")
-                    .digest("$sessionId:$filePath".toByteArray(Charsets.UTF_8))
-                    .joinToString("") { "%02x".format(it) }
+                val digest = Sha256.hex("$sessionId:$filePath")
                 val safeName = filePath.substringAfterLast('/')
                     .replace(Regex("[^A-Za-z0-9._-]"), "_")
                     .ifBlank { "audio" }
@@ -74,9 +72,7 @@ object MediaPlayerManager {
             isCanonicalGuestPath(filePath) -> {
                 val context = appContext
                     ?: return "Error: media player is not initialized"
-                val digest = MessageDigest.getInstance("SHA-256")
-                    .digest("$sessionId:$filePath".toByteArray(Charsets.UTF_8))
-                    .joinToString("") { "%02x".format(it) }
+                val digest = Sha256.hex("$sessionId:$filePath")
                 val safeName = filePath.substringAfterLast('/')
                     .replace(Regex("[^A-Za-z0-9._-]"), "_")
                     .ifBlank { "audio" }

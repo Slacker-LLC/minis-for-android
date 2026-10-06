@@ -3,6 +3,7 @@ package com.openminis.app.runtime.ubuntu
 import android.content.Context
 import android.util.Log
 import com.openminis.app.sandbox.RootfsManager
+import com.openminis.app.util.shellQuote
 
 /**
  * Trusted Root-only maintenance for the Ubuntu base image.
@@ -145,28 +146,28 @@ internal object UbuntuProvisioner {
     internal fun buildProbeCommand(rootfs: String): String {
         val root = rootfs.trimEnd('/')
         val commands = listOf(
-            "test -d ${DirectRootRunner.shellQuote(root)}",
-            "test ! -L ${DirectRootRunner.shellQuote(root)}",
-            "test -d ${DirectRootRunner.shellQuote("$root/etc")}",
-            "test ! -L ${DirectRootRunner.shellQuote("$root/etc")}",
-            "test -d ${DirectRootRunner.shellQuote("$root/etc/minis")}",
-            "test ! -L ${DirectRootRunner.shellQuote("$root/etc/minis")}",
-            "test -f ${DirectRootRunner.shellQuote("$rootfs/$MARKER")}",
-            "test ! -L ${DirectRootRunner.shellQuote("$rootfs/$MARKER")}",
-            "test -x ${DirectRootRunner.shellQuote("$rootfs/usr/bin/python3")}",
-            "test -x ${DirectRootRunner.shellQuote("$rootfs/usr/bin/git")}",
-            "test -x ${DirectRootRunner.shellQuote("$rootfs/usr/bin/curl")}",
-            "test -x ${DirectRootRunner.shellQuote("$rootfs/usr/bin/ping")}",
-            "test -x ${DirectRootRunner.shellQuote("$rootfs/usr/bin/wget")}",
-            "test -x ${DirectRootRunner.shellQuote("$rootfs/usr/bin/gawk")}",
-            "test -x ${DirectRootRunner.shellQuote("$rootfs/usr/bin/zip")}",
-            "test -x ${DirectRootRunner.shellQuote("$rootfs/usr/bin/unzip")}",
-            "test -x ${DirectRootRunner.shellQuote("$rootfs/usr/bin/xz")}",
-            "test -x ${DirectRootRunner.shellQuote("$rootfs/usr/bin/zstd")}",
+            "test -d ${shellQuote(root)}",
+            "test ! -L ${shellQuote(root)}",
+            "test -d ${shellQuote("$root/etc")}",
+            "test ! -L ${shellQuote("$root/etc")}",
+            "test -d ${shellQuote("$root/etc/minis")}",
+            "test ! -L ${shellQuote("$root/etc/minis")}",
+            "test -f ${shellQuote("$rootfs/$MARKER")}",
+            "test ! -L ${shellQuote("$rootfs/$MARKER")}",
+            "test -x ${shellQuote("$rootfs/usr/bin/python3")}",
+            "test -x ${shellQuote("$rootfs/usr/bin/git")}",
+            "test -x ${shellQuote("$rootfs/usr/bin/curl")}",
+            "test -x ${shellQuote("$rootfs/usr/bin/ping")}",
+            "test -x ${shellQuote("$rootfs/usr/bin/wget")}",
+            "test -x ${shellQuote("$rootfs/usr/bin/gawk")}",
+            "test -x ${shellQuote("$rootfs/usr/bin/zip")}",
+            "test -x ${shellQuote("$rootfs/usr/bin/unzip")}",
+            "test -x ${shellQuote("$rootfs/usr/bin/xz")}",
+            "test -x ${shellQuote("$rootfs/usr/bin/zstd")}",
             // Ubuntu binaries use the guest glibc loader. Running the ELF
             // directly from Android's host shell returns 126; chroot first so
             // the guest interpreter and libraries resolve inside rootfs.
-            "/system/bin/chroot ${DirectRootRunner.shellQuote(root)} /usr/bin/python3 -m pip --version >/dev/null 2>&1",
+            "/system/bin/chroot ${shellQuote(root)} /usr/bin/python3 -m pip --version >/dev/null 2>&1",
             "echo MINIS_PROVISION:READY",
         )
         return commands.joinToString(" && ")
@@ -181,8 +182,8 @@ internal object UbuntuProvisioner {
         val aptProxy = if (proxy.isBlank()) {
             ""
         } else {
-            " -o ${DirectRootRunner.shellQuote("Acquire::http::Proxy=$proxy")}" +
-                " -o ${DirectRootRunner.shellQuote("Acquire::https::Proxy=$proxy")}" 
+            " -o ${shellQuote("Acquire::http::Proxy=$proxy")}" +
+                " -o ${shellQuote("Acquire::https::Proxy=$proxy")}" 
         }
         // Do not leave the Root launcher blocked for apt's default retry
         // budget when a device has no direct egress or DNS. A later readiness
@@ -190,7 +191,7 @@ internal object UbuntuProvisioner {
         // pin the whole Runtime lifecycle indefinitely.
         val aptNetworkTimeouts =
             " -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30"
-        val packageArgs = BASE_PACKAGES.joinToString(" ") { DirectRootRunner.shellQuote(it) }
+        val packageArgs = BASE_PACKAGES.joinToString(" ") { shellQuote(it) }
         val guest = buildString {
             appendLine("set -eu")
             appendLine("export DEBIAN_FRONTEND=noninteractive")
@@ -208,7 +209,7 @@ internal object UbuntuProvisioner {
         }
         val inner = buildString {
             appendLine("set -eu")
-            appendLine("ROOTFS=${DirectRootRunner.shellQuote(rootfs)}")
+            appendLine("ROOTFS=${shellQuote(rootfs)}")
             // Android toybox exposes propagation flags through -o; its GNU
             // --make-rprivate spelling is parsed as an fstab lookup.
             appendLine("/system/bin/mount -o rprivate,bind / /")
@@ -216,9 +217,9 @@ internal object UbuntuProvisioner {
             appendLine(
                 "exec /system/bin/chroot \"\$ROOTFS\" /usr/bin/env -i " +
                     "HOME=/root PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin " +
-                    "LANG=C.UTF-8 LC_ALL=C.UTF-8 /bin/bash -c ${DirectRootRunner.shellQuote(guest)}",
+                    "LANG=C.UTF-8 LC_ALL=C.UTF-8 /bin/bash -c ${shellQuote(guest)}",
             )
         }
-        return "exec /system/bin/unshare -m /system/bin/sh -c ${DirectRootRunner.shellQuote(inner)}"
+        return "exec /system/bin/unshare -m /system/bin/sh -c ${shellQuote(inner)}"
     }
 }

@@ -5,6 +5,7 @@ import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.tools.ToolExecutionResult
 import com.openminis.app.tools.ToolFailureKind
 import com.openminis.app.tools.ToolTimeoutPolicy
+import com.openminis.app.util.shellQuote
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
@@ -368,8 +369,6 @@ class LinuxPythonRunHandler : ToolHandler {
             cleanupFailure = cleanupFailure,
         )
     }
-
-    private fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
 }
 
 private fun com.openminis.app.runtime.ExecutionCoordinator.CommandResult.toToolFailureKind(): ToolFailureKind? =

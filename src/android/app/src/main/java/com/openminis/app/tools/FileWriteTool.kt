@@ -6,7 +6,7 @@ import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.internal.FileMutationQueue
-import com.openminis.app.tools.internal.FileRevision
+import com.openminis.app.util.Sha256
 import org.json.JSONObject
 
 object FileWriteTool {
@@ -89,7 +89,7 @@ object FileWriteTool {
                         }
                         throw error
                     }
-                    if (!FileRevision.sha256(current).equals(expectedSha256, ignoreCase = true)) {
+                    if (!Sha256.hex(current).equals(expectedSha256, ignoreCase = true)) {
                         return@withKey ToolExecutionResult(
                             "Error: File changed since it was opened; reload before saving: $path",
                             false, toolTitle = toolTitle,

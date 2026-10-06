@@ -6,6 +6,7 @@ import android.util.Log
 import com.openminis.app.runtime.ubuntu.DirectRootRunner
 import com.openminis.app.runtime.ubuntu.UbuntuKernel
 import com.openminis.app.runtime.ubuntu.UbuntuPaths
+import com.openminis.app.util.shellQuote
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
@@ -138,33 +139,33 @@ internal object GuestCommandBridge {
                 noSymlinkRootfsPathGuards(rootfs, relative, leafMustBeDirectory = true)
                     .forEach(::appendLine)
             }
-            appendLine("mkdir -p ${DirectRootRunner.shellQuote(binDir)} ${DirectRootRunner.shellQuote(etcDir)} ${DirectRootRunner.shellQuote(usrLocalBin)}")
+            appendLine("mkdir -p ${shellQuote(binDir)} ${shellQuote(etcDir)} ${shellQuote(usrLocalBin)}")
             generatedFiles.forEach { file ->
-                val quoted = DirectRootRunner.shellQuote(file)
+                val quoted = shellQuote(file)
                 appendLine("[ ! -L $quoted ] || exit 75")
                 appendLine("if [ -e $quoted ] && [ ! -f $quoted ]; then exit 75; fi")
             }
-            appendLine("printf %s ${DirectRootRunner.shellQuote(config)} > ${DirectRootRunner.shellQuote(configFile)}")
-            appendLine("printf %s ${DirectRootRunner.shellQuote(wrapper)} > ${DirectRootRunner.shellQuote(configWrapper)}")
-            appendLine("cp ${DirectRootRunner.shellQuote(configWrapper)} ${DirectRootRunner.shellQuote(modelWrapper)}")
+            appendLine("printf %s ${shellQuote(config)} > ${shellQuote(configFile)}")
+            appendLine("printf %s ${shellQuote(wrapper)} > ${shellQuote(configWrapper)}")
+            appendLine("cp ${shellQuote(configWrapper)} ${shellQuote(modelWrapper)}")
             bridgePaths.forEach { path ->
-                appendLine("printf %s ${DirectRootRunner.shellQuote(wrapper)} > ${DirectRootRunner.shellQuote(path)}")
+                appendLine("printf %s ${shellQuote(wrapper)} > ${shellQuote(path)}")
             }
             urlPaths.forEach { path ->
-                appendLine("printf %s ${DirectRootRunner.shellQuote(urlWrapper)} > ${DirectRootRunner.shellQuote(path)}")
+                appendLine("printf %s ${shellQuote(urlWrapper)} > ${shellQuote(path)}")
             }
             val executablePaths = listOf(configWrapper, modelWrapper) + bridgePaths + urlPaths
             appendLine(
                 "chmod 755 " + listOf(
-                    DirectRootRunner.shellQuote("$rootfs/opt"),
-                    DirectRootRunner.shellQuote("$rootfs/opt/minis"),
-                    DirectRootRunner.shellQuote(binDir),
-                ).plus(executablePaths.map(DirectRootRunner::shellQuote)).joinToString(" "),
+                    shellQuote("$rootfs/opt"),
+                    shellQuote("$rootfs/opt/minis"),
+                    shellQuote(binDir),
+                ).plus(executablePaths.map(::shellQuote)).joinToString(" "),
             )
-            appendLine("chown ${identity.uid}:${identity.gid} ${DirectRootRunner.shellQuote(configFile)}")
-            appendLine("chmod 600 ${DirectRootRunner.shellQuote(configFile)}")
+            appendLine("chown ${identity.uid}:${identity.gid} ${shellQuote(configFile)}")
+            appendLine("chmod 600 ${shellQuote(configFile)}")
             listOf(configLink, modelLink).forEach { link ->
-                val quoted = DirectRootRunner.shellQuote(link)
+                val quoted = shellQuote(link)
                 val expectedTarget = if (link == configLink) "/opt/minis/bin/minis-config" else "/opt/minis/bin/minis-model-use"
                 // Older rootfs revisions used ordinary handler stubs at these
                 // two paths. They are application-managed command slots, so
@@ -180,8 +181,8 @@ internal object GuestCommandBridge {
                 appendLine("if [ -e $quoted ] && [ ! -f $quoted ]; then echo \"guest-cli: unsupported core path $link\" >&2; exit 76; fi")
                 appendLine("if [ -f $quoted ]; then rm -f -- $quoted; fi")
             }
-            appendLine("ln -s /opt/minis/bin/minis-config ${DirectRootRunner.shellQuote(configLink)}")
-            appendLine("ln -s /opt/minis/bin/minis-model-use ${DirectRootRunner.shellQuote(modelLink)}")
+            appendLine("ln -s /opt/minis/bin/minis-config ${shellQuote(configLink)}")
+            appendLine("ln -s /opt/minis/bin/minis-model-use ${shellQuote(modelLink)}")
         }
         val result = DirectRootRunner.runScript(script, INSTALL_TIMEOUT_MS)
         if (!result.success) {
@@ -426,11 +427,11 @@ internal object GuestCommandBridge {
         val root = rootfs.trimEnd('/')
         var current = root
         return buildList {
-            add("[ -d ${DirectRootRunner.shellQuote(current)} ] && [ ! -L ${DirectRootRunner.shellQuote(current)} ] || exit 72")
+            add("[ -d ${shellQuote(current)} ] && [ ! -L ${shellQuote(current)} ] || exit 72")
             val components = relativePath.split('/').filter { it.isNotEmpty() }
             components.forEachIndexed { index, component ->
                 current = "$current/$component"
-                val quoted = DirectRootRunner.shellQuote(current)
+                val quoted = shellQuote(current)
                 add("[ ! -L $quoted ] || exit 73")
                 if (index < components.lastIndex || leafMustBeDirectory) {
                     add("if [ -e $quoted ] && [ ! -d $quoted ]; then exit 74; fi")
@@ -441,8 +442,8 @@ internal object GuestCommandBridge {
 
     private fun osReleaseGuard(rootfs: String): String {
         val root = rootfs.trimEnd('/')
-        val link = DirectRootRunner.shellQuote("$root/etc/os-release")
-        val target = DirectRootRunner.shellQuote("$root/usr/lib/os-release")
+        val link = shellQuote("$root/etc/os-release")
+        val target = shellQuote("$root/usr/lib/os-release")
         return "if [ -L $link ]; then " +
             "[ \"\$(readlink $link 2>/dev/null || true)\" = '../usr/lib/os-release' ] || exit 73; " +
             "[ -f $target ] && [ ! -L $target ] || exit 74; " +

@@ -1,9 +1,8 @@
 package com.openminis.app.mcp.server
 
+import com.openminis.app.util.Sha256
 import org.json.JSONArray
 import org.json.JSONObject
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.util.UUID
 
 /**
@@ -165,17 +164,7 @@ class ConfirmQueue(
          */
         fun requestKey(caller: String, method: String, params: JSONObject): String {
             val canonical = canonicalJson(params)
-            val input = "$caller\u0000$method\u0000$canonical"
-                .toByteArray(StandardCharsets.UTF_8)
-            val digest = MessageDigest.getInstance("SHA-256").digest(input)
-            val hex = "0123456789abcdef"
-            return buildString(digest.size * 2) {
-                digest.forEach { byte ->
-                    val value = byte.toInt() and 0xff
-                    append(hex[value ushr 4])
-                    append(hex[value and 0x0f])
-                }
-            }
+            return Sha256.hex("$caller\u0000$method\u0000$canonical")
         }
 
         /** Deterministic JSON encoding so object key order cannot alter a ticket. */

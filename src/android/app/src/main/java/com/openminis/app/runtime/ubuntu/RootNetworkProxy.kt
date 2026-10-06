@@ -2,6 +2,7 @@ package com.openminis.app.runtime.ubuntu
 
 import android.content.Context
 import android.util.Log
+import com.openminis.app.util.shellQuote
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -208,24 +209,24 @@ internal object RootNetworkProxy {
         require(uid > 0) { "invalid app uid" }
         val pidParent = File(pidFilePath).parent ?: pidFilePath
         val child = "umask 077; " +
-            "mkdir -p ${DirectRootRunner.shellQuote(pidParent)} || exit 126; " +
-            "chmod 711 ${DirectRootRunner.shellQuote(pidParent)} || exit 126; " +
-            "echo \$\$ > ${DirectRootRunner.shellQuote(pidFilePath)} || exit 126; " +
-            "exec ${DirectRootRunner.shellQuote(binaryPath)} " +
-            "--listen ${DirectRootRunner.shellQuote(PROXY_LISTEN)} --auth-stdin"
+            "mkdir -p ${shellQuote(pidParent)} || exit 126; " +
+            "chmod 711 ${shellQuote(pidParent)} || exit 126; " +
+            "echo \$\$ > ${shellQuote(pidFilePath)} || exit 126; " +
+            "exec ${shellQuote(binaryPath)} " +
+            "--listen ${shellQuote(PROXY_LISTEN)} --auth-stdin"
         return "if [ -x /system/bin/setsid ]; then " +
-            "exec /system/bin/setsid /system/bin/sh -c ${DirectRootRunner.shellQuote(child)}; " +
+            "exec /system/bin/setsid /system/bin/sh -c ${shellQuote(child)}; " +
             "else echo 'setsid is required for isolated Root proxy' >&2; exit 125; fi"
     }
 
     internal fun buildCleanupCommand(pidFilePath: String): String =
-        "PID=\$(cat ${DirectRootRunner.shellQuote(pidFilePath)} 2>/dev/null || true); " +
+        "PID=\$(cat ${shellQuote(pidFilePath)} 2>/dev/null || true); " +
             "case \"\$PID\" in ''|*[!0-9]*) ;; *) " +
             "if [ \"\$PID\" -gt 1 ]; then " +
             "kill -TERM -\$PID 2>/dev/null || kill -TERM \$PID 2>/dev/null || true; " +
             "sleep 0.05; " +
             "kill -KILL -\$PID 2>/dev/null || kill -KILL \$PID 2>/dev/null || true; " +
-            "fi ;; esac; rm -f -- ${DirectRootRunner.shellQuote(pidFilePath)}"
+            "fi ;; esac; rm -f -- ${shellQuote(pidFilePath)}"
 
     private fun clearOwnedProcess(child: Process, pidFile: File) {
         if (process === child) {

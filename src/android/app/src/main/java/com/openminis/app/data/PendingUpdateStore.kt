@@ -3,9 +3,9 @@ package com.openminis.app.data
 import android.content.Context
 import android.content.SharedPreferences
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.util.Sha256
 import org.json.JSONObject
 import java.io.File
-import java.security.MessageDigest
 
 /**
  * Persists a downloaded-but-not-yet-installed APK across Activity recreate /
@@ -130,25 +130,12 @@ object PendingUpdateStore {
             return null
         }
         if (pending.sha256 != null) {
-            val actual = runCatching { sha256(f) }.getOrNull()
+            val actual = runCatching { Sha256.hex(f) }.getOrNull()
             if (actual == null || !actual.equals(pending.sha256, ignoreCase = true)) {
                 AppLogger.warning(TAG, "verify: sha256 mismatch expected=${pending.sha256} actual=$actual")
                 return null
             }
         }
         return f
-    }
-
-    fun sha256(file: File): String {
-        val md = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buf = ByteArray(64 * 1024)
-            while (true) {
-                val n = input.read(buf)
-                if (n <= 0) break
-                md.update(buf, 0, n)
-            }
-        }
-        return md.digest().joinToString("") { "%02x".format(it) }
     }
 }

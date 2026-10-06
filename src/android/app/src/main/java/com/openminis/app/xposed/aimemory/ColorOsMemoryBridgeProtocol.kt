@@ -1,5 +1,6 @@
 package com.openminis.app.xposed.aimemory
 
+import com.openminis.app.util.shellQuote
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 import org.json.JSONObject
@@ -99,8 +100,6 @@ object ColorOsMemoryBridgeProtocol {
             .getOrNull()
             ?.takeIf { it.size <= maxBytes }
     }
-
-    private fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
 
     private val OPERATIONS = setOf(OPERATION_SEARCH, OPERATION_ORDERS, OPERATION_PLACES)
 }

@@ -7,13 +7,13 @@ import android.os.Build
 import com.openminis.app.BuildConfig
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.ExternalMountAccess
+import com.openminis.app.util.Sha256
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.FileOutputStream
 import java.io.File
-import java.security.MessageDigest
 import java.util.ArrayDeque
 
 /** Metadata read from a real APK artifact, never inferred from a fixed filename. */
@@ -83,8 +83,7 @@ object AndroidApkInspector {
             @Suppress("DEPRECATION") archive.signatures?.toList().orEmpty()
         }
         val signing = signatures.map { signature ->
-            MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
-                .joinToString("") { "%02x".format(it) }
+            Sha256.hex(signature.toByteArray())
         }
         return ApkArtifact(
             hostPath = file.canonicalPath,
@@ -227,9 +226,7 @@ object AndroidApkInspector {
         }
         val modified = info.optLong("modified", 0L)
         val name = linuxPath.substringAfterLast('/').ifBlank { "artifact.apk" }
-        val digest = MessageDigest.getInstance("SHA-256")
-            .digest("$linuxPath\u0000$size\u0000$modified".toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+        val digest = Sha256.hex("$linuxPath\u0000$size\u0000$modified")
         val target = File(context.cacheDir, "android-deploy/guest/$digest-$name")
         target.parentFile?.mkdirs()
         if (!target.isFile || target.length() != size) {
@@ -270,9 +267,7 @@ object AndroidApkInspector {
         }
         val modified = info.optLong("modified", 0L)
         val name = linuxPath.substringAfterLast('/').ifBlank { "artifact.apk" }
-        val digest = MessageDigest.getInstance("SHA-256")
-            .digest("$linuxPath\u0000$size\u0000$modified".toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+        val digest = Sha256.hex("$linuxPath\u0000$size\u0000$modified")
         val target = File(context.cacheDir, "android-deploy/external/$digest-$name")
         if (!target.isFile || target.length() != size) {
             WorkspaceFileClient.readToFile(null, linuxPath, target, WorkspaceFileClient.MAX_FILE_BYTES)

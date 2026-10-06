@@ -1,6 +1,7 @@
 package com.openminis.app.backup
 
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.util.Sha256
 import java.io.File
 
 /**
@@ -152,7 +153,7 @@ class BackupPackageReader(private val root: File) {
             val file = File(root, path)
             if (!file.exists()) {
                 failures.add(path)
-            } else if (BackupBlobStore.sha256OfFile(file) != expected) {
+            } else if (Sha256.hex(file) != expected) {
                 failures.add(path)
             }
             done += 1

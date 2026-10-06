@@ -54,6 +54,7 @@ import coil.compose.AsyncImage
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.util.Sha256
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -710,9 +711,7 @@ private suspend fun resolveMediaFile(context: Context, url: String): File? {
 private suspend fun stageGuestMedia(context: Context, linuxPath: String): File? {
     if (!isGlobalGuestPath(linuxPath)) return null
     val fileName = linuxPath.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
-    val digest = java.security.MessageDigest.getInstance("SHA-256")
-        .digest(linuxPath.toByteArray(Charsets.UTF_8))
-        .joinToString("") { "%02x".format(java.util.Locale.US, it) }
+    val digest = Sha256.hex(linuxPath)
     val cacheFile = File(File(context.cacheDir, "markdown-media"), "$digest-$fileName")
     return runCatching {
         WorkspaceFileClient.readToFile("", linuxPath, cacheFile)
