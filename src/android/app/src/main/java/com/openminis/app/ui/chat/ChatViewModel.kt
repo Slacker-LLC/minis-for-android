@@ -6669,9 +6669,14 @@ class ChatViewModel(
 
     fun sendMessage(text: String) = sendMessage(text, skipContextCheck = false)
 
-    internal fun submitPrompt(text: String): AgentTurnHandle {
+    /**
+     * A programmatic prompt (background callback, routine, RPC). It owns exactly [text] and
+     * [attachments]: the user's composer — attachments being prepared, a message being edited, pasted
+     * snippets — is not read, sent or cleared by it.
+     */
+    internal fun submitPrompt(text: String, attachments: List<InputAttachment> = emptyList()): AgentTurnHandle {
         val handle = AgentTurnHandle()
-        sendMessage(text, skipContextCheck = false, request = handle)
+        sendMessage(text, skipContextCheck = false, request = handle, ownAttachments = attachments)
         return handle
     }
 
@@ -6682,8 +6687,15 @@ class ChatViewModel(
      *   chunk) token count and pop the dialog again — iOS guards the identical
      *   re-entry with `skipCompactCheck`.
      */
-    private fun sendMessage(text: String, skipContextCheck: Boolean, request: AgentTurnHandle? = null) {
+    private fun sendMessage(
+        text: String,
+        skipContextCheck: Boolean,
+        request: AgentTurnHandle? = null,
+        ownAttachments: List<InputAttachment> = emptyList(),
+    ) {
         val trimmed = text.trim()
+        // Only submitPrompt passes a request; such a send carries its own input (see submitPrompt).
+        val programmatic = request != null
         // While streaming, enqueue instead of silently dropping (iOS: send vs enqueuePrompt).
         if (_isStreaming.value) {
             if (request != null) request.reject("session_busy") else enqueuePrompt(text)
@@ -6692,7 +6704,7 @@ class ChatViewModel(
         // T180: allow attachments-only sends (no caption). Mirrors iOS, where
         // an empty text + non-empty attachments still produces a valid user
         // message. Without this an image-only "look at this" send dropped.
-        if (trimmed.isBlank() && _attachments.value.isEmpty()) {
+        if (trimmed.isBlank() && (if (programmatic) ownAttachments else _attachments.value).isEmpty()) {
             request?.reject("empty_prompt")
             return
         }
@@ -6746,7 +6758,7 @@ class ChatViewModel(
         // "image attachment shows up as Move to" symptom in T185. Mirrors
         // iOS AIChatView.swift:2255 (`hasInjectedShareContent = false`
         // inside the send button's tap closure).
-        if (_hasInjectedShareContent.value) _hasInjectedShareContent.value = false
+        if (!programmatic && _hasInjectedShareContent.value) _hasInjectedShareContent.value = false
 
         val initialProvider = currentProvider
         if (initialProvider == null) {
@@ -6758,8 +6770,11 @@ class ChatViewModel(
 
         _error.value = null
 
-        val currentAttachments = _attachments.value
-        clearAttachments()
+        val currentAttachments = if (programmatic) {
+            ownAttachments
+        } else {
+            _attachments.value.also { clearAttachments() }
+        }
 
         // T145: claim _isStreaming synchronously so a rapid second tap can't
         // slip past the entry guard during DB/OAuth setup. See retryFromMessage.
@@ -6786,7 +6801,9 @@ class ChatViewModel(
         // edited text as a fresh user turn. Snapshot + clear the id here so
         // any error in the truncate path doesn't leave the composer stuck
         // in edit mode.
-        val editingId = _editingMessageId.value
+        // A programmatic send never takes over the user's edit: it would truncate history at the
+        // message being edited and replace it with text the user never wrote.
+        val editingId = if (programmatic) null else _editingMessageId.value
         if (editingId != null) _editingMessageId.value = null
 
         val acceptedTurn = request ?: AgentTurnHandle()
@@ -6806,7 +6823,7 @@ class ChatViewModel(
            // Save user message — text + persisted mediaRef parts so images survive
            // a session reload (T128). Non-image attachments still only contribute
            // their name (rendered as a file tile) and are not persisted.
-            val pasted = buildPastedParts(trimmed, activeSessionId)
+            val pasted = if (programmatic) null else buildPastedParts(trimmed, activeSessionId)
             val userPartsJson = buildUserPartsJson(
                 trimmed,
                 prepared.mediaRefPartsJson,

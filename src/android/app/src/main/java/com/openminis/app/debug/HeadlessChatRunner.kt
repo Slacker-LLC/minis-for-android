@@ -15,7 +15,6 @@ import com.openminis.app.ui.chat.SessionEventHub
 import com.openminis.app.ui.chat.SessionEventReplay
 import com.openminis.app.ui.chat.SessionEventTail
 import com.openminis.app.ui.chat.SessionEventTailTool
-import com.openminis.app.ui.chat.addAttachment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -204,14 +203,21 @@ internal object HeadlessChatRunner {
         if (vm.isStreaming.value) {
             return@withContext PromptResult("Busy", "session_busy", false, streamExited = false)
         }
-        for (att in attachments) vm.addAttachment(att)
         if (chatOnly) vm.chatOnlyForNextTurn = true
-        val request = vm.submitPrompt(text)
+        // The request carries its own attachments; the user's composer is left as it is.
+        val request = vm.submitPrompt(text, attachments)
         if (!wait && !request.result.isCompleted) {
             return@withContext PromptResult("Running", null, false, streamExited = false)
         }
-        val outcome = if (request.result.isCompleted) request.result.await() else {
-            withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { request.result.await() }
+        val outcome = try {
+            if (request.result.isCompleted) request.result.await() else {
+                withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { request.result.await() }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // The caller that waited for this turn was stopped (a parent turn waiting on its sub agent or
+            // Ralph round): the turn it owned stops with it instead of running on unobserved.
+            request.cancel()
+            throw e
         }
         if (outcome == null) request.cancel()
         val streamExited = outcome != null || withTimeoutOrNull(5_000L) {
@@ -261,7 +267,12 @@ internal object HeadlessChatRunner {
      * awaited, so a Timeout result never leaves the turn running behind the caller.
      */
     private suspend fun awaitRequest(request: AgentTurnHandle, timeoutMs: Long): Pair<AgentTurnOutcome?, Boolean> {
-        val outcome = withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { request.result.await() }
+        val outcome = try {
+            withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { request.result.await() }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            request.cancel()
+            throw e
+        }
         if (outcome != null) return outcome to true
         request.cancel()
         val exited = withTimeoutOrNull(5_000L) { request.result.await(); true } == true

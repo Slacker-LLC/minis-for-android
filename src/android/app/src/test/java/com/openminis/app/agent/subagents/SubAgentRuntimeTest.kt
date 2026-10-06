@@ -89,7 +89,11 @@ class SubAgentRuntimeTest {
             return wrapUp
         }
 
+        /** When set, a delivery waits for it: the parent conversation is mid-turn and cannot take it. */
+        @Volatile var parentBusy: CompletableDeferred<Unit>? = null
+
         override suspend fun deliverToParent(parentSessionId: String, text: String) {
+            parentBusy?.await()
             delivered += parentSessionId to text
         }
 
@@ -109,6 +113,45 @@ class SubAgentRuntimeTest {
     }.also { assertTrue(what, cond()) }
 
     private fun json(reply: SubAgentReply) = JSONObject(reply.text)
+
+    @Test
+    fun `cancelling a queued job does not wait for the busy parent to take the callback`() = runBlocking {
+        val port = FakePort()
+        val rt = runtime(port, maxConcurrent = 1)
+        // The parent's own turn is the one issuing the cancel, so it cannot settle until the cancel returns.
+        port.parentBusy = CompletableDeferred()
+        rt.execute(args("agent" to "General Sub Agent"), "chat-A")
+        until("first job running") { port.briefs.containsKey("child-1") }
+        val queuedId = json(rt.execute(args("agent" to "General Sub Agent"), "chat-A")).getString("job_id")
+        assertEquals(SubAgentJobState.QUEUED, rt.registry.get(queuedId)!!.state)
+
+        val reply = withTimeout(2_000) {
+            rt.execute(JSONObject().put("action", "cancel").put("job_id", queuedId).toString(), "chat-A")
+        }
+        assertTrue(reply.text, reply.ok)
+        assertEquals(SubAgentJobState.CANCELLED, rt.registry.get(queuedId)!!.state)
+        assertTrue("the callback is still owed, not dropped", port.delivered.isEmpty())
+
+        port.parentBusy!!.complete(Unit)
+        until("callback delivered once the parent settles") { port.delivered.any { it.second.contains(queuedId.take(8)) } }
+    }
+
+    @Test
+    fun `a finished job frees its slot for the queue while the parent is still busy`() = runBlocking {
+        val port = FakePort()
+        val rt = runtime(port, maxConcurrent = 1)
+        port.parentBusy = CompletableDeferred()
+        rt.execute(args("agent" to "General Sub Agent"), "chat-A")
+        until("first job running") { port.briefs.containsKey("child-1") }
+        rt.execute(args("agent" to "General Sub Agent"), "chat-A")
+
+        port.finish("child-1", "first answer")
+
+        until("the queued job starts without waiting for the callback") { port.briefs.containsKey("child-2") }
+        assertTrue(port.delivered.isEmpty())
+        port.parentBusy!!.complete(Unit)
+        until("callback delivered") { port.delivered.isNotEmpty() }
+    }
 
     // ── delegate ────────────────────────────────────────────────────────────
 
