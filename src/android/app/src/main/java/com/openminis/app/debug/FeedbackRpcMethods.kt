@@ -9,13 +9,19 @@ import org.json.JSONObject
  */
 internal object FeedbackRpcMethods {
 
-    fun put(context: Context, params: JSONObject): JSONObject {
+    suspend fun put(context: Context, params: JSONObject): JSONObject {
         val messageId = params.optString("messageId", "").ifEmpty {
             throw RPCException(-32602, "Missing 'messageId' param")
         }
         val kind = params.optString("kind", "up")
         if (kind != "up" && kind != "down") throw RPCException(-32602, "kind must be 'up' or 'down'")
-        val fb = MessageFeedbackStore.put(context, messageId, kind, params.optString("note", ""))
+        val sessionId = (context.applicationContext as? com.openminis.app.MinisApp)
+            ?.chatRepository?.messageById(messageId)?.sessionId
+        val fb = try {
+            MessageFeedbackStore.put(context, messageId, kind, params.optString("note", ""), sessionId)
+        } catch (e: java.io.IOException) {
+            throw RPCException(-32000, "Could not save the feedback: ${e.message}")
+        }
         return JSONObject().apply {
             put("ok", true)
             put("kind", fb.kind)
@@ -28,8 +34,13 @@ internal object FeedbackRpcMethods {
         val messageId = params.optString("messageId", "").ifEmpty {
             throw RPCException(-32602, "Missing 'messageId' param")
         }
+        val removed = try {
+            MessageFeedbackStore.delete(context, messageId)
+        } catch (e: java.io.IOException) {
+            throw RPCException(-32000, "Could not save the feedback: ${e.message}")
+        }
         return JSONObject().apply {
-            put("ok", MessageFeedbackStore.delete(context, messageId))
+            put("ok", removed)
         }
     }
 
