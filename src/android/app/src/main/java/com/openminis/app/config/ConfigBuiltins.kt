@@ -1048,7 +1048,7 @@ internal object ConfigBuiltins {
                     path = "prompt." + module.id + ".text",
                     displayName = module.title + " - text",
                     description = module.description + " Default wording ships in assets/prompts/" + module.assetName +
-                        ". A write stores a user override; writing the default text back (or Reset to default in Settings -> System prompt) clears it. An empty value removes this section from the prompt.",
+                        ". A write stores a user override; writing the default text back (or Reset to default in Settings -> System prompt) clears it. An empty value clears the override and restores the default wording; to leave the section out of the prompt, set prompt." + module.id + ".enabled to false.",
                     valueSchema = ConfigSchema.Str(maxLength = PROMPT_MODULE_MAX_CHARS),
                     risk = ConfigRisk.NORMAL,
                     revertable = true,

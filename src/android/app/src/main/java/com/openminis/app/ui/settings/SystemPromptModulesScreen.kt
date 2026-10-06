@@ -184,7 +184,9 @@ private fun ModuleEditorSheet(
     onSave: (String) -> Unit,
     onReset: () -> Unit,
 ) {
-    var text by remember(snapshot.module.id, snapshot.text) { mutableStateOf(snapshot.text) }
+    // Keyed on the module only: a change to the stored text while the sheet is open (an Agent write)
+    // must not replace what the user has typed and not yet saved.
+    var text by remember(snapshot.module.id) { mutableStateOf(snapshot.text) }
 
     MinisModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = settingsSheetColor()) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
