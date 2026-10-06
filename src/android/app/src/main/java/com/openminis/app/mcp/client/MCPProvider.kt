@@ -145,7 +145,7 @@ object MCPProvider {
         val added = mutableListOf<String>()
         try {
             connected.tools.forEach { tool ->
-                val handler = MCPToolHandler(sanitizedId, tool, connected.session)
+                val handler = MCPToolHandler(sanitizedId, tool, connected.session, configId = cfg.id)
                 val fullName = "mcp.$sanitizedId.${tool.name}"
                 ToolRegistry.register(handler)
                 registeredTools[fullName] = handler
@@ -191,6 +191,38 @@ object MCPProvider {
         registeredTools.clear()
         sessions.values.forEach { it.close() }
         sessions.clear()
+    }
+
+    /**
+     * Whether the configured server [configId] is switched on for [sessionId]: the session's override
+     * when it has one, otherwise the server's global switch. False when no repository is attached.
+     */
+    fun isServerEnabledForSession(configId: String, sessionId: String): Boolean =
+        repository?.isEnabledForSession(configId, sessionId) ?: false
+
+    /**
+     * Whether a tool may be offered to the model in [sessionId]. Tools that are not remote MCP tools
+     * are not this gate's business and always pass; an MCP tool passes when its server is on for the
+     * session.
+     */
+    fun isToolOfferedInSession(toolName: String, sessionId: String): Boolean {
+        val handler = registeredTools[toolName]
+            ?: (ToolRegistry.canonicalName(toolName)?.let { registeredTools[it] })
+            ?: return true
+        return isServerEnabledForSession(handler.configId, sessionId)
+    }
+
+    /** [definitions] without the MCP tools of servers switched off for [sessionId]; one lookup per server. */
+    fun offeredInSession(
+        definitions: List<com.openminis.app.data.model.AgentToolDefinition>,
+        sessionId: String,
+    ): List<com.openminis.app.data.model.AgentToolDefinition> {
+        if (registeredTools.isEmpty()) return definitions
+        val enabledByServer = mutableMapOf<String, Boolean>()
+        return definitions.filter { def ->
+            val handler = registeredTools[def.name] ?: return@filter true
+            enabledByServer.getOrPut(handler.configId) { isServerEnabledForSession(handler.configId, sessionId) }
+        }
     }
 
     /** Tool-name-safe server id (ToolRegistry names are dot-separated). */

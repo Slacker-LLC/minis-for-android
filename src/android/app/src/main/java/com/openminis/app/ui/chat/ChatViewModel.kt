@@ -1084,7 +1084,11 @@ class ChatViewModel(
                 sessionSource != ChatSessionEntity.LEGACY_SOURCE_BOT_DELEGATION,
             subAgentRosterNames = subAgentRoster()?.map { it.name },
             subAgentChild = sessionSource == ChatSessionEntity.SOURCE_SUB_AGENT,
-        )
+        ).let {
+            // MCP servers the user switched off for this session are not offered (and their handler
+            // refuses calls as well; see MCPToolHandler).
+            com.openminis.app.mcp.client.MCPProvider.offeredInSession(it, activeSessionId)
+        }
 
     /**
      * The sub agent roster this session may delegate to, or null when the roster tool is not offered:
