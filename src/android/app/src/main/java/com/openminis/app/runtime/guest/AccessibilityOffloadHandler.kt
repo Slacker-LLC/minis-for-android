@@ -1,5 +1,6 @@
 package com.openminis.app.runtime.guest
 
+import com.openminis.app.tools.android.UiSensitiveValuePolicy
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.graphics.Bitmap
@@ -249,11 +250,18 @@ First-run: enable "Minis" under Settings → Accessibility, then `service ping`.
         }
     }
 
+    /** The node's text as an observer may see it: empty for a password field. */
+    private fun AccessibilityNodeInfo.observedText(): String? =
+        text?.toString()?.let { UiSensitiveValuePolicy.redactAccessibilityValue(isPassword, it) }
+
+    private fun AccessibilityNodeInfo.observedDescription(): String? =
+        contentDescription?.toString()?.let { UiSensitiveValuePolicy.redactAccessibilityValue(isPassword, it) }
+
     private fun nodeToJson(registry: NodeRegistry, n: AccessibilityNodeInfo, depth: Int, compact: Boolean): JSONObject {
         val id = registry.put(n)
         val rect = Rect(); n.getBoundsInScreen(rect)
-        val text = n.text?.toString()
-        val desc = n.contentDescription?.toString()
+        val text = n.observedText()
+        val desc = n.observedDescription()
         val obj = JSONObject().put("nodeId", id)
         if (compact) {
             if (!text.isNullOrEmpty()) obj.put("text", text)
@@ -319,10 +327,11 @@ First-run: enable "Minis" under Settings → Accessibility, then `service ping`.
     }
 
     private fun matchesPredicate(n: AccessibilityNodeInfo, args: OffloadArgs): Boolean {
-        args.get("text")?.let { if (n.text?.toString() != it) return false }
-        args.get("text-contains")?.let { if (n.text?.toString()?.contains(it) != true) return false }
-        args.get("desc")?.let { if (n.contentDescription?.toString() != it) return false }
-        args.get("desc-contains")?.let { if (n.contentDescription?.toString()?.contains(it) != true) return false }
+        // Matching on a password field's text would let a caller probe the value one guess at a time.
+        args.get("text")?.let { if (n.observedText() != it) return false }
+        args.get("text-contains")?.let { if (n.observedText()?.contains(it) != true) return false }
+        args.get("desc")?.let { if (n.observedDescription() != it) return false }
+        args.get("desc-contains")?.let { if (n.observedDescription()?.contains(it) != true) return false }
         args.get("id")?.let { if (n.viewIdResourceName != it) return false }
         args.get("class")?.let { if (n.className?.toString() != it) return false }
         args.get("package")?.let { if (n.packageName?.toString() != it) return false }
@@ -510,8 +519,8 @@ First-run: enable "Minis" under Settings → Accessibility, then `service ping`.
         maxDepth: Int, depth: Int, out: MutableList<AccessibilityNodeInfo>,
     ) {
         if (node == null || depth > maxDepth) return
-        val t = node.text?.toString()
-        val d = node.contentDescription?.toString()
+        val t = node.observedText()
+        val d = node.observedDescription()
         val match = if (contains)
             (t != null && t.contains(target)) || (d != null && d.contains(target))
         else
@@ -997,7 +1006,7 @@ First-run: enable "Minis" under Settings → Accessibility, then `service ping`.
 
     private fun collectClickableTexts(node: AccessibilityNodeInfo?, maxDepth: Int, depth: Int, out: JSONArray, registry: NodeRegistry) {
         if (node == null || depth > maxDepth) return
-        val t = node.text?.toString()
+        val t = node.observedText()
         if (node.isClickable && !t.isNullOrEmpty()) {
             out.put(JSONObject().put("text", t).put("nodeId", registry.put(node)))
         }
@@ -1006,7 +1015,7 @@ First-run: enable "Minis" under Settings → Accessibility, then `service ping`.
 
     private fun collectText(node: AccessibilityNodeInfo?, maxDepth: Int, depth: Int, out: StringBuilder) {
         if (node == null || depth > maxDepth) return
-        node.text?.toString()?.takeIf { it.isNotBlank() }?.let { out.append(it).append(' ') }
+        node.observedText()?.takeIf { it.isNotBlank() }?.let { out.append(it).append(' ') }
         for (i in 0 until node.childCount) collectText(node.getChild(i), maxDepth, depth + 1, out)
     }
 
@@ -1069,7 +1078,7 @@ First-run: enable "Minis" under Settings → Accessibility, then `service ping`.
     private fun collectVisibleText(node: AccessibilityNodeInfo?, maxDepth: Int, depth: Int, arr: JSONArray, sb: StringBuilder, sep: String) {
         if (node == null || depth > maxDepth) return
         if (node.isVisibleToUser) {
-            val t = node.text?.toString()
+            val t = node.observedText()
             if (!t.isNullOrBlank()) {
                 val r = Rect(); node.getBoundsInScreen(r)
                 arr.put(JSONObject().put("text", t).put("bounds", JSONObject()
@@ -1128,8 +1137,8 @@ First-run: enable "Minis" under Settings → Accessibility, then `service ping`.
         if (node.isEditable || node.isCheckable) {
             val obj = JSONObject().put("nodeId", registry.put(node))
                 .put("type", node.className?.toString() ?: "")
-                .put("label", node.contentDescription?.toString() ?: node.hintText?.toString() ?: "")
-            if (node.isEditable) obj.put("value", node.text?.toString() ?: "")
+                .put("label", node.observedDescription() ?: node.hintText?.toString() ?: "")
+            if (node.isEditable) obj.put("value", node.observedText() ?: "")
             if (node.isCheckable) obj.put("checked", node.isChecked)
             arr.put(obj)
         }
