@@ -373,6 +373,10 @@ class BackupImporter(
         // Sessions before messages — a message row needs its parent to exist,
         // and the schema enforces it with a foreign key.
         val restoredSessionIds = mutableSetOf<String>()
+        // Sessions where the device already holds the same or a newer copy. Their metadata is kept
+        // above, and so are the messages that exist: restoring an older package must not roll back
+        // an edit made after it was taken. Messages the device lacks are still filled in.
+        val keptLocalSessionIds = mutableSetOf<String>()
         // [XSessionDiag] Restore wall clock, sampled once rather than per row —
         // the comparison below only needs "roughly now", and calling
         // currentTimeMillis() inside a loop over thousands of records would be
@@ -420,6 +424,7 @@ class BackupImporter(
             if (existing != null && existing.updatedAt >= incomingUpdated) {
                 report.skipped += 1
                 restoredSessionIds.add(id)
+                keptLocalSessionIds.add(id)
                 return@readJsonl
             }
             val record =
@@ -532,6 +537,10 @@ class BackupImporter(
                 // those messages went — with nothing on disk to say so.
                 orphanedMessages += 1
                 orphanSessionIds.add(sessionId)
+                report.skipped += 1
+                return@readJsonl
+            }
+            if (sessionId in keptLocalSessionIds && dao.getMessageById(id) != null) {
                 report.skipped += 1
                 return@readJsonl
             }
