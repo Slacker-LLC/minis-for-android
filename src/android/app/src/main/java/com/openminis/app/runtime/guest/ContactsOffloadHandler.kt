@@ -278,8 +278,9 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
         }
         val rawId = firstRawContactId(id)
             ?: return NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "not_found").put("contact_id", id).toString(), args) + "\n")
-        // Name, phone and email are separate provider writes, so a failure part-way leaves the earlier
-        // ones in place; say which fields went in instead of reporting only the failure.
+        // One provider batch: Contacts applies the operations of a batch in a single transaction, so an
+        // exception rolls all of them back instead of leaving the first fields changed. Everything is
+        // looked up and validated before anything is written.
         val applied = JSONArray()
         return try {
             val fields = listOf(
@@ -289,31 +290,39 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
                     ContactsContract.CommonDataKinds.Phone.NUMBER),
                 Triple("email", email, ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE to
                     ContactsContract.CommonDataKinds.Email.ADDRESS),
-            )
-            for ((label, value, target) in fields) {
-                if (value == null) continue
-                if (!upsertData(id, rawId, target.first, target.second, value)) {
-                    return NativeOffloadResult(
-                        1,
-                        OffloadOutput.formatBody(
-                            JSONObject().put("error", "contacts_write_failed").put("failed_field", label)
-                                .put("applied", applied).toString(),
-                            args,
-                        ) + "\n",
-                    )
-                }
-                applied.put(label)
+            ).filter { it.second != null }
+            val ops = ArrayList<ContentProviderOperation>()
+            for ((_, value, target) in fields) {
+                ops += upsertOperation(id, rawId, target.first, target.second, value!!)
+            }
+            val results = context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
+            fields.forEachIndexed { i, field ->
+                // A write the provider did not confirm: a URI for an insert, a positive count for an update.
+                val r = results.getOrNull(i)
+                if (r != null && (r.uri != null || (r.count ?: 0) > 0)) applied.put(field.first)
+            }
+            val failed = fields.firstOrNull { f -> (0 until applied.length()).none { applied.getString(it) == f.first } }
+            if (failed != null) {
+                return NativeOffloadResult(
+                    1,
+                    OffloadOutput.formatBody(
+                        JSONObject().put("error", "contacts_write_failed").put("failed_field", failed.first)
+                            .put("applied", applied).toString(),
+                        args,
+                    ) + "\n",
+                )
             }
             NativeOffloadResult(0, OffloadOutput.formatBody(JSONObject().put("contact_id", id).put("updated", true).toString(2), args) + "\n")
         } catch (e: SecurityException) {
-            NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).put("applied", applied).toString(), args) + "\n")
+            NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).put("applied", JSONArray()).toString(), args) + "\n")
         } catch (e: Throwable) {
-            NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "contacts_provider_error").put("message", e.message).put("applied", applied).toString(), args) + "\n")
+            // The batch is one transaction: nothing was written.
+            NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "contacts_provider_error").put("message", e.message).put("applied", JSONArray()).toString(), args) + "\n")
         }
     }
 
-    /** True only when the provider reports the write: a returned URI for an insert, a positive row count for an update. */
-    private fun upsertData(contactId: Long, rawId: Long, mimeType: String, column: String, value: String): Boolean {
+    /** The batch operation that sets [column] of the contact's [mimeType] row: an update of the existing row, else an insert. */
+    private fun upsertOperation(contactId: Long, rawId: Long, mimeType: String, column: String, value: String): ContentProviderOperation {
         // A null cursor is "could not read", not "no row yet": inserting then could duplicate data.
         val existingId = (context.contentResolver.query(
             ContactsContract.Data.CONTENT_URI,
@@ -323,15 +332,17 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
             "${ContactsContract.Data._ID} ASC",
         ) ?: throw IllegalStateException("the contacts provider returned no data"))
             .use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
-        val values = ContentValues().apply {
-            put(ContactsContract.Data.MIMETYPE, mimeType)
-            put(column, value)
-        }
         return if (existingId == null) {
-            values.put(ContactsContract.Data.RAW_CONTACT_ID, rawId)
-            context.contentResolver.insert(ContactsContract.Data.CONTENT_URI, values) != null
+            ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                .withValue(ContactsContract.Data.RAW_CONTACT_ID, rawId)
+                .withValue(ContactsContract.Data.MIMETYPE, mimeType)
+                .withValue(column, value)
+                .build()
         } else {
-            context.contentResolver.update(ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, existingId), values, null, null) > 0
+            ContentProviderOperation.newUpdate(ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, existingId))
+                .withValue(ContactsContract.Data.MIMETYPE, mimeType)
+                .withValue(column, value)
+                .build()
         }
     }
 
