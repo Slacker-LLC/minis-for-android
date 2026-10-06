@@ -817,6 +817,7 @@
     <string name="mount_badge_rw">읽기/쓰기</string>
     <string name="mount_badge_locked">잠김</string>
     <string name="mount_badge_readonly">읽기 전용</string>
+    <string name="mount_badge_unavailable">사용할 수 없음</string>
     <string name="mount_only_on_device_supported">기기 로컬 폴더만 지원됩니다(Google Drive 등 클라우드 제공자는 지원되지 않음).</string>
     <string name="mount_all_files_access_required">"모든 파일 액세스" 권한 미허용</string>
     <string name="mount_all_files_access_required_desc">허용되지 않으면 shell은 이 앱이 만든 파일만 볼 수 있습니다 — 다른 앱(예: Obsidian)이 쓴 파일은 숨겨집니다. 시스템 설정에서 권한을 허용하려면 탭하세요.</string>

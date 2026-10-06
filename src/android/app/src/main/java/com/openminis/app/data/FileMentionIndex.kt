@@ -40,6 +40,10 @@ import java.util.UUID
  * scope roots gain 50 points. Ties broken by `modifiedAt` descending, capped
  * at [DEFAULT_MATCH_LIMIT].
  */
+/** Whether a scan result may be served again: same session, inside the TTL, and something was found. */
+internal fun mentionCacheUsable(sameSession: Boolean, fresh: Boolean, hasEntries: Boolean): Boolean =
+    sameSession && fresh && hasEntries
+
 class FileMentionIndex(
     private val mountsProvider: suspend () -> List<MountEntry> = { emptyList() },
     private val cacheTtlMs: Long = DEFAULT_CACHE_TTL_MS,
@@ -90,16 +94,34 @@ class FileMentionIndex(
 
     private var lastScanSessionId: String? = null
     private var lastScanAt: Long = 0
+    private var lastMountsKey: List<Pair<String, String>>? = null
     private var currentScanToken: UUID = UUID.randomUUID()
     private var currentJob: Job? = null
 
-    /** Rescan if the session changed or the cache went stale. Idempotent. */
+    /** Set when a listing failed during the running scan, so the partial result is not trusted as fresh. */
+    @Volatile private var scanHadFailure = false
+
+    /** Rescan if the session changed, the mounts changed, or the cache went stale. Idempotent. */
     fun refreshIfNeeded(sessionId: String) {
         val now = System.currentTimeMillis()
         val sameSession = lastScanSessionId == sessionId
         val fresh = now - lastScanAt < cacheTtlMs
-        if (sameSession && fresh && _entries.value.isNotEmpty()) return
+        if (!mentionCacheUsable(sameSession, fresh, _entries.value.isNotEmpty())) {
+            startScan(sessionId, now)
+            return
+        }
+        // The cache looks good, but mounts are part of what it holds: one added, renamed or
+        // removed since the scan makes its candidates wrong even inside the TTL.
+        scope.launch {
+            if (mountsKey() != lastMountsKey) startScan(sessionId, System.currentTimeMillis())
+        }
+    }
 
+    private suspend fun mountsKey(): List<Pair<String, String>> =
+        mountsProvider().map { it.name to it.root.absolutePath }
+
+    @Synchronized
+    private fun startScan(sessionId: String, now: Long) {
         lastScanSessionId = sessionId
         lastScanAt = now
         val token = UUID.randomUUID()
@@ -116,6 +138,8 @@ class FileMentionIndex(
 
     private suspend fun scan(sessionId: String, token: UUID) {
         _isScanning.value = true
+        scanHadFailure = false
+        lastMountsKey = mountsKey()
         val collected = mutableListOf<Entry>()
         try {
             if (!com.openminis.app.runtime.ubuntu.UbuntuPaths.isSafeSessionId(sessionId)) {
@@ -130,6 +154,7 @@ class FileMentionIndex(
                     "/var/minis/attachments" to Scope.ATTACHMENTS,
                 ),
                 linuxRootFor = { scope -> "/var/minis/${scope.displayLabel}" },
+                budget = GLOBAL_SCAN_BUDGET - collected.size,
             ).let { newBatch ->
                 collected += newBatch
                 publish(token, collected)
@@ -144,6 +169,7 @@ class FileMentionIndex(
                     "/var/minis/memory" to Scope.MEMORY,
                 ),
                 linuxRootFor = { scope -> "/var/minis/${scope.displayLabel}" },
+                budget = GLOBAL_SCAN_BUDGET - collected.size,
             ).let { newBatch ->
                 collected += newBatch
                 publish(token, collected)
@@ -182,7 +208,13 @@ class FileMentionIndex(
                 publish(token, collected)
             }
         } finally {
-            _isScanning.value = false
+            // Only the scan that is still current owns these: a cancelled predecessor reaching
+            // here after its replacement started must not mark the replacement as finished.
+            if (currentScanToken == token) {
+                _isScanning.value = false
+                // A listing failed: do not let the partial index stand as fresh for the whole TTL.
+                if (scanHadFailure) lastScanAt = 0
+            }
         }
     }
 
@@ -190,14 +222,18 @@ class FileMentionIndex(
         sessionId: String,
         layers: List<Pair<String, Scope>>,
         linuxRootFor: (Scope) -> String,
+        budget: Int,
     ): List<Entry> {
         val out = mutableListOf<Entry>()
+        // One budget for all the roots of the layer (and, through the caller, for the whole scan).
+        var remaining = budget
         for ((guestRoot, scope) in layers) {
             val info = try {
                 WorkspaceFileClient.info(sessionId, guestRoot)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
+                scanHadFailure = true
                 null
             }
             if (info?.optString("type") != "dir") continue
@@ -210,15 +246,17 @@ class FileMentionIndex(
                 modifiedAt = info.optLong("modified", 0),
                 isDirectory = true,
             )
-            out += scanGuestDir(
+            val scanned = scanGuestDir(
                 sessionId = sessionId,
                 guestRoot = guestRoot,
                 linuxRoot = linuxRoot,
                 scope = scope,
                 mountName = null,
                 maxDepth = Int.MAX_VALUE,
-                budget = GLOBAL_SCAN_BUDGET,
+                budget = remaining.coerceAtLeast(0),
             )
+            out += scanned
+            remaining -= scanned.size
         }
         return out
     }
@@ -256,6 +294,7 @@ class FileMentionIndex(
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
+                    scanHadFailure = true
                     null
                 } ?: break
                 val entries = listing.optJSONArray("entries") ?: break

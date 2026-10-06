@@ -466,6 +466,7 @@
     <string name="mount_badge_rw">讀寫</string>
     <string name="mount_badge_locked">已鎖定</string>
     <string name="mount_badge_readonly">唯讀</string>
+    <string name="mount_badge_unavailable">無法使用</string>
     <string name="mount_only_on_device_supported">僅支援裝置本機資料夾（不支援 Google Drive 等雲端提供者）。</string>
     <string name="mount_all_files_access_required">未授予「所有檔案存取權限」</string>
     <string name="mount_all_files_access_required_desc">未開啟時，shell 只能看到本應用程式建立的檔案——其他應用程式（如 Obsidian）寫入的檔案會被隱藏。點此前往系統設定授權。</string>

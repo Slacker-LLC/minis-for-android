@@ -65,7 +65,7 @@ object ChatExporter {
      * without re-reading the payload.
      */
     data class Summary(
-        val format: String,              // "json" | "text"
+        val format: String,              // "json" | "text" | "markdown"
         val messageCount: Int,
         val firstCreatedAt: Long?,       // ms, or null if empty
         val lastCreatedAt: Long?,
@@ -302,7 +302,7 @@ object ChatExporter {
         }
 
         return Summary(
-            format = if (isJson) "json" else "text",
+            format = if (isJson) "json" else if (isMarkdown) "markdown" else "text",
             messageCount = done,
             firstCreatedAt = first,
             lastCreatedAt = last,

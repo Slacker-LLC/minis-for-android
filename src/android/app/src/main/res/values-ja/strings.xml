@@ -817,6 +817,7 @@
     <string name="mount_badge_rw">読み書き</string>
     <string name="mount_badge_locked">ロック中</string>
     <string name="mount_badge_readonly">読み取り専用</string>
+    <string name="mount_badge_unavailable">利用不可</string>
     <string name="mount_only_on_device_supported">端末ローカルのフォルダのみ対応しています（Google Drive などのクラウドプロバイダーには非対応）。</string>
     <string name="mount_all_files_access_required">「すべてのファイルへのアクセス」が未許可</string>
     <string name="mount_all_files_access_required_desc">許可されていないと、shell からはこのアプリが作成したファイルしか見えません — 他のアプリ（Obsidian など）が書き込んだファイルは非表示になります。タップしてシステム設定で許可してください。</string>
