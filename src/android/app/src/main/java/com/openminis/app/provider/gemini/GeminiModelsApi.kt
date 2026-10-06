@@ -49,9 +49,11 @@ object GeminiModelsApi {
         val staticModels = com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
         val collected = mutableListOf<LLMModel>()
         var pageToken: String? = null
-        // The endpoint pages (50 by default), so asking for one page can leave
-        // the newest models off the list. A later page that fails keeps what
-        // the earlier pages returned; only a failed first page falls back.
+        // The endpoint pages (50 by default), so asking for one page can leave the newest models off
+        // the list. Only a failed first page falls back to the built-in list; once a later page
+        // fails (or pages run out of budget) the walk is incomplete, and an incomplete walk is
+        // "no list" so the caller keeps its current catalog instead of deleting models that sat on
+        // the pages we never read.
         for (page in 0 until MAX_PAGES) {
             val builder = Request.Builder()
             val tokenParam = pageToken?.let { "&pageToken=" + java.net.URLEncoder.encode(it, "UTF-8") }.orEmpty()
@@ -68,11 +70,11 @@ object GeminiModelsApi {
                 client.newCall(builder.build()).execute()
             } catch (e: Exception) {
                 if (page == 0) throw e
-                break
+                return@withContext emptyList()
             }
             val body = response.use { it.body?.string() }
             if (!response.isSuccessful || body == null) {
-                if (page > 0) break
+                if (page > 0) return@withContext emptyList()
                 // 403 on OAuth almost always means the token lacks the
                 // generative-language scope. Falling back to the built-in list
                 // matches iOS and keeps Cloud Code Assist users functional.
@@ -85,13 +87,14 @@ object GeminiModelsApi {
             }
             val parsed = parseModelsPage(body)
             if (parsed == null) {
-                if (page > 0) break
+                if (page > 0) return@withContext emptyList()
                 return@withContext staticModels
             }
             collected += parsed.models
             pageToken = parsed.nextPageToken
             if (pageToken == null) break
         }
+        if (pageToken != null) return@withContext emptyList() // ran out of page budget with more to read
         if (collected.isEmpty()) return@withContext staticModels
         val models = ModelsDevApi.enrichModels(collected.distinctBy { it.id })
 
