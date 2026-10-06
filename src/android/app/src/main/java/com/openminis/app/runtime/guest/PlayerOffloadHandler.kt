@@ -36,7 +36,7 @@ class PlayerOffloadHandler : NativeOffloadHandler {
                     if (id == null || path == null) {
                         return NativeOffloadResult(2, "android-player play: need <session> <path>\n")
                     }
-                    MediaPlayerManager.play(id, path)
+                    MediaPlayerManager.play(id, path, request.sessionId)
                 }
                 "pause" -> {
                     if (id == null) return NativeOffloadResult(2, "android-player pause: need <session>\n")

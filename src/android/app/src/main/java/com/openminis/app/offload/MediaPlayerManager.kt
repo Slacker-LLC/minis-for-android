@@ -47,7 +47,11 @@ object MediaPlayerManager {
      * Start playback of a file in a new or existing session.
      * If the session already exists, the previous player is released first.
      */
-    fun play(sessionId: String, filePath: String): String {
+    /**
+     * @param sourceSessionId the chat session whose files [filePath] refers to. [sessionId] names
+     *   the player (free-form: "music"); falling back to it keeps older callers working.
+     */
+    fun play(sessionId: String, filePath: String, sourceSessionId: String? = null): String {
         // Stop existing session if any
         sessions[sessionId]?.let { existing ->
             releaseSession(existing)
@@ -72,13 +76,14 @@ object MediaPlayerManager {
             isCanonicalGuestPath(filePath) -> {
                 val context = appContext
                     ?: return "Error: media player is not initialized"
-                val digest = Sha256.hex("$sessionId:$filePath")
+                val source = sourceSessionId ?: sessionId
+                val digest = Sha256.hex("$source:$filePath")
                 val safeName = filePath.substringAfterLast('/')
                     .replace(Regex("[^A-Za-z0-9._-]"), "_")
                     .ifBlank { "audio" }
                 val staged = File(File(context.cacheDir, "media-player"), "$digest-$safeName")
                 try {
-                    WorkspaceFileClient.readToFileBlocking(sessionId, filePath, staged)
+                    WorkspaceFileClient.readToFileBlocking(source, filePath, staged)
                     staged
                 } catch (error: Throwable) {
                     return "Error: cannot read guest media '$filePath': ${error.message}"
