@@ -402,6 +402,19 @@
     <!-- T336 follow-up: ASK_ONCE 在进程生命周期内只问一次,改文案避免误导 -->
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">配置工具</string>
+    <string name="perm_section_autonomy">Agent 自主程度</string>
+    <string name="perm_autonomy_ask">询问</string>
+    <string name="perm_autonomy_ask_sub">Agent 每次修改设置都要你确认。</string>
+    <string name="perm_autonomy_smart">智能</string>
+    <string name="perm_autonomy_smart_sub">普通设置直接通过；密钥、令牌和有风险的修改仍会询问。</string>
+    <string name="perm_autonomy_full">全自动</string>
+    <string name="perm_autonomy_full_sub">设置修改一律不再询问，但仍会记录，也可以撤销。</string>
+    <string name="perm_section_android_grants">Android 系统权限</string>
+    <string name="perm_grant_all_title">一键授予全部 Android 权限</string>
+    <string name="perm_grant_all_sub">用 root 一次性授予本应用声明的全部权限，系统不再逐个弹窗。</string>
+    <string name="perm_grant_all_done">已授予：%1$d / %2$d</string>
+    <string name="perm_grant_all_failed">部分权限未能授予：%1$s</string>
+    <string name="perm_grant_all_no_root">没有可用的 root，无法自动授予权限。</string>
     <!-- T336: 每个集成 CLI 一个独立 SectionCard,展示 CLI 描述 / Agent 权限 / 系统授权状态 / 跳转入口 -->
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
     <string name="perm_tool_shizuku_cli">android-shizuku-cli</string>

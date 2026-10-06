@@ -308,6 +308,19 @@
     <!-- T336 follow-up: ASK_ONCE granted for the whole app launch -->
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">設定ツール</string>
+    <string name="perm_section_autonomy">エージェントの自律レベル</string>
+    <string name="perm_autonomy_ask">確認する</string>
+    <string name="perm_autonomy_ask_sub">エージェントによる設定変更をすべて確認します。</string>
+    <string name="perm_autonomy_smart">スマート</string>
+    <string name="perm_autonomy_smart_sub">通常の設定は確認なしで変更。キー・トークン・危険な変更は引き続き確認します。</string>
+    <string name="perm_autonomy_full">完全自動</string>
+    <string name="perm_autonomy_full_sub">設定変更について確認しません。ログに残り、元に戻せます。</string>
+    <string name="perm_section_android_grants">Android の権限</string>
+    <string name="perm_grant_all_title">Android の権限をすべて許可</string>
+    <string name="perm_grant_all_sub">root で、このアプリが宣言する権限をすべて許可し、個別の確認を出さないようにします。</string>
+    <string name="perm_grant_all_done">許可済み：%1$d / %2$d</string>
+    <string name="perm_grant_all_failed">許可できなかった権限があります：%1$s</string>
+    <string name="perm_grant_all_no_root">root が利用できないため、権限を自動で許可できません。</string>
     <!-- T336: dedicated SectionCard per integration CLI. TODO translate (ja) -->
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
     <string name="perm_tool_shizuku_cli">android-shizuku-cli</string>

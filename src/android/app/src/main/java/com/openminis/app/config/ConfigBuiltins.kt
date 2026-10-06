@@ -41,6 +41,7 @@ internal object ConfigBuiltins {
         chatRepo: ChatRepository,
     ) {
         registerSelfMeta(r)
+        registerAutonomy(r)
         registerSession(r, providerRepo, chatRepo)
         registerAppearance(r, context)
         registerChat(r, context)
@@ -99,6 +100,26 @@ internal object ConfigBuiltins {
                     throw ConfigError.PermissionDenied(
                         "Master switch — toggle via Settings → Permissions only"
                     )
+                },
+            )
+        )
+    }
+
+    // -- Autonomy mode: shown to the agent, changed only by the user --
+    private fun registerAutonomy(r: ConfigRegistry) {
+        r.register(
+            ClosureField(
+                path = "permissions.autonomy.mode",
+                displayName = "Agent autonomy",
+                description = "ask | smart | full — how much the app asks before the agent changes settings. " +
+                    "Read-only here — change it in Settings → Permissions.",
+                valueSchema = ConfigSchema.Str(maxLength = 8),
+                access = ConfigAccess.READONLY,
+                risk = ConfigRisk.DESTRUCTIVE,
+                revertable = false,
+                reader = { ConfigValue.Str(AutonomyStore.current.wire) },
+                writer = { _ ->
+                    throw ConfigError.PermissionDenied("Autonomy mode — change it in Settings → Permissions only")
                 },
             )
         )

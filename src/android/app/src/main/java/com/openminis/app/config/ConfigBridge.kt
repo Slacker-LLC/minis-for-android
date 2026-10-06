@@ -532,7 +532,14 @@ object ConfigBridge {
         // 2. Enqueue confirmation. Suspends until user acts or timeout —
         //    or skipped when the caller already collected user consent
         //    (see [skipConfirmation] doc).
-        val outcome: ConfirmOutcome = if (skipConfirmation) {
+        // The user's autonomy mode decides whether an agent-initiated change is asked about at all; the
+        // change is still audited and revertable either way.
+        val autoApproved = !skipConfirmation && !AutonomyPolicy.configNeedsConfirmation(
+            mode = AutonomyStore.current,
+            risks = resolvedItems.map { it.risk },
+            touchesSecret = resolved.any { it.auditNewValue != null },
+        )
+        val outcome: ConfirmOutcome = if (skipConfirmation || autoApproved) {
             ConfirmOutcome.Approved(resolvedItems)
         } else {
             val pending = PendingConfigChange(items = resolvedItems, caption = caption)
