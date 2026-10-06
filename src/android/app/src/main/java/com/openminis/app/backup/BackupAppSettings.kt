@@ -40,43 +40,67 @@ internal object BackupAppSettings {
     private const val MAX_KEY_LENGTH = 128
     const val MAX_TASKS = 200
 
-    /** Preference file -> the keys that may travel. Anything not listed here is neither exported nor restored. */
-    val ALLOWED_PREFS: Map<String, Set<String>> = mapOf(
-        "appearance_prefs" to setOf(
-            "theme_mode", "accent_color", "ui_style", "launch_session", "returnKeyBehavior",
-            "keepScreenAwakeDuringTasks", "tool_preview", "tool_status_bar", "chat.autoFocusAfterReply",
-            "appearance.show_chat_title", "chat.autoExpandThinking", "autoGroupingEnabled",
-            "font_chat_input", "font_message", "font_app_base", "app_language",
+    /**
+     * Preference file -> the keys that may travel, each with the type its consumer reads it as
+     * (`b` Boolean, `i` Int, `l` Long, `f` Float, `s` String). SharedPreferences throws
+     * ClassCastException when a key holds another type than the reader asks for, and some readers run
+     * in `Application.onCreate`, so a package must never decide the type that lands on disk.
+     * Anything not listed here is neither exported nor restored.
+     */
+    val ALLOWED_PREFS: Map<String, Map<String, Char>> = mapOf(
+        "appearance_prefs" to mapOf(
+            "theme_mode" to 'i', "accent_color" to 'i', "ui_style" to 'i', "launch_session" to 'i',
+            "returnKeyBehavior" to 'i', "keepScreenAwakeDuringTasks" to 'b', "tool_preview" to 'b',
+            "tool_status_bar" to 'b', "chat.autoFocusAfterReply" to 'b', "appearance.show_chat_title" to 'b',
+            "chat.autoExpandThinking" to 'b', "autoGroupingEnabled" to 'b', "font_chat_input" to 'i',
+            "font_message" to 'i', "font_app_base" to 'i', "app_language" to 's',
         ),
-        "ui_prefs" to setOf("tablet_list_pane_width_dp", "tablet_list_pane_collapsed"),
-        "composer_input_prefs" to setOf("composer_input_mode_pref"),
-        "minis_fast_mode_prefs" to setOf("codexFastModeEnabled"),
-        "minis_auto_compact_prefs" to setOf("autoCompactOnThreshold"),
-        "minis_steps_presentation_prefs" to setOf("stepsPresentation"),
-        "minis_memory_prefs" to setOf("memory.global.enabled"),
-        "minis_agent_presets" to setOf("default_for_new_sessions"),
-        "browser_prefs" to setOf("idle_timeout_minutes", "browser_custom_viewport_width", "browser_custom_viewport_height"),
-        "file_browser_prefs" to setOf("file_browser_show_hidden"),
-        "voice_prefs" to setOf(
-            "readReplies", "readReplies.muted", "readReplies.speed", "readReplies.systemVoice",
-            "readReplies.systemVoiceLabel",
+        "ui_prefs" to mapOf("tablet_list_pane_width_dp" to 'f', "tablet_list_pane_collapsed" to 'b'),
+        "composer_input_prefs" to mapOf("composer_input_mode_pref" to 's'),
+        "minis_fast_mode_prefs" to mapOf("codexFastModeEnabled" to 'b'),
+        "minis_auto_compact_prefs" to mapOf("autoCompactOnThreshold" to 'b'),
+        "minis_steps_presentation_prefs" to mapOf("stepsPresentation" to 's'),
+        "minis_memory_prefs" to mapOf("memory.global.enabled" to 'b'),
+        "minis_agent_presets" to mapOf("default_for_new_sessions" to 's'),
+        "browser_prefs" to mapOf(
+            "idle_timeout_minutes" to 'i', "browser_custom_viewport_width" to 'i',
+            "browser_custom_viewport_height" to 'i',
         ),
-        "speech_recognition" to setOf("locale"),
+        "file_browser_prefs" to mapOf("file_browser_show_hidden" to 'b'),
+        "voice_prefs" to mapOf(
+            "readReplies" to 'b', "readReplies.muted" to 'b', "readReplies.speed" to 'f',
+            "readReplies.systemVoice" to 's', "readReplies.systemVoiceLabel" to 's',
+        ),
+        "speech_recognition" to mapOf("locale" to 's'),
     )
 
     /** Preference files whose keys are a family: `enabled.<module id>` and `mirror.selected.<category>`. */
-    private val ALLOWED_PREFIXES: Map<String, List<String>> = mapOf(
-        "minis_system_prompt" to listOf("enabled."),
-        "mirror_settings" to listOf("mirror.selected.", "mirror.useCustom."),
+    private val ALLOWED_PREFIXES: Map<String, Map<String, Char>> = mapOf(
+        "minis_system_prompt" to mapOf("enabled." to 'b'),
+        "mirror_settings" to mapOf("mirror.selected." to 's', "mirror.useCustom." to 'b'),
     )
 
-    fun isAllowed(prefsName: String, key: String): Boolean {
-        if (key.isEmpty() || key.length > MAX_KEY_LENGTH) return false
-        if (key in (ALLOWED_PREFS[prefsName] ?: emptySet())) return true
-        val prefix = ALLOWED_PREFIXES[prefsName]?.firstOrNull { key.startsWith(it) && key.length > it.length } ?: return false
+    /** The type [key] must have in [prefsName], or null when the key may not travel at all. */
+    fun expectedType(prefsName: String, key: String): Char? {
+        if (key.isEmpty() || key.length > MAX_KEY_LENGTH) return null
+        ALLOWED_PREFS[prefsName]?.get(key)?.let { return it }
+        val (prefix, type) = ALLOWED_PREFIXES[prefsName]?.entries
+            ?.firstOrNull { key.startsWith(it.key) && key.length > it.key.length } ?: return null
         // A prompt-module flag only means something for a module that exists.
-        return prefsName != "minis_system_prompt" || PromptModuleRegistry.byId(key.removePrefix(prefix)) != null
+        if (prefsName == "minis_system_prompt" && PromptModuleRegistry.byId(key.removePrefix(prefix)) == null) return null
+        return type
     }
+
+    private fun typeOf(value: Any): Char? = when (value) {
+        is Boolean -> 'b'
+        is Int -> 'i'
+        is Long -> 'l'
+        is Float -> if (value.isFinite()) 'f' else null
+        is String -> 's'
+        else -> null
+    }
+
+    fun isAllowed(prefsName: String, key: String): Boolean = expectedType(prefsName, key) != null
 
     /** The preference files that carry settings; the exporter reads exactly these. */
     val prefsFileNames: Set<String> get() = ALLOWED_PREFS.keys + ALLOWED_PREFIXES.keys
@@ -111,7 +135,8 @@ internal object BackupAppSettings {
             val values = read(name)
             val encoded = buildJsonObject {
                 for ((key, value) in values.entries.sortedBy { it.key }) {
-                    if (!isAllowed(name, key)) continue
+                    // A value of the wrong type is a leftover, not a setting: leave it out.
+                    if (value == null || expectedType(name, key) != typeOf(value)) continue
                     encodeValue(value)?.let { put(key, it) }
                 }
             }
@@ -134,7 +159,10 @@ internal object BackupAppSettings {
             val accepted = linkedMapOf<String, Any>()
             for ((key, raw) in entries) {
                 val value = (raw as? JsonObject)?.let(::decodeValue)
-                if (value == null || !isAllowed(name, key)) rejected++ else accepted[key] = value
+                // The package's own type tag only says how to parse the value; the key decides
+                // what may be stored.
+                val expected = expectedType(name, key)
+                if (value == null || expected == null || typeOf(value) != expected) rejected++ else accepted[key] = value
             }
             if (accepted.isNotEmpty()) writes[name] = accepted
         }

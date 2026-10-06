@@ -5,6 +5,7 @@ import com.openminis.app.scheduled.ScheduledTask
 import com.openminis.app.scheduled.ScheduledTaskPermissionTier
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.json.JSONObject
@@ -108,6 +109,68 @@ class BackupAppSettingsTest {
         val plan = BackupAppSettings.planPrefs(crafted)
         assertEquals(mapOf("appearance_prefs" to mapOf<String, Any>("theme_mode" to 1)), plan.writes)
         assertEquals("2 forbidden entries + 5 bad ones + 1 malformed file", 8, plan.rejected)
+    }
+
+    private fun tagged(t: String, v: kotlinx.serialization.json.JsonElement) =
+        buildJsonObject { put("t", t); put("v", v) }
+
+    private fun plan(file: String, key: String, entry: JsonObject) =
+        BackupAppSettings.planPrefs(buildJsonObject { put(file, buildJsonObject { put(key, entry) }) })
+
+    @Test
+    fun `a value whose type is not the one the key is read as is refused`() {
+        // The case from the audit: a String written under a key that startup reads with getBoolean.
+        val asString = plan("minis_auto_compact_prefs", "autoCompactOnThreshold", tagged("s", JsonPrimitive("true")))
+        assertTrue(asString.writes.isEmpty())
+        assertEquals(1, asString.rejected)
+        // Int where Boolean is read, Boolean where Int is read, Long where Int is read, Int where Float is read.
+        assertTrue(plan("minis_memory_prefs", "memory.global.enabled", tagged("i", JsonPrimitive(1))).writes.isEmpty())
+        assertTrue(plan("appearance_prefs", "theme_mode", tagged("b", JsonPrimitive(true))).writes.isEmpty())
+        assertTrue(plan("appearance_prefs", "theme_mode", tagged("l", JsonPrimitive(1))).writes.isEmpty())
+        assertTrue(plan("ui_prefs", "tablet_list_pane_width_dp", tagged("i", JsonPrimitive(320))).writes.isEmpty())
+        assertTrue(plan("appearance_prefs", "app_language", tagged("i", JsonPrimitive(1))).writes.isEmpty())
+    }
+
+    @Test
+    fun `the right type is still restored`() {
+        val ok = plan("minis_auto_compact_prefs", "autoCompactOnThreshold", tagged("b", JsonPrimitive(true)))
+        assertEquals(mapOf("minis_auto_compact_prefs" to mapOf<String, Any>("autoCompactOnThreshold" to true)), ok.writes)
+        val width = plan("ui_prefs", "tablet_list_pane_width_dp", tagged("f", JsonPrimitive(320.0)))
+        assertEquals(320f, width.writes["ui_prefs"]!!["tablet_list_pane_width_dp"])
+    }
+
+    @Test
+    fun `prefix families are typed too and a non-finite float is refused`() {
+        val someModule = com.openminis.app.prompt.PromptModuleRegistry.modules.first().id
+        assertTrue(plan("minis_system_prompt", "enabled.$someModule", tagged("s", JsonPrimitive("yes"))).writes.isEmpty())
+        assertEquals(1, plan("minis_system_prompt", "enabled.$someModule", tagged("b", JsonPrimitive(false))).count)
+        assertTrue(plan("mirror_settings", "mirror.selected.apt", tagged("b", JsonPrimitive(true))).writes.isEmpty())
+        assertTrue(plan("mirror_settings", "mirror.useCustom.apt", tagged("s", JsonPrimitive("x"))).writes.isEmpty())
+        assertEquals(1, plan("mirror_settings", "mirror.selected.apt", tagged("s", JsonPrimitive("https://m"))).count)
+        assertTrue(plan("voice_prefs", "readReplies.speed", tagged("f", JsonPrimitive("NaN"))).writes.isEmpty())
+    }
+
+    @Test
+    fun `every allowed key declares a type the format can carry`() {
+        for ((file, keys) in BackupAppSettings.ALLOWED_PREFS) {
+            for ((key, type) in keys) {
+                assertTrue("$file/$key", type in "bilfs")
+                assertEquals(type, BackupAppSettings.expectedType(file, key))
+            }
+        }
+        assertEquals(null, BackupAppSettings.expectedType("appearance_prefs", "some_future_key"))
+    }
+
+    @Test
+    fun `a leftover of the wrong type is not exported`() {
+        val snapshot = BackupAppSettings.snapshotPrefs { name ->
+            if (name == "minis_auto_compact_prefs") mapOf("autoCompactOnThreshold" to "true") else emptyMap<String, Any>()
+        }
+        assertTrue(snapshot.isEmpty())
+        val good = BackupAppSettings.snapshotPrefs { name ->
+            if (name == "minis_auto_compact_prefs") mapOf("autoCompactOnThreshold" to true) else emptyMap<String, Any>()
+        }
+        assertTrue("minis_auto_compact_prefs" in good)
     }
 
     @Test
