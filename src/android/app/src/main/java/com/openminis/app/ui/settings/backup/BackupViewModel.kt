@@ -966,6 +966,24 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissReport() { _report.value = null }
 
+    /** The running restore, held so [stopRestore] can cancel it. */
+    private var restoreJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Stop the running restore. The importer checks for cancellation between records and rolls the
+     * table in progress back; categories already finished stay restored. The UI is reset here, not
+     * in the job's handlers, so the button changes on the frame the user tapped it.
+     */
+    fun stopRestore() {
+        val job = restoreJob ?: return
+        AppLogger.info(TAG, "[Restore] stop requested by user")
+        job.cancel()
+        restoreJob = null
+        _isRunning.value = false
+        _restoreProgress.value = null
+        _statusText.value = null
+    }
+
     /** Confirm + run the restore of the currently pending package. */
     fun startRestore(passphrase: String?) {
         val pending = _pending.value ?: return
@@ -978,7 +996,7 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
         }
         _isRunning.value = true
         _statusText.value = "Restoring…"
-        viewModelScope.launch {
+        restoreJob = viewModelScope.launch {
             try {
                 val report = withContext(Dispatchers.IO) {
                     BackupImporter(getApplication(), db).import(
@@ -993,12 +1011,19 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
                 _pending.value?.extractedRoot?.deleteRecursively()
                 _pending.value = null
                 _statusText.value = null
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Stopped by the user: stopRestore() already reset the UI, and a stop is not an error.
+                throw e
             } catch (e: Exception) {
                 AppLogger.error(TAG, "[Restore] failed: ${e.message}")
                 _errorText.value = e.message ?: "Restore failed."
                 _statusText.value = null
             } finally {
-                _isRunning.value = false
+                // A stopped job may finish after a new restore started; only the current one resets state.
+                if (restoreJob === coroutineContext[kotlinx.coroutines.Job]) {
+                    restoreJob = null
+                    _isRunning.value = false
+                }
             }
         }
     }

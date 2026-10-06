@@ -988,11 +988,35 @@ private fun RestoreTab(
                 )
             }
         }
+        // While a restore runs, the secondary button stops it (after a confirmation: categories
+        // already restored stay, the one in progress rolls back).
+        var confirmStop by remember { mutableStateOf(false) }
         MinisOutlinedButton(
-            onClick = { vm.cancelRestore(); onPassphraseChange("") },
-            enabled = !running,
+            onClick = {
+                if (running) {
+                    confirmStop = true
+                } else {
+                    vm.cancelRestore()
+                    onPassphraseChange("")
+                }
+            },
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-        ) { Text(stringResource(R.string.backup_choose_different)) }
+        ) {
+            Text(stringResource(if (running) R.string.restore_stop else R.string.backup_choose_different))
+        }
+        if (confirmStop) {
+            MinisAlertDialog(
+                onDismissRequest = { confirmStop = false },
+                title = stringResource(R.string.restore_stop_title),
+                text = stringResource(R.string.restore_stop_message),
+                confirmText = stringResource(R.string.restore_stop),
+                onConfirm = {
+                    confirmStop = false
+                    vm.stopRestore()
+                },
+                isDestructive = true,
+            )
+        }
         error?.let {
             Text(
                 it,

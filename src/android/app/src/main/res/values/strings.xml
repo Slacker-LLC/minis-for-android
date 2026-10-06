@@ -2468,4 +2468,7 @@
     <string name="sub_agent_state_failed">Failed</string>
     <string name="sub_agent_state_timeout">Timed out</string>
     <string name="sub_agent_state_interrupted">Interrupted</string>
+    <string name="restore_stop">Stop restoring</string>
+    <string name="restore_stop_title">Stop the restore?</string>
+    <string name="restore_stop_message">What has already been restored stays. The part in progress is rolled back, so nothing is left half-written. You can run the restore again later.</string>
 </resources>

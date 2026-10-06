@@ -2349,4 +2349,7 @@
     <string name="sub_agent_state_failed">失敗</string>
     <string name="sub_agent_state_timeout">逾時</string>
     <string name="sub_agent_state_interrupted">已中斷</string>
+    <string name="restore_stop">停止還原</string>
+    <string name="restore_stop_title">停止還原？</string>
+    <string name="restore_stop_message">已經還原的內容會保留；正在還原的部分會整體復原，不會留下寫到一半的資料。之後可以重新還原。</string>
 </resources>

@@ -2035,4 +2035,7 @@
     <string name="sub_agent_state_failed">Échec</string>
     <string name="sub_agent_state_timeout">Délai dépassé</string>
     <string name="sub_agent_state_interrupted">Interrompu</string>
+    <string name="restore_stop">Arrêter la restauration</string>
+    <string name="restore_stop_title">Arrêter la restauration ?</string>
+    <string name="restore_stop_message">Ce qui a déjà été restauré est conservé. La partie en cours est annulée en entier, rien ne reste à moitié écrit. Vous pourrez relancer la restauration plus tard.</string>
 </resources>

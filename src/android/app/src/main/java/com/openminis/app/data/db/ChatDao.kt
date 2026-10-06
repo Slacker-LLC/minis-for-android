@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RawQuery
 import androidx.room.Transaction
+import androidx.room.Update
 import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 
@@ -95,6 +96,14 @@ interface ChatDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSession(session: ChatSessionEntity)
+
+    /**
+     * Rewrite an existing session row in place. Use this, not [insertSession], for a row that may
+     * already exist: REPLACE deletes the old row first, and the CASCADE foreign keys on messages,
+     * compact markers and session events delete everything that belonged to it.
+     */
+    @Update
+    suspend fun updateSession(session: ChatSessionEntity)
 
     @Query("UPDATE sessions SET title = :title, updated_at = :updatedAt WHERE id = :id")
     suspend fun updateSessionTitle(id: String, title: String, updatedAt: Long)

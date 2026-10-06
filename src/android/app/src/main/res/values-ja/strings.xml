@@ -2136,4 +2136,7 @@
     <string name="sub_agent_state_failed">失敗</string>
     <string name="sub_agent_state_timeout">時間切れ</string>
     <string name="sub_agent_state_interrupted">中断</string>
+    <string name="restore_stop">復元を停止</string>
+    <string name="restore_stop_title">復元を停止しますか？</string>
+    <string name="restore_stop_message">すでに復元された内容はそのまま残ります。処理中の部分はまとめて元に戻るため、書きかけのデータは残りません。後でもう一度復元できます。</string>
 </resources>
