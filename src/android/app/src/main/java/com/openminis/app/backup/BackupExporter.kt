@@ -758,10 +758,11 @@ class BackupExporter(
      * re-encrypt of everything else (§5.4).
      */
     private fun encryptStagedMembers(staging: File, keys: BackupCrypto.Keys) {
+        // (see encryptionOrder for why the order matters)
         val base = staging.canonicalFile
-        val members = base.walkTopDown()
-            .filter { it.isFile && it.name != "manifest.json" }
-            .toList()
+        val members = encryptionOrder(
+            base.walkTopDown().filter { it.isFile && it.name != "manifest.json" }.toList(),
+        )
         for (file in members) {
             val rel = file.relativeTo(base).path.replace(File.separatorChar, '/')
             val key = if (rel == "secrets.json") keys.secretsKey else keys.dataKey
@@ -873,6 +874,15 @@ class BackupExporter(
     }.getOrDefault("?")
 
     companion object {
+        /**
+         * Longest path first. Encrypting `F` writes `F.enc`, which is longer than `F`; if a staged
+         * file already has that name it is longer too, so it has been handled (and moved on to
+         * `F.enc.enc`) by the time `F` is reached, and no member is ever overwritten by the output
+         * of another.
+         */
+        internal fun encryptionOrder(files: List<File>): List<File> =
+            files.sortedByDescending { it.path.length }
+
         private const val TAG = "Backup"
 
         /**

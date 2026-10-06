@@ -136,16 +136,21 @@ class RcloneRemoteSingleFileTest {
             Entry("old.minisbak.${RcloneChunkedUpload.PARTIAL_SUFFIX}", false),
             Entry(RcloneChunkedUpload.PARTS_DIR, true),
             Entry("family-photos", true),
+            // Not ours: another program's scratch/download file in a shared folder.
+            Entry("dataset.partial", false),
+            Entry("movie.mkv.partial", false),
+            Entry(".minisbak.partial", false),
         )
         val current = "backup-2.minisbak.${RcloneChunkedUpload.PARTIAL_SUFFIX}"
 
         val swept = listing
             .filterNot { it.isDir }
-            .filter { it.name.endsWith(".${RcloneChunkedUpload.PARTIAL_SUFFIX}") }
+            .filter { RcloneChunkedUpload.isMinisScratchName(it.name) }
             .filterNot { it.name == current } // this run reuses its own
             .map { it.name }
 
         assertEquals(listOf("old.minisbak.partial"), swept)
+        assertFalse("another program's .partial file must never be swept", swept.any { it.startsWith("dataset") || it.startsWith("movie") })
         assertFalse("a real backup must never be swept", swept.any { it == "backup-1.minisbak" })
         assertFalse(
             "the legacy parts directory must never be swept",
