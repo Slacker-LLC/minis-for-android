@@ -84,6 +84,27 @@ class BackgroundSettingsRepository(context: Context) {
         prefs.edit().putInt(KEY_BG_OVERLAY_X, x).putInt(KEY_BG_OVERLAY_Y, y).apply()
     }
 
+    /**
+     * The preferences file is also written by `minis-config` (PrefsBoolField). Without this the flows
+     * above only changed through the setters, so a CLI write reached the file but not the screen, the
+     * notifier or the foreground service until the process restarted. SharedPreferences keeps only a
+     * weak reference to a listener, hence the field.
+     */
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        when (key) {
+            KEY_TASK_NOTIFICATIONS ->
+                _taskNotificationsEnabled.value = prefs.getBoolean(KEY_TASK_NOTIFICATIONS, DEFAULT_TASK_NOTIFICATIONS)
+            KEY_BG_OVERLAY_ENABLED ->
+                _backgroundOverlayEnabled.value = prefs.getBoolean(KEY_BG_OVERLAY_ENABLED, false)
+            KEY_DYNAMIC_ISLAND_ENABLED ->
+                _dynamicIslandEnabled.value = prefs.getBoolean(KEY_DYNAMIC_ISLAND_ENABLED, false)
+        }
+    }
+
+    init {
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+    }
+
     companion object {
         private const val PREFS_NAME = "background_settings"
         private const val KEY_TASK_NOTIFICATIONS = "taskNotificationsEnabled"
