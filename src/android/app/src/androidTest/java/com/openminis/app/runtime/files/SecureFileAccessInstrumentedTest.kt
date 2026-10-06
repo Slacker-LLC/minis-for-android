@@ -30,6 +30,9 @@ class SecureFileAccessInstrumentedTest {
     @After
     fun tearDown() {
         UbuntuPaths.resetLayoutForTest()
+        // resetLayoutForTest() falls back to the legacy host paths and drops the app context; put the
+        // app's real layout back so tests that run later in this process still see it.
+        UbuntuPaths.initialize(context)
         root.deleteRecursively()
     }
 

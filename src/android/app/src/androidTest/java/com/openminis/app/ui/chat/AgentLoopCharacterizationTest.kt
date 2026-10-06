@@ -183,7 +183,11 @@ class AgentLoopCharacterizationTest {
                 vm.setInputText("See the file")
                 vm.sendMessage("See the file")
             }
-            withTimeout(30_000L) { vm.awaitStreamExit(30_000L) }
+            // Wait for the whole exchange to be stored: awaitStreamExit can return before the send has
+            // started, which made this read race the write.
+            withTimeout(30_000L) {
+                while (repository.dao.loadMessages(vm.currentSessionId).none { it.role == "assistant" && it.partsJson.contains("Got it") }) delay(50)
+            }
             val user = repository.dao.loadMessages(vm.currentSessionId).first { it.role == "user" }
             assertTrue("the message text is stored", user.partsJson.contains("See the file"))
             assertTrue("the attachment is referenced by the stored message: ${user.partsJson.take(300)}", user.partsJson.contains("characterization-note"))
