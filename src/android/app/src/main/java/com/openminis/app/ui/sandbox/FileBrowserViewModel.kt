@@ -436,6 +436,9 @@ class FileBrowserViewModel(
         return items.sortedWith(final)
     }
 
+    /** Only the newest directory load may publish; a slow earlier one must not overwrite it. */
+    private val latestLoad = LatestRequest()
+
     private fun loadItems() {
         _uiState.value = _uiState.value.copy(isLoading = true)
         if (guestRootPath != null) {
@@ -443,6 +446,7 @@ class FileBrowserViewModel(
             return
         }
         val hostPath = currentHostPath
+        val ticket = latestLoad.next()
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 // Resolve symlinks for listing but keep logical path for breadcrumbs
@@ -462,6 +466,7 @@ class FileBrowserViewModel(
                     ?.mapNotNull { FileItem.from(it) }
                     ?: emptyList()
 
+                if (!latestLoad.isCurrent(ticket)) return@launch
                 rawItems = files
                 val sorted = applySort(files, _uiState.value)
                 _uiState.value = _uiState.value.copy(
@@ -469,7 +474,10 @@ class FileBrowserViewModel(
                     isLoading = false,
                     isEmpty = sorted.isEmpty(),
                 )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
+                if (!latestLoad.isCurrent(ticket)) return@launch
                 _uiState.value = _uiState.value.copy(
                     items = emptyList(),
                     isLoading = false,
@@ -482,6 +490,7 @@ class FileBrowserViewModel(
 
     private fun loadGuestItems() {
         val directory = currentGuestPath()
+        val ticket = latestLoad.next()
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val showHidden = _uiState.value.showHidden
@@ -499,6 +508,7 @@ class FileBrowserViewModel(
                 val files = entries.mapNotNull { entry ->
                     guestItem(directory, entry, showHidden)
                 }
+                if (!latestLoad.isCurrent(ticket)) return@launch
                 rawItems = files
                 val sorted = applySort(files, _uiState.value)
                 _uiState.value = _uiState.value.copy(
@@ -507,7 +517,10 @@ class FileBrowserViewModel(
                     isEmpty = sorted.isEmpty(),
                     errorMessage = null,
                 )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
+                if (!latestLoad.isCurrent(ticket)) return@launch
                 _uiState.value = _uiState.value.copy(
                     items = emptyList(),
                     isLoading = false,
@@ -600,3 +613,10 @@ class FileBrowserViewModel(
 
 private const val SESSION_GUEST_ROOT = "/var/minis"
 private val SESSION_GUEST_FOLDERS = listOf("workspace", "attachments", "offloads", "browser")
+
+/** Hands out tickets for a series of loads; only the holder of the newest ticket may publish. */
+internal class LatestRequest {
+    private val counter = java.util.concurrent.atomic.AtomicLong()
+    fun next(): Long = counter.incrementAndGet()
+    fun isCurrent(ticket: Long): Boolean = counter.get() == ticket
+}
