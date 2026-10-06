@@ -768,6 +768,19 @@
          Label rewritten to match the real behavior. -->
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">Configuration Tool</string>
+    <string name="perm_section_autonomy">Agent autonomy</string>
+    <string name="perm_autonomy_ask">Ask</string>
+    <string name="perm_autonomy_ask_sub">Confirm every change the agent makes to settings.</string>
+    <string name="perm_autonomy_smart">Smart</string>
+    <string name="perm_autonomy_smart_sub">Ordinary settings change without asking; keys, tokens and risky changes still ask.</string>
+    <string name="perm_autonomy_full">Full auto</string>
+    <string name="perm_autonomy_full_sub">Never ask about settings changes. They are still logged and can be undone.</string>
+    <string name="perm_section_android_grants">Android permissions</string>
+    <string name="perm_grant_all_title">Grant all Android permissions</string>
+    <string name="perm_grant_all_sub">Uses root to grant every permission this app declares, so the system stops asking one by one.</string>
+    <string name="perm_grant_all_done">Granted: %1$d / %2$d</string>
+    <string name="perm_grant_all_failed">Some permissions could not be granted: %1$s</string>
+    <string name="perm_grant_all_no_root">Root is not available, so permissions cannot be granted automatically.</string>
     <!-- T336: dedicated SectionCard per integration CLI. Each surfaces
          the CLI title + description, the agent tri-state policy, and
          the system-layer authorization status with an inline action

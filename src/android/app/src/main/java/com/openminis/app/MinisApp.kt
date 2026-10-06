@@ -532,6 +532,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         // ConfigRegistry.get() is safe from any thread for the rest of
         // the process. Mirrors iOS ConfigRegistry.shared.registerBuiltinsIfNeeded().
         com.openminis.app.config.MinisConfigPermissionStore.init(this)
+        com.openminis.app.config.AutonomyStore.init(this)
         com.openminis.app.config.audit.ConfigAuditLog.init(this)
         com.openminis.app.config.ConfigRegistry.init(
             this, providerRepository, envVarRepository, chatRepository,

@@ -7,6 +7,7 @@ import android.provider.Settings
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Shield
@@ -76,6 +77,48 @@ fun OffloadPermissionScreen(
             }
         },
     ) {
+        val autonomy by com.openminis.app.config.AutonomyStore.mode.collectAsState()
+        SettingsSection(header = stringResource(R.string.perm_section_autonomy)) {
+            AutonomyOption(
+                mode = com.openminis.app.config.AutonomyMode.ASK,
+                title = R.string.perm_autonomy_ask, subtitle = R.string.perm_autonomy_ask_sub, current = autonomy,
+            )
+            AutonomyOption(
+                mode = com.openminis.app.config.AutonomyMode.SMART,
+                title = R.string.perm_autonomy_smart, subtitle = R.string.perm_autonomy_smart_sub, current = autonomy,
+            )
+            AutonomyOption(
+                mode = com.openminis.app.config.AutonomyMode.FULL,
+                title = R.string.perm_autonomy_full, subtitle = R.string.perm_autonomy_full_sub, current = autonomy,
+                showDivider = false,
+            )
+        }
+
+        SettingsSection(header = stringResource(R.string.perm_section_android_grants)) {
+            var granting by remember { mutableStateOf(false) }
+            SettingsRow(
+                title = stringResource(R.string.perm_grant_all_title),
+                subtitle = stringResource(R.string.perm_grant_all_sub),
+                onClick = if (granting) null else ({
+                    granting = true
+                    scope.launch {
+                        val result = com.openminis.app.permissions.RuntimePermissionGranter.grantAll(context)
+                        granting = false
+                        val message = when {
+                            result.unavailable != null -> context.getString(R.string.perm_grant_all_no_root)
+                            result.failed.isNotEmpty() -> context.getString(
+                                R.string.perm_grant_all_failed, result.failed.joinToString(", "),
+                            )
+                            else -> context.getString(R.string.perm_grant_all_done, result.succeeded, result.attempted)
+                        }
+                        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }),
+                showChevron = false,
+                showDivider = false,
+            )
+        }
+
         SettingsSection(
             header = stringResource(R.string.perm_section_config_tool),
         ) {
@@ -396,4 +439,31 @@ private fun performShizukuAction(context: Context, state: ShizukuManager.State) 
         ShizukuManager.State.NEED_PERMISSION -> ShizukuManager.requestPermission()
         ShizukuManager.State.READY -> {}
     }
+}
+
+/** One row of the autonomy choice; the selected one carries a check. */
+@Composable
+private fun AutonomyOption(
+    mode: com.openminis.app.config.AutonomyMode,
+    title: Int,
+    subtitle: Int,
+    current: com.openminis.app.config.AutonomyMode,
+    showDivider: Boolean = true,
+) {
+    SettingsRow(
+        title = stringResource(title),
+        subtitle = stringResource(subtitle),
+        onClick = { com.openminis.app.config.AutonomyStore.setMode(mode) },
+        showChevron = false,
+        showDivider = showDivider,
+        trailing = {
+            if (mode == current) {
+                androidx.compose.material3.Icon(
+                    Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
+    )
 }
