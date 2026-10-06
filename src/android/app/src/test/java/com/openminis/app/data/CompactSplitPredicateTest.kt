@@ -3,7 +3,7 @@ package com.openminis.app.data
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.model.LLMError
 import com.openminis.app.data.model.LLMMessage
-import com.openminis.app.ui.chat.ChatViewModel.Companion.shouldSplitOnError
+import com.openminis.app.ui.chat.CompactionSummarizer.Companion.shouldSplitOnError
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 import org.junit.Assert.assertFalse
