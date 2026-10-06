@@ -113,7 +113,9 @@ class ModelsCollection(
             userModifiedAt = System.currentTimeMillis(),
         )
         repo.addEntry(entry)
-        return entry.id
+        // The repository stores the entry under instance/modelId, not the random id the object was
+        // built with; the caller (and the audit row used for revert) must get the stored one.
+        return com.openminis.app.data.db.compositeEntryKey(instanceId, modelIdStr)
     }
 
     override fun remove(id: String) {

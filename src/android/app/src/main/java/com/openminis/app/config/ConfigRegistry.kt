@@ -41,10 +41,15 @@ class ConfigRegistry private constructor() {
      */
     fun resolveField(path: String): ConfigField? {
         fields[path]?.let { return it }
-        val segments = path.split('.', limit = 3)
-        if (segments.size != 3) return null
-        val coll = collections[segments[0]] ?: return null
-        return coll.fields(forId = segments[1]).firstOrNull { it.path == path }
+        // Ids normally have no dot: `<base>.<id>.<sub>`, where <sub> may itself be dotted.
+        val plain = path.split('.', limit = 3)
+        if (plain.size == 3) {
+            collections[plain[0]]?.fields(forId = plain[1])?.firstOrNull { it.path == path }?.let { return it }
+        }
+        // An id that contains dots (`inst/mimo-v2.5`): the field is what follows the last dot.
+        val parts = splitChildPath(path) ?: return null
+        val coll = collections[parts.first] ?: return null
+        return coll.fields(forId = parts.second).firstOrNull { it.path == path }
     }
 
     fun collection(basePath: String): ConfigCollection? = collections[basePath]
@@ -100,7 +105,22 @@ class ConfigRegistry private constructor() {
         }
 
     companion object {
+        /**
+         * `<collection>.<id>.<field>` as (collection, id). The collection is up to the FIRST dot and
+         * the field after the LAST, so an id may itself contain dots (`inst/mimo-v2.5`); splitting
+         * into three at the first two dots cut such ids in half. Null when there are fewer than two dots.
+         */
+        internal fun splitChildPath(path: String): Pair<String, String>? {
+            val first = path.indexOf('.')
+            val last = path.lastIndexOf('.')
+            if (first <= 0 || last <= first || last == path.length - 1) return null
+            return path.substring(0, first) to path.substring(first + 1, last)
+        }
+
         private const val TAG = "ConfigRegistry"
+
+        /** An empty, unpublished registry for tests. */
+        internal fun newForTest(): ConfigRegistry = ConfigRegistry()
 
         @Volatile private var INSTANCE: ConfigRegistry? = null
 
