@@ -126,7 +126,7 @@ object OpenRouterOAuthManager {
         val hash = MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.UTF_8))
         val challenge = standardBase64ToUrlSafe(hash)
 
-        Log.d(TAG, "PKCE verifier (${verifier.length} chars): ${verifier.take(20)}...")
+        Log.d(TAG, "PKCE verifier generated (${verifier.length} chars)")
         Log.d(TAG, "PKCE challenge (${challenge.length} chars): $challenge")
 
         return verifier to challenge
@@ -155,9 +155,8 @@ object OpenRouterOAuthManager {
         body.put("code_verifier", verifier)
         body.put("code_challenge_method", "S256")
 
-        Log.d(TAG, "Exchange request body: ${body.toString()}")
-        Log.d(TAG, "Code: $code")
-        Log.d(TAG, "Verifier (${verifier.length} chars): ${verifier.take(20)}...${verifier.takeLast(10)}")
+        // Lengths only: the code and the PKCE verifier are what the exchange is made of.
+        Log.d(TAG, "Exchange request: code ${code.length} chars, verifier ${verifier.length} chars")
 
         val request = Request.Builder()
             .url(ProviderTransportPolicy.requireHttps(KEYS_URL, "OpenRouter key exchange URL"))
