@@ -1139,25 +1139,15 @@ class SessionListViewModel(
         query: String,
     ): Map<String, String> {
         if (query.isBlank() || sessions.isEmpty()) return emptyMap()
-        val q = query.lowercase()
         val out = HashMap<String, String>()
         for (session in sessions) {
             val title = session.title.orEmpty()
-            if (title.lowercase().contains(q)) continue
+            if (title.contains(query, ignoreCase = true)) continue
             val msgs = chatRepository.loadMessages(session.id)
             var foundSnippet: String? = null
             for (m in msgs) {
-                val text = extractText(m.partsJson)
-                val pos = text.lowercase().indexOf(q)
-                if (pos < 0) continue
-                val radius = 50
-                val start = (pos - radius).coerceAtLeast(0)
-                val end = (pos + query.length + radius).coerceAtMost(text.length)
-                val core = text.substring(start, end).replace('\n', ' ').replace('\r', ' ')
-                val prefix = if (start > 0) "…" else ""
-                val suffix = if (end < text.length) "…" else ""
-                foundSnippet = prefix + core + suffix
-                break
+                foundSnippet = snippetAround(extractText(m.partsJson), query)
+                if (foundSnippet != null) break
             }
             if (foundSnippet != null) out[session.id] = foundSnippet
         }
