@@ -126,8 +126,12 @@ object ChatExporter {
                 .replace(Regex("[^A-Za-z0-9_-]+"), "_")
                 .take(64)
                 .ifEmpty { "conversation" }
-            val zipFile = File(sharedDir, "${safeTitle}-${session.id.take(8)}.zip")
-            if (zipFile.exists()) zipFile.delete()
+            // A new file per export. The share Intent hands out a FileProvider URI for this path and
+            // the receiver may read it later; reusing one name after deleting the previous file made
+            // an earlier share point at the next export's content (or a different format).
+            val stem = "${safeTitle}-${session.id.take(8)}"
+            deleteStaleExports(sharedDir, stem)
+            val zipFile = File(sharedDir, "$stem-${java.lang.Long.toString(System.currentTimeMillis(), 36)}.zip")
 
             ZipOutputStream(FileOutputStream(zipFile).buffered()).use { zos ->
                 zipFileEntry(zos, transcriptName, transcriptFile)
@@ -406,8 +410,21 @@ object ChatExporter {
         val arguments: String?,
     )
 
-    /** Best-effort `(images, videos)` count by walking parts_json. */
-    private fun countAttachments(partsJson: String): Pair<Int, Int> = try {
+    /** Exports of this session older than [EXPORT_KEEP_MS] are removed; recent ones may still be read. */
+    private fun deleteStaleExports(dir: File, stem: String) {
+        val cutoff = System.currentTimeMillis() - EXPORT_KEEP_MS
+        dir.listFiles { f -> f.isFile && f.name.startsWith("$stem-") && f.name.endsWith(".zip") }
+            ?.filter { it.lastModified() < cutoff }
+            ?.forEach { runCatching { it.delete() } }
+    }
+
+    private const val EXPORT_KEEP_MS = 60 * 60 * 1000L
+
+    /**
+     * `(images, videos)` in a message's parts_json. Current attachments are `mediaRef` parts whose
+     * MIME type says what they are; the older `image`/`video` part types are still counted.
+     */
+    internal fun countAttachments(partsJson: String): Pair<Int, Int> = try {
         val arr = JSONArray(partsJson)
         var img = 0
         var vid = 0
@@ -416,6 +433,13 @@ object ChatExporter {
             when (obj.optString("type")) {
                 "image", "image_url" -> img += 1
                 "video", "video_url" -> vid += 1
+                "mediaRef" -> {
+                    val mime = obj.optJSONObject("value")?.optString("mimeType").orEmpty().lowercase()
+                    when {
+                        mime.startsWith("image/") -> img += 1
+                        mime.startsWith("video/") -> vid += 1
+                    }
+                }
             }
         }
         img to vid
