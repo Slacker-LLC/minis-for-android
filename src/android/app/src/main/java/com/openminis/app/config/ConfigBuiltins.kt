@@ -426,24 +426,33 @@ internal object ConfigBuiltins {
 
     private fun registerBackground(r: ConfigRegistry, context: Context) {
         val prefs = context.getSharedPreferences("background_settings", Context.MODE_PRIVATE)
+        // Nothing reads this key: whether work continues in the background is decided by the
+        // foreground-service policy (active sessions), not by a flag. Registered only so the path
+        // answers clearly instead of looking like a switch that does something.
         r.register(
-            PrefsBoolField(
-                path = "background.enhanced",
-                displayName = "Enhanced background execution",
-                description = "Keep agent tasks running when the app is backgrounded.",
-                prefs = prefs,
-                key = "enhanced_background_execution",
-                defaultValue = false,
-                risk = ConfigRisk.SENSITIVE,
+            UnavailableField(
+                PrefsBoolField(
+                    path = "background.enhanced",
+                    displayName = "Enhanced background execution",
+                    description = "Keep agent tasks running when the app is backgrounded.",
+                    prefs = prefs,
+                    key = "enhanced_background_execution",
+                    defaultValue = false,
+                    risk = ConfigRisk.SENSITIVE,
+                ),
+                "This setting has no effect: background execution follows the foreground service, " +
+                    "which runs while a chat has a task in progress.",
             )
         )
+        // Same file and key as BackgroundSettingsRepository (taskNotificationsEnabled); a different
+        // key here meant the CLI read back its own value while the notifier ignored it.
         r.register(
             PrefsBoolField(
                 path = "background.notifications",
                 displayName = "Background notifications",
                 description = "Post a system notification when long-running tasks complete.",
                 prefs = prefs,
-                key = "background_notifications_enabled",
+                key = "taskNotificationsEnabled",
                 defaultValue = true,
             )
         )
