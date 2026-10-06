@@ -18,9 +18,17 @@ import org.json.JSONObject
  * Access, and the raw content never enters the persisted agent conversation — the tools that
  * read this store are classified sensitive, so the transcript keeps a placeholder.
  */
-class NotificationHistoryRepository(context: Context) {
+class NotificationHistoryRepository(context: Context, databaseName: String = DATABASE_NAME) {
 
-    private val database = Database(context.applicationContext)
+    private val database = Database(context.applicationContext, databaseName)
+
+    /**
+     * Deletes records older than the retention window. Recording already does this, but a store nobody
+     * records into (no new notifications, or access revoked) would otherwise keep old raw text forever,
+     * so reads purge too. Returns how many rows went.
+     */
+    fun purgeExpired(now: Long = System.currentTimeMillis()): Int =
+        database.writableDatabase.delete(TABLE, "posted_at<?", arrayOf((now - NotificationHistoryPolicy.RETENTION_MS).toString()))
 
     fun record(
         key: String,
@@ -53,6 +61,7 @@ class NotificationHistoryRepository(context: Context) {
 
     /** Newest first, filtered by keyword and package, bounded by the caller's limit. */
     fun search(query: String, packageName: String, maxAgeHours: Int, limit: Int): List<JSONObject> {
+        purgeExpired()
         val clauses = mutableListOf("posted_at>=?")
         val args = mutableListOf(
             (System.currentTimeMillis() - maxAgeHours * NotificationHistoryPolicy.HOUR_MS).toString(),
@@ -90,7 +99,7 @@ class NotificationHistoryRepository(context: Context) {
     }
 
     /** How many records the store currently holds (diagnostics and tool summaries). */
-    fun count(): Int = database.readableDatabase.rawQuery("SELECT COUNT(*) FROM $TABLE", null).use { cursor ->
+    fun count(): Int = purgeExpired().let { database.readableDatabase }.rawQuery("SELECT COUNT(*) FROM $TABLE", null).use { cursor ->
         if (cursor.moveToFirst()) cursor.getInt(0) else 0
     }
 
@@ -104,7 +113,7 @@ class NotificationHistoryRepository(context: Context) {
         }
     }
 
-    private class Database(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, 1) {
+    private class Database(context: Context, name: String) : SQLiteOpenHelper(context, name, null, 1) {
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL(
                 "CREATE TABLE $TABLE (" +
@@ -118,8 +127,8 @@ class NotificationHistoryRepository(context: Context) {
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
     }
 
-    private companion object {
+    companion object {
         const val DATABASE_NAME = "minis_notification_history.db"
-        const val TABLE = "notification_history"
+        private const val TABLE = "notification_history"
     }
 }
