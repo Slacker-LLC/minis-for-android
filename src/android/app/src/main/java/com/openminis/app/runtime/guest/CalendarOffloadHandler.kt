@@ -244,12 +244,25 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
             ?: return NativeOffloadResult(2, "android-calendar create: --start is required\n")
         val startMs = parseDate(startStr)
             ?: return NativeOffloadResult(2, "android-calendar: invalid --start '$startStr'\n")
-        val endMs = args.get("end")?.let { parseDate(it) } ?: (startMs + 60 * 60 * 1000L)
+        // A --end that was given must parse (and come after the start); only a missing --end defaults.
+        val endStr = args.get("end")
+        val endMs = if (endStr != null) {
+            parseDate(endStr) ?: return NativeOffloadResult(2, "android-calendar: invalid --end '$endStr'\n")
+        } else {
+            startMs + 60 * 60 * 1000L
+        }
+        if (endMs <= startMs && !args.hasFlag("all-day")) {
+            return NativeOffloadResult(2, "android-calendar create: --end must be after --start\n")
+        }
         // Notes — apple-calendar uses --notes; --description kept as alias.
         val notes = args.get("notes") ?: args.get("description")
         val alarmMinutes = args.getInt("alarm")
 
-        val calendarId = resolveCalendarId(args) ?: return missingCalendarError(args)
+        val calendarId = when (val target = resolveCalendarTarget(args)) {
+            is CalendarTarget.Found -> target.id
+            CalendarTarget.NoneGiven -> pickWritableCalendar() ?: return missingCalendarError(args)
+            is CalendarTarget.Rejected -> return calendarTargetError(args, target)
+        }
 
         val values = ContentValues().apply {
             put(CalendarContract.Events.CALENDAR_ID, calendarId)
@@ -325,7 +338,11 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
         // resolveCalendarIdOptional lets either flag be absent without falling
         // back to pickWritableCalendar (which would mean "always move" — not
         // what update should do).
-        resolveCalendarIdOptional(args)?.let { values.put(CalendarContract.Events.CALENDAR_ID, it) }
+        when (val target = resolveCalendarTarget(args)) {
+            is CalendarTarget.Found -> values.put(CalendarContract.Events.CALENDAR_ID, target.id)
+            CalendarTarget.NoneGiven -> Unit // no flag: the event keeps its calendar
+            is CalendarTarget.Rejected -> return calendarTargetError(args, target)
+        }
         val alarmMinutes = args.getInt("alarm")
 
         if (values.size() == 0 && alarmMinutes == null) {
@@ -553,34 +570,40 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
     }
 
     /**
-     * Resolve the target calendar for create: --calendar-id wins, then a
-     * --calendar name lookup (case-insensitive contains, mirrors iOS), then
-     * the auto-pick heuristic. Returns null only when none of these apply
-     * (no writable calendar at all).
+     * The calendar a write was asked to use. `--calendar-id` must be one of the writable calendars;
+     * `--calendar NAME` must match one (an exact name wins, otherwise a single partial match).
+     * A target that was given but cannot be resolved is rejected with the candidates: quietly using
+     * another calendar put events in the wrong account, and on update moved existing ones.
+     * [CalendarTarget.NoneGiven] is the only case where the caller may choose a default.
      */
-    private fun resolveCalendarId(args: OffloadArgs): Long? {
-        args.getLong("calendar-id")?.let { return it }
-        args.get("calendar")?.let { name ->
-            val cals = listWritableCalendars()
-            for (i in 0 until cals.length()) {
-                val c = cals.getJSONObject(i)
-                if (c.optString("display_name").contains(name, ignoreCase = true)) {
-                    return c.optLong("id", -1L).takeIf { it > 0 }
-                }
+    private fun resolveCalendarTarget(args: OffloadArgs): CalendarTarget {
+        val id = args.getLong("calendar-id")
+        val name = args.get("calendar")
+        if (id == null && name == null) return CalendarTarget.NoneGiven
+        val writable = listWritableCalendars().let { arr ->
+            (0 until arr.length()).map { i ->
+                val c = arr.getJSONObject(i)
+                CalendarRef(c.optLong("id", -1L), c.optString("display_name"))
             }
-            // Named calendar not found → fall through to auto-pick rather than fail
-            // hard, matching apple-calendar's silent fallback.
-            AppLogger.warning(TAG, "--calendar '$name' not matched; falling back to auto-pick")
         }
-        return pickWritableCalendar()
+        return resolveCalendarTarget(id, name, writable)
     }
 
-    /** Like [resolveCalendarId] but returns null when no flag was supplied
-     *  at all (used by update so absence of the flag doesn't trigger a move). */
-    private fun resolveCalendarIdOptional(args: OffloadArgs): Long? {
-        if (args.get("calendar-id") == null && args.get("calendar") == null) return null
-        return resolveCalendarId(args)
-    }
+    private fun calendarTargetError(args: OffloadArgs, rejected: CalendarTarget.Rejected): NativeOffloadResult =
+        NativeOffloadResult(
+            2,
+            OffloadOutput.formatBody(
+                JSONObject()
+                    .put("error", "calendar_target_invalid")
+                    .put("message", rejected.reason)
+                    .put(
+                        "candidates",
+                        org.json.JSONArray(rejected.candidates.map { JSONObject().put("id", it.id).put("name", it.name) }),
+                    )
+                    .toString(),
+                args,
+            ) + "\n",
+        )
 
     private fun missingCalendarError(args: OffloadArgs): NativeOffloadResult =
         NativeOffloadResult(
@@ -701,25 +724,65 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
             }
             return System.currentTimeMillis() + sign * n * unitMs
         }
-        val formats = listOf(
-            "yyyy-MM-dd'T'HH:mm:ssXXX",
-            "yyyy-MM-dd'T'HH:mm:ss'Z'",
-            "yyyy-MM-dd'T'HH:mm:ss",
-            "yyyy-MM-dd'T'HH:mm",
-            "yyyy-MM-dd",
-        )
-        for (f in formats) {
-            try {
-                val sdf = SimpleDateFormat(f, Locale.US).apply {
-                    timeZone = if (f.endsWith("'Z'")) TimeZone.getTimeZone("UTC") else TimeZone.getDefault()
-                }
-                return sdf.parse(s)?.time
-            } catch (_: Throwable) {}
-        }
-        return null
+        return parseStrictInstant(s)
     }
 
     companion object {
+        /** A calendar the caller may write to. */
+        internal data class CalendarRef(val id: Long, val name: String)
+
+        internal sealed interface CalendarTarget {
+            /** Neither --calendar nor --calendar-id was given. */
+            data object NoneGiven : CalendarTarget
+            data class Found(val id: Long) : CalendarTarget
+            data class Rejected(val reason: String, val candidates: List<CalendarRef>) : CalendarTarget
+        }
+
+        internal fun resolveCalendarTarget(id: Long?, name: String?, writable: List<CalendarRef>): CalendarTarget {
+            if (id == null && name == null) return CalendarTarget.NoneGiven
+            if (id != null) {
+                return if (writable.any { it.id == id }) CalendarTarget.Found(id)
+                else CalendarTarget.Rejected("--calendar-id $id is not a writable calendar.", writable)
+            }
+            val wanted = name!!.trim()
+            val exact = writable.filter { it.name.equals(wanted, ignoreCase = true) }
+            if (exact.size == 1) return CalendarTarget.Found(exact.single().id)
+            if (exact.size > 1) {
+                return CalendarTarget.Rejected("Several calendars are named '$wanted'; pass --calendar-id.", exact)
+            }
+            val partial = writable.filter { wanted.isNotEmpty() && it.name.contains(wanted, ignoreCase = true) }
+            return when (partial.size) {
+                1 -> CalendarTarget.Found(partial.single().id)
+                0 -> CalendarTarget.Rejected("No writable calendar matches --calendar '$wanted'.", writable)
+                else -> CalendarTarget.Rejected("--calendar '$wanted' matches several calendars; be more specific or pass --calendar-id.", partial)
+            }
+        }
+
+        /**
+         * An ISO date or date-time consuming the whole string with calendar-valid fields. Lenient
+         * parsing rolled 2026-13-01 into next year and ignored trailing text. null when it is none.
+         */
+        internal fun parseStrictInstant(raw: String, zone: TimeZone = TimeZone.getDefault()): Long? {
+            val text = raw.trim()
+            val patterns = listOf(
+                "yyyy-MM-dd'T'HH:mm:ssXXX",
+                "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                "yyyy-MM-dd'T'HH:mm:ss",
+                "yyyy-MM-dd'T'HH:mm",
+                "yyyy-MM-dd",
+            )
+            for (p in patterns) {
+                val sdf = SimpleDateFormat(p, Locale.US).apply {
+                    timeZone = if (p.endsWith("'Z'")) TimeZone.getTimeZone("UTC") else zone
+                    isLenient = false
+                }
+                val pos = java.text.ParsePosition(0)
+                val date = sdf.parse(text, pos)
+                if (date != null && pos.index == text.length) return date.time
+            }
+            return null
+        }
+
         private const val TAG = "CalendarOffload"
         private const val DEFAULT_LIMIT = 50
         private const val HELP = """android-calendar — list, create, update, delete events; query free/busy
