@@ -578,13 +578,22 @@ internal object SecureFileAccess {
         }
     }
 
-    private fun samePath(left: UbuntuPaths.SecureFilePath, right: UbuntuPaths.SecureFilePath): Boolean =
-        left.root.path == right.root.path && left.components == right.components
+    internal fun samePath(left: UbuntuPaths.SecureFilePath, right: UbuntuPaths.SecureFilePath): Boolean =
+        identity(left) == identity(right)
 
-    private fun isDescendant(candidate: UbuntuPaths.SecureFilePath, ancestor: UbuntuPaths.SecureFilePath): Boolean =
-        candidate.root.path == ancestor.root.path &&
-            candidate.components.size > ancestor.components.size &&
-            candidate.components.subList(0, ancestor.components.size) == ancestor.components
+    internal fun isDescendant(candidate: UbuntuPaths.SecureFilePath, ancestor: UbuntuPaths.SecureFilePath): Boolean {
+        val c = identity(candidate)
+        val a = identity(ancestor)
+        return c.size > a.size && c.subList(0, a.size) == a
+    }
+
+    /**
+     * The physical location as a list of names. Two requests can reach one place through different
+     * root/component splits (`/workspace` is root=<workspace>, `/var/minis/attachments` is
+     * root=<workspace>/attachments), so comparing the roots as strings misses that they overlap.
+     */
+    private fun identity(path: UbuntuPaths.SecureFilePath): List<String> =
+        path.root.toPath().normalize().map { it.toString() } + path.components
 
     private object PathsFor {
         fun temp(leaf: Path): Path = Paths.get(".${leaf.fileName}.minis-tmp-${UUID.randomUUID()}")
