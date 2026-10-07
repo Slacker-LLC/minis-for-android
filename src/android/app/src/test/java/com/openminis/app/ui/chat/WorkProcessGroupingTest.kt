@@ -197,4 +197,72 @@ class WorkProcessGroupingTest {
         ).summary()
         assertEquals("terminal", noTitle.failureReason)
     }
+
+    @Test
+    fun `a live turn is running for its whole length, not only while a tool call is in flight`() {
+        val blocks = listOf(tool("a"), tool("b"))
+        // Both calls are done but the model is still writing: the row must not fold and re-open.
+        val live = WorkProcess("p", blocks, turnLive = true)
+        assertTrue(live.isRunning)
+        assertTrue(live.summary().isRunning)
+        assertNull(live.summary().runningStepNumber)
+        assertNull("no duration until the turn ends", live.durationMs)
+        assertFalse(WorkProcess("p", blocks, turnLive = false).isRunning)
+    }
+
+    @Test
+    fun `a live turn does not report a failure on its header`() {
+        val live = WorkProcess("p", listOf(tool("a", status = ToolBlockStatus.FAILED, content = "boom")), turnLive = true)
+        assertNull(live.summary().failureReason)
+    }
+
+    @Test
+    fun `a failed step the turn went on from does not claim the header`() {
+        val process = WorkProcess(
+            "p",
+            listOf(tool("a", status = ToolBlockStatus.FAILED, content = "boom"), tool("b")),
+            messageCreatedAtMs = 1_000L,
+            messageUpdatedAtMs = 13_000L,
+        )
+        val summary = process.summary()
+        assertNull("step b recovered it", summary.failureReason)
+        assertNull(summary.failedStepNumber)
+        assertEquals(12_000L, summary.durationMs)
+    }
+
+    @Test
+    fun `an unrecovered failure still reports its step and the duration together`() {
+        val process = WorkProcess(
+            "p",
+            listOf(tool("a"), tool("b", status = ToolBlockStatus.FAILED, content = "boom")),
+            messageCreatedAtMs = 1_000L,
+            messageUpdatedAtMs = 6_000L,
+        )
+        val summary = process.summary()
+        assertEquals(2, summary.failedStepNumber)
+        assertEquals("boom", summary.failureReason)
+        assertEquals(5_000L, summary.durationMs)
+    }
+
+    @Test
+    fun `the turn-live flag reaches the process the builder makes`() {
+        val entries = buildAssistantTurnEntries(
+            messageId = "m1",
+            blocks = listOf(tool("a")),
+            presentation = StepsPresentation.GROUPED,
+            thinkingVisible = true,
+            turnLive = true,
+        )
+        assertTrue(processes(entries).single().turnLive)
+    }
+
+    @Test
+    fun `a collapsed note shows one plain line, the latest while it streams`() {
+        val md = "## Plan\n\n- **first** step with `code`\n- second step"
+        assertEquals("Plan", notePreview(md, latest = false))
+        assertEquals("second step", notePreview(md, latest = true))
+        assertEquals("first step with code", notePreview("- **first** step with `code`", latest = false))
+        assertEquals("", notePreview("  \n\n", latest = false))
+        assertTrue(notePreview("x".repeat(500), latest = false).length <= 201)
+    }
 }

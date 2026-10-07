@@ -30,6 +30,7 @@ import com.openminis.app.data.model.SystemVoiceEntries
 import com.openminis.app.data.model.hasAudioInput
 import com.openminis.app.data.model.hasAudioOutput
 import com.openminis.app.data.model.hasImageInput
+import com.openminis.app.data.model.hasImageOutput
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.theme.ChatColors
 import sh.calvin.reorderable.ReorderableColumn
@@ -174,6 +175,7 @@ internal fun slotCandidates(config: ProviderConfig, slot: ModelSlot): List<Model
             ModelSlot.vision -> entry.model.hasImageInput
             ModelSlot.voiceInput -> entry.model.hasAudioInput
             ModelSlot.voiceOutput -> entry.model.hasAudioOutput
+            ModelSlot.image -> entry.model.hasImageOutput
         }
     }
     val systemEntries = when (slot) {

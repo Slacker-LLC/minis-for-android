@@ -3,6 +3,7 @@ package com.openminis.app.ui.settings
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Tune
@@ -48,6 +49,7 @@ fun ModelsScreen(
                 ModelSlot.vision to (R.string.model_slot_vision to Icons.Outlined.Image),
                 ModelSlot.voiceInput to (R.string.model_slot_voice_input to Icons.Outlined.GraphicEq),
                 ModelSlot.voiceOutput to (R.string.model_slot_voice_output to Icons.Outlined.GraphicEq),
+                ModelSlot.image to (R.string.model_slot_image to Icons.Outlined.Brush),
             )
             slots.forEachIndexed { index, (slot, display) ->
                 val ids = config.slots.entries(slot)
@@ -144,6 +146,7 @@ private fun ModelSlot.pickerModalityFilter(): PickerModalityFilter = when (this)
     ModelSlot.vision -> PickerModalityFilter.IMAGE_INPUT
     ModelSlot.voiceInput -> PickerModalityFilter.AUDIO_INPUT
     ModelSlot.voiceOutput -> PickerModalityFilter.AUDIO_OUTPUT
+    ModelSlot.image -> PickerModalityFilter.IMAGE_OUTPUT
 }
 
 @Composable
@@ -154,5 +157,6 @@ fun modelSlotTitle(slot: ModelSlot): String = stringResource(
         ModelSlot.vision -> R.string.model_slot_vision
         ModelSlot.voiceInput -> R.string.model_slot_voice_input
         ModelSlot.voiceOutput -> R.string.model_slot_voice_output
+        ModelSlot.image -> R.string.model_slot_image
     },
 )

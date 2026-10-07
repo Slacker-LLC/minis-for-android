@@ -525,6 +525,20 @@ object OffloadPermissionManager {
         prefs.edit().putString("level_$toolName", level.name).apply()
     }
 
+    /**
+     * Allow every Agent tool in one go (the one-tap authorize in Settings → System & permissions): the
+     * integrations that default to off (accessibility, Shizuku, the virtual screen) are switched on too, so
+     * granting the Android side does not leave the Agent side shut.
+     */
+    fun allowAll() {
+        val editor = prefs.edit()
+        for (tool in toolRegistry) editor.putString("level_${tool.toolName}", PermissionLevel.BYPASS.name)
+        editor.apply()
+    }
+
+    /** True when every Agent tool is currently allowed. */
+    fun isEverythingAllowed(): Boolean = toolRegistry.all { getLevel(it.toolName) == PermissionLevel.BYPASS }
+
     fun resetAll() {
         val editor = prefs.edit()
         for (tool in toolRegistry) {

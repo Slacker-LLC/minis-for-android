@@ -21,7 +21,12 @@ enum class AutonomyMode(val wire: String) {
     ASK("ask"), SMART("smart"), FULL("full");
 
     companion object {
-        fun fromWire(value: String?): AutonomyMode = entries.firstOrNull { it.wire == value } ?: SMART
+        /** What a fresh install uses: the user asked for no one-time popups, so nothing is asked until they pick otherwise. */
+        val DEFAULT = FULL
+
+        /** A missing value is [DEFAULT]; an unreadable one fails to the cautious middle. */
+        fun fromWire(value: String?): AutonomyMode =
+            if (value == null) DEFAULT else entries.firstOrNull { it.wire == value } ?: SMART
     }
 }
 
@@ -30,7 +35,7 @@ object AutonomyStore {
     private const val KEY = "mode"
     private var prefs: SharedPreferences? = null
 
-    private val _mode = MutableStateFlow(AutonomyMode.SMART)
+    private val _mode = MutableStateFlow(AutonomyMode.DEFAULT)
     val mode: StateFlow<AutonomyMode> = _mode.asStateFlow()
 
     val current: AutonomyMode get() = _mode.value

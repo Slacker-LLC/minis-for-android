@@ -11,6 +11,7 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material3.Icon
@@ -123,9 +124,22 @@ fun SystemEnhanceScreen(
         title = stringResource(R.string.system_enhance_title),
         onBack = onBack, backLabel = stringResource(R.string.settings_section_system),
     ) {
+        if (!connected) {
+            // The framework hands its service to an app only when the app's process starts, so a module
+            // enabled while Minis was already running stays "not connected" until the process restarts.
+            SettingsSection(footer = stringResource(R.string.module_settings_not_connected)) {
+                SettingsRow(
+                    icon = Icons.Outlined.Refresh,
+                    iconColor = ChatColors.warn,
+                    title = stringResource(R.string.module_settings_restart_title),
+                    subtitle = stringResource(R.string.module_settings_restart_sub),
+                    onClick = { com.openminis.app.AppRestart.restart(context) },
+                    showDivider = false,
+                )
+            }
+        }
         SettingsSection(
             header = stringResource(R.string.module_settings_section_switches),
-            footer = if (connected) null else stringResource(R.string.module_settings_not_connected),
         ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.Search,
@@ -233,7 +247,6 @@ fun SystemEnhanceScreen(
 private fun PowerAssistantTarget.labelRes(): Int = when (this) {
     PowerAssistantTarget.OEM -> R.string.module_settings_target_oem
     PowerAssistantTarget.MINIS -> R.string.module_settings_target_minis
-    PowerAssistantTarget.GEMINI -> R.string.module_settings_target_gemini
 }
 
 /** The switch keys the module owns; the status row above counts them. */

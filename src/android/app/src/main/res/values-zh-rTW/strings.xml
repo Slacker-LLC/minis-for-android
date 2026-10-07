@@ -949,8 +949,7 @@
     <string name="module_settings_assistant_footer">只接管電源鍵長按；其他快捷方式維持各自的行為。</string>
     <string name="module_settings_target_oem">裝置內建助理</string>
     <string name="module_settings_target_minis">Minis</string>
-    <string name="module_settings_target_gemini">Google Gemini</string>
-    <string name="module_settings_not_connected">Xposed 框架未連線：這些開關暫時寫不進去。請安裝框架並在作用域中啟用 Minis。</string>
+    <string name="module_settings_not_connected">尚未連線 Xposed 框架，這些開關暫時寫不進去。請在框架管理器裡啟用 Minis，然後重新啟動 Minis：框架只在應用程式啟動時下發連線。</string>
     <string name="module_settings_write_failed">框架沒有確認這次寫入</string>
     <string name="module_settings_assistant_role">系統預設助理</string>
     <string name="module_settings_assistant_role_held">Minis 已是本機的數位助理</string>
@@ -1436,9 +1435,6 @@
     <string name="perm_autonomy_smart_sub">一般設定直接通過；金鑰、權杖和有風險的修改仍會詢問。</string>
     <string name="perm_autonomy_full">全自動</string>
     <string name="perm_autonomy_full_sub">設定修改一律不再詢問，但仍會記錄，也可以復原。</string>
-    <string name="perm_section_android_grants">Android 系統權限</string>
-    <string name="perm_grant_all_title">一鍵授予全部 Android 權限</string>
-    <string name="perm_grant_all_sub">用 root 一次性授予本應用程式宣告的全部權限，系統不再逐個彈窗。</string>
     <string name="perm_grant_all_done">已授予：%1$d / %2$d</string>
     <string name="perm_grant_all_failed">部分權限未能授予：%1$s</string>
     <string name="perm_grant_all_no_root">沒有可用的 root，無法自動授予權限。</string>
@@ -2369,4 +2365,13 @@
     <string name="agent_models_footer">助手可以讓子代理用這些模型工作，也可以用 minis-model-use 呼叫它們。固定了模型的子代理一律使用固定的模型。長按可調整順序。</string>
     <string name="agent_models_no_credential">未設定金鑰</string>
     <string name="agent_models_cli_only">僅限 minis-model-use（非對話模型）</string>
+    <string name="oneclick_header">一鍵授權</string>
+    <string name="oneclick_title">授權全部</string>
+    <string name="oneclick_sub">以 root 一次授予本應用宣告的全部 Android 權限，並開啟 Agent 的全部工具權限（含無障礙、Shizuku、虛擬螢幕）。關閉只會把 Agent 權限還原為預設，Android 系統授權保留。</string>
+    <string name="oneclick_working">正在授權…</string>
+    <string name="module_settings_restart_title">重新啟動 Minis 以連接框架</string>
+    <string name="module_settings_restart_sub">在 Minis 已經執行時才啟用模組的話，點這裡重新啟動一次。</string>
+    <string name="work_process_failed_only">第 %1$d 步失敗</string>
+    <string name="model_slot_image">圖像</string>
+    <string name="selection_reply_actions">回覆操作</string>
 </resources>

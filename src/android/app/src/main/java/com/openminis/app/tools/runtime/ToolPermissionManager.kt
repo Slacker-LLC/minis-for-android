@@ -27,6 +27,9 @@ object ToolPermissionManager {
         val mcp: Level = Level.LOCAL_ONLY,
     )
 
+    // The `local` side is never MCP_CONFIRM: the user turned the one-time approval popups off for their own
+    // Agent (the Permission switches and the blacklist are the gate there). `mcp` confirmation for remote
+    // callers is unchanged.
     private val table: Map<String, ToolPolicy> = mapOf(
         "system.info" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
         "system.jobs.list" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
@@ -122,8 +125,8 @@ object ToolPermissionManager {
         "android.app.force_stop" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.app.restart" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.app.usage" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
-        "android.package.install" to ToolPolicy(Level.MCP_CONFIRM, Level.MCP_CONFIRM),
-        "android.package.uninstall" to ToolPolicy(Level.MCP_CONFIRM, Level.MCP_CONFIRM),
+        "android.package.install" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.package.uninstall" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.screenshot" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
         "android.ui.observe" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.input.tap" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
@@ -135,11 +138,11 @@ object ToolPermissionManager {
         "android.logs.read" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.logs.clear" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_DENIED),
         "android.diagnose" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
-        "android.deploy" to ToolPolicy(Level.MCP_CONFIRM, Level.MCP_CONFIRM),
+        "android.deploy" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "system.jobs" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.diagnose.*" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
-        "android.deploy.*" to ToolPolicy(Level.MCP_CONFIRM, Level.MCP_CONFIRM),
-        "android.root.probe" to ToolPolicy(Level.MCP_CONFIRM, Level.LOCAL_ONLY),
+        "android.deploy.*" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.root.probe" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         "android.browser.*" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         // Upstream-compatible structured Root entry: available to the local
         // Agent, never exposed to remote MCP callers.

@@ -895,6 +895,12 @@ data class SelectionToolbarActions(
      * half-arrived answer would narrate a truncated text.
      */
     val onReadFromStart: ((String) -> Unit)? = null,
+    /**
+     * Open the reply-actions menu (regenerate, branch, share, delete, …) of the message that owns the
+     * selection. Selecting in place replaced the long-press menu, so this keeps those actions one tap away.
+     * Receives the owning message's id; null hides the entry.
+     */
+    val onOpenReplyMenu: ((String) -> Unit)? = null,
 )
 
 @Composable
@@ -1086,6 +1092,7 @@ fun MinisSelectionToolbarHost(
                 // scope. selection_read_aloud is now "Read Selection".
                 val labelReadSelection = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_read_aloud)
                 val labelReadFromStart = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_read_from_start)
+                val labelReplyActions = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_reply_actions)
                 val labelReadAloud = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.read_aloud_group)
                 val toastCopiedAsMarkdown = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_copied_as_markdown_toast)
                 val toastCopiedAsRichText = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_copied_as_rich_text_toast)
@@ -1247,6 +1254,13 @@ fun MinisSelectionToolbarHost(
                             val text = controller.selectedPlainText()
                             if (text.isNotEmpty()) actions.onAddToInput.invoke(text)
                             controller.clearSelection()
+                        })
+                    }
+                    val replyOwner = controller.singleMessageId()
+                    if (actions?.onOpenReplyMenu != null && replyOwner != null) {
+                        add(SelectionAction(labelReplyActions) {
+                            controller.clearSelection()
+                            actions.onOpenReplyMenu.invoke(replyOwner)
                         })
                     }
                     if (tableActions != null) {

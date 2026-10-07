@@ -775,9 +775,6 @@
     <string name="perm_autonomy_smart_sub">Ordinary settings change without asking; keys, tokens and risky changes still ask.</string>
     <string name="perm_autonomy_full">Full auto</string>
     <string name="perm_autonomy_full_sub">Never ask about settings changes. They are still logged and can be undone.</string>
-    <string name="perm_section_android_grants">Android permissions</string>
-    <string name="perm_grant_all_title">Grant all Android permissions</string>
-    <string name="perm_grant_all_sub">Uses root to grant every permission this app declares, so the system stops asking one by one.</string>
     <string name="perm_grant_all_done">Granted: %1$d / %2$d</string>
     <string name="perm_grant_all_failed">Some permissions could not be granted: %1$s</string>
     <string name="perm_grant_all_no_root">Root is not available, so permissions cannot be granted automatically.</string>
@@ -1736,8 +1733,7 @@
     <string name="module_settings_assistant_footer">Only the long press of the power key is taken over; every other shortcut keeps its own behaviour.</string>
     <string name="module_settings_target_oem">The device\'s own assistant</string>
     <string name="module_settings_target_minis">Minis</string>
-    <string name="module_settings_target_gemini">Google Gemini</string>
-    <string name="module_settings_not_connected">Xposed framework not connected: these switches cannot be written. Install the framework and enable Minis in its scope.</string>
+    <string name="module_settings_not_connected">Not connected to the Xposed framework, so these switches cannot be written yet. Enable Minis in the framework manager, then restart Minis: the framework hands its connection over only when the app starts.</string>
     <string name="module_settings_write_failed">The framework did not accept the change</string>
     <string name="module_settings_assistant_role">System default assistant</string>
     <string name="module_settings_assistant_role_held">Minis is this device\'s assistant</string>
@@ -2488,4 +2484,13 @@
     <string name="agent_models_footer">The assistant can run a sub agent on any of these and call them with minis-model-use. A sub agent you pinned to a model always uses that model. Long-press to reorder.</string>
     <string name="agent_models_no_credential">No API key</string>
     <string name="agent_models_cli_only">minis-model-use only (not a chat model)</string>
+    <string name="oneclick_header">One-tap authorize</string>
+    <string name="oneclick_title">Authorize everything</string>
+    <string name="oneclick_sub">Grants every Android permission the app declares (needs root) and allows every Agent tool, including accessibility, Shizuku and the virtual screen. Switching off puts the Agent tools back to their defaults; Android grants stay.</string>
+    <string name="oneclick_working">Granting…</string>
+    <string name="module_settings_restart_title">Restart Minis to connect</string>
+    <string name="module_settings_restart_sub">Use this after enabling the module while Minis was already running.</string>
+    <string name="work_process_failed_only">Step %1$d failed</string>
+    <string name="model_slot_image">Image</string>
+    <string name="selection_reply_actions">Reply actions</string>
 </resources>

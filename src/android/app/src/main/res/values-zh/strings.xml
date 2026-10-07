@@ -409,9 +409,6 @@
     <string name="perm_autonomy_smart_sub">普通设置直接通过；密钥、令牌和有风险的修改仍会询问。</string>
     <string name="perm_autonomy_full">全自动</string>
     <string name="perm_autonomy_full_sub">设置修改一律不再询问，但仍会记录，也可以撤销。</string>
-    <string name="perm_section_android_grants">Android 系统权限</string>
-    <string name="perm_grant_all_title">一键授予全部 Android 权限</string>
-    <string name="perm_grant_all_sub">用 root 一次性授予本应用声明的全部权限，系统不再逐个弹窗。</string>
     <string name="perm_grant_all_done">已授予：%1$d / %2$d</string>
     <string name="perm_grant_all_failed">部分权限未能授予：%1$s</string>
     <string name="perm_grant_all_no_root">没有可用的 root，无法自动授予权限。</string>
@@ -1593,8 +1590,7 @@
     <string name="module_settings_assistant_footer">只接管电源键长按；其它快捷方式保持各自的行为。</string>
     <string name="module_settings_target_oem">设备自带的助手</string>
     <string name="module_settings_target_minis">Minis</string>
-    <string name="module_settings_target_gemini">Google Gemini</string>
-    <string name="module_settings_not_connected">Xposed 框架未连接：这些开关暂时写不进去。请安装框架并在作用域中启用 Minis。</string>
+    <string name="module_settings_not_connected">尚未连接 Xposed 框架，这些开关暂时写不进去。请在框架管理器里启用 Minis，然后重启 Minis：框架只在应用启动时下发连接。</string>
     <string name="module_settings_write_failed">框架没有确认这次写入</string>
     <string name="module_settings_assistant_role">系统默认助手</string>
     <string name="module_settings_assistant_role_held">Minis 已是本机的数字助手</string>
@@ -2398,4 +2394,13 @@
     <string name="agent_models_footer">助手可以让子代理用这些模型干活，也可以用 minis-model-use 调用它们。固定了模型的子代理始终用固定的模型。长按可调整顺序。</string>
     <string name="agent_models_no_credential">未设置密钥</string>
     <string name="agent_models_cli_only">仅限 minis-model-use（非对话模型）</string>
+    <string name="oneclick_header">一键授权</string>
+    <string name="oneclick_title">授权全部</string>
+    <string name="oneclick_sub">用 root 一次性授予本应用声明的全部 Android 权限，并打开 Agent 的全部工具权限（含无障碍、Shizuku、虚拟屏幕）。关闭只把 Agent 权限恢复默认，Android 系统授权保留。</string>
+    <string name="oneclick_working">正在授权…</string>
+    <string name="module_settings_restart_title">重启 Minis 以连接框架</string>
+    <string name="module_settings_restart_sub">在 Minis 已经运行时才启用模块的话，点这里重启一次。</string>
+    <string name="work_process_failed_only">第 %1$d 步失败</string>
+    <string name="model_slot_image">图像</string>
+    <string name="selection_reply_actions">回复操作</string>
 </resources>

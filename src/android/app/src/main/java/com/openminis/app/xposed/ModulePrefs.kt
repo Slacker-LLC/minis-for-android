@@ -31,7 +31,7 @@ object ModulePrefs {
     const val GROUP = "minis_prefs"
 
     object Keys {
-        /** Which assistant a power-key long press should open: oem, minis or gemini. */
+        /** Which assistant a power-key long press should open: oem or minis. */
         const val POWER_KEY_ASSISTANT_TARGET = "power_key_assistant_target"
 
         const val GESTURE_BAR_CIRCLE_TO_SEARCH = "gesture_bar_circle_to_search"

@@ -82,6 +82,13 @@ internal data class WorkProcess(
     /** [T-android-turn-work] The turn's row timestamps, used when the steps carry none. */
     val messageCreatedAtMs: Long = 0L,
     val messageUpdatedAtMs: Long? = null,
+    /**
+     * The turn this run belongs to is still being generated. The row is "running" for the whole turn,
+     * not only while a tool call is in flight: between two calls, and while the model writes its final
+     * answer after the last one, no tool is running but the turn is not over - judging by the tools
+     * alone folded the row at every gap and opened it again at the next call.
+     */
+    val turnLive: Boolean = false,
 ) {
     init {
         require(blocks.isNotEmpty()) { "WorkProcess needs at least one block" }
@@ -95,14 +102,22 @@ internal data class WorkProcess(
             it.kind == TOOL_USE_KIND && it.toolStatus in WORK_PROCESS_RUNNING_STATUSES
         }
 
-    /** True while at least one step is still executing. */
-    val isRunning: Boolean get() = runningTool != null
+    /** True while a step is executing or the turn is still being generated. */
+    val isRunning: Boolean get() = runningTool != null || turnLive
 
     /** The last failing tool block — what the collapsed row has to explain. */
     val failedTool: AssistantBlock?
         get() = blocks.lastOrNull {
             it.kind == TOOL_USE_KIND && it.toolStatus in WORK_PROCESS_FAILED_STATUSES
         }
+
+    /**
+     * A failure the turn did not recover from: the LAST tool step failed. A step that failed and was
+     * followed by working steps is history - it stays visible inside the panel but does not claim the
+     * header, which would otherwise hide the duration for the rest of the turn.
+     */
+    val unrecoveredFailure: AssistantBlock?
+        get() = toolBlocks.lastOrNull()?.takeIf { it.toolStatus in WORK_PROCESS_FAILED_STATUSES }
 
     /** 1-based ordinal of [block] among the tool steps, or null when it is not one. */
     private fun toolStepNumber(block: AssistantBlock): Int? {
@@ -154,11 +169,11 @@ internal data class WorkProcess(
     /** A snapshot of everything the collapsed row renders. */
     fun summary(maxFailureChars: Int = DEFAULT_FAILURE_CHARS): WorkProcessSummary {
         val running = runningTool
-        val failed = failedTool
+        val failed = unrecoveredFailure
         return WorkProcessSummary(
             toolCount = toolBlocks.size,
             thinkingCount = blocks.size - toolBlocks.size,
-            isRunning = running != null,
+            isRunning = isRunning,
             runningStepNumber = running?.let(::toolStepNumber),
             runningToolName = running?.let {
                 it.toolTitle.trim().ifBlank { toolDisplayName(it.toolName) }
@@ -170,7 +185,7 @@ internal data class WorkProcess(
             // A running step outranks an earlier failure: the row must describe
             // what is happening now, and the failure stays visible inside the
             // panel. Only a finished run reports its failure on the header.
-            failureReason = if (running == null) failed?.let { failureSummary(it, maxFailureChars) } else null,
+            failureReason = if (!isRunning) failed?.let { failureSummary(it, maxFailureChars) } else null,
             durationMs = durationMs,
             tallies = tallies,
         )
@@ -324,6 +339,7 @@ internal fun buildAssistantTurnEntries(
     thinkingVisible: Boolean,
     messageCreatedAtMs: Long = 0L,
     messageUpdatedAtMs: Long? = null,
+    turnLive: Boolean = false,
 ): List<AssistantTurnEntry> {
     if (presentation == StepsPresentation.PER_TOOL) {
         return blocks.mapIndexed { index, block -> AssistantTurnEntry.Single(index, block) }
@@ -352,6 +368,7 @@ internal fun buildAssistantTurnEntries(
                 blocks = workBlocks.toList(),
                 messageCreatedAtMs = messageCreatedAtMs,
                 messageUpdatedAtMs = messageUpdatedAtMs,
+                turnLive = turnLive,
             ),
         ),
     )

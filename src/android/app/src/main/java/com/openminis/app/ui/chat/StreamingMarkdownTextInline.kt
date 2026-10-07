@@ -380,6 +380,151 @@ internal fun safeInlineSplitOffset(text: String): Int {
     return lastSafeNewlineEnd
 }
 
+// ─── HTML in model output ───────────────────────────────────────────────────
+
+private val HTML_ENTITIES = mapOf(
+    "nbsp" to "\u00A0", "amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'",
+    "ensp" to "\u2002", "emsp" to "\u2003", "hellip" to "\u2026", "mdash" to "\u2014", "ndash" to "\u2013",
+    "copy" to "\u00A9", "reg" to "\u00AE", "trade" to "\u2122", "times" to "\u00D7", "middot" to "\u00B7",
+    "laquo" to "\u00AB", "raquo" to "\u00BB", "rarr" to "\u2192", "larr" to "\u2190", "deg" to "\u00B0",
+)
+
+/** An HTML tag or entity at [i] that this renderer understands. [next] is the index after everything consumed. */
+internal sealed interface HtmlInline {
+    val next: Int
+    data class Text(val value: String, override val next: Int) : HtmlInline
+    data class Break(override val next: Int) : HtmlInline
+    /** `<tag>inner</tag>`: [innerStart, innerEnd) is the content, styled according to [tag]. */
+    data class Span(val tag: String, val innerStart: Int, val innerEnd: Int, override val next: Int) : HtmlInline
+}
+
+private val HTML_SPAN_TAGS = setOf("b", "strong", "i", "em", "u", "s", "del", "strike", "sub", "sup", "kbd", "code", "mark")
+
+/**
+ * Models write `<br>` in table cells, `&amp;`/`&lt;` in prose and `<b>`/`<sub>` here and there; shown literally they
+ * read as broken markdown. Only a closed, known tag or a known entity is interpreted; anything else (a stray `<`, an
+ * unknown tag, an unclosed `<b>` still streaming) stays literal text.
+ */
+internal fun htmlInlineAt(text: String, i: Int): HtmlInline? {
+    if (i >= text.length) return null
+    if (text[i] == '&') {
+        val semi = text.indexOf(';', i + 1)
+        if (semi == -1 || semi - i > 10 || semi == i + 1) return null
+        val name = text.substring(i + 1, semi)
+        val decoded = when {
+            name.startsWith("#x") || name.startsWith("#X") ->
+                name.drop(2).toIntOrNull(16)?.takeIf { it in 1..0x10FFFF }?.let { String(Character.toChars(it)) }
+            name.startsWith("#") ->
+                name.drop(1).toIntOrNull()?.takeIf { it in 1..0x10FFFF }?.let { String(Character.toChars(it)) }
+            else -> HTML_ENTITIES[name.lowercase()]
+        } ?: return null
+        return HtmlInline.Text(decoded, semi + 1)
+    }
+    if (text[i] != '<') return null
+    val close = text.indexOf('>', i + 1)
+    if (close == -1 || close - i > 40) return null
+    val body = text.substring(i + 1, close).trim()
+    if (body.isEmpty() || body.startsWith("/")) return null
+    val selfClosing = body.endsWith("/")
+    val name = body.removeSuffix("/").trim().substringBefore(' ').lowercase()
+    if (name == "br") return HtmlInline.Break(close + 1)
+    if (selfClosing || name !in HTML_SPAN_TAGS) return null
+    val closer = "</$name>"
+    val end = text.indexOf(closer, close + 1, ignoreCase = true)
+    if (end == -1) return null
+    return HtmlInline.Span(name, close + 1, end, end + closer.length)
+}
+
+/** Appends the interpreted HTML [html] found in [text]; the span's content goes through [appendContent]. */
+internal fun AnnotatedString.Builder.appendHtml(
+    text: String,
+    html: HtmlInline,
+    colors: MdColors,
+    appendContent: AnnotatedString.Builder.(String) -> Unit,
+) {
+    when (html) {
+        is HtmlInline.Text -> append(html.value)
+        is HtmlInline.Break -> append('\n')
+        is HtmlInline.Span -> {
+            val style = when (html.tag) {
+                "b", "strong" -> SpanStyle(fontWeight = FontWeight.Bold)
+                "i", "em" -> SpanStyle(fontStyle = FontStyle.Italic)
+                "u" -> SpanStyle(textDecoration = TextDecoration.Underline)
+                "s", "del", "strike" -> SpanStyle(textDecoration = TextDecoration.LineThrough)
+                "sub" -> SpanStyle(baselineShift = androidx.compose.ui.text.style.BaselineShift.Subscript, fontSize = 12.sp)
+                "sup" -> SpanStyle(baselineShift = androidx.compose.ui.text.style.BaselineShift.Superscript, fontSize = 12.sp)
+                "kbd", "code" -> SpanStyle(fontFamily = FontFamily.Monospace, color = colors.inlineCodeText, background = colors.inlineCodeBg)
+                else -> SpanStyle(background = colors.inlineCodeBg) // mark
+            }
+            withStyle(style) { appendContent(text.substring(html.innerStart, html.innerEnd)) }
+        }
+    }
+}
+
+/**
+ * Underscore emphasis does not start inside a word: `snake_case_name` and `__init__.py` are identifiers, not
+ * italic/bold runs (CommonMark's flanking rule; `*` has no such restriction).
+ */
+internal fun underscoreCanOpen(text: String, i: Int): Boolean = i == 0 || !text[i - 1].isLetterOrDigit()
+
+/** The close of an underscore run, which likewise must not sit inside a word. -1 when there is none. */
+internal fun findUnderscoreClose(text: String, from: Int, delim: String): Int {
+    var k = text.indexOf(delim, from)
+    while (k != -1) {
+        val after = k + delim.length
+        if ((after >= text.length || !text[after].isLetterOrDigit()) && k > from && !text[k - 1].isWhitespace()) return k
+        k = text.indexOf(delim, k + 1)
+    }
+    return -1
+}
+
+/**
+ * A bare web address starting at [start] in [text] (`https://…` / `http://…`, optionally wrapped as `<…>`),
+ * or null. Returns the address and the index just past what was consumed. Trailing sentence punctuation and an
+ * unbalanced closing bracket are left outside the link, the way chat apps do: "see https://a.b/c." links
+ * `https://a.b/c`, and "(https://a.b/c)" keeps its parenthesis.
+ */
+internal fun bareUrlAt(text: String, start: Int): Pair<String, Int>? {
+    val angle = text[start] == '<'
+    val from = if (angle) start + 1 else start
+    if (!(text.startsWith("https://", from, ignoreCase = true) || text.startsWith("http://", from, ignoreCase = true))) return null
+    // Not the tail of an ASCII word or of a longer token ("xhttps://"); a Chinese character right before the
+    // address is normal ("链接https://…") and does not block it.
+    if (!angle && start > 0) {
+        val before = text[start - 1]
+        if ((before.code < 128 && before.isLetterOrDigit()) || before == '/') return null
+    }
+    var end = from
+    while (end < text.length) {
+        val c = text[end]
+        if (c.isWhitespace() || c == '<' || c == '>' || c == '"' || c == '`' || c == '\u3000') break
+        // Full-width punctuation ends a link in running Chinese text.
+        if (c in "，。！？；：、）】」』》\u201d\u2019") break
+        end++
+    }
+    if (angle) {
+        if (end >= text.length || text[end] != '>') return null
+        return text.substring(from, end) to end + 1
+    }
+    var url = text.substring(from, end)
+    while (url.isNotEmpty()) {
+        val last = url.last()
+        val unbalanced = (last == ')' && url.count { it == ')' } > url.count { it == '(' }) ||
+            (last == ']' && url.count { it == ']' } > url.count { it == '[' })
+        if (last in ".,;:!?'*_~" || unbalanced) url = url.dropLast(1) else break
+    }
+    // "https://" alone is not a link.
+    if (url.length <= (if (url.startsWith("https", ignoreCase = true)) 8 else 7)) return null
+    return url to from + url.length
+}
+
+/** Appends [url] as a tappable link (the same style and `url` annotation a `[text](url)` link gets). */
+internal fun AnnotatedString.Builder.appendLink(label: String, url: String, colors: MdColors) {
+    val linkStart = length
+    withStyle(SpanStyle(color = colors.link, textDecoration = TextDecoration.Underline)) { append(label) }
+    addStringAnnotation("url", url, linkStart, length)
+}
+
 internal fun parseInline(text: String, colors: MdColors): AnnotatedString {
     return buildAnnotatedString {
         var i = 0
@@ -396,6 +541,18 @@ internal fun parseInline(text: String, colors: MdColors): AnnotatedString {
                         appendInlineContent(katexInlineTagFor(text.substring(i + 2, end)), text.substring(i + 2, end))
                         i = end + 2
                     } else { append(text[i]); i++ }
+                }
+                // Bare web address (or <https://…>): a link without the [text](url) ceremony.
+                (text[i] == 'h' || text[i] == 'H' || text[i] == '<') && bareUrlAt(text, i) != null -> {
+                    val (url, next) = bareUrlAt(text, i)!!
+                    appendLink(url, url, colors)
+                    i = next
+                }
+                // HTML the model wrote instead of markdown: <br>, &amp;, <b>…</b>, <sub>…</sub>.
+                (text[i] == '&' || text[i] == '<') && htmlInlineAt(text, i) != null -> {
+                    val html = htmlInlineAt(text, i)!!
+                    appendHtml(text, html, colors) { appendRecursive(it, colors) }
+                    i = html.next
                 }
                 // Escape: \* \_ \` etc.
                 text[i] == '\\' && i + 1 < text.length -> {
@@ -433,8 +590,8 @@ internal fun parseInline(text: String, colors: MdColors): AnnotatedString {
                         i = end + 2
                     } else { append(text[i]); i++ }
                 }
-                text.startsWith("__", i) -> {
-                    val end = text.indexOf("__", i + 2)
+                text.startsWith("__", i) && underscoreCanOpen(text, i) -> {
+                    val end = findUnderscoreClose(text, i + 2, "__")
                     if (end != -1) {
                         withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
                             appendRecursive(text.substring(i + 2, end), colors)
@@ -506,9 +663,10 @@ internal fun parseInline(text: String, colors: MdColors): AnnotatedString {
                     } else { append(text[i]); i++ }
                 }
                 // Italic: *text* or _text_ (single delimiter, not followed by same)
-                (text[i] == '*' || text[i] == '_') && i + 1 < text.length && text[i + 1] != text[i] && text[i + 1] != ' ' -> {
+                (text[i] == '*' || (text[i] == '_' && underscoreCanOpen(text, i))) &&
+                    i + 1 < text.length && text[i + 1] != text[i] && text[i + 1] != ' ' -> {
                     val delim = text[i]
-                    val end = text.indexOf(delim, i + 1)
+                    val end = if (delim == '_') findUnderscoreClose(text, i + 1, "_") else text.indexOf(delim, i + 1)
                     if (end != -1 && end > i + 1) {
                         withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
                             appendRecursive(text.substring(i + 1, end), colors)
@@ -556,6 +714,28 @@ internal fun AnnotatedString.Builder.appendRecursive(text: String, colors: MdCol
                         i = end + 1
                     } else { append(text[i]); i++ }
                 } else { append(text[i]); i++ }
+            }
+            (text[i] == 'h' || text[i] == 'H' || text[i] == '<') && bareUrlAt(text, i) != null -> {
+                val (url, next) = bareUrlAt(text, i)!!
+                appendLink(url, url, colors)
+                i = next
+            }
+            (text[i] == '&' || text[i] == '<') && htmlInlineAt(text, i) != null -> {
+                val html = htmlInlineAt(text, i)!!
+                appendHtml(text, html, colors) { appendRecursive(it, colors) }
+                i = html.next
+            }
+            // Emphasis inside emphasis: **bold with *italic* inside**, *italic with **bold** inside*.
+            text.startsWith("**", i) && text.indexOf("**", i + 2) != -1 -> {
+                val end = text.indexOf("**", i + 2)
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { appendRecursive(text.substring(i + 2, end), colors) }
+                i = end + 2
+            }
+            text[i] == '*' && i + 1 < text.length && text[i + 1] != '*' && text[i + 1] != ' ' &&
+                text.indexOf('*', i + 1) > i + 1 -> {
+                val end = text.indexOf('*', i + 1)
+                withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { appendRecursive(text.substring(i + 1, end), colors) }
+                i = end + 1
             }
             text[i] == '\\' && i + 1 < text.length -> { append(text[i + 1]); i += 2 }
             text.startsWith("```", i) -> { append("```"); i += 3 }

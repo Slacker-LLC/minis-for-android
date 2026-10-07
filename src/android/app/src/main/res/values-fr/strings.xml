@@ -315,9 +315,6 @@
     <string name="perm_autonomy_smart_sub">Les réglages ordinaires changent sans demander ; clés, jetons et changements risqués restent confirmés.</string>
     <string name="perm_autonomy_full">Automatique</string>
     <string name="perm_autonomy_full_sub">Ne jamais demander pour les changements de réglages. Ils restent journalisés et annulables.</string>
-    <string name="perm_section_android_grants">Autorisations Android</string>
-    <string name="perm_grant_all_title">Accorder toutes les autorisations Android</string>
-    <string name="perm_grant_all_sub">Utilise root pour accorder toutes les autorisations déclarées par l\'app, afin que le système ne demande plus une par une.</string>
     <string name="perm_grant_all_done">Accordées : %1$d / %2$d</string>
     <string name="perm_grant_all_failed">Certaines autorisations n\'ont pas pu être accordées : %1$s</string>
     <string name="perm_grant_all_no_root">Root n\'est pas disponible : les autorisations ne peuvent pas être accordées automatiquement.</string>
@@ -1300,7 +1297,6 @@
     <string name="module_settings_assistant_footer">Seul l\'appui long sur le bouton d\'alimentation est repris ; les autres raccourcis gardent leur comportement.</string>
     <string name="module_settings_target_oem">L\'assistant du appareil</string>
     <string name="module_settings_target_minis">Minis</string>
-    <string name="module_settings_target_gemini">Google Gemini</string>
     <string name="module_settings_not_connected">Framework Xposed non connecté : ces interrupteurs ne peuvent pas être écrits. Installez le framework et activez Minis dans son périmètre.</string>
     <string name="module_settings_write_failed">Le framework n\'a pas confirmé la modification</string>
     <string name="module_settings_assistant_role">Assistant par défaut du système</string>
@@ -2056,4 +2052,13 @@
     <string name="agent_models_footer">L’assistant peut faire travailler un sous-agent sur ces modèles et les appeler avec minis-model-use. Un sous-agent épinglé à un modèle utilise toujours celui-ci. Appui long pour réordonner.</string>
     <string name="agent_models_no_credential">Aucune clé API</string>
     <string name="agent_models_cli_only">minis-model-use uniquement (pas un modèle de chat)</string>
+    <string name="oneclick_header">Autorisation en un geste</string>
+    <string name="oneclick_title">Tout autoriser</string>
+    <string name="oneclick_sub">Accorde via root toutes les autorisations Android déclarées par l\'app et autorise tous les outils de l\'agent, y compris accessibilité, Shizuku et l\'écran virtuel. Désactiver remet les outils de l\'agent à leurs valeurs par défaut ; les autorisations Android restent.</string>
+    <string name="oneclick_working">Autorisation en cours…</string>
+    <string name="module_settings_restart_title">Redémarrer Minis pour se connecter</string>
+    <string name="module_settings_restart_sub">À utiliser après avoir activé le module alors que Minis tournait déjà.</string>
+    <string name="work_process_failed_only">Étape %1$d échouée</string>
+    <string name="model_slot_image">Image</string>
+    <string name="selection_reply_actions">Actions de la réponse</string>
 </resources>

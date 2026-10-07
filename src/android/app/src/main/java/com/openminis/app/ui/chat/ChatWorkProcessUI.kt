@@ -86,7 +86,11 @@ internal fun WorkProcessRowView(
     onRerunFromHere: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
 ) {
-    val summary = remember(process.blocks) { process.summary() }
+    // Everything the summary reads: the blocks, whether the turn is still live, and the turn's end time (the
+    // duration). Keyed on the blocks alone it kept saying "working" after the turn had ended.
+    val summary = remember(process.blocks, process.turnLive, process.messageUpdatedAtMs, process.messageCreatedAtMs) {
+        process.summary()
+    }
     // [T-android-turn-work] Wall-clock label while the turn runs; one tick a second is enough.
     val startedAt = process.startedAtMs
     var elapsedSec by remember(process.id, summary.isRunning, startedAt) { mutableStateOf(0L) }
@@ -109,7 +113,7 @@ internal fun WorkProcessRowView(
         if (!userToggled) expanded = summary.isRunning
     }
 
-    val failed = summary.failureReason != null
+    val failed = summary.failureReason != null && !summary.isRunning
     val statusText = workStatusText(summary, elapsedSec.takeIf { summary.isRunning })
 
     // The redesign's status line: one small grey line above the reply, "已完成 · 用时 12s" with a chevron
@@ -149,6 +153,23 @@ internal fun WorkProcessRowView(
                 )
             }
         }
+        // An unrecovered failure is a second, red line: the first line keeps the step count and the time the
+        // turn took, which a failure used to replace.
+        if (failed) {
+            Text(
+                text = stringResource(
+                    R.string.work_process_failed_step,
+                    summary.failedStepNumber ?: 0,
+                    summary.failureReason.orEmpty(),
+                ),
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                color = ToolErrorColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(end = 8.dp, bottom = 6.dp),
+            )
+        }
 
         AnimatedVisibility(
             visible = expanded,
@@ -165,7 +186,15 @@ internal fun WorkProcessRowView(
                 ),
             ),
         ) {
+            val panelScroll = androidx.compose.foundation.rememberScrollState()
             Column(modifier = Modifier.padding(start = 4.dp, top = 2.dp)) {
+              // A long run scrolls inside a bounded panel, so the header (and the fold button under it) is never
+              // a long scroll away; a short run just lays out in full.
+              Column(
+                modifier = Modifier
+                    .heightIn(max = WORK_PANEL_MAX_HEIGHT)
+                    .verticalScroll(panelScroll),
+              ) {
                 // [T-android-work-items] What the run consisted of, by type - the same idea as
                 // Codex's grouped work items, in one line above the individual steps. The labels
                 // are resolved with a plain loop: a composable call inside joinToString's lambda
@@ -189,18 +218,19 @@ internal fun WorkProcessRowView(
                 val trailingBlockId = process.blocks.lastOrNull()?.id
                 process.blocks.forEach { block ->
                     when (block.kind) {
-                        THINKING_KIND -> ThinkingNote(
+                        // Thinking and the model's own remarks are one line each, like the tool steps; a tap opens them.
+                        THINKING_KIND -> OneLineNote(
                             block = block,
+                            isThinking = true,
                             isStreaming = summary.isRunning && block.id == trailingBlockId,
                         )
                         // [T-android-turn-work] Text the model wrote between tool calls is part
                         // of the turn's work, not its answer - it belongs in here with the steps.
                         "text" -> if (block.content.isNotBlank()) {
-                            Text(
-                                text = block.content,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ChatColors.secondaryText,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                            OneLineNote(
+                                block = block,
+                                isThinking = false,
+                                isStreaming = summary.isRunning && block.id == trailingBlockId,
                             )
                         }
                         else -> if (block.kind == TOOL_USE_KIND) {
@@ -256,10 +286,91 @@ internal fun WorkProcessRowView(
                         }
                     }
                 }
-                Spacer(Modifier.height(4.dp))
+              }
+              // The fold button sits under the steps, so a long run never has to be scrolled back to its start.
+              Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable {
+                        userToggled = true
+                        expanded = false
+                    }
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+              ) {
+                Text(
+                    text = stringResource(R.string.work_process_collapse),
+                    fontSize = 13.sp,
+                    color = ChatColors.secondaryText,
+                )
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    Icons.Filled.KeyboardArrowUp,
+                    contentDescription = null,
+                    tint = ChatColors.secondaryText,
+                    modifier = Modifier.size(16.dp),
+                )
+              }
             }
         }
     }
+}
+
+/** Tallest the opened steps panel gets before it scrolls on its own. */
+private val WORK_PANEL_MAX_HEIGHT = 440.dp
+
+/**
+ * One step of thinking or narration as a single line, the way a tool step is: a plain-text preview
+ * (markdown marks stripped, the latest line while it streams), with the full text a tap away.
+ */
+@Composable
+private fun OneLineNote(block: AssistantBlock, isThinking: Boolean, isStreaming: Boolean) {
+    var open by rememberSaveable(block.id) { mutableStateOf(false) }
+    val preview = notePreview(block.content, latest = isStreaming)
+    if (preview.isEmpty() && !open) return
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { open = !open }
+                .padding(horizontal = 4.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = if (isThinking) stringResource(R.string.chat_thinking_chip, preview) else preview,
+                fontSize = 13.sp,
+                color = ChatColors.secondaryText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(4.dp))
+            StepChevron(expanded = open, contentDescription = null)
+        }
+        if (open) {
+            if (isThinking) {
+                ThinkingNote(block = block, isStreaming = isStreaming)
+            } else {
+                StreamingMarkdownText(
+                    content = block.content,
+                    isStreaming = isStreaming,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+/** The line a collapsed note shows: first non-blank line (latest one while streaming), without markdown marks. */
+internal fun notePreview(content: String, latest: Boolean, maxChars: Int = 200): String {
+    val lines = content.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }
+    val line = (if (latest) lines.lastOrNull() else lines.firstOrNull()).orEmpty()
+    val plain = line
+        .replace(Regex("^(#{1,6}|[-*+>]|\\d+[.)])\\s+"), "")
+        .replace(Regex("[*_`~]+"), "")
+        .trim()
+    return if (plain.length <= maxChars) plain else plain.take(maxChars).trimEnd() + "…"
 }
 
 /**
@@ -268,19 +379,34 @@ internal fun WorkProcessRowView(
  */
 @Composable
 internal fun workStatusText(summary: WorkProcessSummary, runningElapsedSec: Long? = null): String = when {
-    summary.isRunning -> stringResource(R.string.work_status_running)
-    summary.failureReason != null -> stringResource(
-        R.string.work_process_failed_step,
-        summary.failedStepNumber ?: 0,
-        summary.failureReason,
-    )
+    summary.isRunning -> {
+        val running = stringResource(R.string.work_status_running)
+        if (runningElapsedSec != null && runningElapsedSec > 0L) {
+            "$running · ${formatStepDuration(runningElapsedSec, stillRunning = true)}"
+        } else {
+            running
+        }
+    }
     else -> {
         val done = if (summary.toolCount > 0) {
             pluralStringResource(R.plurals.work_process_completed_steps, summary.toolCount, summary.toolCount)
         } else {
             stringResource(R.string.work_status_done)
         }
-        val took = summary.durationMs?.let { stringResource(R.string.work_process_duration, formatStepDuration(it / 1000L, stillRunning = false)) }
+        // The first line always says how long the turn took, failed or not; the failure itself is the
+        // red line under it (and the step number rides along here so a folded row still shows it).
+        val seconds = summary.durationMs?.let { it / 1000L }
+        val failedStep = summary.failedStepNumber?.takeIf { summary.failureReason != null }
+        val took = when {
+            seconds != null && failedStep != null -> stringResource(
+                R.string.work_process_duration_failed, formatStepDuration(seconds, stillRunning = false), failedStep,
+            )
+            seconds != null -> stringResource(
+                R.string.work_process_duration, formatStepDuration(seconds, stillRunning = false),
+            )
+            failedStep != null -> stringResource(R.string.work_process_failed_only, failedStep)
+            else -> null
+        }
         if (took != null) "$done · $took" else done
     }
 }

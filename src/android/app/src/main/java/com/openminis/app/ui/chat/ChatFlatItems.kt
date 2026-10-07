@@ -456,6 +456,8 @@ internal sealed class FlatChatItem {
             if (other !is WorkProcessRow) return false
             if (messageId != other.messageId) return false
             if (process.id != other.process.id) return false
+            if (process.turnLive != other.process.turnLive) return false
+            if (process.messageUpdatedAtMs != other.process.messageUpdatedAtMs) return false
             val mine = process.blocks
             val theirs = other.process.blocks
             if (mine.size != theirs.size) return false
@@ -475,6 +477,7 @@ internal sealed class FlatChatItem {
             var hash = messageId.hashCode()
             hash = hash * 31 + process.id.hashCode()
             hash = hash * 31 + process.blocks.size
+            hash = hash * 31 + process.turnLive.hashCode()
             process.blocks.forEach { block ->
                 hash = hash * 31 + block.id.hashCode()
                 hash = hash * 31 + (block.toolStatus?.ordinal ?: -1)
@@ -748,6 +751,7 @@ internal fun buildFlatChatItems(
             thinkingVisible = thinkingVisible,
             messageCreatedAtMs = turnStartedAtMs.takeIf { it > 0L } ?: message.createdAtMs,
             messageUpdatedAtMs = message.updatedAtMs,
+            turnLive = message.isStreaming,
         )
 
         fun emitBlock(index: Int, block: AssistantBlock) {

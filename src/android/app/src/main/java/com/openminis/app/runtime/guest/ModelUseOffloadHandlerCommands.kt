@@ -5,6 +5,7 @@ import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.repository.instance
 import com.openminis.app.data.repository.loadApiKey
+import com.openminis.app.data.repository.primaryEntry
 import com.openminis.app.data.repository.resolvedAgentLoopEntries
 import com.openminis.app.provider.CustomHeaderPolicy
 import com.openminis.app.provider.ProviderFactory
@@ -79,9 +80,25 @@ internal fun ModelUseOffloadHandler.cmdSearch(args: OffloadArgs): NativeOffloadR
     return NativeOffloadResult(0, body.toString(2) + "\n")
 }
 
+/**
+ * The Image slot's primary model, for a run that names no --model but writes an image: asking for a picture
+ * is enough, the user already chose which model makes them. The result still goes through [resolveEntry], so a
+ * model the user has not made callable by the agent (Settings > Models > Agent models) is refused as usual.
+ */
+private fun ModelUseOffloadHandler.imageSlotModelId(args: OffloadArgs): String? {
+    val output = args.get("output") ?: return null
+    if (!isImageExt(output.substringAfterLast('.', "").lowercase())) return null
+    return providerRepository.primaryEntry(com.openminis.app.data.model.ModelSlot.image)?.id
+}
+
 internal fun ModelUseOffloadHandler.cmdRun(args: OffloadArgs, request: NativeOffloadRequest): NativeOffloadResult {
     val modelArg = args.get("model")
-        ?: return NativeOffloadResult(2, "--model is required. Usage: minis-model-use run --model <id_or_name>\n")
+        ?: imageSlotModelId(args)
+        ?: return NativeOffloadResult(
+            2,
+            "--model is required. Usage: minis-model-use run --model <id_or_name>. " +
+                "(For an image --output path, --model may be left out when an Image model is set in Settings > Models.)\n",
+        )
 
     // Optional provider scoping — disambiguates when multiple instances expose the same model_id.
     val providerFilter = args.get("provider")

@@ -7,6 +7,7 @@ import com.openminis.app.data.model.ModelSlot
 import com.openminis.app.data.model.hasAudioInput
 import com.openminis.app.data.model.hasAudioOutput
 import com.openminis.app.data.model.hasImageInput
+import com.openminis.app.data.model.hasImageOutput
 import com.openminis.app.data.model.SystemVoiceEntries
 import com.openminis.app.data.model.ImageEndpointMode
 import com.openminis.app.data.model.LLMModel
@@ -543,6 +544,7 @@ internal object ProviderMutationMethods {
                             ModelSlot.vision -> entry.model.hasImageInput
                             ModelSlot.voiceInput -> entry.model.hasAudioInput
                             ModelSlot.voiceOutput -> entry.model.hasAudioOutput
+                            ModelSlot.image -> entry.model.hasImageOutput
                         }
                     }
                     if (!compatible) throw RPCException(-32602, "Entry $id is not compatible with slot ${slot.name}")

@@ -16,7 +16,7 @@ internal val baseMethodsPart2: List<MethodSpec> = listOf(
                 ParamSpec("includeHidden", "bool", required = false, default = false, description = "Include user-hidden entries."),
                 ParamSpec("includeDisabled", "bool", required = false, default = false, description = "Include entries from disabled provider instances."),
             ),
-            returns = "{fallbackTrigger, entryCount, slots:{main, light, vision, voiceInput, voiceOutput}, entries:[...]}",
+            returns = "{fallbackTrigger, entryCount, slots:{main, light, vision, voiceInput, voiceOutput, image}, entries:[...]}",
             example = JSONObject(),
         ),
 
@@ -144,7 +144,7 @@ internal val baseMethodsPart2: List<MethodSpec> = listOf(
             name = "provider.slots.set",
             description = "Replace a fixed slot's ordered entry IDs and/or set the Main fallback trigger. Slot entry capabilities are validated; slots cannot be added or removed.",
             params = listOf(
-                ParamSpec("slot", "string", required = false, description = "main / light / vision / voiceInput / voiceOutput; required together with entryIds."),
+                ParamSpec("slot", "string", required = false, description = "main / light / vision / voiceInput / voiceOutput / image; required together with entryIds."),
                 ParamSpec("entryIds", "[string]", required = false, description = "Ordered entry IDs; array order defines fallback order."),
                 ParamSpec("fallbackTrigger", "string", required = false, description = "default (429/5xx) or always; may be passed with a slot update."),
             ),

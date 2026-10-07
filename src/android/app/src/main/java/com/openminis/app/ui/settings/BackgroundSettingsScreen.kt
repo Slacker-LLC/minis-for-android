@@ -4,36 +4,13 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.BatteryFull
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,24 +18,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.openminis.app.MinisApp
 import com.openminis.app.R
 import com.openminis.app.power.PowerOptimizationManager
-import com.openminis.app.i18n.uppercaseForDisplay
-import com.openminis.app.ui.components.groupedCard
 import com.openminis.app.ui.theme.ChatColors
 
 /**
@@ -73,10 +41,8 @@ import com.openminis.app.ui.theme.ChatColors
  * polled on resume — when the user comes back from the system settings
  * dialog, the row updates to "already allowed".
  *
- * Renders without depending on the file-private SettingsSection /
- * SettingsItem helpers in [SettingsScreen]; those don't need to grow
- * a public surface for one consumer. Visual feel is intentionally
- * close to the existing settings rows but the components are local.
+ * Built from the shared settings components (SettingsSection / SettingsRow / SettingsSwitchRow), so it
+ * looks like every other settings page.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,32 +103,35 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
         title = stringResource(R.string.bg_section_header),
         onBack = onBack, backLabel = stringResource(R.string.settings_section_system),
     ) {
-            Spacer(Modifier.size(8.dp))
-            // T180-bg-notif: Task Notifications toggle. Mirrors iOS
-            // EnhancedBackgroundSettingsView's first section (the toggle
-            // ships ON to match iOS default — see
-            // BackgroundSettingsRepository.DEFAULT_TASK_NOTIFICATIONS).
-            BgSectionTitle(stringResource(R.string.settings_section_notifications))
-            BgToggleRow(
+        // The same grouped sections and rows as every other settings page: one card per section, a divider
+        // between rows, the explanation as the section's footer.
+        SettingsSection(
+            header = stringResource(R.string.settings_section_notifications),
+            footer = if (!canDrawOverlays && backgroundOverlayEnabled) {
+                stringResource(R.string.settings_bg_overlay_permission_needed)
+            } else if (!dynamicIslandCapable) {
+                stringResource(R.string.settings_dynamic_island_unsupported)
+            } else {
+                null
+            },
+        ) {
+            // T180-bg-notif: Task Notifications toggle. Mirrors iOS EnhancedBackgroundSettingsView's first
+            // section (ships ON to match iOS default - see BackgroundSettingsRepository.DEFAULT_TASK_NOTIFICATIONS).
+            SettingsSwitchRow(
                 icon = Icons.Outlined.NotificationsActive,
                 iconColor = Color(0xFF007AFF),
                 title = stringResource(R.string.settings_task_notifications),
                 checked = taskNotificationsEnabled,
                 onCheckedChange = { backgroundRepo.setTaskNotificationsEnabled(it) },
             )
-
-            // T-bg-overlay phase 2: floating tool-status overlay toggle.
-            // Tapping ON without SYSTEM_ALERT_WINDOW deep-links the user to
-            // the system "Display over other apps" screen; canDrawOverlays
-            // is re-polled on ON_RESUME so flipping the system grant
-            // immediately makes the UI reflect ready-to-use state.
-            Spacer(Modifier.size(8.dp))
-            BgToggleRow(
+            // T-bg-overlay phase 2: floating tool-status overlay. Switching it on without SYSTEM_ALERT_WINDOW
+            // sends the user to "Display over other apps"; canDrawOverlays is re-read on ON_RESUME.
+            SettingsSwitchRow(
                 icon = Icons.Outlined.Layers,
                 iconColor = Color(0xFF5856D6),
                 title = stringResource(R.string.settings_bg_overlay),
-                // The switch represents the persisted USER INTENT. Permission is a
-                // separate capability gate, surfaced by the footer and enforced by the service.
+                // The switch is the persisted USER INTENT; the permission is a separate gate, explained in
+                // the footer and enforced by the service.
                 checked = backgroundOverlayEnabled,
                 onCheckedChange = { wanted ->
                     if (wanted && !canDrawOverlays) {
@@ -173,47 +142,33 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
                             ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
                             context.startActivity(intent)
                         } catch (_: Throwable) {
-                            // Fallback: open generic overlay settings screen.
                             val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
                                 .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
                             try { context.startActivity(intent) } catch (_: Throwable) {}
                         }
-                        // Persist the user's intent so when they return
-                        // with the grant in place, the overlay turns on
-                        // immediately (canDrawOverlays re-polls on
-                        // ON_RESUME — see LaunchedEffect above).
+                        // Keep the intent so the overlay turns on as soon as the grant is in place.
                         backgroundRepo.setBackgroundOverlayEnabled(true)
                     } else {
                         backgroundRepo.setBackgroundOverlayEnabled(wanted)
                     }
                 },
             )
-            if (!canDrawOverlays && backgroundOverlayEnabled) {
-                BgFooter(stringResource(R.string.settings_bg_overlay_permission_needed))
-            }
-
-            // [T-android-dynamic-island] Live Updates / "dynamic island" toggle.
-            // Only interactive when the device is capable (Android 16+ with the
-            // per-app Live-Updates grant). When ON it REPLACES the floating
-            // overlay — the mutual-exclusion guard lives in
-            // AgentForegroundService.applyOverlayState. Disabled + explained on
-            // devices/versions that don't support it.
-            Spacer(Modifier.size(8.dp))
-            BgToggleRow(
+            // [T-android-dynamic-island] Live Updates / "dynamic island". Only usable on devices with the
+            // per-app Live-Updates grant (Android 16+); when on it REPLACES the floating overlay (the
+            // exclusion lives in AgentForegroundService.applyOverlayState).
+            SettingsSwitchRow(
                 icon = Icons.Outlined.Bolt,
                 iconColor = ChatColors.ok,
                 title = stringResource(R.string.settings_dynamic_island),
                 checked = dynamicIslandEnabled && dynamicIslandCapable,
                 enabled = dynamicIslandCapable,
                 onCheckedChange = { backgroundRepo.setDynamicIslandEnabled(it) },
+                showDivider = false,
             )
-            if (!dynamicIslandCapable) {
-                BgFooter(stringResource(R.string.settings_dynamic_island_unsupported))
-            }
+        }
 
-            Spacer(Modifier.size(16.dp))
-            BgSectionTitle(stringResource(R.string.battery_opt_section_title))
-            BgRow(
+        SettingsSection(header = stringResource(R.string.battery_opt_section_title)) {
+            SettingsRow(
                 icon = Icons.Outlined.BatteryFull,
                 iconColor = if (ignoringOptimizations) ChatColors.ok else ChatColors.warn,
                 title = stringResource(R.string.battery_opt_row_title),
@@ -227,147 +182,24 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
                         PowerOptimizationManager.requestBatteryOptimizationExemption(activity)
                     }
                 },
+                showDivider = false,
             )
+        }
 
-            if (needsOemGuidance) {
-                Spacer(Modifier.size(16.dp))
-                BgSectionTitle(stringResource(R.string.rom_autostart_section_title))
-                BgRow(
+        if (needsOemGuidance) {
+            SettingsSection(header = stringResource(R.string.rom_autostart_section_title)) {
+                SettingsRow(
                     icon = Icons.Outlined.PhoneAndroid,
                     iconColor = ChatColors.warn,
                     title = stringResource(R.string.rom_autostart_row_title),
-                    subtitle = stringResource(
-                        R.string.rom_autostart_row_subtitle,
-                        vendor.displayName,
-                    ),
+                    subtitle = stringResource(R.string.rom_autostart_row_subtitle, vendor.displayName),
                     onClick = {
                         if (activity != null) {
                             val ok = PowerOptimizationManager.openOemAutostartSettings(activity)
                             if (!ok) PowerOptimizationManager.openAppDetailsSettings(activity)
                         }
                     },
-                )
-            }
-
-            Spacer(Modifier.size(16.dp))
-    }
-}
-
-@Composable
-private fun BgSectionTitle(text: String) {
-    Text(
-        text = text.uppercaseForDisplay(),
-        fontSize = 12.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 6.dp),
-    )
-}
-
-@Composable
-private fun BgFooter(text: String) {
-    Text(
-        text = text,
-        fontSize = 12.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 6.dp),
-    )
-}
-
-@Composable
-private fun BgToggleRow(
-    icon: ImageVector,
-    iconColor: Color,
-    title: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    // [T-android-dynamic-island] When false the row is greyed out and both the
-    // whole-row tap and the Switch are inert (used for the dynamic-island
-    // toggle on devices that don't support Live Updates).
-    enabled: Boolean = true,
-) {
-    val rowAlpha = if (enabled) 1f else 0.4f
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .groupedCard(RoundedCornerShape(12.dp))
-            .clickable(enabled = enabled) { onCheckedChange(!checked) }
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(iconColor.copy(alpha = 0.15f * rowAlpha)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconColor.copy(alpha = rowAlpha),
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text = title,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = rowAlpha),
-            modifier = Modifier.weight(1f),
-        )
-        MinisSwitch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled,
-            colors = SwitchDefaults.colors(),
-        )
-    }
-}
-
-@Composable
-private fun BgRow(
-    icon: ImageVector,
-    iconColor: Color,
-    title: String,
-    subtitle: String?,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .groupedCard(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(iconColor.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconColor,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.padding(end = 6.dp)) {
-            Text(
-                text = title,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (!subtitle.isNullOrEmpty()) {
-                Text(
-                    text = subtitle,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    showDivider = false,
                 )
             }
         }

@@ -395,7 +395,7 @@ internal val baseMethodsPart1: List<MethodSpec> = listOf(
             name = "provider.slots.get",
             description = "List the five fixed model slots and their ordered entry IDs.",
             params = emptyList(),
-            returns = "{count, fallbackTrigger, slots:{main:{entryIds,entries}, light:{...}, vision:{...}, voiceInput:{...}, voiceOutput:{...}}}",
+            returns = "{count, fallbackTrigger, slots:{main:{entryIds,entries}, light:{...}, vision:{...}, voiceInput:{...}, voiceOutput:{...}, image:{...}}}",
             example = JSONObject(),
         ),
 

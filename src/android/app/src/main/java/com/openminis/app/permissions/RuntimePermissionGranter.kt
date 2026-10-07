@@ -61,6 +61,20 @@ object RuntimePermissionGranter {
         }
     }
 
+    /** Whether every runtime permission the manifest declares, and the two special accesses, are already granted. */
+    fun allGranted(context: Context): Boolean = runCatching {
+        declaredPermissions(context).all { d ->
+            when {
+                d.name == "android.permission.MANAGE_EXTERNAL_STORAGE" ->
+                    android.os.Build.VERSION.SDK_INT < 30 || android.os.Environment.isExternalStorageManager()
+                d.name == "android.permission.SYSTEM_ALERT_WINDOW" -> android.provider.Settings.canDrawOverlays(context)
+                d.dangerous ->
+                    context.checkSelfPermission(d.name) == PackageManager.PERMISSION_GRANTED
+                else -> true
+            }
+        }
+    }.getOrDefault(false)
+
     suspend fun grantAll(context: Context): Result {
         val commands = plan(context.packageName, declaredPermissions(context))
         var succeeded = 0

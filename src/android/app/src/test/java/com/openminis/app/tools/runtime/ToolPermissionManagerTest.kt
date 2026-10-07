@@ -211,4 +211,21 @@ class ToolPermissionManagerTest {
         assertFalse(ToolPermissionManager.isRemoteVirtualDisplayDenied("android.ui", "mcp:tok1", 0))
         assertFalse(ToolPermissionManager.isRemoteVirtualDisplayDenied("android.ui", "mcp:tok1", null))
     }
+
+    @Test
+    fun `the local agent is never asked for a one-time approval but a remote caller still is`() {
+        val tools = listOf(
+            "android.deploy", "android.deploy.install", "android.package.install",
+            "android.package.uninstall", "android.root.probe",
+        )
+        for (tool in tools) {
+            assertFalse("local $tool", ToolPermissionManager.needsConfirm(tool, "local_agent"))
+            assertTrue("local $tool allowed", ToolPermissionManager.isDirectlyAllowed(tool, "local_agent"))
+        }
+        // A remote MCP caller keeps the confirmation gate; root.probe stays invisible to it.
+        for (tool in tools.filter { it != "android.root.probe" }) {
+            assertTrue("mcp $tool", ToolPermissionManager.needsConfirm(tool, "mcp:tok1"))
+        }
+        assertTrue("android.root.probe" in ToolPermissionManager.localOnlyTools)
+    }
 }

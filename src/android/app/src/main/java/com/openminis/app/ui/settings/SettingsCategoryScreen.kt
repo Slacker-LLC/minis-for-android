@@ -340,6 +340,7 @@ fun SettingsCategoryScreen(
             }
 
             SettingsCategory.SYSTEM -> {
+                OneTapAuthorizeSection()
                 ReadinessCheckSection(onOpenBackground = onOpenBackground)
                 SettingsSection(
                     header = stringResource(R.string.settings_manage_header),
