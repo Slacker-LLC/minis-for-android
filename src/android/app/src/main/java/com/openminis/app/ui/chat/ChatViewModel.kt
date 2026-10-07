@@ -2067,11 +2067,6 @@ class ChatViewModel(
             is CompactionPlanner.Outcome.Ready -> outcome
         }
         val toCompact = ready.toCompact
-        val compactEndIdx = ready.compactEndIdx
-        val chunks = ready.chunks
-        val existingSummary = ready.existingSummary
-        val summaryCharCap = ready.summaryCharCap
-        val summaryMaxInputTokens = ready.summaryMaxInputTokens
         // Past every precondition — from here the launch below owns the
         // onFinished callback.
         markStarted()
@@ -2092,147 +2087,39 @@ class ChatViewModel(
             // keep today's behavior (queued bubbles stay pending + cancellable).
             var compactSucceeded = false
             try {
-                // [C3-android-compaction-guards] Eta's summary loop: one
-                // summary call per planned chunk, chained through
-                // `previousSummary`, and every chunk answer gated before it is
-                // carried forward. A chunk that overflows the provider is
-                // still halved on a complete-batch boundary inside
-                // generateCompactSummaryWithSplitting, bounded by the same
-                // MAX_OVERFLOW_ATTEMPTS depth cap as before.
-                val draft = withTimeout(compactTimeoutMs) {
-                    compactionSummarizer.summarizeCompactionChunks(
-                        chunks = chunks,
-                        previousSummary = existingSummary,
-                        summaryCharCap = summaryCharCap,
-                        summaryMaxInputTokens = summaryMaxInputTokens,
-                    )
-                }
-                val rawSummary = draft.text.trim()
-                val summary = compactionSummarizer.appendAuthoritativeFileActivity(
-                    summary = rawSummary,
-                    previousSummary = existingSummary,
-                    messages = toCompact,
+                val result = CompactionExecution.run(
+                    plan = ready,
+                    history = history,
+                    summarizer = compactionSummarizer,
+                    timeoutMs = compactTimeoutMs,
+                    sessionId = realSessionId.ifEmpty { sessionId },
+                    loadMessageIds = { chatRepository.dao.loadMessages(realSessionId.ifEmpty { sessionId }).map { it.id }.toSet() },
+                    insertMarker = { chatRepository.dao.insertCompactMarker(it) },
                 )
-                // [C3-android-compaction-guards] Eta's summary gate, re-run on
-                // the decorated text that actually reaches the marker: it only
-                // becomes a summary when the model finished normally, the
-                // result is present, bounded and free of tool calls.
-                compactionSummarizer.requireValidSummary(summary, draft.stopReason, summaryCharCap)
-                // [C3-android-compaction-guards] Eta's CONTEXT_NO_REDUCTION
-                // gate, priced on both sides with the ported estimator: what is
-                // replaced is the summarized range plus the previous summary it
-                // supersedes; the replacement is the new summary message.
-                val previousSummaryTokens = existingSummary
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let { AgentContextBudget.rawEstimate(listOf(summaryAsMessage(it))) }
-                    ?: 0
-                val beforeTokens = AgentContextBudget.rawEstimate(toCompact) + previousSummaryTokens
-                val afterTokens = AgentContextBudget.rawEstimate(listOf(summaryAsMessage(summary)))
-                if (!AgentContextCompactor.hasReduction(beforeTokens, afterTokens)) {
-                    val message = AgentContextCompactor.noReductionMessage(beforeTokens, afterTokens)
-                    Log.w(
-                        TAG,
-                        "[Compact] rejected ${AgentContextCompactor.FAILURE_NO_REDUCTION}: $message",
-                    )
-                    withContext(Dispatchers.Main) {
-                        appendSystemInfo(message, "compact")
-                    }
-                    return@launch
-                }
-
-                val sid = realSessionId.ifEmpty { sessionId }
-                // v2 marker: lastCompactedMessageId IS the anchor — single
-                // source of truth. The anchor we resolved above is guaranteed
-                // to have a persisted dbMessageId. Legacy fields (firstKept /
-                // boundary / sortOrder) stay null/MAX so a downgraded reader
-                // sees "everything compacted, nothing kept" as a graceful
-                // fallback rather than a stale boundary.
-                // Re-resolve anchor: now that we're inside an IO coroutine
-                // we can read the messages DB to verify the dbMessageId is
-                // actually persisted, not just set on the in-memory
-                // LLMMessage. iOS does this belt-and-suspenders check
-                // (AIChatViewModel+Compaction.swift:644-657). Walk back from
-                // the guard-selected compactEndIdx until we find an entry whose
-                // id is both non-empty AND present in rawDbIds.
-                val rawDbIds: Set<String> = try {
-                    chatRepository.dao.loadMessages(sid).map { it.id }.toSet()
-                } catch (e: Exception) {
-                    Log.w(TAG, "[Compact] loadMessages for raw-id verify failed: ${e.message}")
-                    emptySet()
-                }
-                val verifiedAnchorIdx = CompactionPlanner.verifiedAnchorIndex(history, compactEndIdx, rawDbIds)
-                if (verifiedAnchorIdx < 0) {
-                    Log.w(TAG, "[Compact] No agentHistory entry has a DB-persisted dbMessageId; aborting")
-                    withContext(Dispatchers.Main) {
-                        appendSystemInfo("Compact failed: could not anchor to a persisted message.", "compact")
-                    }
-                    return@launch
-                }
-                // [C3-android-compaction-guards] The DB walk-back must not land
-                // inside a tool batch — an anchor that splits a tool_use from
-                // its tool_result is exactly the split this guard exists to
-                // prevent. (compactEndIdx can never be history.lastIndex: range
-                // selection always protects a non-empty tail, so this re-check
-                // always looks at a real prefix boundary.)
-                if (verifiedAnchorIdx + 1 < history.size &&
-                    !AgentContextCompactor.canSplit(history, verifiedAnchorIdx + 1)
-                ) {
-                    Log.w(TAG, "[Compact] anchor walk-back landed inside a tool batch; aborting")
-                    withContext(Dispatchers.Main) {
-                        appendSystemInfo(
-                            "Nothing safe to compact — the anchor would split a tool batch in half.",
-                            "compact",
-                        )
-                    }
-                    return@launch
-                }
-                if (verifiedAnchorIdx != compactEndIdx) {
-                    AppLogger.warning(
-                        TAG,
-                        "[Compact] anchor walked back from idx=$compactEndIdx to idx=$verifiedAnchorIdx " +
-                            "(closest with id in rawDbIds). Unsynced tail entries will fall on the active side of the divider.",
-                    )
-                }
-                val lastCompactedDbId = history[verifiedAnchorIdx].dbMessageId
-                    ?: run {
-                        Log.w(TAG, "[Compact] verified anchor at idx=$verifiedAnchorIdx lost dbMessageId; aborting")
-                        withContext(Dispatchers.Main) {
-                            appendSystemInfo("Compact failed: anchor message id unavailable.", "compact")
-                        }
+                when (result) {
+                    is CompactionExecution.Result.Stopped -> {
+                        withContext(Dispatchers.Main) { appendSystemInfo(result.message, "compact") }
                         return@launch
                     }
-                val marker = CompactMarkerEntity(
-                    id = java.util.UUID.randomUUID().toString(),
-                    sessionId = sid,
-                    summary = summary,
-                    firstKeptSortOrder = Int.MAX_VALUE,   // legacy field; v2 ignores
-                    compactedCount = toCompact.size,
-                    createdAt = System.currentTimeMillis(),
-                    uiBoundarySortOrder = null,
-                    boundaryMessageId = null,
-                    firstKeptMessageId = null,
-                    lastCompactedMessageId = lastCompactedDbId,
-                    version = 2,
-                )
-                runCatching { chatRepository.dao.insertCompactMarker(marker) }
-                    .onFailure {
-                        Log.w(TAG, "Failed to persist compact marker: ${it.message}")
+                    is CompactionExecution.Result.Done -> {
+                        val summary = result.summary
+                        _compactSummary.value = summary
+                        // Keep the marker in memory so effectiveAgentHistory() can
+                        // resolve the boundary on the very next outgoing turn.
+                        // Mirrors iOS `cachedLatestMarker = marker`.
+                        _cachedLatestMarker = result.marker
+                        withContext(Dispatchers.Main) {
+                            val divided = CompactionPlanner.markCompacted(_messages.value, result.cutoffId)
+                            val compactedUICount = divided.compactedUiCount
+                            _messages.value = divided.messages
+                            AppLogger.info(TAG, "[Compact] divider: $compactedUICount UI bubbles compacted (history entries: ${ready.toCompact.size})")
+                            appendSystemInfo(
+                                text = "$compactedUICount messages compacted",
+                                iconKind = "compact",
+                                payload = summary,
+                            )
+                        }
                     }
-                _compactSummary.value = summary
-                // Keep the marker in memory so effectiveAgentHistory() can
-                // resolve the boundary on the very next outgoing turn.
-                // Mirrors iOS `cachedLatestMarker = marker`.
-                _cachedLatestMarker = marker
-                withContext(Dispatchers.Main) {
-                    val divided = CompactionPlanner.markCompacted(_messages.value, lastCompactedDbId)
-                    val compactedUICount = divided.compactedUiCount
-                    _messages.value = divided.messages
-                    AppLogger.info(TAG, "[Compact] divider: $compactedUICount UI bubbles compacted (history entries: ${toCompact.size})")
-                    appendSystemInfo(
-                        text = "$compactedUICount messages compacted",
-                        iconKind = "compact",
-                        payload = summary,
-                    )
                 }
                 compactSucceeded = true
             } catch (e: TimeoutCancellationException) {
