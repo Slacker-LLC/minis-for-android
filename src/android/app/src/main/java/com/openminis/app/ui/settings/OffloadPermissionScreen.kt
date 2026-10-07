@@ -364,6 +364,7 @@ private fun toolTitleRes(toolName: String): Int = when (toolName) {
     "photos" -> R.string.perm_tool_photos
     "a11y_cli" -> R.string.perm_tool_a11y_cli
     "shizuku_cli" -> R.string.perm_tool_shizuku_cli
+    "apt_cli" -> R.string.perm_tool_apt_cli
     "android.vscreen.open" -> R.string.perm_tool_vscreen_open
     "android.vscreen.launch" -> R.string.perm_tool_vscreen_launch
     "android.vscreen.close" -> R.string.perm_tool_vscreen_close

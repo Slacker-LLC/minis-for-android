@@ -324,6 +324,7 @@
     <!-- T336: dedicated SectionCard per integration CLI. TODO translate (de) -->
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
     <string name="perm_tool_shizuku_cli">android-shizuku-cli</string>
+    <string name="perm_tool_apt_cli">minis-apt</string>
     <string name="perm_section_a11y">Bedienungshilfen</string>
     <string name="perm_a11y_section_footer">android-a11y-cli ermöglicht dem Agenten, die UI-Struktur zu lesen, Tippen und Gesten auszuführen sowie Systemereignisse zu beobachten. Beide Zeilen unten müssen gesetzt sein: Agent-Berechtigung wählen und Bedienungshilfen-Dienst in den Systemeinstellungen aktivieren.</string>
     <string name="perm_shizuku_section_footer">android-shizuku-cli gewährt dem Agenten privilegierte Android-APIs (Paket-Installation, settings put, Force-Stop, …) über den Shizuku-Dienst, autorisiert via WLAN-ADB oder Root. Beide Zeilen unten müssen gesetzt sein.</string>

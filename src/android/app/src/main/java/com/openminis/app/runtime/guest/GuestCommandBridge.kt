@@ -628,6 +628,7 @@ exit 0
         "android-weather",
         "android-a11y-cli",
         "android-shizuku-cli",
+        "minis-apt",
         "minis-browser-use",
         "minis-scheduled",
         "minis-sessions-cli",

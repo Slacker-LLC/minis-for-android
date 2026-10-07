@@ -787,6 +787,7 @@
          row when system Settings need attention. -->
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
     <string name="perm_tool_shizuku_cli">android-shizuku-cli</string>
+    <string name="perm_tool_apt_cli">minis-apt</string>
     <string name="perm_section_a11y">Accessibility</string>
     <string name="perm_a11y_section_footer">android-a11y-cli lets the agent read on-screen UI structure, perform taps and gestures, and watch system events. Both rows below must be set: pick an Agent permission and enable the Accessibility service in system Settings.</string>
     <string name="perm_shizuku_section_footer">android-shizuku-cli grants the agent privileged Android APIs (package install, settings put, force-stop, …) via the Shizuku service authorized over wireless ADB or root. Both rows below must be set.</string>

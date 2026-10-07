@@ -324,6 +324,7 @@
     <!-- T336: dedicated SectionCard per integration CLI. TODO translate (ko) -->
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
     <string name="perm_tool_shizuku_cli">android-shizuku-cli</string>
+    <string name="perm_tool_apt_cli">minis-apt</string>
     <string name="perm_section_a11y">접근성</string>
     <string name="perm_a11y_section_footer">android-a11y-cli는 에이전트가 화면 UI 구조를 읽고, 탭과 제스처를 수행하며 시스템 이벤트를 감시할 수 있게 합니다. 아래 두 행을 모두 설정하세요: 에이전트 권한을 선택하고 시스템 설정에서 접근성 서비스를 활성화하세요.</string>
     <string name="perm_shizuku_section_footer">android-shizuku-cli는 무선 ADB 또는 root로 시작된 Shizuku 서비스를 통해 에이전트에게 권한 있는 Android API(패키지 설치, settings put, 강제 중지 등)를 부여합니다. 아래 두 행을 모두 설정하세요.</string>

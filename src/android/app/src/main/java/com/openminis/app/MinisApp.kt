@@ -878,6 +878,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         // T323: UI-layer automation backed by MinisAccessibilityService.
         NativeOffloadServer.register("android-a11y-cli", AccessibilityOffloadHandler(this))
         NativeOffloadServer.register("minis-model-use", ModelUseOffloadHandler(this, providerRepository))
+        NativeOffloadServer.register("minis-apt", com.openminis.app.runtime.guest.AptOffloadHandler(this))
         // T-config: minis-config — agent-facing settings management
         // (read/write registered ConfigFields with audit + revert).
         // Mirrors iOS `config_offload_register()` in ISHKernel.m.
