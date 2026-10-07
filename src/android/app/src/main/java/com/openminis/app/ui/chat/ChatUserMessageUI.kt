@@ -293,6 +293,7 @@ internal fun UserMessageBubble(
     // compaction refuses to run mid-turn.
     onCompactAbove: (() -> Unit)? = null,
     onWithdraw: (() -> Unit)? = null,
+    onChangeDelivery: ((PendingDelivery) -> Unit)? = null,
     onPreviewFile: (Uri, String) -> Unit = { _, _ -> },
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -458,6 +459,30 @@ internal fun UserMessageBubble(
                                 )
                             }
                         }
+                    }
+                }
+                // A message sent while the agent was working says when it will arrive, and one tap switches it:
+                // steer (at the agent's next step) or queue (after the whole task).
+                if (isQueued && onChangeDelivery != null) {
+                    val steer = message.queuedDelivery == PendingDelivery.STEER
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .clickable { onChangeDelivery(if (steer) PendingDelivery.QUEUE else PendingDelivery.STEER) }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(if (steer) R.string.queued_delivery_steer else R.string.queued_delivery_queue),
+                            fontSize = 12.sp,
+                            color = ChatColors.secondaryText,
+                        )
+                        Text(
+                            text = "  " + stringResource(if (steer) R.string.queued_delivery_switch_to_queue else R.string.queued_delivery_switch_to_steer),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = ChatColors.sendButton,
+                        )
                     }
                 }
             }

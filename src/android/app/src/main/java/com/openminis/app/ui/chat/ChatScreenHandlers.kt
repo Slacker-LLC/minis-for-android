@@ -11,10 +11,10 @@ import java.io.File
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun rememberPerformSendOrEnqueue(viewModel: com.openminis.app.ui.chat.ChatViewModel, lastSendTimeMsState: androidx.compose.runtime.MutableState<kotlin.Long>, noteSendForInputModePref: kotlin.Function0<kotlin.Unit>, coroutineScope: kotlinx.coroutines.CoroutineScope, tracedScrollToItem: suspend (kotlin.String, kotlin.Int, kotlin.Int) -> kotlin.Unit, isNearBottom: androidx.compose.runtime.State<kotlin.Boolean>, userScrolledAwayState: androidx.compose.runtime.MutableState<kotlin.Boolean>, releaseComposerAfterSend: kotlin.Function0<kotlin.Unit>): kotlin.Function1<kotlin.String, kotlin.Unit> {
+internal fun rememberPerformSendOrEnqueue(viewModel: com.openminis.app.ui.chat.ChatViewModel, lastSendTimeMsState: androidx.compose.runtime.MutableState<kotlin.Long>, noteSendForInputModePref: kotlin.Function0<kotlin.Unit>, coroutineScope: kotlinx.coroutines.CoroutineScope, tracedScrollToItem: suspend (kotlin.String, kotlin.Int, kotlin.Int) -> kotlin.Unit, isNearBottom: androidx.compose.runtime.State<kotlin.Boolean>, userScrolledAwayState: androidx.compose.runtime.MutableState<kotlin.Boolean>, releaseComposerAfterSend: kotlin.Function0<kotlin.Unit>): kotlin.Function2<kotlin.String, PendingDelivery, kotlin.Unit> {
     var lastSendTimeMs by lastSendTimeMsState
     var userScrolledAway by userScrolledAwayState
-    return handler@{ rawText ->
+    return handler@{ rawText, delivery ->
         if (viewModel.tryExecuteInputAsSlashCommand(rawText)) {
             viewModel.setInputText("")
             releaseComposerAfterSend()
@@ -37,7 +37,7 @@ internal fun rememberPerformSendOrEnqueue(viewModel: com.openminis.app.ui.chat.C
         viewModel.endSlashSessionForSend()
         viewModel.setInputText("")
         releaseComposerAfterSend()
-        viewModel.sendMessage(rawText)
+        viewModel.sendMessage(rawText, delivery)
         noteSendForInputModePref()
         userScrolledAway = false
         coroutineScope.launch {

@@ -2154,4 +2154,8 @@
     <string name="model_slot_image">이미지</string>
     <string name="selection_reply_actions">답변 작업</string>
     <string name="chat_interrupted_short">중단됨</string>
+    <string name="queued_delivery_steer">다음 단계에서 작업을 안내합니다</string>
+    <string name="queued_delivery_queue">작업이 끝난 뒤 전송됩니다</string>
+    <string name="queued_delivery_switch_to_queue">끝난 뒤 보내기</string>
+    <string name="queued_delivery_switch_to_steer">지금 안내</string>
 </resources>

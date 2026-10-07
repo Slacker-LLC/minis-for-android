@@ -2403,4 +2403,8 @@
     <string name="model_slot_image">图像</string>
     <string name="selection_reply_actions">回复操作</string>
     <string name="chat_interrupted_short">已中断</string>
+    <string name="queued_delivery_steer">将在下一步引导任务</string>
+    <string name="queued_delivery_queue">任务完成后发送</string>
+    <string name="queued_delivery_switch_to_queue">改为排队</string>
+    <string name="queued_delivery_switch_to_steer">改为引导</string>
 </resources>

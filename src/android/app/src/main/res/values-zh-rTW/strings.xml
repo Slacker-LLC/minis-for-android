@@ -2374,4 +2374,8 @@
     <string name="model_slot_image">圖像</string>
     <string name="selection_reply_actions">回覆操作</string>
     <string name="chat_interrupted_short">已中斷</string>
+    <string name="queued_delivery_steer">將在下一步引導任務</string>
+    <string name="queued_delivery_queue">任務完成後傳送</string>
+    <string name="queued_delivery_switch_to_queue">改為排隊</string>
+    <string name="queued_delivery_switch_to_steer">改為引導</string>
 </resources>

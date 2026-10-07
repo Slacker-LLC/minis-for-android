@@ -141,6 +141,8 @@ data class ChatMessage(
     // Mirrors iOS ChatMessage.isQueued / queuedPromptId.
     val isQueued: Boolean = false,
     val queuedPromptId: String? = null,
+    /** How this waiting message will be delivered; meaningful only while [isQueued]. */
+    val queuedDelivery: PendingDelivery = PendingDelivery.STEER,
     // Set to true when this message belongs to a range that has been folded
     // into a compact summary marker. Mirrors iOS ChatMessage.isCompactedHistory:
     // the message stays in the UI, but renders at reduced opacity so the user
@@ -207,11 +209,23 @@ data class ChatMessage(
     }
 }
 
-/** A user prompt queued while the agent loop is still running. Mirrors iOS QueuedPrompt. */
+/**
+ * When a message sent while the agent is working reaches it.
+ *  - [STEER]: at the agent's next step. After the current tool round the agent sees the message and decides
+ *    whether the task goes on, changes, or stops (the plan is not thrown away).
+ *  - [QUEUE]: after the whole task is done. The agent is not interrupted; the message starts the next turn.
+ */
+enum class PendingDelivery { STEER, QUEUE }
+
+/** The waiting prompts the agent must see at its next step boundary: only those meant to steer, in send order. */
+internal fun List<QueuedPrompt>.dueAtStepBoundary(): List<QueuedPrompt> = filter { it.delivery == PendingDelivery.STEER }
+
+/** A user prompt waiting for the agent loop that is still running. Mirrors iOS QueuedPrompt. */
 data class QueuedPrompt(
     val id: String,
     val text: String,
     val attachments: List<InputAttachment> = emptyList(),
+    val delivery: PendingDelivery = PendingDelivery.STEER,
 )
 
 /**

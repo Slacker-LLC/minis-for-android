@@ -2382,4 +2382,8 @@
     <string name="model_slot_image">Изображения</string>
     <string name="selection_reply_actions">Действия с ответом</string>
     <string name="chat_interrupted_short">Прервано</string>
+    <string name="queued_delivery_steer">Направит задачу на следующем шаге</string>
+    <string name="queued_delivery_queue">Будет отправлено после завершения задачи</string>
+    <string name="queued_delivery_switch_to_queue">Отправить после</string>
+    <string name="queued_delivery_switch_to_steer">Направить сейчас</string>
 </resources>

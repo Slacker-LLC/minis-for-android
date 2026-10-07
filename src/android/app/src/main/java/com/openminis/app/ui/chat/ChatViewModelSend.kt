@@ -31,12 +31,12 @@ import com.openminis.app.data.repository.loadApiKey
 import com.openminis.app.data.repository.saveApiKey
 
 /**
- * Enqueue a prompt to be injected into the currently running agent loop.
- * The message appears immediately in the chat with isQueued=true; when the
- * current agent loop finishes, drainQueuedPrompts() consumes the queue.
+ * Hold a prompt for the currently running agent loop. The message appears immediately in the chat with
+ * isQueued=true. A [PendingDelivery.STEER] prompt is injected at the loop's next step boundary; a
+ * [PendingDelivery.QUEUE] prompt waits until the loop finishes and drainQueuedPrompts() starts its turn.
  * Mirrors iOS AIChatViewModel.enqueuePrompt().
  */
-fun ChatViewModel.enqueuePrompt(text: String) {
+fun ChatViewModel.enqueuePrompt(text: String, delivery: PendingDelivery = PendingDelivery.STEER) {
     val trimmed = text.trim()
     val pendingAttachments = _attachments.value
     if ((trimmed.isBlank() && pendingAttachments.isEmpty()) || !_isStreaming.value) return
@@ -45,6 +45,7 @@ fun ChatViewModel.enqueuePrompt(text: String) {
         id = "queued_${System.currentTimeMillis()}_${(Math.random() * 1_000_000).toInt()}",
         text = trimmed,
         attachments = pendingAttachments,
+        delivery = delivery,
     )
     _promptQueue.value = _promptQueue.value + prompt
 
@@ -60,11 +61,21 @@ fun ChatViewModel.enqueuePrompt(text: String) {
         attachmentUris = attachmentUris,
         isQueued = true,
         queuedPromptId = prompt.id,
+        queuedDelivery = delivery,
     )
     _messages.value = _messages.value + chatMsg
     sessionEventEmitter.messageCreated(chatMsg)
     clearAttachments()
     Log.i(TAG, "Enqueued prompt (${trimmed.length}ch, ${pendingAttachments.size} attachments), queue=${_promptQueue.value.size}")
+}
+
+/** Switch a waiting message between steering the running task and waiting for it to finish. */
+fun ChatViewModel.setQueuedDelivery(messageId: String, delivery: PendingDelivery) {
+    val msg = _messages.value.firstOrNull { it.id == messageId } ?: return
+    if (!msg.isQueued) return
+    val pid = msg.queuedPromptId ?: return
+    _promptQueue.value = _promptQueue.value.map { if (it.id == pid) it.copy(delivery = delivery) else it }
+    _messages.value = _messages.value.map { if (it.id == messageId) it.copy(queuedDelivery = delivery) else it }
 }
 
 /** Remove a queued prompt and its chat message by prompt id. */
@@ -88,9 +99,10 @@ internal suspend fun ChatViewModel.injectQueuedPromptsAsNewTurn(
     finishedAccumulatedText: String,
     finishedAllToolBlocks: List<AssistantBlock>,
 ): InjectedTurn? {
-    if (_promptQueue.value.isEmpty()) return null
-    val queued = _promptQueue.value
-    _promptQueue.value = emptyList()
+    // Only prompts meant to steer the running task are delivered here; QUEUE ones stay for drainQueuedPrompts.
+    val queued = _promptQueue.value.dueAtStepBoundary()
+    if (queued.isEmpty()) return null
+    _promptQueue.value = _promptQueue.value - queued.toSet()
 
     // [T-android-queued-message-duplicated-on-inject] REMOVE the queued
     // placeholder bubbles (the ones enqueuePrompt added with
@@ -336,6 +348,10 @@ internal suspend fun ChatViewModel.drainQueuedPrompts(
 
 fun ChatViewModel.sendMessage(text: String) = sendMessage(text, skipContextCheck = false)
 
+/** Send [text]; while the agent is working it is held and delivered as [delivery] says. */
+fun ChatViewModel.sendMessage(text: String, delivery: PendingDelivery) =
+    sendMessage(text, skipContextCheck = false, delivery = delivery)
+
 /**
  * A programmatic prompt (background callback, routine, RPC). It owns exactly [text] and
  * [attachments]: the user's composer — attachments being prepared, a message being edited, pasted
@@ -359,13 +375,14 @@ internal fun ChatViewModel.sendMessage(
     skipContextCheck: Boolean,
     request: AgentTurnHandle? = null,
     ownAttachments: List<InputAttachment> = emptyList(),
+    delivery: PendingDelivery = PendingDelivery.STEER,
 ) {
     val trimmed = text.trim()
     // Only submitPrompt passes a request; such a send carries its own input (see submitPrompt).
     val programmatic = request != null
     // While streaming, enqueue instead of silently dropping (iOS: send vs enqueuePrompt).
     if (_isStreaming.value) {
-        if (request != null) request.reject("session_busy") else enqueuePrompt(text)
+        if (request != null) request.reject("session_busy") else enqueuePrompt(text, delivery)
         return
     }
     // T180: allow attachments-only sends (no caption). Mirrors iOS, where
