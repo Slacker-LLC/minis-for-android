@@ -488,6 +488,9 @@ internal fun ChatMessageList(
                     onWithdraw = if (item.message.isQueued) {
                         { safeMutate { viewModel.withdrawQueuedMessage(item.message.id) } }
                     } else null,
+                    onChangeDelivery = if (item.message.isQueued) {
+                        { delivery -> safeMutate { viewModel.setQueuedDelivery(item.message.id, delivery) } }
+                    } else null,
                     onPreviewFile = { uri, name ->
                         // T150: turn the persisted file:// URI back
                         // into a FileItem and hand off to the host

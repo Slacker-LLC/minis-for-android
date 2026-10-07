@@ -2162,4 +2162,8 @@
     <string name="model_slot_image">画像</string>
     <string name="selection_reply_actions">返信の操作</string>
     <string name="chat_interrupted_short">中断されました</string>
+    <string name="queued_delivery_steer">次のステップでタスクを誘導します</string>
+    <string name="queued_delivery_queue">タスク完了後に送信されます</string>
+    <string name="queued_delivery_switch_to_queue">完了後に送る</string>
+    <string name="queued_delivery_switch_to_steer">今すぐ誘導</string>
 </resources>

@@ -156,7 +156,7 @@ internal fun ChatComposer(
     tracedScrollToItem: suspend (kotlin.String, kotlin.Int, kotlin.Int) -> kotlin.Unit,
     userScrolledAwayState: androidx.compose.runtime.MutableState<kotlin.Boolean>,
     releaseComposerAfterSend: kotlin.Function0<kotlin.Unit>,
-    performSendOrEnqueue: kotlin.Function1<kotlin.String, kotlin.Unit>,
+    performSendOrEnqueue: kotlin.Function2<kotlin.String, PendingDelivery, kotlin.Unit>,
     chatInputFontScale: kotlin.Float,
     previewImageGalleryState: androidx.compose.runtime.MutableState<kotlin.Pair<kotlin.collections.List<com.openminis.app.ui.components.ImageGalleryItem>, kotlin.Int>?>,
     webAppSheetTargetState: androidx.compose.runtime.MutableState<com.openminis.app.ui.chat.InputAttachment?>,
@@ -251,7 +251,9 @@ internal fun ChatComposer(
                         // matches the send-button tap path which
                         // already enqueues mid-stream via
                         // viewModel.sendMessage → enqueuePrompt.
-                        performSendOrEnqueue(viewModel.inputText.value)
+                        // A swipe is the "release to queue" gesture: while the agent is working the
+                        // message waits for the whole task instead of steering it (a tap steers).
+                        performSendOrEnqueue(viewModel.inputText.value, PendingDelivery.QUEUE)
                     }
                     sendSwipeProgress = 0f
                 } else if (swipedUp && !hasText && !inputFocused) {
@@ -1686,7 +1688,7 @@ internal fun ChatComposer(
                             // the list to index 0 with a 100ms
                             // re-pin to catch the late-mounting
                             // "thinking" indicator.
-                            performSendOrEnqueue(inputText)
+                            performSendOrEnqueue(inputText, PendingDelivery.STEER)
                         },
                     contentAlignment = Alignment.Center,
                 ) {

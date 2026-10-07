@@ -101,7 +101,7 @@ internal fun ChatBottomArea(
     tracedScrollToItem: suspend (kotlin.String, kotlin.Int, kotlin.Int) -> kotlin.Unit,
     userScrolledAway_st: androidx.compose.runtime.MutableState<kotlin.Boolean>,
     releaseComposerAfterSend: kotlin.Function0<kotlin.Unit>,
-    performSendOrEnqueue: kotlin.Function1<kotlin.String, kotlin.Unit>,
+    performSendOrEnqueue: kotlin.Function2<kotlin.String, PendingDelivery, kotlin.Unit>,
     editingSessionState: androidx.compose.runtime.MutableState<com.openminis.app.data.db.ChatSessionEntity?>,
     chatInputFontScale: kotlin.Float,
     previewImageGallery_st: androidx.compose.runtime.MutableState<kotlin.Pair<kotlin.collections.List<com.openminis.app.ui.components.ImageGalleryItem>, kotlin.Int>?>,

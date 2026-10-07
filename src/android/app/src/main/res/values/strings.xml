@@ -2493,4 +2493,8 @@
     <string name="model_slot_image">Image</string>
     <string name="selection_reply_actions">Reply actions</string>
     <string name="chat_interrupted_short">Interrupted</string>
+    <string name="queued_delivery_steer">Will guide the task at its next step</string>
+    <string name="queued_delivery_queue">Will be sent when the task is done</string>
+    <string name="queued_delivery_switch_to_queue">Send when done</string>
+    <string name="queued_delivery_switch_to_steer">Guide now</string>
 </resources>

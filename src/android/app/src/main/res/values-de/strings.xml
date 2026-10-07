@@ -2165,4 +2165,8 @@
     <string name="model_slot_image">Bild</string>
     <string name="selection_reply_actions">Antwort-Aktionen</string>
     <string name="chat_interrupted_short">Unterbrochen</string>
+    <string name="queued_delivery_steer">Lenkt die Aufgabe im nächsten Schritt</string>
+    <string name="queued_delivery_queue">Wird nach Abschluss der Aufgabe gesendet</string>
+    <string name="queued_delivery_switch_to_queue">Danach senden</string>
+    <string name="queued_delivery_switch_to_steer">Jetzt lenken</string>
 </resources>

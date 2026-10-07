@@ -1115,7 +1115,7 @@ internal suspend fun ChatViewModel.runAgentLoop(
         //   …assistant(responds-to-queued).
         // The bridge lives in agentHistory only (NOT persisted) —
         // it's purely a wire-format spacer for the API call.
-        if (_promptQueue.value.isNotEmpty()) {
+        if (_promptQueue.value.dueAtStepBoundary().isNotEmpty()) {
             AppLogger.info(
                 TAG_STREAM,
                 "📨[QueueInterrupt] turn=$turn ${_promptQueue.value.size} queued prompt(s) — interrupting after current tool call to start a standalone turn",
