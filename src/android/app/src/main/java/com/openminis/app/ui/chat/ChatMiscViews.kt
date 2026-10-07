@@ -908,21 +908,42 @@ internal fun ResumeBanner(onResume: () -> Unit) {
     // the first tap only armed the warning and a second tap was required; that
     // extra confirm was friction on an already-explicit gesture.)
     val showCrashWarning = com.openminis.app.diagnostics.LaunchCycleBeacon.lastCycleWasCrash
-    com.openminis.app.ui.components.MinisBanner(
-        text = if (showCrashWarning) {
-            stringResource(R.string.chat_resume_crash_warning)
-        } else {
-            stringResource(R.string.resume_banner_title)
-        },
-        modifier = Modifier.padding(vertical = 4.dp),
-        kind = if (showCrashWarning) {
-            com.openminis.app.ui.components.BannerKind.ERROR
-        } else {
-            com.openminis.app.ui.components.BannerKind.WARNING
-        },
-        actionLabel = stringResource(R.string.resume_action),
-        onAction = onResume,
-    )
+    // In the chat's own voice: a quiet line of grey text (red for a crash) and one capsule button, the same
+    // capsule the send hint uses. Not a coloured alert box with a warning triangle.
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = if (showCrashWarning) {
+                stringResource(R.string.chat_resume_crash_warning)
+            } else {
+                stringResource(R.string.chat_interrupted_short)
+            },
+            fontSize = 13.sp,
+            lineHeight = 19.sp,
+            color = if (showCrashWarning) ToolErrorColor else ChatColors.secondaryText,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(12.dp))
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(ChatColors.sendButton)
+                .clickable(onClick = onResume)
+                .padding(horizontal = 18.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = stringResource(R.string.resume_action),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = ChatColors.background,
+            )
+        }
+    }
 }
 
 /// Floating "send arrow + Release to send capsule" hint shown while the

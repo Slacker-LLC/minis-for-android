@@ -59,7 +59,6 @@
     <string name="mention_no_match">No matching files</string>
 
     <!-- T13: Resume banner (shown at the bottom of the message list when an interrupted agent loop can be resumed) -->
-    <string name="resume_banner_title">Interrupted — tap Resume to continue</string>
     <string name="resume_action">Resume</string>
 
     <!-- T46: Session-list search bar -->
@@ -2493,4 +2492,5 @@
     <string name="work_process_failed_only">Step %1$d failed</string>
     <string name="model_slot_image">Image</string>
     <string name="selection_reply_actions">Reply actions</string>
+    <string name="chat_interrupted_short">Interrupted</string>
 </resources>

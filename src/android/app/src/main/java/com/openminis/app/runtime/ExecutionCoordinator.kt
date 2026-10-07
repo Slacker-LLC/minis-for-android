@@ -145,6 +145,37 @@ object ExecutionCoordinator {
         }
     }
 
+    /**
+     * A guest shell of its own for one background job: same chroot, user, workspace and environment as the
+     * session's persistent shell, but a separate process, so it neither waits for that shell nor blocks it.
+     * Output lines pass the same sanitising and Privacy-Mode masking as a foreground command's output.
+     */
+    fun newJobProcess(sessionId: String): ShellJobs.JobProcess = object : ShellJobs.JobProcess {
+        private val shell = RootPersistentShell(sessionId)
+
+        override suspend fun run(
+            command: String,
+            timeoutMs: Long,
+            onLine: (String) -> Unit,
+        ): ShellJobs.JobProcess.Result {
+            val startTime = System.currentTimeMillis()
+            ensureRuntimeReady(startTime)?.let { failed ->
+                onLine(failed.output)
+                return ShellJobs.JobProcess.Result(failed.exitCode)
+            }
+            shell.ensureStarted()
+            val env = envVarRepository?.allAsDict().orEmpty().toMutableMap().apply {
+                putAll(RootNetworkProxy.proxyEnv())
+            }
+            if (env.isNotEmpty()) shell.applyEnvironment(env)
+            val ran = shell.executeCommand(command, timeoutMs) { line -> onLine(shellOutputForModel(line)) }
+            val timedOut = ran.exitCode == 124 && ran.output.startsWith("command timed out after")
+            return ShellJobs.JobProcess.Result(ran.exitCode, timedOut)
+        }
+
+        override fun stop() = shell.stop()
+    }
+
     private fun acquireSessionState(sessionId: String): SessionState? = synchronized(sessionStateLock) {
         val existing = sessionStates[sessionId]
         if (existing == null) {
@@ -237,9 +268,11 @@ object ExecutionCoordinator {
         }
         shells.remove(sessionId)?.stop()
         lastInjectedKeys.remove(sessionId)
+        // A background job belongs to its session and ends with it.
+        ShellJobs.killSession(sessionId)
     }
 
-    /** User-facing Stop. Kill the session shell; next command recreates it. */
+    /** User-facing Stop. Kill the session shell; next command recreates it. Background jobs are left running on purpose. */
     fun stopCurrentCommand(sessionId: String) {
         synchronized(sessionStateLock) {
             sessionStates[sessionId]?.generation?.incrementAndGet()
@@ -251,6 +284,7 @@ object ExecutionCoordinator {
     /** Stop every live session before mount-layout or rootfs changes. */
     fun stopCurrentCommand() {
         stopGeneration.incrementAndGet()
+        ShellJobs.killAll()
         synchronized(sessionStateLock) {
             sessionStates.values.forEach { it.generation.incrementAndGet() }
         }

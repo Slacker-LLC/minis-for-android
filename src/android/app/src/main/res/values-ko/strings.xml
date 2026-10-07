@@ -48,7 +48,6 @@
     <string name="permissions_category_media">미디어</string>
     <string name="mention_scanning">파일 스캔 중…</string>
     <string name="mention_no_match">일치하는 파일 없음</string>
-    <string name="resume_banner_title">중단됨 — 재개를 눌러 계속하세요</string>
     <string name="resume_action">재개</string>
     <string name="search_chats_placeholder">대화 검색…</string>
     <string name="search_no_results">\"%1$s\"에 대한 결과가 없습니다</string>
@@ -2154,4 +2153,5 @@
     <string name="work_process_failed_only">%1$d단계 실패</string>
     <string name="model_slot_image">이미지</string>
     <string name="selection_reply_actions">답변 작업</string>
+    <string name="chat_interrupted_short">중단됨</string>
 </resources>

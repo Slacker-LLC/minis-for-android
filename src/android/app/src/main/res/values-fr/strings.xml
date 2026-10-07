@@ -48,7 +48,6 @@
     <string name="permissions_category_media">Médias</string>
     <string name="mention_scanning">Analyse des fichiers…</string>
     <string name="mention_no_match">Aucun fichier correspondant</string>
-    <string name="resume_banner_title">Interrompu — appuyez sur Reprendre pour continuer</string>
     <string name="resume_action">Reprendre</string>
     <string name="search_chats_placeholder">Rechercher des conversations…</string>
     <string name="search_no_results">Aucun résultat pour « %1$s »</string>
@@ -2061,4 +2060,5 @@
     <string name="work_process_failed_only">Étape %1$d échouée</string>
     <string name="model_slot_image">Image</string>
     <string name="selection_reply_actions">Actions de la réponse</string>
+    <string name="chat_interrupted_short">Interrompu</string>
 </resources>

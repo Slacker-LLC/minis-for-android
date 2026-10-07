@@ -1,5 +1,6 @@
 package com.openminis.app.offload
 
+import androidx.core.content.edit
 import android.content.Context
 import android.content.SharedPreferences
 import com.openminis.app.scheduled.ScheduledTaskPermissionTier
@@ -540,11 +541,9 @@ object OffloadPermissionManager {
     fun isEverythingAllowed(): Boolean = toolRegistry.all { getLevel(it.toolName) == PermissionLevel.BYPASS }
 
     fun resetAll() {
-        val editor = prefs.edit()
-        for (tool in toolRegistry) {
-            editor.remove("level_${tool.toolName}")
+        prefs.edit {
+            for (tool in toolRegistry) remove("level_${tool.toolName}")
         }
-        editor.apply()
     }
 
     /**

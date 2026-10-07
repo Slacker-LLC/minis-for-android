@@ -25,6 +25,9 @@ object JobTools {
     /** Default wait budget for `job_output` with wait=true (milliseconds). */
     private const val DEFAULT_WAIT_TIMEOUT_MS = 30_000L
 
+    /** Most output one `job_output` call returns. */
+    private const val READ_CHARS = 20_000
+
     /** Poll interval used while waiting for a job to finish. */
     private const val WAIT_POLL_MS = 100L
 
@@ -44,17 +47,19 @@ object JobTools {
     fun jobOutputDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = NAME_OUTPUT,
         description = "Read the output of a background job. Returns the accumulated output so far, always ending " +
-            "with a '[status: <STATUS>]' trailer (RUNNING/COMPLETED/KILLED/FAILED). With wait=true, blocks until " +
-            "the job reaches a terminal status or timeout_ms elapses; a timed-out wait returns the current output " +
-            "with [status: RUNNING] and leaves the job alive.",
+            "with a '[status: <STATUS>]' trailer (RUNNING/COMPLETED/KILLED/FAILED, with the reason when there is one) " +
+            "and '[next_offset: N]'. Pass offset=N back to read only what was written since; without offset you get " +
+            "everything still kept. With wait=true, blocks until the job reaches a terminal status or timeout_ms elapses; " +
+            "a timed-out wait returns the current output with [status: RUNNING] and leaves the job alive.",
         parameters = mapOf(
             "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user. Use the same language as the user."),
             "job_id" to AgentToolParam("string", "The id of the background job to read output from."),
             "wait" to AgentToolParam("boolean", "Block until the job reaches a terminal status (default false)."),
             "timeout_ms" to AgentToolParam("integer", "Maximum time to wait in milliseconds when wait=true (default 30000)."),
+            "offset" to AgentToolParam("integer", "Output position to read from: the next_offset of the previous call. Omit to read everything still kept."),
         ),
         required = listOf("tool_title", "job_id"),
-        propertyOrdering = listOf("tool_title", "job_id", "wait", "timeout_ms"),
+        propertyOrdering = listOf("tool_title", "job_id", "wait", "timeout_ms", "offset"),
         // Generous budget so wait=true has room to complete inside the
         // executor's per-tool cooperative timeout.
         timeoutMs = 120_000L,
@@ -88,7 +93,7 @@ object JobTools {
 
     // ── Executors ───────────────────────────────────────────────────────────
 
-    private suspend fun jobOutput(argsJson: String): ToolExecutionResult {
+    internal suspend fun jobOutput(argsJson: String): ToolExecutionResult {
         val args = runCatching { JSONObject(argsJson) }.getOrNull()
             ?: return ToolExecutionResult("job_output: invalid arguments JSON", false)
         val jobId = args.optString("job_id").trim()
@@ -110,9 +115,16 @@ object JobTools {
         }
 
         val finalJob = JobRegistry.get(jobId)
-        val body = finalJob?.let { JobRegistry.output(jobId)?.ifEmpty { "(no output yet)" } } ?: "(no output yet)"
+        val offset = if (args.has("offset")) args.optLong("offset", 0L) else 0L
+        val read = JobRegistry.read(jobId, offset, READ_CHARS)
+        val body = read?.text?.ifEmpty { "(no output yet)" } ?: "(no output yet)"
+        val notice = if (read != null && read.missed > 0) {
+            "[${read.missed} characters before this point are not shown (kept output is bounded)]\n"
+        } else ""
+        val detail = finalJob?.detail?.takeIf { it.isNotEmpty() }?.let { " \u2014 $it" }.orEmpty()
         return ToolExecutionResult(
-            output = body + "\n[status: " + (finalJob?.status?.name ?: "UNKNOWN") + "]",
+            output = notice + body + "\n[status: " + (finalJob?.status?.name ?: "UNKNOWN") + detail + "]" +
+                (read?.let { "\n[next_offset: ${it.nextOffset}]" } ?: ""),
             success = true,
         )
     }

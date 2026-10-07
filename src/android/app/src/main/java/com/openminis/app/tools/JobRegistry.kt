@@ -16,6 +16,9 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * The registry is bounded: at most [MAX_ENTRIES] jobs are kept, and when the
  * cap is exceeded the oldest (by [Job.startedAt]) entries are evicted first.
+ * A job's output is bounded too: only the newest [MAX_OUTPUT_CHARS] characters are kept, and positions
+ * ([read], `job_output offset`) count from the very first character, so a reader that remembers where it was
+ * keeps its place even after the head has been dropped.
  */
 object JobRegistry {
 
@@ -52,6 +55,21 @@ object JobRegistry {
 
     /** Upper bound on retained jobs; oldest entries are evicted beyond this. */
     private const val MAX_ENTRIES = 100
+
+    /** The newest this many characters of a job's output are kept. */
+    const val MAX_OUTPUT_CHARS = 200_000
+
+    /** Characters dropped from the head of each job's output so far. */
+    private val dropped = ConcurrentHashMap<String, Long>()
+
+    /** A window of a job's output: [text] covers `[from, nextOffset)`, counted from the job's first character. */
+    data class OutputRead(
+        val text: String,
+        val from: Long,
+        val nextOffset: Long,
+        /** Characters between the requested offset and [from] that are gone (dropped head or skipped middle). */
+        val missed: Long,
+    )
 
     private val jobs = ConcurrentHashMap<String, Job>()
 
@@ -102,6 +120,11 @@ object JobRegistry {
         val job = jobs[id] ?: return
         if (job.status != JobStatus.RUNNING) return
         job.output.append(text)
+        val over = job.output.length - MAX_OUTPUT_CHARS
+        if (over > 0) {
+            job.output.delete(0, over)
+            dropped[id] = (dropped[id] ?: 0L) + over
+        }
     }
 
     /**
@@ -116,9 +139,27 @@ object JobRegistry {
         cancellers.remove(id)
     }
 
-    /** Snapshot of the job's current output, or null for unknown ids. */
+    /** Snapshot of the job's current output (the kept tail), or null for unknown ids. */
     @Synchronized
     fun output(id: String): String? = jobs[id]?.output?.toString()
+
+    /**
+     * Output from position [offset] on, at most [maxChars] of it. When more than that is waiting the reader gets
+     * the newest [maxChars] (and [OutputRead.missed] says how much it skipped), because what matters to a
+     * reader that fell behind is where the job is now. Null for unknown ids.
+     */
+    @Synchronized
+    fun read(id: String, offset: Long, maxChars: Int): OutputRead? {
+        val job = jobs[id] ?: return null
+        val head = dropped[id] ?: 0L
+        val total = head + job.output.length
+        val requested = offset.coerceAtLeast(0L)
+        val start = requested.coerceIn(head, total)
+        val take = minOf((total - start).toInt(), maxChars.coerceAtLeast(1))
+        val from = total - take
+        val text = job.output.substring((from - head).toInt(), (total - head).toInt())
+        return OutputRead(text = text, from = from, nextOffset = total, missed = (from - requested).coerceAtLeast(0L))
+    }
 
     /** Current job, or null if the id is unknown. */
     fun get(id: String): Job? = jobs[id]
@@ -152,6 +193,7 @@ object JobRegistry {
         for (job in oldest) {
             jobs.remove(job.id)
             cancellers.remove(job.id)
+            dropped.remove(job.id)
         }
     }
 }

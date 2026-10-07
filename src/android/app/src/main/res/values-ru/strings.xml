@@ -49,7 +49,6 @@
     <string name="permissions_category_media">Медиа</string>
     <string name="mention_scanning">Сканирование файлов…</string>
     <string name="mention_no_match">Нет совпадающих файлов</string>
-    <string name="resume_banner_title">Прервано — нажмите «Продолжить», чтобы возобновить</string>
     <string name="resume_action">Продолжить</string>
     <string name="search_chats_placeholder">Поиск по чатам…</string>
     <string name="search_no_results">Нет результатов по запросу \"%1$s\"</string>
@@ -2382,4 +2381,5 @@
     <string name="work_process_failed_only">Шаг %1$d не удался</string>
     <string name="model_slot_image">Изображения</string>
     <string name="selection_reply_actions">Действия с ответом</string>
+    <string name="chat_interrupted_short">Прервано</string>
 </resources>
