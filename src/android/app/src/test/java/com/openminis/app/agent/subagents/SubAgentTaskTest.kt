@@ -139,4 +139,33 @@ class SubAgentTaskTest {
         assertEquals("error", j.getString("status"))
         assertEquals("unknown_agent", j.getString("error"))
     }
+
+    @Test
+    fun `a named model is parsed and blank means none`() {
+        val ok = SubAgentTask.parseArgs("""{"task":"x","model":" gpt-5 "}""") as SubAgentArgsResult.Ok
+        assertEquals("gpt-5", ok.args.model)
+        val none = SubAgentTask.parseArgs("""{"task":"x","model":"  "}""") as SubAgentArgsResult.Ok
+        assertEquals(null, none.args.model)
+    }
+
+    @Test
+    fun `the model parameter is offered only with a list, and its enum is that list`() {
+        val without = SubAgentToolSchema.definition(listOf("General Sub Agent"))
+        assertFalse(without.parameters.containsKey("model"))
+        assertFalse("model" in without.propertyOrdering.orEmpty())
+        val with = SubAgentToolSchema.definition(listOf("General Sub Agent"), modelHandles = listOf("a", "P/b"))
+        assertEquals(listOf("a", "P/b"), with.parameters.getValue("model").enumValues)
+        assertTrue("model" in with.propertyOrdering.orEmpty())
+    }
+
+    @Test
+    fun `the models section lists every name and is empty without models`() {
+        assertEquals("", SubAgentTask.callableModelsSection(emptyList()))
+        val text = SubAgentTask.callableModelsSection(
+            listOf(CallableModel("a", "e1", "A", "A · 128K context"), CallableModel("P/b", "e2", "B", "B")),
+        )
+        assertTrue(text, text.contains("subagent.model"))
+        assertTrue(text, text.contains("- a — A · 128K context"))
+        assertTrue(text, text.contains("- P/b — B"))
+    }
 }

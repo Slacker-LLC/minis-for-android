@@ -40,6 +40,16 @@ Model selection for an agent that is not pinned (Auto): the delegating model pas
 `same_as_me` (default, the conversation's own model), `default_model` (Main slot) or `sub_model` (Light slot).
 A pinned model that is gone or has no credential is refused, never silently replaced.
 
+It may instead name one specific model with `model`. The allowed names are the user's **Agent Models** list
+(Settings → Models; the same list `minis-model-use` sees), limited to enabled providers with a credential and
+text-output models, at most `CallableModels.MAX_OFFERED`, in the user's order. A model is named by its model id,
+or `provider/model-id` when two providers offer the same id. The `model` enum, the system-prompt section that
+describes each model (context, image input, reasoning) and the check in `SubAgentRuntime` all come from that one
+list (`SubAgents.callableModels`). Matching is exact apart from case: anything else is refused with
+`model_not_allowed` and the allowed names, never mapped to a similar model. `model` beats `model_choice`; a
+pinned agent ignores both. With an empty list, or when every agent is pinned, the parameter is not offered.
+The user chooses by curating that list, by pinning an agent, or simply by asking for a model in the chat.
+
 ## How it runs
 
 `SubAgentRuntime` (pure orchestration) talks to the app through `SubAgentPort`; `AppSubAgentPort` drives

@@ -587,7 +587,7 @@
     <string name="modelgroup_speech_transcription">Transcription vocale</string>
     <string name="modelgroup_text_generation">Génération de texte</string>
     <string name="common_default">Par défaut</string>
-    <string name="settings_agent_loop_models">Modèles de boucle d\'agent</string>
+    <string name="settings_agent_loop_models">Modèles de l’agent</string>
 
     <!-- T172-A parameterized strings -->
     <string name="add_custom_model_id_footer">Le Model ID est l\'identifiant d\'API envoyé à %1$s. Le nom affiché est le libellé plus convivial montré dans le sélecteur ; il revient au Model ID s\'il est laissé vide.</string>
@@ -1745,8 +1745,8 @@
     <string name="model_slot_fallback_title">Repli en cas d’erreur</string>
     <string name="model_slot_fallback_always">À chaque erreur</string>
     <string name="model_slot_fallback_default">Sur limitation de débit et erreurs serveur</string>
-    <string name="agent_loop_models_slots_footer">Seules les entrées sélectionnées individuellement sont accessibles à la boucle Agent.</string>
-    <string name="agent_loop_models_slots_subtitle">Choisissez les modèles accessibles aux outils Agent</string>
+    <string name="agent_loop_models_slots_footer">L’assistant ne peut choisir que les modèles ajoutés ici.</string>
+    <string name="agent_loop_models_slots_subtitle">Les sous-agents et minis-model-use peuvent les utiliser</string>
     <string name="model_slot_selected_models">Modèles sélectionnés</string>
     <string name="model_slot_order_footer">Les entrées sont essayées dans cet ordre. Déplacez-les pour changer la priorité.</string>
     <string name="model_slot_legacy_unresolved">Entrée indisponible conservée depuis la configuration existante</string>
@@ -1755,7 +1755,7 @@
     <string name="model_slot_no_candidates">Aucun modèle compatible disponible</string>
     <string name="model_slot_system_entry">Moteur vocal intégré à l’appareil</string>
     <string name="model_slot_provider_disabled">Fournisseur désactivé</string>
-    <string name="agent_loop_models_title">Modèles de boucle Agent</string>
+    <string name="agent_loop_models_title">Modèles de l’agent</string>
     <string name="model_slot_follow_default">Suivre la valeur par défaut</string>
     <string name="model_slot_follow_default_footer">Utilise la première entrée disponible de cet emplacement vocal.</string>
     <string name="agent_loop_add_models_count">Ajouter %1$d modèles</string>
@@ -1923,7 +1923,7 @@
     <string name="first_run_step_chat">Commencer à discuter</string>
     <string name="first_run_step_chat_locked">Terminez d\'abord les étapes ci-dessus</string>
     <string name="first_run_done">Terminé</string>
-    <string name="settings_agent_loop_models_subtitle">Choisir les modèles utilisables par les outils de l\'agent</string>
+    <string name="settings_agent_loop_models_subtitle">Les sous-agents et minis-model-use peuvent les utiliser</string>
     <string name="settings_thinking_rules">Règles de réflexion</string>
     <string name="settings_thinking_rules_subtitle">Paramètres de réflexion par fournisseur</string>
     <string name="settings_models_stats_header">Statistiques</string>
@@ -2022,7 +2022,7 @@
     <string name="sub_agent_model">Modèle</string>
     <string name="sub_agent_model_auto">Auto</string>
     <string name="sub_agent_model_missing">Modèle indisponible</string>
-    <string name="sub_agent_model_footer">Auto laisse l’assistant choisir, en général le modèle de cette conversation. Un modèle épinglé est toujours utilisé.</string>
+    <string name="sub_agent_model_footer">Auto laisse l’assistant choisir : en général le modèle de cette conversation, ou un modèle ajouté dans « Modèles de l’agent ». Un modèle épinglé est toujours utilisé.</string>
     <string name="sub_agent_thinking">Niveau de raisonnement</string>
     <string name="sub_agent_thinking_default">Par défaut</string>
     <string name="sub_agent_thinking_footer">Par défaut suit le modèle. Un niveau plus élevé réfléchit plus longtemps et coûte plus cher.</string>
@@ -2050,4 +2050,9 @@
     <string name="restore_stop">Arrêter la restauration</string>
     <string name="restore_stop_title">Arrêter la restauration ?</string>
     <string name="restore_stop_message">Ce qui a déjà été restauré est conservé. La partie en cours est annulée en entier, rien ne reste à moitié écrit. Vous pourrez relancer la restauration plus tard.</string>
+    <string name="agent_models_selected_header">Modèles ajoutés</string>
+    <string name="agent_models_empty">Aucun modèle ajouté pour l’instant.</string>
+    <string name="agent_models_footer">L’assistant peut faire travailler un sous-agent sur ces modèles et les appeler avec minis-model-use. Un sous-agent épinglé à un modèle utilise toujours celui-ci. Appui long pour réordonner.</string>
+    <string name="agent_models_no_credential">Aucune clé API</string>
+    <string name="agent_models_cli_only">minis-model-use uniquement (pas un modèle de chat)</string>
 </resources>

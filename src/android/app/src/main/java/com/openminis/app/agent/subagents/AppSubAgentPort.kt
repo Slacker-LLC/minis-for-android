@@ -5,6 +5,9 @@ import com.openminis.app.MinisApp
 import com.openminis.app.agent.AgentRunner
 import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.data.model.ModelEntry
+import com.openminis.app.data.model.hasImageInput
+import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.provider.ModelsDevApi
 import com.openminis.app.data.model.ModelSlot
 import com.openminis.app.data.model.SubAgentDefinition
 import com.openminis.app.data.model.ThinkingLevel
@@ -24,6 +27,8 @@ class AppSubAgentPort(private val context: Context) : SubAgentPort {
     private val app: MinisApp get() = context.applicationContext as MinisApp
 
     override fun roster(): List<SubAgentDefinition> = SubAgentStore.currentRoster()
+
+    override fun callableModels(): List<CallableModel> = SubAgents.callableModels(app.providerRepository)
 
     override suspend fun resolveModel(
         def: SubAgentDefinition,
@@ -216,4 +221,27 @@ object SubAgents {
 
     /** Whether the delegation tool is offered at all (Settings master switch). */
     fun isEnabled(): Boolean = SubAgentStore.enabled.value
+
+    /**
+     * The user's "models the agent can use" list (the same one `minis-model-use` sees) as names a model can
+     * emit in `subagent.model`: enabled providers that have a credential, text-output models only, in the
+     * user's order. The tool schema, the system prompt and the delegation check all read this.
+     */
+    fun callableModels(repo: ProviderRepository): List<CallableModel> = CallableModels.from(
+        repo.resolvedAgentLoopEntries().mapNotNull { entry ->
+            val instance = repo.instance(entry.providerInstanceId) ?: return@mapNotNull null
+            if (!instance.isEnabled || !repo.hasAnyCredential(instance)) return@mapNotNull null
+            val model = ModelsDevApi.enrichModel(entry.model)
+            if (!model.isTextOutput) return@mapNotNull null
+            CallableModels.Source(
+                entryId = entry.id,
+                modelId = model.id,
+                displayName = model.displayName,
+                providerLabel = instance.label,
+                contextWindow = model.contextWindow,
+                imageInput = model.hasImageInput,
+                reasoning = model.supportsReasoning == true,
+            )
+        },
+    )
 }

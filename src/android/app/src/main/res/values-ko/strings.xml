@@ -728,7 +728,7 @@
     <string name="modelgroup_speech_transcription">음성 전사</string>
     <string name="modelgroup_text_generation">텍스트 생성</string>
     <string name="common_default">기본값</string>
-    <string name="settings_agent_loop_models">에이전트 루프 모델</string>
+    <string name="settings_agent_loop_models">에이전트가 쓸 수 있는 모델</string>
 
     <!-- T172-A parameterized strings -->
     <string name="add_custom_model_id_footer">Model ID 는 %1$s 에 전송되는 API 식별자입니다. 표시 이름은 모델 선택기에서 사용되는 더 친숙한 라벨이며, 비워두면 Model ID 로 대체됩니다.</string>
@@ -1838,8 +1838,8 @@
     <string name="model_slot_fallback_title">오류 시 대체</string>
     <string name="model_slot_fallback_always">모든 오류</string>
     <string name="model_slot_fallback_default">요청 제한 및 서버 오류</string>
-    <string name="agent_loop_models_slots_footer">개별로 선택한 항목만 Agent Loop에서 사용할 수 있습니다.</string>
-    <string name="agent_loop_models_slots_subtitle">Agent 도구에서 사용할 모델 선택</string>
+    <string name="agent_loop_models_slots_footer">어시스턴트는 여기에 추가한 모델만 고를 수 있습니다.</string>
+    <string name="agent_loop_models_slots_subtitle">서브 에이전트와 minis-model-use가 사용할 수 있는 모델</string>
     <string name="model_slot_selected_models">선택된 모델</string>
     <string name="model_slot_order_footer">이 순서대로 모델을 시도합니다. 화살표로 우선순위를 바꾸세요.</string>
     <string name="model_slot_legacy_unresolved">기존 구성에서 가져온 사용할 수 없는 항목을 유지함</string>
@@ -1848,7 +1848,7 @@
     <string name="model_slot_no_candidates">호환되는 모델이 없습니다</string>
     <string name="model_slot_system_entry">기기에 내장된 음성 엔진</string>
     <string name="model_slot_provider_disabled">공급자 비활성화됨</string>
-    <string name="agent_loop_models_title">Agent Loop 모델</string>
+    <string name="agent_loop_models_title">에이전트가 쓸 수 있는 모델</string>
     <string name="model_slot_follow_default">슬롯 기본값 사용</string>
     <string name="model_slot_follow_default_footer">음성 슬롯에서 사용 가능한 첫 번째 항목을 사용합니다.</string>
     <string name="agent_loop_add_models_count">모델 %1$d개 추가</string>
@@ -2016,7 +2016,7 @@
     <string name="first_run_step_chat">대화 시작</string>
     <string name="first_run_step_chat_locked">위 단계를 먼저 완료하세요</string>
     <string name="first_run_done">완료</string>
-    <string name="settings_agent_loop_models_subtitle">에이전트 도구가 쓸 수 있는 모델 선택</string>
+    <string name="settings_agent_loop_models_subtitle">서브 에이전트와 minis-model-use가 사용할 수 있는 모델</string>
     <string name="settings_thinking_rules">사고 규칙</string>
     <string name="settings_thinking_rules_subtitle">공급자별 사고 매개변수 형식</string>
     <string name="settings_models_stats_header">통계</string>
@@ -2115,7 +2115,7 @@
     <string name="sub_agent_model">모델</string>
     <string name="sub_agent_model_auto">자동</string>
     <string name="sub_agent_model_missing">모델을 사용할 수 없음</string>
-    <string name="sub_agent_model_footer">자동은 어시스턴트가 선택하며 보통 이 대화의 모델입니다. 고정한 모델은 항상 사용됩니다.</string>
+    <string name="sub_agent_model_footer">자동은 어시스턴트가 선택합니다. 보통 이 대화의 모델이거나 ‘에이전트가 쓸 수 있는 모델’에 추가한 모델입니다. 고정한 모델은 항상 사용됩니다.</string>
     <string name="sub_agent_thinking">추론 수준</string>
     <string name="sub_agent_thinking_default">기본값</string>
     <string name="sub_agent_thinking_footer">기본값은 모델을 따릅니다. 높을수록 더 오래 생각하고 비용이 늘어납니다.</string>
@@ -2143,4 +2143,9 @@
     <string name="restore_stop">복원 중지</string>
     <string name="restore_stop_title">복원을 중지할까요?</string>
     <string name="restore_stop_message">이미 복원된 내용은 그대로 남습니다. 진행 중인 부분은 통째로 되돌려지므로 절반만 기록된 데이터가 남지 않습니다. 나중에 다시 복원할 수 있습니다.</string>
+    <string name="agent_models_selected_header">추가한 모델</string>
+    <string name="agent_models_empty">아직 추가한 모델이 없습니다.</string>
+    <string name="agent_models_footer">어시스턴트는 이 모델들로 서브 에이전트를 실행하거나 minis-model-use로 호출할 수 있습니다. 모델을 고정한 서브 에이전트는 항상 그 모델을 사용합니다. 길게 눌러 순서를 바꿉니다.</string>
+    <string name="agent_models_no_credential">API 키 없음</string>
+    <string name="agent_models_cli_only">minis-model-use 전용(채팅 모델 아님)</string>
 </resources>

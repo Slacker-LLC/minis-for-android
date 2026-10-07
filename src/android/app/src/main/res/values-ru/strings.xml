@@ -829,7 +829,7 @@
     <string name="modelgroup_speech_transcription">Транскрипция речи</string>
     <string name="modelgroup_text_generation">Генерация текста</string>
     <string name="common_default">По умолчанию</string>
-    <string name="settings_agent_loop_models">Модели цикла агента</string>
+    <string name="settings_agent_loop_models">Модели для агента</string>
     <string name="add_custom_model_id_footer">ID модели — это идентификатор API, отправляемый в %1$s. Отображаемое имя — более понятная метка в выборе; по умолчанию равно ID модели, если оставлено пустым.</string>
     <string name="add_custom_model_eg_id_placeholder">например, gpt-4o-custom</string>
     <string name="add_provider_configure_provider">Настроить %1$s</string>
@@ -2064,8 +2064,8 @@
     <string name="model_slot_fallback_title">Резерв при ошибках</string>
     <string name="model_slot_fallback_always">При любой ошибке</string>
     <string name="model_slot_fallback_default">При ограничении частоты и ошибках сервера</string>
-    <string name="agent_loop_models_slots_footer">В цикле агента доступны только выбранные по отдельности записи.</string>
-    <string name="agent_loop_models_slots_subtitle">Выберите модели для инструментов агента</string>
+    <string name="agent_loop_models_slots_footer">Ассистент может выбирать только модели, добавленные здесь.</string>
+    <string name="agent_loop_models_slots_subtitle">Их могут использовать субагенты и minis-model-use</string>
     <string name="model_slot_selected_models">Выбранные модели</string>
     <string name="model_slot_order_footer">Модели проверяются в этом порядке. Стрелками можно изменить приоритет.</string>
     <string name="model_slot_legacy_unresolved">Недоступная запись сохранена из существующей конфигурации</string>
@@ -2074,7 +2074,7 @@
     <string name="model_slot_no_candidates">Нет совместимых моделей</string>
     <string name="model_slot_system_entry">Встроенный голосовой движок устройства</string>
     <string name="model_slot_provider_disabled">Провайдер отключён</string>
-    <string name="agent_loop_models_title">Модели Agent Loop</string>
+    <string name="agent_loop_models_title">Модели для агента</string>
     <string name="model_slot_follow_default">Использовать слот по умолчанию</string>
     <string name="model_slot_follow_default_footer">Используется первая доступная запись в голосовом слоте.</string>
     <string name="agent_loop_add_models_count">Добавить моделей: %1$d</string>
@@ -2244,7 +2244,7 @@
     <string name="first_run_step_chat">Начать чат</string>
     <string name="first_run_step_chat_locked">Сначала выполните шаги выше</string>
     <string name="first_run_done">Готово</string>
-    <string name="settings_agent_loop_models_subtitle">Выберите модели, доступные инструментам агента</string>
+    <string name="settings_agent_loop_models_subtitle">Их могут использовать субагенты и minis-model-use</string>
     <string name="settings_thinking_rules">Правила рассуждения</string>
     <string name="settings_thinking_rules_subtitle">Параметры рассуждения у провайдеров</string>
     <string name="settings_models_stats_header">Статистика</string>
@@ -2343,7 +2343,7 @@
     <string name="sub_agent_model">Модель</string>
     <string name="sub_agent_model_auto">Авто</string>
     <string name="sub_agent_model_missing">Модель недоступна</string>
-    <string name="sub_agent_model_footer">В режиме «Авто» выбирает ассистент, обычно модель этого разговора. Закреплённая модель используется всегда.</string>
+    <string name="sub_agent_model_footer">В режиме «Авто» выбирает ассистент: обычно модель этого разговора или одну из «Моделей для агента». Закреплённая модель используется всегда.</string>
     <string name="sub_agent_thinking">Уровень рассуждения</string>
     <string name="sub_agent_thinking_default">По умолчанию</string>
     <string name="sub_agent_thinking_footer">По умолчанию следует модели. Чем выше уровень, тем дольше думает и дороже.</string>
@@ -2371,4 +2371,9 @@
     <string name="restore_stop">Остановить восстановление</string>
     <string name="restore_stop_title">Остановить восстановление?</string>
     <string name="restore_stop_message">Уже восстановленные данные сохранятся. Текущая часть будет полностью отменена, поэтому ничего не останется записанным наполовину. Восстановление можно запустить снова позже.</string>
+    <string name="agent_models_selected_header">Добавленные модели</string>
+    <string name="agent_models_empty">Модели ещё не добавлены.</string>
+    <string name="agent_models_footer">Ассистент может запускать субагентов на этих моделях и вызывать их через minis-model-use. Субагент с закреплённой моделью всегда использует её. Удерживайте, чтобы изменить порядок.</string>
+    <string name="agent_models_no_credential">Нет API-ключа</string>
+    <string name="agent_models_cli_only">Только minis-model-use (не чат-модель)</string>
 </resources>

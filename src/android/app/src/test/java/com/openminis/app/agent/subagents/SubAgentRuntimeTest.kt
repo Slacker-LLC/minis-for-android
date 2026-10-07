@@ -44,11 +44,15 @@ class SubAgentRuntimeTest {
         private var next = 0
 
         override fun roster() = rosterDefs
+        var callable: List<CallableModel> = emptyList()
+        override fun callableModels() = callable
+        val childModels = CopyOnWriteArrayList<SubAgentModel>()
         override suspend fun resolveModel(def: SubAgentDefinition, choice: SubAgentModelChoice, parentSessionId: String) =
             if (modelAvailable) SubAgentModel("entry-${choice.wire}", "Model ${choice.wire}", def.pinnedEntryId?.let { "agent" } ?: choice.wire) else null
 
         override suspend fun createChild(parentSessionId: String, title: String, model: SubAgentModel): String {
             if (createFails) error("no session")
+            childModels += model
             val id = "child-${++next}"
             created += id
             gates[id] = CompletableDeferred()
@@ -402,6 +406,87 @@ class SubAgentRuntimeTest {
         val reply = rt.execute(args(), "chat-A")
         assertEquals("model_unavailable", json(reply).getString("error"))
         assertTrue(rt.registry.jobsOf("chat-A").isEmpty())
+    }
+
+    // ── a model named from the user's list ─────────────────────────────────
+
+    private val listed = listOf(
+        CallableModel("deepseek-v4-flash", "entry-flash", "DeepSeek V4 Flash", "DeepSeek V4 Flash · 128K context"),
+        CallableModel("Work/gpt-5", "entry-gpt", "GPT-5", "GPT-5 · via Work"),
+    )
+
+    @Test
+    fun `a model named from the user's list runs the child on that entry`() = runBlocking {
+        val port = FakePort().also { it.callable = listed }
+        val rt = runtime(port)
+        val reply = rt.execute(args("model" to "DEEPSEEK-v4-flash", "model_choice" to "default_model"), "chat-A")
+        assertTrue(reply.text, reply.ok)
+        assertEquals("DeepSeek V4 Flash", json(reply).getString("model"))
+        until("child created") { port.created.isNotEmpty() }
+        val model = port.childModels.single()
+        assertEquals("entry-flash", model.entryId)
+        assertEquals(ORIGIN_NAMED, model.origin)
+        until("child started its run") { port.briefs.containsKey("child-1") }
+        port.finish("child-1", "ok")
+    }
+
+    @Test
+    fun `a model that is not on the list is refused, lists the allowed names and starts nothing`() = runBlocking {
+        val port = FakePort().also { it.callable = listed }
+        val rt = runtime(port)
+        for (name in listOf("gpt-5", "deepseek", "deepseek-v4-flash-pro", "entry-flash")) {
+            val reply = rt.execute(args("model" to name), "chat-A")
+            assertFalse(name, reply.ok)
+            assertEquals(name, "model_not_allowed", json(reply).getString("error"))
+            val available = json(reply).getJSONArray("available")
+            assertEquals(listOf("deepseek-v4-flash", "Work/gpt-5"), (0 until available.length()).map { available.getString(it) })
+        }
+        assertTrue(rt.registry.jobsOf("chat-A").isEmpty())
+        assertTrue(port.created.isEmpty())
+    }
+
+    @Test
+    fun `naming a model when the user listed none is refused instead of falling back`() = runBlocking {
+        val port = FakePort()
+        val rt = runtime(port)
+        val reply = rt.execute(args("model" to "deepseek-v4-flash"), "chat-A")
+        assertFalse(reply.ok)
+        assertEquals("model_not_allowed", json(reply).getString("error"))
+        assertEquals(0, json(reply).getJSONArray("available").length())
+        assertTrue(port.created.isEmpty())
+    }
+
+    @Test
+    fun `a sub agent the user pinned ignores a named model`() = runBlocking {
+        val port = FakePort(
+            SubAgentRoster.normalize(
+                listOf(
+                    SubAgentDefinition(
+                        id = "r1", name = "researcher", description = "digs",
+                        modelBinding = ModelBinding.encodeEntry("entry-9"),
+                    ),
+                ),
+            ),
+        ).also { it.callable = listed }
+        val rt = runtime(port)
+        // Even a name that is not on the list is not an error here: the pin decides, as with model_choice.
+        val reply = rt.execute(args("agent" to "researcher", "model" to "not-listed"), "chat-A")
+        assertTrue(reply.text, reply.ok)
+        until("child created") { port.created.isNotEmpty() }
+        assertEquals("agent", port.childModels.single().origin)
+        until("child started its run") { port.briefs.containsKey("child-1") }
+        port.finish("child-1", "ok")
+    }
+
+    @Test
+    fun `without a named model the model choice decides as before`() = runBlocking {
+        val port = FakePort().also { it.callable = listed }
+        val rt = runtime(port)
+        rt.execute(args("model_choice" to "sub_model"), "chat-A")
+        until("child created") { port.created.isNotEmpty() }
+        assertEquals("entry-sub_model", port.childModels.single().entryId)
+        until("child started its run") { port.briefs.containsKey("child-1") }
+        port.finish("child-1", "ok")
     }
 
     @Test

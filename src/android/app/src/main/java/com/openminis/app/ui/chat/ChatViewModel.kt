@@ -1006,6 +1006,7 @@ class ChatViewModel(
                 sessionSource != ChatSessionEntity.SOURCE_BOT_DELEGATION &&
                 sessionSource != ChatSessionEntity.LEGACY_SOURCE_BOT_DELEGATION,
             subAgentRosterNames = subAgentRoster()?.map { it.name },
+            subAgentModelHandles = subAgentCallableModels().map { it.handle },
             subAgentChild = sessionSource == ChatSessionEntity.SOURCE_SUB_AGENT,
         ).let {
             // MCP servers the user switched off for this session are not offered (and their handler
@@ -1028,14 +1029,29 @@ class ChatViewModel(
     private fun subAgentPromptFragment(): String? {
         val roster = subAgentRoster() ?: return null
         val entries = providerRepository.allVisibleEntries()
+        val callable = subAgentCallableModels()
+        val autoNote = if (callable.isEmpty()) "Auto — you choose with model_choice"
+            else "Auto — you choose with model_choice, or name a listed model with model"
         val section = com.openminis.app.agent.subagents.SubAgentTask.rosterSection(roster) { def ->
             val pinned = def.pinnedEntryId
             when {
-                pinned == null -> "Auto — you choose with model_choice"
+                pinned == null -> autoNote
                 else -> "fixed — " + (entries.firstOrNull { it.id == pinned }?.model?.displayName ?: "unavailable model")
             }
         }
-        return com.openminis.app.agent.subagents.SubAgentTask.SYSTEM_PROMPT_BULLET + "\n" + section
+        val models = com.openminis.app.agent.subagents.SubAgentTask.callableModelsSection(callable)
+        return com.openminis.app.agent.subagents.SubAgentTask.SYSTEM_PROMPT_BULLET + "\n" + section + models
+    }
+
+    /**
+     * The models this session's delegating model may name in `subagent.model`: the user's agent model
+     * list, offered only while some sub agent is set to Auto (a pinned one ignores the parameter, so
+     * describing models nobody can use would be pure prompt cost).
+     */
+    private fun subAgentCallableModels(): List<com.openminis.app.agent.subagents.CallableModel> {
+        val roster = subAgentRoster() ?: return emptyList()
+        if (roster.none { it.pinnedEntryId == null }) return emptyList()
+        return com.openminis.app.agent.subagents.SubAgents.callableModels(providerRepository)
     }
 
     /**

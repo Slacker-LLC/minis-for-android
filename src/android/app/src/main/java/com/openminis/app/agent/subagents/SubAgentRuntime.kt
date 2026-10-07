@@ -32,6 +32,9 @@ data class ChildOutcome(val completed: Boolean, val text: String?, val timedOut:
 interface SubAgentPort {
     fun roster(): List<SubAgentDefinition>
 
+    /** The models the user made available for `subagent.model`, already filtered to usable text models, in the user's order. */
+    fun callableModels(): List<CallableModel>
+
     /** The model for this delegation, or null when none is usable (pinned entry gone, no provider). */
     suspend fun resolveModel(def: SubAgentDefinition, choice: SubAgentModelChoice, parentSessionId: String): SubAgentModel?
 
@@ -110,7 +113,24 @@ class SubAgentRuntime(
             ?: return fail("unknown_agent", "No sub agent named '${args.agent}'.") {
                 put("available", org.json.JSONArray(roster.map { it.name }))
             }
-        val model = port.resolveModel(def, args.modelChoice, parentSessionId)
+        // A model named by the delegating agent must be on the user's list; it never falls back to a
+        // different one. A sub agent the user pinned ignores it, exactly like model_choice.
+        val named: CallableModel? = if (args.model != null && def.pinnedEntryId == null) {
+            val callable = port.callableModels()
+            CallableModels.match(args.model, callable)
+                ?: return fail(
+                    "model_not_allowed",
+                    if (callable.isEmpty()) {
+                        "No models are available to name: the user has not added any under Settings → Models the agent can use. Leave `model` out."
+                    } else {
+                        "'${args.model}' is not one of the models the user made available. Use one of these names exactly, or leave `model` out."
+                    },
+                ) { put("available", org.json.JSONArray(callable.map { it.handle })) }
+        } else {
+            null
+        }
+        val model = named?.let { SubAgentModel(it.entryId, it.label, ORIGIN_NAMED) }
+            ?: port.resolveModel(def, args.modelChoice, parentSessionId)
             ?: return fail(
                 "model_unavailable",
                 "No usable model for sub agent '${def.name}': its pinned model is gone or no provider is configured.",
@@ -361,6 +381,9 @@ class SubAgentRuntime(
     private fun fail(code: String, message: String, extra: org.json.JSONObject.() -> Unit = {}) =
         SubAgentReply(SubAgentTask.error(code, message, extra), false)
 }
+
+/** [SubAgentModel.origin] of a model the delegating agent named from the user's list. */
+const val ORIGIN_NAMED = "named"
 
 private fun defaultProgressInterval(level: String): Long? = when (level) {
     "frequent" -> 15_000L

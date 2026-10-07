@@ -115,10 +115,7 @@ object Routes {
     fun modelSlotDetail(slot: ModelSlot) = "model_slot/${slot.name}"
     /** T185: picker that adds model *entries* to the agent-loop set. */
     const val ADD_MODELS_TO_AGENT_LOOP = "add_models_to_agent_loop"
-    /** T171→T182: AGENT_LOOP_MODELS deprecated (the screen lived inside
-     *  Settings; agent tools expose individual model entries only.
-     *  Route declared so any back-compat deep-link string from preview
-     *  builds pops back instead of crashing. */
+    /** The list of models the agent may use (sub agents, minis-model-use). */
     const val AGENT_LOOP_MODELS = "agent_loop_models"
     const val MODEL_ENTRY_DETAIL = "model_entry/{instanceId}/{entryId}"
     const val ADD_CUSTOM_MODEL = "add_custom_model/{instanceId}"
@@ -682,7 +679,7 @@ fun AppNavigation(
                     onBack = { navController.safePopBackStack() },
                     onProvidersClick = { navController.safeNavigate(Routes.PROVIDER_LIST) },
                     onModelsClick = { navController.safeNavigate(Routes.MODELS) },
-                    onAgentLoopModelsClick = { navController.safeNavigate(Routes.ADD_MODELS_TO_AGENT_LOOP) },
+                    onAgentLoopModelsClick = { navController.safeNavigate(Routes.AGENT_LOOP_MODELS) },
                     onUsageClick = { navController.safeNavigate(Routes.USAGE_STATS) },
                     onSkillsClick = { navController.safeNavigate(Routes.SKILLS) },
                     onCharactersClick = { navController.safeNavigate(Routes.CHARACTERS) },
@@ -902,7 +899,7 @@ fun AppNavigation(
                 providerRepository = providerRepository,
                 onBack = { navController.safePopBackStack() },
                 onSlotClick = { slot -> navController.safeNavigate(Routes.modelSlotDetail(slot)) },
-                onAgentLoopModelsClick = { navController.safeNavigate(Routes.ADD_MODELS_TO_AGENT_LOOP) },
+                onAgentLoopModelsClick = { navController.safeNavigate(Routes.AGENT_LOOP_MODELS) },
             )
         }
 
@@ -930,17 +927,14 @@ fun AppNavigation(
             )
         }
 
-        // T182: AgentLoopModels is no longer a standalone screen. The
-        // picker now lists individual entries in the Models screen
-        // (mirrors iOS Views/Providers/ModelsView.swift's
-        // `AgentLoopModelsSection`). Routes.AGENT_LOOP_MODELS is left
-        // declared for back-compat with any deep-link string we may
-        // have shipped to early users; safePopBackStack lands them on
-        // the prior screen if it ever fires.
+        // The list of models the agent may use (remove / reorder / add). It used to be reachable only
+        // through the add picker, which hides what is already added.
         composable(Routes.AGENT_LOOP_MODELS) {
-            androidx.compose.runtime.LaunchedEffect(Unit) {
-                navController.safePopBackStack()
-            }
+            com.openminis.app.ui.settings.AgentModelsScreen(
+                providerRepository = providerRepository,
+                onAddModels = { navController.safeNavigate(Routes.ADD_MODELS_TO_AGENT_LOOP) },
+                onBack = { navController.safePopBackStack() },
+            )
         }
 
         composable(
