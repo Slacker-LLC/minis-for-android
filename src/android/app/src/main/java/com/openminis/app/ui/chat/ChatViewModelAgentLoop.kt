@@ -1326,6 +1326,14 @@ internal fun ChatViewModel.applyRepeatGuard(
     name: String,
     argsJson: String,
     result: ToolExecutionResult,
+): ToolExecutionResult = synchronized(this) { applyRepeatGuardLocked(name, argsJson, result) }
+
+// Read-only calls of one turn now finish concurrently; the two counters this reads and writes are the
+// view model's, so the update is made under its lock.
+private fun ChatViewModel.applyRepeatGuardLocked(
+    name: String,
+    argsJson: String,
+    result: ToolExecutionResult,
 ): ToolExecutionResult {
     // Ignore tools that are allowed to repeat (reads, questions, waits).
     if (name == FileReadTool.NAME || name == "memory_get" ||
