@@ -1,5 +1,7 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.ui.chat.md.BlockParser
+import com.openminis.app.ui.chat.md.MdDocument
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -407,50 +409,41 @@ fun MarkdownDocument(
  */
 fun splitMarkdownIntoBlockTexts(content: String): List<String> {
     if (content.isEmpty()) return emptyList()
-    val out = mutableListOf<String>()
-    val cur = StringBuilder()
-    var inFence = false
-    val lines = content.lines()
-    fun flush() {
-        if (cur.isNotEmpty()) {
-            // Trim trailing empty line we used as boundary, but keep
-            // intentional internal newlines.
-            out.add(cur.toString().trimEnd('\n'))
-            cur.clear()
+    val lines = content.replace("\r\n", "\n").replace('\r', '\n').split('\n')
+    val doc = BlockParser(gfm = true).parse(content)
+    // Footnote definitions are collected into one list at the end of the message, which needs the whole message.
+    if (doc.footnoteLabels.isNotEmpty()) return listOf(content.trimEnd('\n'))
+    // One fragment per top-level block, cut where the parser says each block starts, so a list with blank lines
+    // between its items, an item holding several paragraphs, a fence with blank lines in it stay in one piece.
+    val starts = doc.root.children.map { (it.startLine - 1).coerceIn(0, lines.size - 1) }.distinct().sorted()
+    if (starts.isEmpty()) return listOf(content.trimEnd('\n'))
+    val definitions = referenceDefinitionLines(doc)
+    // the definitions' own lines render as nothing; they are re-added, canonical, where a fragment may use them
+    val definitionLine = BooleanArray(lines.size)
+    for (r in doc.refDefLines) for (n in r) if (n - 1 in definitionLine.indices) definitionLine[n - 1] = true
+    val out = ArrayList<String>(starts.size)
+    for ((k, start) in starts.withIndex()) {
+        // text before the first block (blank lines, reference definitions) belongs to it
+        val from = if (k == 0) 0 else start
+        val to = if (k + 1 < starts.size) starts[k + 1] else lines.size
+        var fragment = (from until to).filter { !definitionLine[it] }.joinToString("\n") { lines[it] }.trim('\n')
+        if (fragment.isBlank()) continue
+        // A reference link only resolves where its definition is, so the definitions travel with every fragment that
+        // could use one (never into a code fence, where they would be text).
+        if (definitions.isNotEmpty() && fragment.contains('[') && !isFenceFragment(fragment)) {
+            fragment = fragment + "\n\n" + definitions
         }
+        out += fragment
     }
-    for (line in lines) {
-        val trimmed = line.trimStart()
-        val isFence = trimmed.startsWith("```")
-        if (isFence) {
-            // A fence line both closes the previous fragment (when we're
-            // not inside a fence) and opens/closes the fence fragment.
-            if (!inFence) {
-                flush()
-                cur.append(line).append('\n')
-                inFence = true
-            } else {
-                cur.append(line).append('\n')
-                inFence = false
-                flush()
-            }
-            continue
-        }
-        if (inFence) {
-            cur.append(line).append('\n')
-            continue
-        }
-        if (line.isBlank()) {
-            // Boundary: paragraph end. Drop the blank line itself; it
-            // signals the split.
-            flush()
-            continue
-        }
-        cur.append(line).append('\n')
-    }
-    flush()
     return out
 }
+
+/** The document's link reference definitions as canonical lines, to be appended to fragments that may use them. */
+private fun referenceDefinitionLines(doc: MdDocument): String =
+    doc.refmap.entries.joinToString("\n") { (label, ref) ->
+        val title = if (ref.title.isEmpty()) "" else " \"" + ref.title.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+        "[${label.replace("]", "\\]")}]: <${ref.destination}>$title"
+    }
 
 /**
  * [T-android-defensive-fragment-merge] A fenced code block fragment is one
@@ -460,7 +453,8 @@ fun splitMarkdownIntoBlockTexts(content: String): List<String> {
  */
 internal fun isFenceFragment(fragment: String): Boolean {
     val firstLine = fragment.lineSequence().firstOrNull { it.isNotBlank() } ?: return false
-    return firstLine.trimStart().startsWith("```")
+    val t = firstLine.trimStart()
+    return t.startsWith("```") || t.startsWith("~~~")
 }
 
 /**
@@ -832,7 +826,13 @@ internal sealed class MdBlock(val raw: String) {
     class OrderedList(raw: String, val items: List<ListItem>, val startNum: Int = 1) : MdBlock(raw)
     class TaskList(raw: String, val items: List<TaskItem>) : MdBlock(raw)
     class HorizontalRule(raw: String) : MdBlock(raw)
-    class Table(raw: String, val headers: List<String>, val rows: List<List<String>>) : MdBlock(raw)
+    class Table(
+        raw: String,
+        val headers: List<String>,
+        val rows: List<List<String>>,
+        /** Column alignment from the delimiter row; empty or shorter than the columns means left. */
+        val aligns: List<com.openminis.app.ui.chat.md.Align> = emptyList(),
+    ) : MdBlock(raw)
     class Image(raw: String, val alt: String, val url: String) : MdBlock(raw)
     class Video(raw: String, val alt: String, val url: String) : MdBlock(raw)
     class Audio(raw: String, val alt: String, val url: String) : MdBlock(raw)
@@ -885,7 +885,6 @@ internal val inlineMediaRegex = Regex("""!\[([^\]\n]*)]\(([^)\s]+)\)""")
 internal val inlineFileLinkRegex = Regex("""(?<!\!)\[([^\]\n]+)]\(([^)\s]+)\)""")
 
 // ─── Hoisted block-parser regexes ─────────────────────────────────────────────
-internal val thematicBreakRegex = Regex("^[-*_]{3,}\\s*$")
 
 internal val standaloneImageLineRegex = Regex("^!\\[.*]\\(.*\\)\\s*$")
 
@@ -893,33 +892,14 @@ internal val imageMatchRegex = Regex("^!\\[(.*)\\]\\((.*)\\)")
 
 internal val standaloneFileLinkRegex = Regex("""^\[([^\]\n]+)]\(([^)\s]+)\)\s*$""")
 
-internal val tableSeparatorRegex = Regex("^\\|?[\\s\\-:|]+\\|?$")
 
-internal val taskListItemRegex = Regex("^[-*+]\\s+\\[[ xX]\\]\\s+.*")
 
-internal val taskListPrefixRegex = Regex("^[-*+]\\s+\\[[ xX]\\]\\s+")
 
-internal val bulletListItemRegex = Regex("^[-*+]\\s+.*")
 
-internal val bulletListPrefixRegex = Regex("^[-*+]\\s+")
 
-internal val numberedListItemRegex = Regex("^\\d+[.)\\s]+.*")
 
-internal val numberedListStartRegex = Regex("^(\\d+)")
 
-internal val numberedListPrefixRegex = Regex("^\\d+[.)\\s]+")
 
-/**
- * A blockquote line must be `>` followed by a space, a tab, or end of line.
- * Anything else (e.g. `>foo`, `>5`, `>=`) is regular prose — likely shell
- * output or a comparison emitted by the LLM, not an intentional quote.
- */
-internal fun isBlockquoteLine(trimmed: String): Boolean {
-    if (!trimmed.startsWith(">")) return false
-    if (trimmed.length == 1) return true
-    val next = trimmed[1]
-    return next == ' ' || next == '\t'
-}
 
 /**
  * Split a paragraph's raw text at inline media (`![alt](url)`) and local/sandbox
@@ -1063,34 +1043,8 @@ internal fun splitParagraphOnWideMath(text: String): List<MdBlock> {
 
 internal data class ListItem(val text: String, val children: List<MdBlock> = emptyList())
 
-/**
- * A line indented under a list item. A sub-list (or anything after one) is kept as raw lines for the item's
- * children; a plain wrapped line just continues the item's own text, as before.
- */
-internal fun addListContinuation(items: MutableList<ListItem>, nested: MutableList<MutableList<String>>, line: String, trimmed: String) {
-    if (items.isEmpty()) return
-    val last = items.lastIndex
-    val startsSubList = trimmed.matches(bulletListItemRegex) || trimmed.matches(numberedListItemRegex) || trimmed.startsWith("```")
-    if (startsSubList || nested[last].isNotEmpty()) {
-        nested[last].add(line)
-    } else {
-        items[last] = items[last].copy(text = items[last].text + "\n" + trimmed)
-    }
-}
-
-/** Parse each item's collected sub-lines (de-indented together) into child blocks. */
-internal suspend fun withNestedBlocks(items: List<ListItem>, nested: List<List<String>>): List<ListItem> =
-    items.mapIndexed { index, item ->
-        val sub = nested.getOrNull(index).orEmpty()
-        if (sub.isEmpty()) item else {
-            val strip = sub.minOf { it.length - it.trimStart().length }
-            item.copy(children = parseMarkdownBlocks(sub.joinToString("\n") { it.drop(strip) }))
-        }
-    }
 
 internal data class TaskItem(val checked: Boolean, val text: String)
-
-// ─── Block parser ───────────────────────────────────────────────────────────
 
 /**
  * [T-android-latex-code-mask] Find the line index that closes a multi-line
@@ -1139,321 +1093,4 @@ internal fun findDisplayMathClose(lines: List<String>, from: Int): Int? {
         j++
     }
     return null
-}
-
-internal suspend fun parseMarkdownBlocks(content: String): List<MdBlock> {
-    val blocks = mutableListOf<MdBlock>()
-    val lines = content.lines()
-    var i = 0
-    // Counter so we don't query coroutineContext on EVERY line (small but
-    // measurable allocation overhead at ~thousands of lines per pass).
-    var sinceLastCheck = 0
-
-    while (i < lines.size) {
-        if (sinceLastCheck >= 64) {
-            coroutineContext.ensureActive()
-            sinceLastCheck = 0
-        }
-        sinceLastCheck++
-        val line = lines[i]
-        val trimmed = line.trimStart()
-
-        when {
-            // T155: display math `$$...$$` (single-line or multi-line) and `\[...\]`
-            trimmed.startsWith("$$") -> {
-                val rest = trimmed.removePrefix("$$")
-                val inlineEnd = rest.indexOf("$$")
-                if (inlineEnd >= 0) {
-                    // Same-line `$$ … $$`
-                    val latex = rest.substring(0, inlineEnd).trim()
-                    blocks.add(MdBlock.MathDisplay(line, latex))
-                    i++
-                } else {
-                    // [T-android-latex-code-mask] Multi-line: LOOK AHEAD for the
-                    // closing `$$` and validate it before committing. The old
-                    // loop scanned forward unconditionally, so an unclosed `$$`
-                    // (a model forgetting to close it, or prose explaining
-                    // LaTeX) paired with a `$$` inside a LATER ``` fence and
-                    // swallowed every paragraph in between plus the fence's own
-                    // opening line — leaving an orphaned closing fence. This is
-                    // issue #117 defect 3 on the streaming path; the same defect
-                    // was fixed in MarkdownParser (521b2dc7), but THIS is the
-                    // renderer the chat transcript actually uses.
-                    val closeIdx = findDisplayMathClose(lines, i + 1)
-                    if (closeIdx == null) {
-                        // No plausible closer — emit the `$$` as ordinary text
-                        // and let the following lines parse normally.
-                        blocks.add(MdBlock.Paragraph(line))
-                        i++
-                    } else {
-                        val rawLines = mutableListOf(line)
-                        val mathLines = mutableListOf<String>()
-                        if (rest.isNotEmpty()) mathLines.add(rest)
-                        i++
-                        while (i <= closeIdx) {
-                            rawLines.add(lines[i])
-                            if (i == closeIdx) {
-                                val close = lines[i].indexOf("$$")
-                                val pre = lines[i].substring(0, close)
-                                if (pre.isNotEmpty()) mathLines.add(pre)
-                                i++
-                                break
-                            }
-                            mathLines.add(lines[i])
-                            i++
-                        }
-                        blocks.add(
-                            MdBlock.MathDisplay(
-                                rawLines.joinToString("\n"),
-                                mathLines.joinToString("\n").trim(),
-                            ),
-                        )
-                    }
-                }
-            }
-            trimmed.startsWith("\\[") -> {
-                val rest = trimmed.removePrefix("\\[")
-                val inlineEnd = rest.indexOf("\\]")
-                if (inlineEnd >= 0) {
-                    val latex = rest.substring(0, inlineEnd).trim()
-                    blocks.add(MdBlock.MathDisplay(line, latex))
-                    i++
-                } else {
-                    val rawLines = mutableListOf(line)
-                    val mathLines = mutableListOf<String>()
-                    if (rest.isNotEmpty()) mathLines.add(rest)
-                    i++
-                    while (i < lines.size) {
-                        rawLines.add(lines[i])
-                        val close = lines[i].indexOf("\\]")
-                        if (close >= 0) {
-                            val pre = lines[i].substring(0, close)
-                            if (pre.isNotEmpty()) mathLines.add(pre)
-                            i++
-                            break
-                        }
-                        mathLines.add(lines[i])
-                        i++
-                    }
-                    blocks.add(MdBlock.MathDisplay(rawLines.joinToString("\n"), mathLines.joinToString("\n").trim()))
-                }
-            }
-            // Fenced code block
-            trimmed.startsWith("```") -> {
-                val lang = trimmed.removePrefix("```").trim()
-                val codeLines = mutableListOf<String>()
-                val rawLines = mutableListOf(line)
-                i++
-                while (i < lines.size) {
-                    rawLines.add(lines[i])
-                    if (lines[i].trimStart().startsWith("```")) { i++; break }
-                    codeLines.add(lines[i])
-                    i++
-                }
-                blocks.add(MdBlock.CodeBlock(rawLines.joinToString("\n"), lang, codeLines.joinToString("\n")))
-            }
-
-            // Heading
-            trimmed.startsWith("#") && (trimmed.length == 1 || trimmed[trimmed.indexOfFirst { it != '#' }.coerceAtLeast(0)] == ' ') -> {
-                val level = trimmed.takeWhile { it == '#' }.length.coerceAtMost(6)
-                val text = trimmed.drop(level).trimStart()
-                blocks.add(MdBlock.Heading(line, level, text))
-                i++
-            }
-
-            // Horizontal rule
-            trimmed.matches(thematicBreakRegex) -> {
-                blocks.add(MdBlock.HorizontalRule(line))
-                i++
-            }
-
-            // Image / Video / Audio: ![alt](url) on its own line — routed by file extension.
-            trimmed.matches(standaloneImageLineRegex) -> {
-                val match = imageMatchRegex.find(trimmed)
-                if (match != null) {
-                    val alt = match.groupValues[1]
-                    val url = match.groupValues[2]
-                    val blk = mediaBlockFrom(line, alt, url)
-                    android.util.Log.d("MdStream", "media match: alt=\"$alt\" url=$url -> ${blk::class.simpleName}")
-                    blocks.add(blk)
-                }
-                i++
-            }
-
-            // File attachment: [title](url) on its own line — routed to FileAttachment if sandbox/local url
-            trimmed.matches(standaloneFileLinkRegex) -> {
-                val match = standaloneFileLinkRegex.find(trimmed)
-                if (match != null) {
-                    val title = match.groupValues[1]
-                    val url = match.groupValues[2]
-                    if (isSandboxOrLocalUrl(url)) {
-                        blocks.add(MdBlock.FileAttachment(line, title, url))
-                    } else {
-                        blocks.add(MdBlock.Paragraph(line))
-                    }
-                } else {
-                    blocks.add(MdBlock.Paragraph(line))
-                }
-                i++
-            }
-
-            // Table (line contains | and next line is separator)
-            trimmed.contains('|') && i + 1 < lines.size &&
-                lines[i + 1].trim().matches(tableSeparatorRegex) -> {
-                val tableLines = mutableListOf<String>()
-                while (i < lines.size && (lines[i].contains('|') ||
-                        lines[i].trim().matches(tableSeparatorRegex))) {
-                    tableLines.add(lines[i])
-                    i++
-                }
-                val (headers, rows) = parseTable(tableLines)
-                blocks.add(MdBlock.Table(tableLines.joinToString("\n"), headers, rows))
-            }
-
-            // Blockquote — strict CommonMark match: `>` followed by space or end
-            // of line. The looser `startsWith(">")` accidentally swallowed
-            // shell-output prompts like `>foo`, comparisons (`>5`, `>=`), and
-            // generally any inline `>`-led token an LLM happens to emit, which
-            // wrapped innocent prose in an orange leading rule (T117).
-            isBlockquoteLine(trimmed) -> {
-                val rawLines = mutableListOf<String>()
-                val innerLines = mutableListOf<String>()
-                while (i < lines.size && isBlockquoteLine(lines[i].trimStart())) {
-                    rawLines.add(lines[i])
-                    innerLines.add(lines[i].trimStart().removePrefix(">").removePrefix(" "))
-                    i++
-                }
-                val innerBlocks = parseMarkdownBlocks(innerLines.joinToString("\n"))
-                blocks.add(MdBlock.BlockQuote(rawLines.joinToString("\n"), innerBlocks))
-            }
-
-            // Task list: - [x] or - [ ]
-            trimmed.matches(taskListItemRegex) -> {
-                val items = mutableListOf<TaskItem>()
-                val rawLines = mutableListOf<String>()
-                while (i < lines.size && lines[i].trimStart().matches(taskListItemRegex)) {
-                    rawLines.add(lines[i])
-                    val t = lines[i].trimStart()
-                    val checked = t.contains("[x]", ignoreCase = true)
-                    val text = t.replaceFirst(taskListPrefixRegex, "")
-                    items.add(TaskItem(checked, text))
-                    i++
-                }
-                blocks.add(MdBlock.TaskList(rawLines.joinToString("\n"), items))
-            }
-
-            // Unordered list
-            trimmed.matches(bulletListItemRegex) -> {
-                val items = mutableListOf<ListItem>()
-                val rawLines = mutableListOf<String>()
-                val nested = mutableListOf<MutableList<String>>()
-                val baseIndent = line.length - trimmed.length
-                while (i < lines.size) {
-                    val l = lines[i]
-                    val t = l.trimStart()
-                    val indent = l.length - t.length
-                    if (t.isEmpty()) { i++; continue }
-                    if (!t.matches(bulletListItemRegex) && indent <= baseIndent) break
-                    if (indent > baseIndent) {
-                        addListContinuation(items, nested, l, t)
-                    } else {
-                        rawLines.add(l)
-                        items.add(ListItem(t.replaceFirst(bulletListPrefixRegex, "")))
-                        nested.add(mutableListOf())
-                    }
-                    i++
-                }
-                blocks.add(MdBlock.UnorderedList(rawLines.joinToString("\n"), withNestedBlocks(items, nested)))
-            }
-
-            // Ordered list
-            trimmed.matches(numberedListItemRegex) -> {
-                val items = mutableListOf<ListItem>()
-                val rawLines = mutableListOf<String>()
-                val nested = mutableListOf<MutableList<String>>()
-                val startMatch = numberedListStartRegex.find(trimmed)
-                val startNum = startMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
-                val baseIndent = line.length - trimmed.length
-                while (i < lines.size) {
-                    val l = lines[i]
-                    val t = l.trimStart()
-                    val indent = l.length - t.length
-                    if (t.isEmpty()) { i++; continue }
-                    if (!t.matches(numberedListItemRegex) && indent <= baseIndent) break
-                    if (indent > baseIndent) {
-                        addListContinuation(items, nested, l, t)
-                    } else {
-                        rawLines.add(l)
-                        items.add(ListItem(t.replaceFirst(numberedListPrefixRegex, "")))
-                        nested.add(mutableListOf())
-                    }
-                    i++
-                }
-                blocks.add(MdBlock.OrderedList(rawLines.joinToString("\n"), withNestedBlocks(items, nested), startNum))
-            }
-
-            // Empty line
-            trimmed.isEmpty() -> { i++ }
-
-            // Paragraph
-            else -> {
-                val paraLines = mutableListOf<String>()
-                while (i < lines.size) {
-                    val l = lines[i]
-                    val t = l.trimStart()
-                    if (t.isEmpty() || t.startsWith("#") || t.startsWith("```") ||
-                        isBlockquoteLine(t) || t.matches(thematicBreakRegex) ||
-                        t.matches(bulletListItemRegex) || t.matches(numberedListItemRegex) ||
-                        t.matches(standaloneImageLineRegex) ||
-                        t.matches(standaloneFileLinkRegex) ||
-                        (t.contains('|') && i + 1 < lines.size &&
-                            lines[i + 1].trim().matches(tableSeparatorRegex))
-                    ) break
-                    paraLines.add(l)
-                    i++
-                }
-                val text = paraLines.joinToString("\n")
-                if (text.isNotBlank()) {
-                    // Split out inline media (`![alt](url)` that's a .mp4/.mp3/etc)
-                    // and local file attachments (`[title](url)`) so they get dedicated cards.
-                    // Plain web URLs remain inline as text links.
-                    //
-                    // T208-4 part 3: after the media split, run a second pass
-                    // that promotes "wide" inline math (matrices, multi-row
-                    // \\, large \frac, long formulas) to standalone display
-                    // blocks. Compose's `InlineTextContent` placeholder is
-                    // fixed-size — wide formulas inside it either clip or
-                    // scale to unreadable. Splitting at parse time lets each
-                    // wide span render at its natural display-mode size on
-                    // its own line; short inline math (`$x_i$`) stays inline.
-                    val mediaBlocks = splitParagraphOnMediaAndFiles(text)
-                    for (b in mediaBlocks) {
-                        if (b is MdBlock.Paragraph) {
-                            blocks.addAll(splitParagraphOnWideMath(b.raw))
-                        } else {
-                            blocks.add(b)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return blocks
-}
-
-internal fun parseTable(lines: List<String>): Pair<List<String>, List<List<String>>> {
-    val headers = mutableListOf<String>()
-    val rows = mutableListOf<List<String>>()
-    for (line in lines) {
-        val trimmed = line.trim()
-        if (trimmed.matches(tableSeparatorRegex)) continue
-        // T308: Strip the leading/trailing pipe (if present) before splitting.
-        // The previous `.filter { isNotEmpty() }` swallowed legitimate empty
-        // cells like the first column of `| | Manus | TikTok |`, leaving the
-        // header with fewer columns than body rows and breaking alignment.
-        val core = trimmed.removePrefix("|").removeSuffix("|")
-        val cells = core.split("|").map { it.trim() }
-        if (headers.isEmpty()) headers.addAll(cells) else rows.add(cells)
-    }
-    return headers to rows
 }

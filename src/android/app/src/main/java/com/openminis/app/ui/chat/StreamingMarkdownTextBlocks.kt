@@ -1247,7 +1247,12 @@ internal fun RenderTable(block: MdBlock.Table) {
                                     }
                                 }
                                 .padding(horizontal = 14.dp, vertical = 11.dp),
-                            contentAlignment = Alignment.CenterStart,
+                            // The column's alignment from the delimiter row (`:--`, `:-:`, `--:`).
+                            contentAlignment = when (block.aligns.getOrNull(colIndex)) {
+                                com.openminis.app.ui.chat.md.Align.CENTER -> Alignment.Center
+                                com.openminis.app.ui.chat.md.Align.RIGHT -> Alignment.CenterEnd
+                                else -> Alignment.CenterStart
+                            },
                         ) {
                             val cellText = cells.getOrElse(colIndex) { "" }
                             MdText(

@@ -226,6 +226,15 @@ License text: `src/android/app/src/main/java/com/kyant/backdrop/LICENSE-backdrop
 | [models.dev](https://github.com/sst/models.dev) model catalog snapshot (`models-dev-api.json`) | Android app assets | MIT |
 | cppjieba dictionaries | Android app assets | MIT / upstream distribution terms |
 
+## Markdown parser and its test data
+
+| Item | Source | License | Use |
+|---|---|---|---|
+| Parsing algorithm (block structure by containers, the inline delimiter-run and bracket algorithms) | [commonmark.js](https://github.com/commonmark/commonmark.js) by John MacFarlane | BSD-2-Clause | `ui/chat/md/` is a Kotlin implementation that follows its structure |
+| CommonMark specification 0.31.2 examples (`src/test/resources/md/commonmark-0.31.2.json`) | [spec.commonmark.org](https://spec.commonmark.org/) | CC BY-SA 4.0 | conformance tests only; not shipped in the APK |
+| GitHub Flavored Markdown extension examples (`src/test/resources/md/gfm-extensions.json`) | [github/cmark-gfm](https://github.com/github/cmark-gfm) `test/spec.txt` | CC BY-SA 4.0 | conformance tests only; not shipped in the APK |
+| HTML5 named character references (`MdEntities.kt`) | WHATWG HTML Standard | CC0 / public domain data | decoding `&amp;`-style references |
+
 ## Removed or historical runtime components
 
 The current Android execution architecture does **not** build or ship the former privileged `minisd` broker or the earlier Alpine/PRoot runtime. Older Git history, archived documents, Issue implementation records, and regression tests may still mention:
