@@ -462,7 +462,9 @@ internal object ChatMutationMethods {
             if (totalBytes > 32L * 1024 * 1024) {
                 throw RPCException(-32602, "Total attachment size exceeds 32 MiB")
             }
-            val file = File(cacheDir, "${System.currentTimeMillis()}-$name")
+            // The stored name is unique per attachment: two attachments with the same (or same sanitized)
+            // name, or two requests in the same millisecond, must not write the same file.
+            val file = File(cacheDir, "${System.currentTimeMillis()}-${java.util.UUID.randomUUID().toString().take(8)}-$name")
             file.outputStream().use { it.write(bytes) }
             // Use FileProvider so the URI is consumable by Android components
             // (matches what the document/image pickers hand back to the app).

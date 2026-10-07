@@ -82,4 +82,27 @@ class SmsCodeExtractionPolicyTest {
     fun `runs after the keyword are preferred and the nearest of them wins`() {
         assertEquals("1111", SmsCodeExtractionPolicy.codeIn("9999 验证码 1111 订单 2222"))
     }
+
+    @Test
+    fun `a code leading its own sentence beats an amount in the next one`() {
+        assertEquals("123456", SmsCodeExtractionPolicy.codeIn("123456 is your verification code. Order amount 9999"))
+        assertEquals("123456", SmsCodeExtractionPolicy.codeIn("【Shop】123456 是您的验证码。订单金额 9999 元"))
+    }
+
+    @Test
+    fun `a code after the word still wins inside the sentence, whatever the amount before it`() {
+        assertEquals("123456", SmsCodeExtractionPolicy.codeIn("Pay 1000 now. Your verification code: 123456"))
+        assertEquals("123456", SmsCodeExtractionPolicy.codeIn("金额1000验证码为：123456"))
+    }
+
+    @Test
+    fun `when the word's sentence has no run the nearest after it, then before it, is used`() {
+        assertEquals("4321", SmsCodeExtractionPolicy.codeIn("Your verification code\nis below.\n4321"))
+        assertEquals("777777", SmsCodeExtractionPolicy.codeIn("Ref 777777. This is your OTP!"))
+    }
+
+    @Test
+    fun `a decimal point does not end the sentence`() {
+        assertEquals("5555", SmsCodeExtractionPolicy.codeIn("Balance 12.50 verification code 5555"))
+    }
 }
