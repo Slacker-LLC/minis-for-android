@@ -177,8 +177,7 @@ internal object SecureFileAccess {
                         onChunk(buffer.copyOf(count), total)
                     }
                 }
-                deleteEntryIfPresent(parent.stream, leaf)
-                parent.stream.move(temporary, parent.stream, leaf)
+                commitReplacing(parent.stream, temporary, parent.stream, leaf)
                 committed = true
                 total
             } finally {
@@ -218,6 +217,11 @@ internal object SecureFileAccess {
             throw WorkspaceFileClient.Failure("BAD_PARAMS", "refusing to move symbolic link")
         }
         ensureParent(destination)
+        // Checked before the attempt below, whose failures fall back to copy + delete: a move onto a
+        // directory would otherwise delete that whole tree first.
+        if (attributesOrNull(destination)?.let { it.isDirectory && !it.isSymbolicLink } == true) {
+            throw WorkspaceFileClient.Failure("BAD_PARAMS", "destination is an existing directory")
+        }
         val moved = runCatching {
             withParent(source) { sourceParent ->
                 withParent(destination) { destinationParent ->
@@ -225,8 +229,7 @@ internal object SecureFileAccess {
                         ?: throw WorkspaceFileClient.Failure("BAD_PARAMS", "cannot move a root")
                     val destinationLeaf = destinationParent.leaf
                         ?: throw WorkspaceFileClient.Failure("BAD_PARAMS", "cannot replace a root")
-                    deleteEntryIfPresent(destinationParent.stream, destinationLeaf)
-                    sourceParent.stream.move(sourceLeaf, destinationParent.stream, destinationLeaf)
+                    commitReplacing(sourceParent.stream, sourceLeaf, destinationParent.stream, destinationLeaf)
                 }
             }
             true
@@ -333,8 +336,7 @@ internal object SecureFileAccess {
                             setOf(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS),
                         ).use { output -> copyChannel(input, output, size) }
                     }
-                    deleteEntryIfPresent(destinationParent.stream, destinationLeaf)
-                    destinationParent.stream.move(temporary, destinationParent.stream, destinationLeaf)
+                    commitReplacing(destinationParent.stream, temporary, destinationParent.stream, destinationLeaf)
                     committed = true
                 } finally {
                     if (!committed) deleteEntryIfPresent(destinationParent.stream, temporary)
@@ -353,8 +355,7 @@ internal object SecureFileAccess {
                     temporary,
                     setOf(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS),
                 ).use(write)
-                deleteEntryIfPresent(parent.stream, leaf)
-                parent.stream.move(temporary, parent.stream, leaf)
+                commitReplacing(parent.stream, temporary, parent.stream, leaf)
                 committed = true
                 result
             } finally {
@@ -528,6 +529,37 @@ internal object SecureFileAccess {
         val stream = Files.newDirectoryStream(path)
         return stream as? SecureDirectoryStream<Path>
             ?: run { stream.close(); throw WorkspaceFileClient.Failure("IO_ERROR", "secure directory handles unavailable") }
+    }
+
+    /**
+     * Puts [source] in place of [target]. A directory is never a valid thing to replace: a write or a
+     * move that lands on one used to delete the whole tree first. A file or link is replaced by the
+     * rename itself, which is atomic, so a failure keeps the old content; only a provider whose rename
+     * refuses an existing target falls back to delete-then-rename.
+     */
+    private fun commitReplacing(
+        sourceParent: SecureDirectoryStream<Path>,
+        source: Path,
+        targetParent: SecureDirectoryStream<Path>,
+        target: Path,
+    ) {
+        val existing = try {
+            targetParent.getFileAttributeView(target, BasicFileAttributeView::class.java, *NOFOLLOW)?.readAttributes()
+        } catch (_: NoSuchFileException) {
+            null
+        } catch (error: Exception) {
+            throw WorkspaceFileClient.Failure("IO_ERROR", "cannot inspect entry ${target.fileName}: ${error.message}")
+        }
+        if (existing != null && existing.isDirectory && !existing.isSymbolicLink) {
+            throw WorkspaceFileClient.Failure("BAD_PARAMS", "destination is a directory: ${target.fileName}")
+        }
+        try {
+            sourceParent.move(source, targetParent, target)
+        } catch (error: java.nio.file.FileSystemException) {
+            if (existing == null) throw error
+            deleteEntryIfPresent(targetParent, target)
+            sourceParent.move(source, targetParent, target)
+        }
     }
 
     private fun deleteEntryIfPresent(parent: SecureDirectoryStream<Path>, entry: Path) {

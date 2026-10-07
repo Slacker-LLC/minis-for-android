@@ -97,4 +97,52 @@ class SecureFileAccessInstrumentedTest {
             outside.deleteRecursively()
         }
     }
+
+    @Test
+    fun writingOverAnExistingFileReplacesItsContent() = runBlocking {
+        WorkspaceFileClient.writeBytes(null, "/workspace/f.txt", "old".toByteArray())
+        WorkspaceFileClient.writeBytes(null, "/workspace/f.txt", "new content".toByteArray())
+        assertArrayEquals("new content".toByteArray(), WorkspaceFileClient.readAll(null, "/workspace/f.txt"))
+        assertTrue("no temporary file is left behind", File(root, "workspace").list().orEmpty().none { it != "f.txt" && it.contains("f.txt") })
+    }
+
+    @Test
+    fun writingOverADirectoryIsRefusedAndTheTreeSurvives() = runBlocking {
+        WorkspaceFileClient.writeBytes(null, "/workspace/project/src/a.txt", "A".toByteArray())
+        WorkspaceFileClient.writeBytes(null, "/workspace/project/b.txt", "B".toByteArray())
+        val failure = runCatching {
+            WorkspaceFileClient.writeBytes(null, "/workspace/project", "oops".toByteArray())
+        }.exceptionOrNull()
+        assertTrue("overwriting a directory must fail", failure is WorkspaceFileClient.Failure)
+        assertArrayEquals("A".toByteArray(), WorkspaceFileClient.readAll(null, "/workspace/project/src/a.txt"))
+        assertArrayEquals("B".toByteArray(), WorkspaceFileClient.readAll(null, "/workspace/project/b.txt"))
+    }
+
+    @Test
+    fun movingOntoADirectoryIsRefusedAndBothSidesSurvive() = runBlocking {
+        WorkspaceFileClient.writeBytes(null, "/workspace/src.txt", "S".toByteArray())
+        WorkspaceFileClient.writeBytes(null, "/workspace/dest/keep.txt", "K".toByteArray())
+        val failure = runCatching { WorkspaceFileClient.move(null, "/workspace/src.txt", "/workspace/dest") }.exceptionOrNull()
+        assertTrue("moving onto a directory must fail", failure is WorkspaceFileClient.Failure)
+        assertArrayEquals("S".toByteArray(), WorkspaceFileClient.readAll(null, "/workspace/src.txt"))
+        assertArrayEquals("K".toByteArray(), WorkspaceFileClient.readAll(null, "/workspace/dest/keep.txt"))
+    }
+
+    @Test
+    fun movingAFileOverAnotherFileReplacesIt() = runBlocking {
+        WorkspaceFileClient.writeBytes(null, "/workspace/a.txt", "from".toByteArray())
+        WorkspaceFileClient.writeBytes(null, "/workspace/b.txt", "to".toByteArray())
+        WorkspaceFileClient.move(null, "/workspace/a.txt", "/workspace/b.txt")
+        assertArrayEquals("from".toByteArray(), WorkspaceFileClient.readAll(null, "/workspace/b.txt"))
+        assertTrue(runCatching { WorkspaceFileClient.readAll(null, "/workspace/a.txt") }.isFailure)
+    }
+
+    @Test
+    fun copyingAFileOverAnotherFileReplacesIt() = runBlocking {
+        WorkspaceFileClient.writeBytes(null, "/workspace/a.txt", "from".toByteArray())
+        WorkspaceFileClient.writeBytes(null, "/workspace/b.txt", "to".toByteArray())
+        WorkspaceFileClient.copy(null, "/workspace/a.txt", "/workspace/b.txt")
+        assertArrayEquals("from".toByteArray(), WorkspaceFileClient.readAll(null, "/workspace/b.txt"))
+        assertArrayEquals("from".toByteArray(), WorkspaceFileClient.readAll(null, "/workspace/a.txt"))
+    }
 }

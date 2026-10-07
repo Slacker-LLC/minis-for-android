@@ -279,6 +279,7 @@ object LinuxFileOps {
             } else {
                 WorkspaceFileClient.info(sessionId, path)
             }
+            grepTargetError(metadata, path)?.let { return ToolExecutionResult(it, false) }
             var scanTruncated = false
             val files = if (metadata.optString("type") == "dir") {
                 val walk = walkTree(sessionId, path, true, scanBudget = MAX_SCAN_ENTRIES) { it.type == "file" }
@@ -349,6 +350,18 @@ object LinuxFileOps {
             ToolExecutionResult("Error: grep failed: ${t.message}", false)
         }
     }
+
+    /**
+     * Why a grep target cannot be searched, or null when it can. A path that does not exist has no type in
+     * its metadata; searching it used to report "complete, 0 matches", which tells the model there is
+     * nothing to find instead of that nothing was looked at.
+     */
+    internal fun grepTargetError(metadata: JSONObject, path: String): String? =
+        when (metadata.optString("type")) {
+            "dir", "file" -> null
+            "" -> "Error: grep target not found: $path"
+            else -> "Error: grep target is not a regular file or directory: $path"
+        }
 
     suspend fun headTail(sessionId: String, path: String, position: String, lines: Int, context: Context): ToolExecutionResult {
         val n = lines.coerceIn(1, MAX_HEAD_TAIL_LINES)

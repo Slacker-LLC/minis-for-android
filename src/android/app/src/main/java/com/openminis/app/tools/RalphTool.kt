@@ -208,7 +208,7 @@ object RalphTool {
         append("genuinely cannot be achieved (missing dependency, contradiction).\n")
     }
 
-    private fun parseReport(answer: String, childId: String): RalphReport? {
+    internal fun parseReport(answer: String, childId: String): RalphReport? {
         val json = lastJsonObject(answer)
             ?: run { Log.w(TAG, "round child $childId produced no parseable JSON report"); return null }
         val status = json.optString("status").trim()
@@ -217,9 +217,17 @@ object RalphTool {
             Log.w(TAG, "round child $childId invalid report (status=$status summaryLen=${summary.length})")
             return null
         }
+        // A summary over the limit is shortened, but never silently: the cut is marked in the text the
+        // next round and the user read. (Failing a whole multi-round run over a few extra characters of
+        // prose would cost more than it protects.)
+        val boundedSummary = if (summary.length <= MAX_SUMMARY_CHARS) summary else {
+            Log.w(TAG, "round child $childId summary is ${summary.length} chars; shortened to $MAX_SUMMARY_CHARS")
+            val note = "… [summary shortened from ${summary.length} chars]"
+            summary.take(MAX_SUMMARY_CHARS - note.length) + note
+        }
         val report = RalphReport(
             status = status,
-            summary = summary.take(MAX_SUMMARY_CHARS),
+            summary = boundedSummary,
             evidence = json.optString("evidence").trim().take(MAX_HANDOFF_CHARS),
             nextSteps = json.optString("nextSteps").trim().take(MAX_HANDOFF_CHARS),
             blockedReason = json.optString("blockedReason").trim().take(MAX_HANDOFF_CHARS),
