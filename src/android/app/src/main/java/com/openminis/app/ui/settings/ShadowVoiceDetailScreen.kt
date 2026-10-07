@@ -31,6 +31,8 @@ import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.hasAudioInput
 import com.openminis.app.data.model.hasAudioOutput
 import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.data.repository.isVoiceShadowDisabled
+import com.openminis.app.data.repository.setVoiceShadowDisabled
 
 /**
  * [T-android-provider-voice] Read-only detail of a shadow Voice Service —

@@ -36,6 +36,8 @@ import com.openminis.app.ui.components.DialogTextField
 import com.openminis.app.ui.settings.SettingsSection
 import com.openminis.app.ui.settings.SkillRowItem
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.data.repository.isEnabledForSession
+import com.openminis.app.data.repository.setSessionOverride
 
 /**
  * Bottom sheet showing all skills with per-session enable/disable toggles.

@@ -31,6 +31,7 @@ import com.openminis.app.ui.chat.runCompactNow
 import com.openminis.app.ui.chat.selectEntry
 import com.openminis.app.ui.chat.setThinkingLevel
 import com.openminis.app.ui.chat.submitPrompt
+import com.openminis.app.data.repository.allVisibleEntries
 
 /**
  * Headless wrapper around [ChatViewModel] for the debug RPC layer.

@@ -24,6 +24,7 @@ import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
+import com.openminis.app.data.repository.awaitConfigLoaded
 
 class BotDelegationCoordinator private constructor(
     private val application: Application,

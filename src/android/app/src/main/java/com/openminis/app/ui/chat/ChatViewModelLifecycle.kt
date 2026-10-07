@@ -28,6 +28,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import com.openminis.app.data.repository.loadApiKey
+import com.openminis.app.data.repository.saveApiKey
 
 fun ChatViewModel.cancelStream() {
     AppLogger.info(TAG_STREAM, "cancelStream invoked _isStreaming=false (sid=$activeSessionId)")

@@ -10,6 +10,12 @@ import com.openminis.app.data.model.ProviderType
 import com.openminis.app.data.repository.ProviderRepository
 import org.json.JSONArray
 import org.json.JSONObject
+import com.openminis.app.data.repository.ensureConfigLoaded
+import com.openminis.app.data.repository.entriesFor
+import com.openminis.app.data.repository.exportInstanceJSON
+import com.openminis.app.data.repository.importInstanceJSON
+import com.openminis.app.data.repository.instance
+import com.openminis.app.data.repository.usableApiKey
 
 /**
  * Read-only `provider.*` RPC handlers — Phase 1.

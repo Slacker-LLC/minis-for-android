@@ -50,6 +50,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import com.openminis.app.data.repository.instance
 
 /**
  * Unwrap exceptions thrown inside callbackFlow.

@@ -95,6 +95,11 @@ import com.openminis.app.browser.BrowserTabPool
 import com.openminis.app.browser.UserAgentProfile
 import com.openminis.app.ui.chat.StandardChatSheet
 import kotlinx.coroutines.launch
+import com.openminis.app.browser.goBack
+import com.openminis.app.browser.goForward
+import com.openminis.app.browser.loadURL
+import com.openminis.app.browser.reload
+import com.openminis.app.browser.stopLoading
 
 /**
  * Bottom sheet presenting the browser tab pool with tab bar, URL bar,

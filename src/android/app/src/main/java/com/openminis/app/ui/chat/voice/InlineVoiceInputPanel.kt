@@ -83,6 +83,10 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.data.repository.ensureDefaultVoiceInputSlot
+import com.openminis.app.data.repository.ensureDefaultVoiceOutputSlot
+import com.openminis.app.data.repository.resolveVoiceInputChoice
+import com.openminis.app.data.repository.voiceInputSlotName
 
 /**
  * [T-android-voice-panel] Inline voice input panel — Android port of iOS

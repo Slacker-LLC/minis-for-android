@@ -269,6 +269,7 @@ import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.browser.BrowserSheet
 import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.browser.captureLiveSnapshot
 
 // ─── Bordered Markdown Table (iOS style: bordered cells with grid lines) ─────
 

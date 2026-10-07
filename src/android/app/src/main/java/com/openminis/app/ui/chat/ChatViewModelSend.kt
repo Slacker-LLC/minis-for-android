@@ -27,6 +27,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.openminis.app.data.repository.loadApiKey
+import com.openminis.app.data.repository.saveApiKey
 
 /**
  * Enqueue a prompt to be injected into the currently running agent loop.

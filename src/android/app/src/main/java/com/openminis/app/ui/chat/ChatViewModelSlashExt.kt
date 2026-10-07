@@ -77,6 +77,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import com.openminis.app.data.repository.isEnabledForSession
 
 /** Filter available commands by current filter text, with dynamic
  *  localized subtitles. Subtitles read strings.xml via the injected

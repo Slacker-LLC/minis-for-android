@@ -61,6 +61,9 @@ import com.openminis.app.runtime.guest.WeatherOffloadHandler
 import com.openminis.app.service.SessionActivityTracker
 import com.openminis.app.ui.MinisImageFetcher
 import kotlinx.coroutines.launch
+import com.openminis.app.data.repository.refreshAllModelsIfNeeded
+import com.openminis.app.data.repository.triggerBackgroundRefreshIfStale
+import com.openminis.app.data.repository.reloadFromDisk
 
 class MinisApp : Application(), ImageLoaderFactory {
     /**

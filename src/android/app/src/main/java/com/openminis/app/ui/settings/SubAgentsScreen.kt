@@ -33,6 +33,7 @@ import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.chat.ModelPickerSheet
 import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.data.repository.allVisibleEntries
 
 /**
  * Settings › Agent › Sub Agents: the master switch and the roster the assistant can delegate to.

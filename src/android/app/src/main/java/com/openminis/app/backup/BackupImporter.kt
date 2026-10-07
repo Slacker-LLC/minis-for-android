@@ -27,6 +27,10 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import com.openminis.app.data.repository.mergeBackupProviderConfig
+import com.openminis.app.data.repository.restoreBackupProviderSecret
+import com.openminis.app.data.repository.restoreBackupThinkingRules
+import com.openminis.app.data.repository.restoreFromBackup
 
 /**
  * Restores a `.minisbak` package on Android (docs/backup-restore-design.md §8),

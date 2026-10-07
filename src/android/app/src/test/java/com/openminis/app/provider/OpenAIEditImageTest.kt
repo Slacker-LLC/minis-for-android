@@ -13,6 +13,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import com.openminis.app.provider.openai.editImage
 
 /**
  * [T-android-image-edit-endpoint] Wire-level coverage for the /images/edits

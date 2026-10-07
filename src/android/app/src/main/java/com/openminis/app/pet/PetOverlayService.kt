@@ -41,6 +41,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import kotlin.random.Random
+import com.openminis.app.data.repository.awaitConfigLoaded
+import com.openminis.app.data.repository.ensureDefaultVoiceInputSlot
+import com.openminis.app.data.repository.ensureDefaultVoiceOutputSlot
+import com.openminis.app.data.repository.resolveVoiceInputChoice
 
 class PetOverlayService : Service() {
     companion object {

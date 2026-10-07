@@ -17,6 +17,7 @@ import java.net.SocketTimeoutException
 import java.net.URI
 import java.net.UnknownHostException
 import kotlin.coroutines.resume
+import com.openminis.app.data.repository.saveApiKey
 
 /**
  * Thrown by [OpenAIOAuthManager] when DNS lookup or socket connect to

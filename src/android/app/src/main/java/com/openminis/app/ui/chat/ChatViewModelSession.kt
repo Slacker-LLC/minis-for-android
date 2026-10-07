@@ -28,6 +28,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.openminis.app.data.repository.allVisibleEntries
+import com.openminis.app.data.repository.availableEntries
+import com.openminis.app.data.repository.instance
+import com.openminis.app.data.repository.lastUsedVisibleEntry
+import com.openminis.app.data.repository.newestProviderNewestTextEntry
+import com.openminis.app.data.repository.primaryEntry
+import com.openminis.app.data.repository.usableApiKey
+import com.openminis.app.data.repository.renameSessionOverrides
 
 internal suspend fun <T> ChatViewModel.withBotTurnLock(block: suspend () -> T): T {
     val botId = sessionBotId ?: chatRepository.getSession(activeSessionId)?.botId

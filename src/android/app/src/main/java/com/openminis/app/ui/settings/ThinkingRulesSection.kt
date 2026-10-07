@@ -38,6 +38,13 @@ import com.openminis.app.R
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.provider.thinking.ThinkingRule
+import com.openminis.app.data.repository.builtInThinkingRulesForDisplay
+import com.openminis.app.data.repository.deleteThinkingRule
+import com.openminis.app.data.repository.firstModelId
+import com.openminis.app.data.repository.reorderThinkingRules
+import com.openminis.app.data.repository.saveThinkingRule
+import com.openminis.app.data.repository.thinkingRuleIds
+import com.openminis.app.data.repository.thinkingRules
 
 /**
  * [T-android-thinking-rules-phase2 §3 / parity with iOS ThinkingRulesSection.swift]

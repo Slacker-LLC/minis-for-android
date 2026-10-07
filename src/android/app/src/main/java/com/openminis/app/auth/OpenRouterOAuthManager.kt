@@ -18,6 +18,9 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
+import com.openminis.app.data.repository.deleteApiKey
+import com.openminis.app.data.repository.loadApiKey
+import com.openminis.app.data.repository.saveApiKey
 
 /**
  * OpenRouter OAuth manager using PKCE flow.

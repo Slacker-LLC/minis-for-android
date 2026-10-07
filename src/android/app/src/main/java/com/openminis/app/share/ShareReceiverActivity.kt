@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
+import com.openminis.app.data.repository.importInstanceJSON
 
 /**
  * Activity that handles ACTION_SEND / ACTION_SEND_MULTIPLE / ACTION_VIEW

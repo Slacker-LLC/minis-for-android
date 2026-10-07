@@ -22,6 +22,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.sqrt
+import com.openminis.app.data.repository.loadApiKey
+import com.openminis.app.data.repository.resolveVoiceInputCandidates
+import com.openminis.app.data.repository.resolveVoiceInputEntry
 
 /**
  * [T-android-provider-voice] Provider-backed transcription engine — the

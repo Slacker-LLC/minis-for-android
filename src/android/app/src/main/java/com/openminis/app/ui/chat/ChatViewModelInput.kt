@@ -13,6 +13,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import com.openminis.app.data.repository.allVisibleEntries
 
 /**
  * Bump the visible cap by [VISIBLE_MESSAGE_CAP_STEP], saturating at

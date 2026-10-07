@@ -68,6 +68,11 @@ import com.openminis.app.data.model.ProviderType
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.data.repository.addEntry
+import com.openminis.app.data.repository.addInstance
+import com.openminis.app.data.repository.refreshModels
+import com.openminis.app.data.repository.saveApiKey
+import com.openminis.app.data.repository.setSlotEntries
 
 /**
  * Multi-step onboarding flow shown on first launch.
