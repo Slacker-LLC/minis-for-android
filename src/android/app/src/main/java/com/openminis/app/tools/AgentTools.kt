@@ -104,9 +104,21 @@ object AgentTools {
         val legacyCanonicals = mapNotNull {
             com.openminis.app.tools.runtime.ToolRegistry.canonicalName(it.name)
         }.toSet()
+        // The capability gate above decided whether read_image is offered; the registry's copy of it
+        // must not bring it back for a model that cannot see images and has no Vision Group to describe
+        // them for it.
+        val withheldImageTool = if (supportsImageInput || visionGroupConfigured) {
+            emptySet()
+        } else {
+            setOfNotNull(
+                ReadImageTool.NAME,
+                com.openminis.app.tools.runtime.ToolRegistry.canonicalName(ReadImageTool.NAME),
+            )
+        }
         addAll(
             com.openminis.app.tools.runtime.ToolRegistry.definitions().filter {
-                it.name !in legacyCanonicals && (botEnabled || it.name !in BOT_COORDINATION_TOOL_NAMES) &&
+                it.name !in legacyCanonicals && it.name !in withheldImageTool &&
+                    (botEnabled || it.name !in BOT_COORDINATION_TOOL_NAMES) &&
                     // The registry's own copy of the delegation tool is never offered directly: the
                     // definition above (roster or older schema) stands in for it, and a sub agent's
                     // child gets none.
