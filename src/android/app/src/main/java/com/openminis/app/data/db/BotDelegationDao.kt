@@ -55,8 +55,22 @@ interface BotDelegationDao {
     @Query("UPDATE bot_delegations SET status = 'BUSY_GAVE_UP', error_text = :reason, finished_at = :now, updated_at = :now WHERE id = :id AND status = 'WAITING_TARGET'")
     suspend fun giveUpBusy(id: String, reason: String, now: Long): Int
 
-    @Query("UPDATE bot_delegations SET status = 'RUNNING', target_session_id = :targetSessionId, started_at = :now, updated_at = :now WHERE id = :id AND source_turn_settled = 1 AND status IN ('QUEUED', 'WAITING_TARGET')")
+    /**
+     * Starts a delegation, unless the task it belongs to has been stopped in the meantime. The check is part
+     * of this one statement so it cannot be overtaken: a cancel that lands between the dispatcher's own
+     * look at the task and this claim still wins. The statuses are those of
+     * `BotDelegationCoordinator.STOPPED_ROOT_STATUSES`.
+     */
+    @Query(
+        "UPDATE bot_delegations SET status = 'RUNNING', target_session_id = :targetSessionId, started_at = :now, updated_at = :now " +
+            "WHERE id = :id AND source_turn_settled = 1 AND status IN ('QUEUED', 'WAITING_TARGET') " +
+            "AND (root_task_id IS NULL OR NOT EXISTS (SELECT 1 FROM bot_tasks WHERE bot_tasks.id = bot_delegations.root_task_id " +
+            "AND bot_tasks.status IN ('PAUSED', 'CANCELLED', 'FAILED', 'BUDGET_EXHAUSTED', 'COMPLETED')))",
+    )
     suspend fun claim(id: String, targetSessionId: String, now: Long): Int
+
+    @Query("SELECT * FROM bot_delegations WHERE root_task_id = :rootTaskId AND status IN ('QUEUED', 'WAITING_TARGET', 'RUNNING') ORDER BY created_at ASC")
+    suspend fun listNonTerminalForRootTask(rootTaskId: String): List<BotDelegationEntity>
 
     @Query("UPDATE bot_delegations SET status = 'CANCELLED', error_text = 'source process stopped before turn settled', finished_at = :now, updated_at = :now WHERE source_turn_settled = 0 AND status IN ('QUEUED', 'WAITING_TARGET')")
     suspend fun cancelUnsettledAfterProcessStart(now: Long): Int

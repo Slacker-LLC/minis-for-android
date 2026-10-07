@@ -147,8 +147,12 @@ class OAuthCallbackServerTest {
 
         Socket(InetAddress.getLoopbackAddress(), port).use { s ->
             s.soTimeout = 3_000
-            s.getOutputStream().write(("GET /" + "a".repeat(200_000) + " HTTP/1.1\r\n\r\n").toByteArray())
-            s.getOutputStream().flush()
+            // The server drops the connection as soon as the line is too long, so the rest of the write may
+            // hit a closed socket ("Broken pipe"): that is the behaviour under test, not a failure.
+            runCatching {
+                s.getOutputStream().write(("GET /" + "a".repeat(200_000) + " HTTP/1.1\r\n\r\n").toByteArray())
+                s.getOutputStream().flush()
+            }
             runCatching { s.getInputStream().readBytes() }
         }
         assertFalse(done.count == 0L)

@@ -306,7 +306,10 @@ fun BotsScreen(
                                     },
                                     onCancel = {
                                         scope.launch {
-                                            if (!taskRepository.cancel(rootTask.id)) error = failureText
+                                            val cancelled = com.openminis.app.tools.BotDelegationCoordinator.current()
+                                                ?.cancelRootTask(rootTask.id)
+                                                ?: taskRepository.cancel(rootTask.id)
+                                            if (!cancelled) error = failureText
                                         }
                                     },
                                 )
