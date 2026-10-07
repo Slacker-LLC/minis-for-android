@@ -39,9 +39,7 @@ import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.ThumbUp
-import com.openminis.app.data.BPETokenizer
 import com.openminis.app.data.CompactBudget
-import com.openminis.app.data.ContextOffload
 import com.openminis.app.data.ContextPolicy
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.data.FileMentionIndex
@@ -2706,13 +2704,6 @@ class ChatViewModel(
     }
 
     /**
-     * [T-android-auto-compact-inloop] Max in-loop compactions per runAgentLoop.
-     * Bounds compact-thrash within a single turn; the MAX_AGENT_TURNS ceiling is
-     * never reset by compaction, so this is a second, tighter backstop.
-     */
-    private val maxInLoopCompactions = 3
-
-    /**
      * [T-android-auto-compact-inloop] Re-evaluate [ContextPolicy] between agent
      * iterations and act on it (iOS f70ac173).
      *
@@ -2727,20 +2718,19 @@ class ChatViewModel(
      */
     private suspend fun inLoopContextCheck(compactionsSoFar: Int): InLoopContextAction {
         val tokens = _lastTurnContextTokens.value
-        if (tokens <= 0) return InLoopContextAction.PROCEED
-        val window = effectiveContextWindowTokens() ?: return InLoopContextAction.PROCEED
-        val policy = ContextPolicy.forContextWindow(window)
-        return when (policy.check(tokens, window)) {
-            ContextPolicy.CheckResult.OK -> InLoopContextAction.PROCEED
+        val window = effectiveContextWindowTokens()
+        return when (InLoopContextPolicy.decide(tokens, window, compactionsSoFar)) {
+            InLoopContextPolicy.Decision.PROCEED -> InLoopContextAction.PROCEED
 
-            ContextPolicy.CheckResult.NEEDS_COMPACT -> {
-                if (compactionsSoFar >= maxInLoopCompactions) {
-                    AppLogger.warning(
-                        TAG,
-                        "[AutoCompact] still over threshold after $compactionsSoFar compaction(s) — stopping",
-                    )
-                    return InLoopContextAction.STOP
-                }
+            InLoopContextPolicy.Decision.STOP_COMPACTION_BUDGET -> {
+                AppLogger.warning(
+                    TAG,
+                    "[AutoCompact] still over threshold after $compactionsSoFar compaction(s) — stopping",
+                )
+                InLoopContextAction.STOP
+            }
+
+            InLoopContextPolicy.Decision.COMPACT -> {
                 // NOTE: deliberately NOT gated on AutoCompactPrefs. That flag
                 // governs the SEND-time decision (compact silently vs. ask
                 // first) — mid-loop there is nobody to ask, and the alternative
@@ -2773,13 +2763,7 @@ class ChatViewModel(
                 InLoopContextAction.COMPACTED
             }
 
-            // EXHAUSTED is only ever returned by `exhaustedOnly` tiers — windows
-            // under 64K, where ContextPolicy sets compactThreshold = 0 precisely
-            // BECAUSE the window is too small for auto-compact to pay for itself
-            // (the summary plus re-appended recent turns would eat the headroom
-            // it just freed). Attempting a "rescue" compaction here would
-            // contradict the policy, so stop and let the user decide.
-            ContextPolicy.CheckResult.EXHAUSTED -> {
+            InLoopContextPolicy.Decision.STOP_EXHAUSTED -> {
                 AppLogger.warning(
                     TAG,
                     "[AutoCompact] exhausted on a no-auto-compact tier ($tokens / $window) — stopping",
@@ -6284,275 +6268,6 @@ class ChatViewModel(
         return result
     }
 
-    // ─── Context Window Offload ──────────────────────────────────────────────
-    //
-    // Mirrors iOS `AIChatViewModel.swift`:
-    //   - estimateContextTokens()        (line 7451)
-    //   - offloadContextIfNeeded()       (line 7481)
-    // Per-tool writers live in [com.openminis.app.data.ContextOffload].
-    //
-    // The agent loop calls [offloadContextIfNeeded] once per turn just before
-    // the next API call. When token usage crosses the policy threshold, large
-    // tool outputs in older messages are written to disk under
-    // `filesDir/minis-sessions/<sid>/offloads/tools/` and replaced in
-    // [agentHistory] by `[CONTEXT OFFLOADED] … <linux path>` stubs. The model
-    // can later `file_read` the path to retrieve the original content.
-    //
-    // Why this matters: without offloading, a session that runs many large
-    // shell tools fills the context window and either trips compact (lossy)
-    // or hits the model's context-exhausted error. Offload is lossless —
-    // the data still exists, just on disk instead of in-prompt.
-
-    /**
-     * Char-based fallback estimate when the API hasn't reported a token
-     * baseline yet (first call in a turn). Mirrors iOS line 7451.
-     *
-     * Uses ~3.5 chars per token for mixed text + adds the tokenizer's
-     * image-aware count for image bytes. Underestimates JSON-heavy tool
-     * inputs slightly but is adequate as a "should we offload" gate —
-     * offload itself uses precise [BPETokenizer.countTokens] per-part
-     * for the candidate ranking.
-     */
-    private fun estimateContextTokens(): Int {
-        var totalChars = 0
-        var imageTokens = 0
-        for (msg in agentHistory) {
-            for (part in msg.contentParts) {
-                when (part) {
-                    is AgentContentPart.Text -> totalChars += part.text.length
-                    is AgentContentPart.ToolUse -> totalChars += part.input.toString().length
-                    is AgentContentPart.ToolResult -> {
-                        totalChars += part.content.length
-                        part.imageData?.let { imageTokens += BPETokenizer.countImageTokens(it) }
-                    }
-                    is AgentContentPart.ImageData -> {
-                        imageTokens += BPETokenizer.countImageTokens(part.data)
-                    }
-                }
-            }
-        }
-        return (totalChars / 3.5).toInt() + imageTokens
-    }
-
-
-    /**
-     * Offload candidate descriptor. `msgIdx` and `partIdx` index back into
-     * [agentHistory] so we can mutate the part in place after writing the
-     * stub to disk.
-     */
-    private data class OffloadCandidate(
-        val msgIdx: Int,
-        val partIdx: Int,
-        val tokens: Int,
-        val bytes: Int,
-        val toolId: String,
-        val toolName: String,
-    )
-
-    /**
-     * Walk [agentHistory], identify large tool outputs in the older
-     * (non-protected) message range, and offload the highest-token ones to
-     * disk until we're back under [ContextPolicy.offloadTarget]. Mirrors iOS
-     * `offloadContextIfNeeded(model:lastContextTokens:force:)` (line 7481).
-     *
-     * Protection rules (parity with iOS line 7535):
-     *   - Last 4 messages are never offloaded — the model needs them
-     *     verbatim to plan the current turn coherently.
-     *   - Already-offloaded parts (prefix [ContextOffload.OFFLOADED_PREFIX])
-     *     are skipped — second pass would rewrite the stub uselessly.
-     *
-     * Eligibility (parity with iOS lines 7556-7596):
-     *   - `ToolResult` with content > 500 chars OR image data > 1 KB
-     *   - `ToolUse` for `file_write` / `file_edit` whose `content` arg > 500 chars
-     *   - bare `ImageData` part > 1 KB
-     *
-     * Candidates are sorted by token count descending and offloaded greedily
-     * until current usage drops below [policy.offloadTarget] (or all
-     * candidates are exhausted). When [force] is true, all eligible
-     * candidates are offloaded regardless of remaining headroom — used by
-     * post-compact code paths to slim down the kept-tail aggressively.
-     */
-    private suspend fun offloadContextIfNeeded(
-        contextWindow: Int,
-        lastContextTokens: Int,
-        force: Boolean = false,
-    ) {
-        val sid = activeSessionId
-        val policy = ContextPolicy.forContextWindow(contextWindow)
-
-        if (!force && policy.offloadThreshold == 0) {
-            // Small-window tier: offload disabled — UI surfaces "exhausted"
-            // when the user crosses the threshold. Nothing to do here.
-            return
-        }
-
-        val effectiveTokens =
-            if (lastContextTokens > 0) lastContextTokens else estimateContextTokens()
-
-        if (!force && effectiveTokens < policy.offloadThreshold) {
-            // Below threshold — no work needed. Caller logs at debug level
-            // via dynamicMaxTokens; we stay silent to keep logs readable.
-            return
-        }
-
-        val targetTokens = if (force) 0 else policy.offloadTarget
-        val beforeTokens = effectiveTokens
-        var currentTokens = effectiveTokens
-        val pct = (effectiveTokens.toLong() * 100 / contextWindow.coerceAtLeast(1)).toInt()
-        val remaining = contextWindow - beforeTokens
-
-        AppLogger.info(TAG, "━━━ Context Offload Triggered ━━━")
-        AppLogger.info(TAG, "  Window: $contextWindow tokens")
-        AppLogger.info(TAG, "  Before: $beforeTokens tokens ($pct% of window, ~$remaining remaining)")
-        if (force) {
-            AppLogger.info(TAG, "  Mode: FORCE — offloading all eligible candidates")
-        } else {
-            AppLogger.info(TAG, "  Threshold: ${policy.offloadThreshold} → Target: $targetTokens")
-            AppLogger.info(TAG, "  Need to free: ~${beforeTokens - targetTokens} tokens")
-        }
-        AppLogger.info(TAG, "  Agent history: ${agentHistory.size} messages")
-
-        val protectedCount = minOf(4, agentHistory.size)
-        val candidateUpper = agentHistory.size - protectedCount
-        AppLogger.info(TAG, "  Scanning messages 0..<$candidateUpper (last $protectedCount protected)")
-
-        val candidates = mutableListOf<OffloadCandidate>()
-        var skippedAlreadyOffloaded = 0
-        var skippedTooSmall = 0
-
-        for (msgIdx in 0 until candidateUpper) {
-            val msg = agentHistory[msgIdx]
-            for ((partIdx, part) in msg.contentParts.withIndex()) {
-                when (part) {
-                    is AgentContentPart.ToolResult -> {
-                        if (part.content.startsWith(ContextOffload.OFFLOADED_PREFIX)) {
-                            skippedAlreadyOffloaded++
-                            continue
-                        }
-                        val hasLargeContent = part.content.length > 500
-                        val hasLargeImage = (part.imageData?.size ?: 0) > 1024
-                        if (!hasLargeContent && !hasLargeImage) {
-                            skippedTooSmall++
-                            continue
-                        }
-                        val tokens = OutgoingHistory.countPartTokens(part)
-                        val bytes = part.content.toByteArray(Charsets.UTF_8).size +
-                            (part.imageData?.size ?: 0)
-                        candidates.add(OffloadCandidate(msgIdx, partIdx, tokens, bytes, part.id, part.name))
-                    }
-                    is AgentContentPart.ToolUse -> {
-                        if (part.name != "file_write" && part.name != "file_edit") continue
-                        val content = part.input.optString("content", "")
-                        if (content.length <= 500) continue
-                        val tokens = OutgoingHistory.countPartTokens(part)
-                        val bytes = content.toByteArray(Charsets.UTF_8).size
-                        candidates.add(OffloadCandidate(msgIdx, partIdx, tokens, bytes, part.id, part.name))
-                    }
-                    is AgentContentPart.ImageData -> {
-                        if (part.data.size <= 1024) {
-                            skippedTooSmall++
-                            continue
-                        }
-                        val tokens = OutgoingHistory.countPartTokens(part)
-                        // Synthesize a tool id since bare images don't carry one.
-                        val synthId = "img${msgIdx}_$partIdx"
-                        candidates.add(OffloadCandidate(msgIdx, partIdx, tokens, part.data.size, synthId, "image"))
-                    }
-                    is AgentContentPart.Text -> Unit
-                }
-            }
-        }
-
-        candidates.sortByDescending { it.tokens }
-        val totalCandidateTokens = candidates.sumOf { it.tokens }
-        AppLogger.info(TAG, "  Candidates: ${candidates.size} parts (~$totalCandidateTokens tokens total)")
-        AppLogger.info(TAG, "  Skipped: $skippedAlreadyOffloaded already offloaded, $skippedTooSmall too small")
-
-        var offloadedCount = 0
-        var freedTokens = 0
-
-        for (candidate in candidates) {
-            if (currentTokens <= targetTokens) break
-
-            val msg = agentHistory[candidate.msgIdx]
-            val parts = msg.contentParts.toMutableList()
-            val part = parts[candidate.partIdx]
-            var linuxPath = ""
-
-            val newPart: AgentContentPart? = when (part) {
-                is AgentContentPart.ToolResult -> {
-                    if (part.content.length > 500) {
-                        linuxPath = ContextOffload.offloadContent(
-                            context, sid, part.content,
-                            toolId = part.id, toolName = part.name,
-                        )
-                    }
-                    val imgPath = part.imageData?.let { data ->
-                        if (data.size > 1024) {
-                            ContextOffload.offloadImage(
-                                context, sid, data,
-                                toolId = part.id,
-                                mimeType = part.imageMimeType ?: "image/png",
-                            )
-                        } else ""
-                    } ?: ""
-                    if (linuxPath.isEmpty()) linuxPath = imgPath
-                    val stub = ContextOffload.stub(candidate.tokens, candidate.bytes, linuxPath)
-                    part.copy(content = stub, imageData = null, imageMimeType = null)
-                }
-                is AgentContentPart.ToolUse -> {
-                    val content = part.input.optString("content", "")
-                    linuxPath = ContextOffload.offloadContent(
-                        context, sid, content,
-                        toolId = part.id, toolName = part.name,
-                    )
-                    val newInput = org.json.JSONObject(part.input.toString())
-                    newInput.put(
-                        "content",
-                        ContextOffload.stub(candidate.tokens, candidate.bytes, linuxPath),
-                    )
-                    part.copy(input = newInput)
-                }
-                is AgentContentPart.ImageData -> {
-                    linuxPath = ContextOffload.offloadImage(
-                        context, sid, part.data,
-                        toolId = candidate.toolId,
-                        mimeType = part.mimeType,
-                    )
-                    // Bare ImageData has no toolUseId pairing — replace with a
-                    // text part carrying the stub. Mirrors iOS line 7653.
-                    AgentContentPart.Text(
-                        ContextOffload.stub(candidate.tokens, candidate.bytes, linuxPath),
-                    )
-                }
-                is AgentContentPart.Text -> null
-            }
-
-            if (newPart == null) continue
-            parts[candidate.partIdx] = newPart
-            agentHistory[candidate.msgIdx] = msg.copy(contentParts = parts)
-
-            currentTokens -= candidate.tokens
-            freedTokens += candidate.tokens
-            offloadedCount++
-            val afterPct = (currentTokens.toLong() * 100 / contextWindow.coerceAtLeast(1)).toInt()
-            AppLogger.info(
-                TAG,
-                "  ✂ Offloaded #$offloadedCount: [${candidate.toolName}] id:${candidate.toolId.take(8)} ~${candidate.tokens} tokens (${candidate.bytes} bytes) → $linuxPath [now $currentTokens ($afterPct%)]",
-            )
-        }
-
-        if (offloadedCount > 0) {
-            val afterPct = (currentTokens.toLong() * 100 / contextWindow.coerceAtLeast(1)).toInt()
-            AppLogger.info(TAG, "━━━ Context Offload Complete ━━━")
-            AppLogger.info(TAG, "  Parts offloaded: $offloadedCount")
-            AppLogger.info(TAG, "  Tokens freed: ~$freedTokens")
-            AppLogger.info(TAG, "  Before: $beforeTokens/$contextWindow ($pct%)")
-            AppLogger.info(TAG, "  After:  $currentTokens/$contextWindow ($afterPct%)")
-            AppLogger.info(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        }
-    }
-
     private suspend fun runAgentLoop(
         provider: LLMProvider,
         systemPrompt: String?,
@@ -6778,7 +6493,8 @@ class ChatViewModel(
             // snapshot inside a long-running agent turn is exactly the iOS
             // fcc22b66 item-3 bug.
             effectiveContextWindowTokens()?.takeIf { it > 0 }?.let { window ->
-                offloadContextIfNeeded(
+                ContextOffloader.offloadIfNeeded(
+                    context, activeSessionId, agentHistory,
                     contextWindow = window,
                     lastContextTokens = lastContextTokens,
                 )
