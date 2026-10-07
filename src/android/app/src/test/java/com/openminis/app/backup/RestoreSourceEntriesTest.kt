@@ -27,14 +27,16 @@ import org.junit.Test
 class RestoreSourceEntriesTest {
 
     private val screen: String by lazy {
-        val f = File("src/main/java/com/openminis/app/ui/settings/backup/BackupAndRestoreScreen.kt")
-        assertTrue("expected to find ${f.path} relative to the app module", f.isFile)
-        f.readText()
+        // The screen file and the files its composables were split into.
+        val dir = File("src/main/java/com/openminis/app/ui/settings/backup")
+        val files = dir.listFiles { x -> x.name.startsWith("BackupAndRestoreScreen") && x.name.endsWith(".kt") }.orEmpty()
+        assertTrue("expected to find BackupAndRestoreScreen*.kt in ${dir.path} relative to the app module", files.isNotEmpty())
+        files.sortedBy { it.name }.joinToString("\n") { it.readText() }
     }
 
     /** Body of `RestoreTab`, so Backup-tab rows cannot satisfy these checks. */
     private val restoreTab: String by lazy {
-        val start = screen.indexOf("private fun RestoreTab(")
+        val start = screen.indexOf("fun RestoreTab(")
         assertTrue("RestoreTab not found", start >= 0)
         // Up to the next top-level composable declaration.
         val end = screen.indexOf("\n@Composable", start + 1).let { if (it < 0) screen.length else it }
@@ -184,9 +186,9 @@ class RestoreSourceEntriesTest {
         val dest = File(
             "src/main/java/com/openminis/app/ui/settings/backup/RcloneDestinationsScreen.kt",
         ).readText()
-        val nav = File(
-            "src/main/java/com/openminis/app/ui/navigation/AppNavigation.kt",
-        ).readText()
+        val nav = File("src/main/java/com/openminis/app/ui/navigation")
+            .listFiles { x -> x.name.startsWith("AppNavigation") && x.name.endsWith(".kt") }!!
+            .joinToString("\n") { it.readText() }
         for (marker in listOf("startOnAddForm", "BACKUP_DESTINATIONS_ADD")) {
             assertFalse("$marker should have been withdrawn", dest.contains(marker))
             assertFalse("$marker should have been withdrawn", nav.contains(marker))

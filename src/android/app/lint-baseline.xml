@@ -72,11 +72,11 @@
     <issue
         id="DefaultLocale"
         message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="        bytes >= 1024 -> String.format(&quot;%.1f KB&quot;, bytes / 1024.0)"
+        errorLine1="        bytes &gt;= 1024 -&gt; String.format(&quot;%.1f KB&quot;, bytes / 1024.0)"
         errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatToolDetailUI.kt"
-            line="1551"
+            file="src/main/java/com/openminis/app/ui/chat/ChatToolDetailUIHelpers.kt"
+            line="281"
             column="26"/>
     </issue>
 
@@ -892,12 +892,12 @@
     <issue
         id="StateFlowValueCalledInComposition"
         message="StateFlow.value should not be called within composition"
-        errorLine1="                                    ?: viewModel.thinkingLevel.value"
-        errorLine2="                                                               ~~~~~">
+        errorLine1="                        ?: viewModel.thinkingLevel.value"
+        errorLine2="                                                   ~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
-            line="3829"
-            column="64"/>
+            file="src/main/java/com/openminis/app/ui/chat/ChatScreenMessages.kt"
+            line="575"
+            column="52"/>
     </issue>
 
     <issue
@@ -7340,55 +7340,55 @@
     <issue
         id="AutoboxingStateCreation"
         message="Prefer `mutableLongStateOf` instead of `mutableStateOf`"
-        errorLine1="    var lastSendTimeMs by remember { mutableStateOf(0L) }"
+        errorLine1="    val lastSendTimeMs_st = remember { mutableStateOf(0L) }"
         errorLine2="                                     ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
-            line="642"
+            line="281"
             column="38"/>
     </issue>
 
     <issue
         id="AutoboxingStateCreation"
         message="Prefer `mutableLongStateOf` instead of `mutableStateOf`"
-        errorLine1="    var lastUserAppendMs by remember { mutableStateOf(0L) }"
+        errorLine1="    val lastUserAppendMs_st = remember { mutableStateOf(0L) }"
         errorLine2="                                       ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
-            line="666"
+            line="307"
             column="40"/>
     </issue>
 
     <issue
         id="AutoboxingStateCreation"
         message="Prefer `mutableLongStateOf` instead of `mutableStateOf`"
-        errorLine1="    var lastStreamEndMs by remember { mutableStateOf(0L) }"
+        errorLine1="    val lastStreamEndMs_st = remember { mutableStateOf(0L) }"
         errorLine2="                                      ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
-            line="670"
+            line="312"
             column="39"/>
     </issue>
 
     <issue
         id="AutoboxingStateCreation"
         message="Prefer `mutableFloatStateOf` instead of `mutableStateOf`"
-        errorLine1="    var sendSwipeProgress by remember { mutableStateOf(0f) }"
+        errorLine1="    val sendSwipeProgress_st = remember { mutableStateOf(0f) }"
         errorLine2="                                        ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
-            line="700"
+            line="344"
             column="41"/>
     </issue>
 
     <issue
         id="AutoboxingStateCreation"
         message="Prefer `mutableLongStateOf` instead of `mutableStateOf`"
-        errorLine1="    var lastInterruptMs by remember { mutableStateOf(0L) }"
+        errorLine1="    val lastInterruptMs_st = remember { mutableStateOf(0L) }"
         errorLine2="                                      ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
-            line="1513"
+            line="723"
             column="39"/>
     </issue>
 
@@ -7399,7 +7399,7 @@
         errorLine2="                                       ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
-            line="2085"
+            line="1049"
             column="40"/>
     </issue>
 
@@ -7410,41 +7410,41 @@
         errorLine2="                                     ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
-            line="2086"
+            line="1050"
             column="38"/>
     </issue>
 
     <issue
         id="AutoboxingStateCreation"
         message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
-        errorLine1="                var toolBarHeightPx by remember { mutableStateOf(0) }"
-        errorLine2="                                                  ~~~~~~~~~~~~~~">
+        errorLine1="        var toolBarHeightPx by remember { mutableStateOf(0) }"
+        errorLine2="                                          ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
-            line="2904"
-            column="51"/>
+            file="src/main/java/com/openminis/app/ui/chat/ChatScreenPane.kt"
+            line="137"
+            column="43"/>
     </issue>
 
     <issue
         id="AutoboxingStateCreation"
         message="Prefer `mutableLongStateOf` instead of `mutableStateOf`"
-        errorLine1="                var lastColdPrewarmMs by remember(sessionId) { mutableStateOf(-1L) }"
-        errorLine2="                                                               ~~~~~~~~~~~~~~">
+        errorLine1="        val lastColdPrewarmMs_st = remember(sessionId) { mutableStateOf(-1L) }"
+        errorLine2="                                                       ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
-            line="3063"
-            column="64"/>
+            file="src/main/java/com/openminis/app/ui/chat/ChatScreenPane.kt"
+            line="299"
+            column="56"/>
     </issue>
 
     <issue
         id="AutoboxingStateCreation"
         message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
-        errorLine1="                            var spokenUpTo by remember(lastAssistantId) { mutableStateOf(0) }"
-        errorLine2="                                                                          ~~~~~~~~~~~~~~">
+        errorLine1="                var spokenUpTo by remember(lastAssistantId) { mutableStateOf(0) }"
+        errorLine2="                                                              ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
-            line="5777"
-            column="75"/>
+            file="src/main/java/com/openminis/app/ui/chat/ChatScreenComposer.kt"
+            line="1358"
+            column="63"/>
     </issue>
 
     <issue
@@ -7454,7 +7454,7 @@
         errorLine2="                                 ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/openminis/app/ui/chat/ChatToolDetailUI.kt"
-            line="290"
+            line="113"
             column="34"/>
     </issue>
 
@@ -7464,8 +7464,8 @@
         errorLine1="    var revealed by remember(bodyText) { mutableStateOf(initialRevealChunks(chunks)) }"
         errorLine2="                                         ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatToolDetailUI.kt"
-            line="1468"
+            file="src/main/java/com/openminis/app/ui/chat/ChatToolDetailUIHelpers.kt"
+            line="198"
             column="42"/>
     </issue>
 
@@ -7652,8 +7652,8 @@
         errorLine1="    var positionMs by remember { mutableStateOf(0) }"
         errorLine2="                                 ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/StreamingMarkdownText.kt"
-            line="2470"
+            file="src/main/java/com/openminis/app/ui/chat/StreamingMarkdownTextBlocks.kt"
+            line="939"
             column="34"/>
     </issue>
 
@@ -7855,20 +7855,20 @@
         errorLine1="                    .offset(x = pressOffset.x, y = pressOffset.y)"
         errorLine2="                     ~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sessions/SessionListScreen.kt"
-            line="1794"
+            file="src/main/java/com/openminis/app/ui/sessions/SessionListScreenGroups.kt"
+            line="822"
             column="22"/>
     </issue>
 
     <issue
         id="UseOfNonLambdaOffsetOverload"
         message="State backed values should use the lambda overload of Modifier.offset"
-        errorLine1="                .offset(x = pressOffset.x, y = pressOffset.y)"
-        errorLine2="                 ~~~~~~">
+        errorLine1="                    .offset(x = pressOffset.x, y = pressOffset.y)"
+        errorLine2="                     ~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sessions/SessionListScreen.kt"
-            line="2284"
-            column="18"/>
+            file="src/main/java/com/openminis/app/ui/sessions/SessionListScreenGroups.kt"
+            line="822"
+            column="22"/>
     </issue>
 
     <issue
@@ -10075,20 +10075,20 @@
         errorLine1="                                prefs.edit().putBoolean(PREF_FAB_SWAPPED, isSwapped).apply()"
         errorLine2="                                ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sessions/SessionListScreen.kt"
-            line="1370"
+            file="src/main/java/com/openminis/app/ui/sessions/SessionListScreenGroups.kt"
+            line="413"
             column="33"/>
     </issue>
 
     <issue
         id="UseKtx"
         message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="                                        prefs.edit().putBoolean(PREF_FAB_SWAPPED, isSwapped).apply()"
-        errorLine2="                                        ~~~~~~~~~~~~">
+        errorLine1="                                prefs.edit().putBoolean(PREF_FAB_SWAPPED, isSwapped).apply()"
+        errorLine2="                                ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sessions/SessionListScreen.kt"
-            line="1448"
-            column="41"/>
+            file="src/main/java/com/openminis/app/ui/sessions/SessionListScreenGroups.kt"
+            line="413"
+            column="33"/>
     </issue>
 
     <issue
@@ -10248,11 +10248,11 @@
     <issue
         id="UseKtx"
         message="Use the KTX extension function `String.toUri` instead?"
-        errorLine1="        stripped.startsWith(&quot;file://&quot;) -> File(Uri.parse(stripped).path ?: return null)"
+        errorLine1="        stripped.startsWith(&quot;file://&quot;) -&gt; File(Uri.parse(stripped).path ?: return null)"
         errorLine2="                                               ~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/StreamingMarkdownText.kt"
-            line="2283"
+            file="src/main/java/com/openminis/app/ui/chat/StreamingMarkdownTextBlocks.kt"
+            line="753"
             column="48"/>
     </issue>
 
@@ -10729,4 +10729,48 @@
             column="44"/>
     </issue>
 
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="        val chatPaneWidthPx_st = remember { mutableStateOf(0) }"
+        errorLine2="                                            ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
+            line="1237"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="    val composerWidthPx_st = remember { mutableStateOf(0) }"
+        errorLine2="                                        ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/openminis/app/ui/chat/ChatScreenBottom.kt"
+            line="146"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="UseOfNonLambdaOffsetOverload"
+        message="State backed values should use the lambda overload of Modifier.offset"
+        errorLine1="                .offset(x = pressOffset.x, y = pressOffset.y)"
+        errorLine2="                 ~~~~~~">
+        <location
+            file="src/main/java/com/openminis/app/ui/sessions/SessionListScreenRows.kt"
+            line="290"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            val uri = runCatching { android.net.Uri.parse(trimmed) }.getOrNull()"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/openminis/app/ui/chat/StreamingMarkdownTextContext.kt"
+            line="855"
+            column="37"/>
+    </issue>
 </issues>
