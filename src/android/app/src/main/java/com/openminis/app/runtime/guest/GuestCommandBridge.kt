@@ -109,6 +109,32 @@ internal object GuestCommandBridge {
         val config = "MINIS_CONFIG_PROXY_PORT=${ep.port}\nMINIS_CONFIG_PROXY_TOKEN='${ep.token}'\n"
         val wrapper = wrapperScript()
         val urlWrapper = minisOpenWrapperScript()
+        val script = installScript(rootfs, identity.uid, identity.gid, config, wrapper, urlWrapper, commandNames)
+        val result = DirectRootRunner.runScript(script, INSTALL_TIMEOUT_MS)
+        if (!result.success) {
+            val detail = result.error ?: listOfNotNull(
+                result.stderr.takeIf { it.isNotBlank() }?.let { "stderr=${it.take(600)}" },
+                result.stdout.takeIf { it.isNotBlank() }?.let { "stdout=${it.take(600)}" },
+                "exit=${result.exitCode}",
+            ).joinToString(" ")
+            Log.w(TAG, "guest CLI install failed: $detail")
+            return false
+        }
+        cliInstalled = true
+        installedCommandNames = commandNames
+        return true
+    }
+
+    /** The root script that writes the wrappers into [rootfs]; one `su -c` argument, so its size is bounded (see tests). */
+    internal fun installScript(
+        rootfs: String,
+        uid: Int,
+        gid: Int,
+        config: String,
+        wrapper: String,
+        urlWrapper: String,
+        commandNames: Set<String>,
+    ): String {
         val binDir = "$rootfs/opt/minis/bin"
         val etcDir = "$rootfs/etc/minis"
         val usrLocalBin = "$rootfs/usr/local/bin"
@@ -126,7 +152,12 @@ internal object GuestCommandBridge {
         // below instead of treating an already-installed exact symlink as a
         // hostile generated file.
         val generatedFiles = listOf(configFile, configWrapper, modelWrapper) + bridgePaths + urlPaths
-        val script = buildString {
+        return buildString {
+            fun writeCopies(paths: List<String>, content: String) {
+                val first = paths.firstOrNull() ?: return
+                appendLine("printf %s ${shellQuote(content)} > ${shellQuote(first)}")
+                paths.drop(1).forEach { appendLine("cp ${shellQuote(first)} ${shellQuote(it)}") }
+            }
             appendLine("set -eu")
             // Ubuntu ships /etc/os-release as a relative symlink into /usr.
             // Keep the same exact-target exception as rootfs health checks;
@@ -148,12 +179,11 @@ internal object GuestCommandBridge {
             appendLine("printf %s ${shellQuote(config)} > ${shellQuote(configFile)}")
             appendLine("printf %s ${shellQuote(wrapper)} > ${shellQuote(configWrapper)}")
             appendLine("cp ${shellQuote(configWrapper)} ${shellQuote(modelWrapper)}")
-            bridgePaths.forEach { path ->
-                appendLine("printf %s ${shellQuote(wrapper)} > ${shellQuote(path)}")
-            }
-            urlPaths.forEach { path ->
-                appendLine("printf %s ${shellQuote(urlWrapper)} > ${shellQuote(path)}")
-            }
+            // One copy of each wrapper is written inline and the rest are `cp`s of it: the whole script is a
+            // single `su -c` argument, and one inline copy per command grew past the kernel's per-argument
+            // limit (E2BIG) once the command set passed a few dozen.
+            writeCopies(bridgePaths, wrapper)
+            writeCopies(urlPaths, urlWrapper)
             val executablePaths = listOf(configWrapper, modelWrapper) + bridgePaths + urlPaths
             appendLine(
                 "chmod 755 " + listOf(
@@ -162,7 +192,7 @@ internal object GuestCommandBridge {
                     shellQuote(binDir),
                 ).plus(executablePaths.map(::shellQuote)).joinToString(" "),
             )
-            appendLine("chown ${identity.uid}:${identity.gid} ${shellQuote(configFile)}")
+            appendLine("chown ${uid}:${gid} ${shellQuote(configFile)}")
             appendLine("chmod 600 ${shellQuote(configFile)}")
             listOf(configLink, modelLink).forEach { link ->
                 val quoted = shellQuote(link)
@@ -184,19 +214,6 @@ internal object GuestCommandBridge {
             appendLine("ln -s /opt/minis/bin/minis-config ${shellQuote(configLink)}")
             appendLine("ln -s /opt/minis/bin/minis-model-use ${shellQuote(modelLink)}")
         }
-        val result = DirectRootRunner.runScript(script, INSTALL_TIMEOUT_MS)
-        if (!result.success) {
-            val detail = result.error ?: listOfNotNull(
-                result.stderr.takeIf { it.isNotBlank() }?.let { "stderr=${it.take(600)}" },
-                result.stdout.takeIf { it.isNotBlank() }?.let { "stdout=${it.take(600)}" },
-                "exit=${result.exitCode}",
-            ).joinToString(" ")
-            Log.w(TAG, "guest CLI install failed: $detail")
-            return false
-        }
-        cliInstalled = true
-        installedCommandNames = commandNames
-        return true
     }
 
     fun invalidateGuestCli() {
