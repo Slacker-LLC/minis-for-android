@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.openminis.app.data.repository.allVisibleEntries
 
 /**
  * [T-android-scheduled-tasks-design] Headless agent launch for scheduled

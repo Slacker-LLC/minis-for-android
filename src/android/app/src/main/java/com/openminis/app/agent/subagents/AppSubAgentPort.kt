@@ -18,6 +18,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import com.openminis.app.ui.chat.enqueuePrompt
+import com.openminis.app.data.repository.allVisibleEntries
+import com.openminis.app.data.repository.availableEntries
+import com.openminis.app.data.repository.hasAnyCredential
+import com.openminis.app.data.repository.instance
+import com.openminis.app.data.repository.resolvedAgentLoopEntries
 
 /**
  * The app side of [SubAgentPort]: child sessions are ordinary sessions driven through [AgentRunner]

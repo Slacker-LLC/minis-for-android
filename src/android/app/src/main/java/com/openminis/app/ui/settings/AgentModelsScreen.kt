@@ -25,6 +25,9 @@ import com.openminis.app.R
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.provider.ModelsDevApi
 import sh.calvin.reorderable.ReorderableColumn
+import com.openminis.app.data.repository.hasAnyCredential
+import com.openminis.app.data.repository.removeAgentLoopEntry
+import com.openminis.app.data.repository.reorderAgentLoopEntries
 
 /**
  * The models the agent may use: what `minis-model-use` can call and what the assistant can run a sub

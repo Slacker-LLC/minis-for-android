@@ -69,6 +69,7 @@ import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.theme.minisSheetColor
+import com.openminis.app.data.repository.activeVoiceSlotEntryId
 
 /**
  * [T-android-unified-model-picker] Android counterpart of iOS

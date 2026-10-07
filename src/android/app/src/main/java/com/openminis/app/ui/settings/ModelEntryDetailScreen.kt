@@ -39,6 +39,7 @@ import com.openminis.app.R
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisTextButton
 import kotlin.math.roundToInt
+import com.openminis.app.data.repository.updateEntry
 
 /**
  * Detail / edit screen for a single ModelEntry. T210: brought to iOS

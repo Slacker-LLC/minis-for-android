@@ -7,6 +7,10 @@ import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.ProviderFactory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
+import com.openminis.app.data.repository.awaitConfigLoaded
+import com.openminis.app.data.repository.instance
+import com.openminis.app.data.repository.loadApiKey
+import com.openminis.app.data.repository.primaryEntry
 
 /**
  * One-shot question answering for the floating pet.

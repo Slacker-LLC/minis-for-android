@@ -46,6 +46,7 @@ import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.components.modelEntryPickerItems
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.data.repository.addAgentLoopEntry
 
 /**
  * T185 — full-screen picker for adding model entries to the agent-loop

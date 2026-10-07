@@ -416,12 +416,12 @@
     <issue
         id="NewApi"
         message="Call requires API level 33 (current min is 26): `java.io.InputStream#readNBytes`"
-        errorLine1="            stream.readNBytes(limit)"
-        errorLine2="                   ~~~~~~~~~~">
+        errorLine1="        stream.readNBytes(limit)"
+        errorLine2="               ~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugRPCHandler.kt"
-            line="509"
-            column="20"/>
+            file="src/main/java/com/openminis/app/debug/DebugRPCHandlerDispatch.kt"
+            line="628"
+            column="16"/>
     </issue>
 
     <issue
@@ -8694,12 +8694,12 @@
     <issue
         id="UseKtx"
         message="Use the KTX function `createBitmap` instead?"
-        errorLine1="            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)"
-        errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        errorLine1="        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/browser/BrowserUseManager.kt"
-            line="814"
-            column="26"/>
+            file="src/main/java/com/openminis/app/browser/BrowserUseManagerClient.kt"
+            line="660"
+            column="22"/>
     </issue>
 
     <issue
@@ -8892,12 +8892,12 @@
     <issue
         id="UseKtx"
         message="Use the KTX function `createBitmap` instead?"
-        errorLine1="                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)"
-        errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        errorLine1="        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugRPCHandler.kt"
-            line="363"
-            column="30"/>
+            file="src/main/java/com/openminis/app/debug/DebugRPCHandlerDispatch.kt"
+            line="367"
+            column="22"/>
     </issue>
 
     <issue
@@ -8906,8 +8906,8 @@
         errorLine1="        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)"
         errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugRPCHandler.kt"
-            line="394"
+            file="src/main/java/com/openminis/app/debug/DebugRPCHandlerDispatch.kt"
+            line="367"
             column="22"/>
     </issue>
 
@@ -9873,34 +9873,34 @@
     <issue
         id="UseKtx"
         message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="        prefs.edit().putLong(lastFetchKey(instanceId), System.currentTimeMillis()).apply()"
-        errorLine2="        ~~~~~~~~~~~~">
+        errorLine1="    prefs.edit().putLong(lastFetchKey(instanceId), System.currentTimeMillis()).apply()"
+        errorLine2="    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
-            line="126"
-            column="9"/>
+            file="src/main/java/com/openminis/app/data/repository/ProviderRepositoryConfig.kt"
+            line="48"
+            column="5"/>
     </issue>
 
     <issue
         id="UseKtx"
         message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="        prefs.edit().remove(lastFetchKey(instanceId)).apply()"
-        errorLine2="        ~~~~~~~~~~~~">
+        errorLine1="    prefs.edit().remove(lastFetchKey(instanceId)).apply()"
+        errorLine2="    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
-            line="144"
-            column="9"/>
+            file="src/main/java/com/openminis/app/data/repository/ProviderRepositoryConfig.kt"
+            line="66"
+            column="5"/>
     </issue>
 
     <issue
         id="UseKtx"
         message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="                        prefs.edit().putString(KEY_LAST_USED_ENTRY, rewritten).apply()"
-        errorLine2="                        ~~~~~~~~~~~~">
+        errorLine1="                    prefs.edit().putString(KEY_LAST_USED_ENTRY, rewritten).apply()"
+        errorLine2="                    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
-            line="366"
-            column="25"/>
+            file="src/main/java/com/openminis/app/data/repository/ProviderRepositoryConfig.kt"
+            line="193"
+            column="21"/>
     </issue>
 
     <issue
@@ -9910,7 +9910,7 @@
         errorLine2="            ~~~~~~~~~~~~">
         <location
             file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
-            line="923"
+            line="310"
             column="13"/>
     </issue>
 
@@ -9921,7 +9921,7 @@
         errorLine2="            ~~~~~~~~~~~~">
         <location
             file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
-            line="1735"
+            line="358"
             column="13"/>
     </issue>
 
@@ -9932,19 +9932,19 @@
         errorLine2="            ~~~~~~~~~~~~">
         <location
             file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
-            line="1870"
+            line="399"
             column="13"/>
     </issue>
 
     <issue
         id="UseKtx"
         message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="        prefs.edit().putBoolean(&quot;voiceShadowDisabled.$instanceId&quot;, disabled).apply()"
-        errorLine2="        ~~~~~~~~~~~~">
+        errorLine1="    prefs.edit().putBoolean(&quot;voiceShadowDisabled.$instanceId&quot;, disabled).apply()"
+        errorLine2="    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
-            line="2002"
-            column="9"/>
+            file="src/main/java/com/openminis/app/data/repository/ProviderRepositoryEntries.kt"
+            line="220"
+            column="5"/>
     </issue>
 
     <issue
@@ -9972,12 +9972,12 @@
     <issue
         id="UseKtx"
         message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="        encryptedPrefs.edit().remove(&quot;apikey_$instanceId&quot;).apply()"
-        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
+        errorLine1="    encryptedPrefs.edit().remove(&quot;apikey_$instanceId&quot;).apply()"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
-            line="2306"
-            column="9"/>
+            file="src/main/java/com/openminis/app/data/repository/ProviderRepositoryEntries.kt"
+            line="582"
+            column="5"/>
     </issue>
 
     <issue
@@ -10149,34 +10149,34 @@
     <issue
         id="UseKtx"
         message="Use the KTX extension function `SQLiteDatabase.transaction` instead?"
-        errorLine1="        db.beginTransaction()"
-        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
+        errorLine1="    db.beginTransaction()"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/SkillRepository.kt"
-            line="341"
-            column="9"/>
+            file="src/main/java/com/openminis/app/data/repository/SkillRepositoryManagement.kt"
+            line="297"
+            column="5"/>
     </issue>
 
     <issue
         id="UseKtx"
         message="Use the KTX extension function `String.toUri` instead?"
-        errorLine1="        val uri = try { Uri.parse(normalized) } catch (_: Exception) { return null }"
-        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~">
+        errorLine1="    val uri = try { Uri.parse(normalized) } catch (_: Exception) { return null }"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/SkillRepository.kt"
-            line="1053"
-            column="25"/>
+            file="src/main/java/com/openminis/app/data/repository/SkillRepositoryInstall.kt"
+            line="107"
+            column="21"/>
     </issue>
 
     <issue
         id="UseKtx"
         message="Use the KTX extension function `String.toUri` instead?"
-        errorLine1="        val uri = try { Uri.parse(normalized) } catch (_: Exception) { return null }"
-        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~">
+        errorLine1="    val uri = try { Uri.parse(normalized) } catch (_: Exception) { return null }"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/SkillRepository.kt"
-            line="1085"
-            column="25"/>
+            file="src/main/java/com/openminis/app/data/repository/SkillRepositoryInstall.kt"
+            line="107"
+            column="21"/>
     </issue>
 
     <issue
@@ -10772,5 +10772,27 @@
             file="src/main/java/com/openminis/app/ui/chat/StreamingMarkdownTextContext.kt"
             line="855"
             column="37"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="    encryptedPrefs.edit().putString(&quot;apikey_$instanceId&quot;, normalizeStoredCredential(key)).apply()"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/openminis/app/data/repository/ProviderRepositoryEntries.kt"
+            line="560"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="    encryptedPrefs.edit().remove(&quot;apikey_$instanceId&quot;).apply()"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/openminis/app/data/repository/ProviderRepositoryEntries.kt"
+            line="582"
+            column="5"/>
     </issue>
 </issues>

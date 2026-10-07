@@ -30,6 +30,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import com.openminis.app.data.repository.instance
+import com.openminis.app.data.repository.resolvedAgentLoopEntries
+import com.openminis.app.data.repository.skillPromptFragment
 
 internal fun ChatViewModel.updateAssistantMessage(
     id: String,

@@ -21,6 +21,21 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
+import com.openminis.app.data.repository.addEntry
+import com.openminis.app.data.repository.addInstance
+import com.openminis.app.data.repository.deleteApiKey
+import com.openminis.app.data.repository.entriesFor
+import com.openminis.app.data.repository.instance
+import com.openminis.app.data.repository.loadApiKey
+import com.openminis.app.data.repository.refreshModels
+import com.openminis.app.data.repository.removeEntry
+import com.openminis.app.data.repository.removeInstance
+import com.openminis.app.data.repository.saveApiKey
+import com.openminis.app.data.repository.setAgentLoopEntryIds
+import com.openminis.app.data.repository.setFallbackTrigger
+import com.openminis.app.data.repository.setSlotEntries
+import com.openminis.app.data.repository.updateEntry
+import com.openminis.app.data.repository.updateInstance
 
 /**
  * Mutation handlers for the `provider.*` RPC methods —

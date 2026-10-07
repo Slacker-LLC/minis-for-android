@@ -9,6 +9,9 @@ import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.provider.ProviderFactory
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import com.openminis.app.data.repository.resolveVisionCandidates
+import com.openminis.app.data.repository.usableApiKey
+import com.openminis.app.data.repository.visionSlotName
 
 /**
  * [T-android-vision-group / GH#182] Image understanding for main models that

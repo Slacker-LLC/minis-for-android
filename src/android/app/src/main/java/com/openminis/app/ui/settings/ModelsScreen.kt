@@ -22,6 +22,8 @@ import com.openminis.app.data.model.ModelSlot
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.components.PickerModalityFilter
 import com.openminis.app.ui.components.UnifiedModelPickerSheet
+import com.openminis.app.data.repository.setFallbackTrigger
+import com.openminis.app.data.repository.setSlotEntries
 
 @Composable
 fun ModelsScreen(

@@ -16,6 +16,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import com.openminis.app.data.repository.instance
+import com.openminis.app.data.repository.loadApiKey
+import com.openminis.app.data.repository.resolveTitleLightEntry
+import com.openminis.app.data.repository.saveApiKey
 
 /**
  * The session's automatic title, category and group: one model call after the first exchange, a

@@ -20,6 +20,7 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
+import com.openminis.app.data.repository.collectBackupProviderSecret
 
 /**
  * Builds a `.minisbak` package on Android (docs/backup-restore-design.md §2,

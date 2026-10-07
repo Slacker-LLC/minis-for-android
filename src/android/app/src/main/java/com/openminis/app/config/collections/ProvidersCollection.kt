@@ -14,6 +14,11 @@ import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.ProviderType
 import com.openminis.app.data.repository.EnvVarRepository
 import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.data.repository.addInstance
+import com.openminis.app.data.repository.deleteApiKey
+import com.openminis.app.data.repository.instance
+import com.openminis.app.data.repository.saveApiKey
+import com.openminis.app.data.repository.updateInstance
 
 /**
  * Exposes `ProviderInstance` fields under `providers.<id>.…`. Mirrors

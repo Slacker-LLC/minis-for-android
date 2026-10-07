@@ -18,6 +18,7 @@ import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
+import com.openminis.app.data.repository.awaitConfigLoaded
 
 /** Uses the real VM/Room loop with an in-process provider; no network or root tools. */
 @RunWith(AndroidJUnit4::class)

@@ -13,6 +13,10 @@ import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ModelOverrides
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.data.repository.addEntry
+import com.openminis.app.data.repository.instance
+import com.openminis.app.data.repository.removeEntry
+import com.openminis.app.data.repository.updateEntry
 
 /**
  * Exposes ModelEntry overrides under `models.<entryUUID>.…`. Mirrors

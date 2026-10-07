@@ -61,6 +61,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import com.openminis.app.data.repository.importFromGitHub
+import com.openminis.app.data.repository.update
 
 private enum class HudState {
     HIDDEN, IMPORTING, SUCCESS, ERROR, HINT

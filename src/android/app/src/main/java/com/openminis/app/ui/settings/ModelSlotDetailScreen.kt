@@ -33,6 +33,9 @@ import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.theme.ChatColors
 import sh.calvin.reorderable.ReorderableColumn
+import com.openminis.app.data.repository.isEntryProviderEnabled
+import com.openminis.app.data.repository.reorderSlot
+import com.openminis.app.data.repository.setSlotEntries
 
 @Composable
 fun ModelSlotDetailScreen(

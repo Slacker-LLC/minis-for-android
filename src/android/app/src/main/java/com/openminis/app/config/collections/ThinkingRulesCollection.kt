@@ -12,6 +12,10 @@ import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.provider.thinking.ThinkingRule
 import com.openminis.app.provider.thinking.ThinkingRuleCoding
 import org.json.JSONObject
+import com.openminis.app.data.repository.deleteThinkingRule
+import com.openminis.app.data.repository.saveThinkingRule
+import com.openminis.app.data.repository.thinkingRuleIds
+import com.openminis.app.data.repository.thinkingRules
 
 /**
  * [T-android-thinking-rules-phase2 / parity with iOS ThinkingRulesCollection.swift]

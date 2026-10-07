@@ -82,6 +82,9 @@ import java.util.UUID
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.RowLabel
 import com.openminis.app.ui.components.SectionTextField
+import com.openminis.app.data.repository.addInstance
+import com.openminis.app.data.repository.refreshModels
+import com.openminis.app.data.repository.saveApiKey
 
 private enum class AddProviderStep {
     CHOOSE_TYPE,

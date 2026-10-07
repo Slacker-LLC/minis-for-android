@@ -71,6 +71,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CoroutineScope
 import androidx.compose.runtime.rememberCoroutineScope
+import com.openminis.app.provider.openai.generateImage
+import com.openminis.app.data.repository.instance
+import com.openminis.app.data.repository.loadApiKey
 
 private const val TAG = "QuickTest"
 

@@ -4,6 +4,10 @@ import com.openminis.app.data.model.ModelBinding
 import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ModelSlot
 import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.data.repository.allVisibleEntries
+import com.openminis.app.data.repository.availableEntries
+import com.openminis.app.data.repository.hasAnyCredential
+import com.openminis.app.data.repository.instance
 
 /** Shared by direct conversations and delegated execution. */
 object BotModelResolver {

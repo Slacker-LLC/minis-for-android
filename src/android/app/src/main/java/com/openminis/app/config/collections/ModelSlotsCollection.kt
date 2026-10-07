@@ -14,6 +14,7 @@ import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.data.model.ProviderConfig
 import com.openminis.app.data.model.SystemVoiceEntries
 import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.data.repository.setSlotEntries
 
 /**
  * Fixed, ordered model slots exposed under `slots.<slot>.entries`.

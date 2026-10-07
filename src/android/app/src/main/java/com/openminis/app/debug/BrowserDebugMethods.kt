@@ -8,6 +8,8 @@ import com.openminis.app.browser.BrowserTabPool
 import com.openminis.app.browser.BrowserUseManager
 import org.json.JSONArray
 import org.json.JSONObject
+import com.openminis.app.browser.evaluateExpressionRaw
+import com.openminis.app.browser.execute
 
 /**
  * Browser-debug RPC handlers (`debug.browser.*`).

@@ -23,6 +23,8 @@ import com.openminis.app.ui.components.RowLabel
 import com.openminis.app.ui.components.SectionTextField
 import com.openminis.app.R
 import com.openminis.app.ui.components.MinisButton
+import com.openminis.app.data.repository.addEntry
+import com.openminis.app.data.repository.instance
 
 /**
  * Add Custom Model — adopts the SettingsScaffold/SettingsSection toolkit

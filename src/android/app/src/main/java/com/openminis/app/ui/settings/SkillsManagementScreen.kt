@@ -106,6 +106,20 @@ import java.util.Locale
 import com.openminis.app.i18n.uppercaseForDisplay
 import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.ui.components.MinisModalBottomSheet
+import com.openminis.app.data.repository.delete
+import com.openminis.app.data.repository.exportSkillToZip
+import com.openminis.app.data.repository.importFromArchive
+import com.openminis.app.data.repository.importFromContent
+import com.openminis.app.data.repository.importFromGitHub
+import com.openminis.app.data.repository.listSkillFiles
+import com.openminis.app.data.repository.parseSkillMdPublic
+import com.openminis.app.data.repository.readSkillFile
+import com.openminis.app.data.repository.reloadFromDisk
+import com.openminis.app.data.repository.rescanFromDisk
+import com.openminis.app.data.repository.setEnabled
+import com.openminis.app.data.repository.update
+import com.openminis.app.data.repository.updateFromURL
+import com.openminis.app.data.repository.writeSkillFile
 
 /**
  * Inline state for the three update actions on [SkillDetailScreen]

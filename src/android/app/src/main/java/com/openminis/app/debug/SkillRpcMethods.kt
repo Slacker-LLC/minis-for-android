@@ -5,6 +5,12 @@ import com.openminis.app.MinisApp
 import com.openminis.app.data.repository.SkillRepository
 import org.json.JSONArray
 import org.json.JSONObject
+import com.openminis.app.data.repository.add
+import com.openminis.app.data.repository.delete
+import com.openminis.app.data.repository.importFromContent
+import com.openminis.app.data.repository.importFromGitHub
+import com.openminis.app.data.repository.setEnabled
+import com.openminis.app.data.repository.update
 
 /**
  * `skills.*` RPC handlers shared by the debug server and Web Remote.

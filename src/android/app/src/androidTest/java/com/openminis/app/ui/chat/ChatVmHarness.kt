@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
+import com.openminis.app.data.repository.awaitConfigLoaded
 
 /**
  * A real [ChatViewModel] over an in-memory Room database with a scripted model. The agent-loop

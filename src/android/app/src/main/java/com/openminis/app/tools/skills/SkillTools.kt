@@ -10,6 +10,11 @@ import com.openminis.app.tools.runtime.ToolHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import com.openminis.app.data.repository.inspectGitHub
+import com.openminis.app.data.repository.installFromGitHub
+import com.openminis.app.data.repository.listSkillFiles
+import com.openminis.app.data.repository.readSkillFile
+import com.openminis.app.data.repository.recordSkillUse
 
 /**
  * [T-eta-skill-tools] Model-facing skill tools: list what is installed, read a

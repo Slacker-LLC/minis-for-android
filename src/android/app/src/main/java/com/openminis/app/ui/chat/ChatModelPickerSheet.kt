@@ -276,6 +276,7 @@ import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.components.MinisModalBottomSheet
+import com.openminis.app.data.repository.triggerBackgroundRefreshIfStale
 
 /**
  * Fuzzy match: substring first, then all query chars appear in order.

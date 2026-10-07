@@ -17,6 +17,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import com.openminis.app.provider.openai.buildResponsesAPIBody
 
 /**
  * [T-eta-responses-opaque-items] Regression coverage for the opaque output items

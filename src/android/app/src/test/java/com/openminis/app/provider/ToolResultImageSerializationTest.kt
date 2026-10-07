@@ -10,6 +10,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.openminis.app.provider.openai.buildRequestBody
+import com.openminis.app.provider.openai.buildResponsesAPIBody
 
 /**
  * [T-android-toolresult-image-dropped]
