@@ -166,7 +166,6 @@ internal fun ChatMessageList(
     perfFirstLayoutFired: java.util.concurrent.atomic.AtomicBoolean,
     lastAssistantMessageId: kotlin.String?,
     actionsFor: kotlin.Function2<kotlin.String, kotlin.String, com.openminis.app.ui.chat.AssistantActionSet>,
-    longPressOnText: kotlin.Function1<com.openminis.app.ui.chat.TextShardId, kotlin.Boolean>,
     sharedEffect: androidx.compose.foundation.OverscrollEffect?,
 ) {
     val messages by messagesState
@@ -235,7 +234,6 @@ internal fun ChatMessageList(
                 // the bottom edge reveals NEWER messages (lower
                 // index) rather than jumping backward.
                 reverseLayout = true,
-                onLongPressOnText = longPressOnText,
             )
             // T29 dismiss-on-tap spy. Only active while the slash
             // popup is showing. awaitFirstDown(requireUnconsumed=false,
@@ -804,6 +802,7 @@ internal fun SelectionToolbarOverlay(
     selectionController: com.openminis.app.ui.chat.SelectionController,
     selectionReader: com.openminis.app.ui.chat.LazyReadAloudPlayer,
     listRootCoordsState: androidx.compose.runtime.MutableState<androidx.compose.ui.layout.LayoutCoordinates?>,
+    onOpenReplyMenu: kotlin.Function1<kotlin.String, kotlin.Unit>,
 ) {
     var listRootCoords by listRootCoordsState
     MinisSelectionToolbarHost(
@@ -849,6 +848,7 @@ internal fun SelectionToolbarOverlay(
             // through the same screen-scoped lazy player the
             // Compose-SelectionContainer toolbar uses.
             onReadAloud = { snippet -> selectionReader.speak(snippet) },
+            onOpenReplyMenu = onOpenReplyMenu,
         ),
     )
 }

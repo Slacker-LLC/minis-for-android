@@ -540,9 +540,6 @@
     <string name="perm_autonomy_smart_sub">Обычные настройки меняются без вопросов; ключи, токены и рискованные изменения по-прежнему подтверждаются.</string>
     <string name="perm_autonomy_full">Полностью автоматически</string>
     <string name="perm_autonomy_full_sub">Не спрашивать об изменениях настроек. Они остаются в журнале и могут быть отменены.</string>
-    <string name="perm_section_android_grants">Разрешения Android</string>
-    <string name="perm_grant_all_title">Выдать все разрешения Android</string>
-    <string name="perm_grant_all_sub">С помощью root выдаёт все разрешения, которые объявляет приложение, чтобы система не спрашивала по одному.</string>
     <string name="perm_grant_all_done">Выдано: %1$d / %2$d</string>
     <string name="perm_grant_all_failed">Не удалось выдать некоторые разрешения: %1$s</string>
     <string name="perm_grant_all_no_root">Root недоступен, поэтому разрешения нельзя выдать автоматически.</string>
@@ -1604,7 +1601,6 @@
     <string name="module_settings_assistant_footer">Перехватывается только долгое нажатие кнопки питания; остальные ярлыки работают как прежде.</string>
     <string name="module_settings_target_oem">Штатный ассистент устройства</string>
     <string name="module_settings_target_minis">Minis</string>
-    <string name="module_settings_target_gemini">Google Gemini</string>
     <string name="module_settings_not_connected">Фреймворк Xposed не подключён: эти переключатели записать нельзя. Установите фреймворк и включите Minis в его области.</string>
     <string name="module_settings_write_failed">Фреймворк не подтвердил изменение</string>
     <string name="module_settings_assistant_role">Системный ассистент</string>
@@ -2377,4 +2373,13 @@
     <string name="agent_models_footer">Ассистент может запускать субагентов на этих моделях и вызывать их через minis-model-use. Субагент с закреплённой моделью всегда использует её. Удерживайте, чтобы изменить порядок.</string>
     <string name="agent_models_no_credential">Нет API-ключа</string>
     <string name="agent_models_cli_only">Только minis-model-use (не чат-модель)</string>
+    <string name="oneclick_header">Разрешить одним нажатием</string>
+    <string name="oneclick_title">Разрешить всё</string>
+    <string name="oneclick_sub">Через root выдаёт все разрешения Android, объявленные приложением, и разрешает все инструменты агента, включая спецвозможности, Shizuku и виртуальный экран. При выключении инструменты агента возвращаются к значениям по умолчанию; разрешения Android остаются.</string>
+    <string name="oneclick_working">Выдача разрешений…</string>
+    <string name="module_settings_restart_title">Перезапустить Minis для подключения</string>
+    <string name="module_settings_restart_sub">Используйте, если модуль включён, когда Minis уже работал.</string>
+    <string name="work_process_failed_only">Шаг %1$d не удался</string>
+    <string name="model_slot_image">Изображения</string>
+    <string name="selection_reply_actions">Действия с ответом</string>
 </resources>

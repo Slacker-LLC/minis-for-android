@@ -183,6 +183,8 @@ data class ModelSlots(
     val vision: List<String> = emptyList(),
     val voiceInput: List<String> = emptyList(),
     val voiceOutput: List<String> = emptyList(),
+    /** Image generation: the model `minis-model-use run` picks when the output is an image and no --model is given. */
+    val image: List<String> = emptyList(),
 ) {
     fun entries(slot: ModelSlot): List<String> = when (slot) {
         ModelSlot.main -> main
@@ -190,6 +192,7 @@ data class ModelSlots(
         ModelSlot.vision -> vision
         ModelSlot.voiceInput -> voiceInput
         ModelSlot.voiceOutput -> voiceOutput
+        ModelSlot.image -> image
     }
 
     fun withEntries(slot: ModelSlot, entryIds: List<String>): ModelSlots = when (slot) {
@@ -198,6 +201,7 @@ data class ModelSlots(
         ModelSlot.vision -> copy(vision = entryIds.toList())
         ModelSlot.voiceInput -> copy(voiceInput = entryIds.toList())
         ModelSlot.voiceOutput -> copy(voiceOutput = entryIds.toList())
+        ModelSlot.image -> copy(image = entryIds.toList())
     }
 }
 
@@ -208,6 +212,7 @@ enum class ModelSlot {
     vision,
     voiceInput,
     voiceOutput,
+    image,
 }
 
 @Serializable

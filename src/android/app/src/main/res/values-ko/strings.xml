@@ -315,9 +315,6 @@
     <string name="perm_autonomy_smart_sub">일반 설정은 묻지 않고 변경하며, 키·토큰·위험한 변경은 계속 확인합니다.</string>
     <string name="perm_autonomy_full">완전 자동</string>
     <string name="perm_autonomy_full_sub">설정 변경은 묻지 않습니다. 기록이 남고 되돌릴 수 있습니다.</string>
-    <string name="perm_section_android_grants">Android 권한</string>
-    <string name="perm_grant_all_title">모든 Android 권한 허용</string>
-    <string name="perm_grant_all_sub">root로 이 앱이 선언한 모든 권한을 허용해 시스템이 하나씩 묻지 않게 합니다.</string>
     <string name="perm_grant_all_done">허용됨: %1$d / %2$d</string>
     <string name="perm_grant_all_failed">일부 권한을 허용하지 못했습니다: %1$s</string>
     <string name="perm_grant_all_no_root">root를 사용할 수 없어 권한을 자동으로 허용할 수 없습니다.</string>
@@ -1401,7 +1398,6 @@
     <string name="module_settings_assistant_footer">전원 키 길게 누르기만 가져옵니다. 다른 단축키는 그대로 동작합니다.</string>
     <string name="module_settings_target_oem">기기 자체 어시스턴트</string>
     <string name="module_settings_target_minis">Minis</string>
-    <string name="module_settings_target_gemini">Google Gemini</string>
     <string name="module_settings_not_connected">Xposed 프레임워크에 연결되지 않았습니다: 이 스위치는 기록할 수 없습니다. 프레임워크를 설치하고 범위에서 Minis를 사용 설정하세요.</string>
     <string name="module_settings_write_failed">프레임워크가 변경을 확인하지 않았습니다</string>
     <string name="module_settings_assistant_role">시스템 기본 어시스턴트</string>
@@ -2149,4 +2145,13 @@
     <string name="agent_models_footer">어시스턴트는 이 모델들로 서브 에이전트를 실행하거나 minis-model-use로 호출할 수 있습니다. 모델을 고정한 서브 에이전트는 항상 그 모델을 사용합니다. 길게 눌러 순서를 바꿉니다.</string>
     <string name="agent_models_no_credential">API 키 없음</string>
     <string name="agent_models_cli_only">minis-model-use 전용(채팅 모델 아님)</string>
+    <string name="oneclick_header">원탭 권한 허용</string>
+    <string name="oneclick_title">모두 허용</string>
+    <string name="oneclick_sub">root로 앱이 선언한 모든 Android 권한을 부여하고, 접근성·Shizuku·가상 화면을 포함한 에이전트의 모든 도구를 허용합니다. 끄면 에이전트 권한은 기본값으로 돌아가고 Android 권한은 그대로 남습니다.</string>
+    <string name="oneclick_working">권한 부여 중…</string>
+    <string name="module_settings_restart_title">Minis를 재시작하여 연결</string>
+    <string name="module_settings_restart_sub">Minis가 실행 중일 때 모듈을 활성화한 경우 사용하세요.</string>
+    <string name="work_process_failed_only">%1$d단계 실패</string>
+    <string name="model_slot_image">이미지</string>
+    <string name="selection_reply_actions">답변 작업</string>
 </resources>

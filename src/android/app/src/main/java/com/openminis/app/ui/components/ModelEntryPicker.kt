@@ -47,6 +47,7 @@ import com.openminis.app.data.model.SystemVoiceEntries
 import com.openminis.app.data.model.hasAudioInput
 import com.openminis.app.data.model.hasAudioOutput
 import com.openminis.app.data.model.hasImageInput
+import com.openminis.app.data.model.hasImageOutput
 import com.openminis.app.data.model.normalizeModalities
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -77,13 +78,16 @@ enum class PickerModalityFilter {
     AUDIO_OUTPUT,
     // [T-android-vision-group] Vision scenario: only image-consuming entries
     // qualify. No System virtual entry — there is no on-device vision engine.
-    IMAGE_INPUT;
+    IMAGE_INPUT,
+    // Image generation: only entries that emit images qualify.
+    IMAGE_OUTPUT;
 
     fun matches(model: LLMModel): Boolean = when (this) {
         TEXT_OUTPUT -> model.isTextOutput
         AUDIO_INPUT -> model.hasAudioInput
         AUDIO_OUTPUT -> model.hasAudioOutput
         IMAGE_INPUT -> model.hasImageInput
+        IMAGE_OUTPUT -> model.hasImageOutput
     }
 
     /** System virtual entries that serve this direction, in display order. */
@@ -92,6 +96,7 @@ enum class PickerModalityFilter {
         AUDIO_INPUT -> listOf(SystemVoiceEntries.asrOnline, SystemVoiceEntries.asrOffline)
         AUDIO_OUTPUT -> listOf(SystemVoiceEntries.tts)
         IMAGE_INPUT -> emptyList()
+        IMAGE_OUTPUT -> emptyList()
     }
 }
 

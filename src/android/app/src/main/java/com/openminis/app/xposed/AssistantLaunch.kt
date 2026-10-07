@@ -9,12 +9,11 @@ import android.provider.Settings
 enum class PowerAssistantTarget(val wire: String) {
     OEM("oem"),
     MINIS("minis"),
-    GEMINI("gemini"),
     ;
 
     companion object {
         /**
-         * Anything unrecognised - an old value, a typo, settings that never arrived - means the
+         * Anything unrecognised - an old value (a stored "gemini" from an earlier build included), a typo, settings that never arrived - means the
          * OEM assistant keeps the button. Fail-safe by construction: a hook must not take over a
          * power-key gesture because it could not read a preference.
          */
@@ -36,8 +35,7 @@ enum class PowerAssistantTarget(val wire: String) {
  * Two of upstream's rules are kept because they are what stops a gesture from being swallowed:
  * its own assistant is only opened once the system's assistant role actually points at it
  * (`AssistantManager.isAssistantConfigured`), and an action is only started after the target really
- * answers it (`resolvesActivity` in `PowerHooks`). For Gemini both actions are tried, as upstream
- * does.
+ * answers it (`resolvesActivity` in `PowerHooks`).
  *
  * The decision is a small value type so it can be tested: which action and package a target maps
  * to, and that the OEM target maps to nothing at all (the OEM path is the absence of a takeover).
@@ -49,13 +47,6 @@ object AssistantLaunch {
 
     /** What this app declares for its own assistant activity. */
     const val ACTION_VOICE_ASSIST = "android.intent.action.VOICE_ASSIST"
-
-    /** The action Google's own power-menu path answers as well. */
-    const val ACTION_VOICE_COMMAND = Intent.ACTION_VOICE_COMMAND
-
-    const val GEMINI_PACKAGE = "com.google.android.googlequicksearchbox"
-    const val GEMINI_ASSIST_COMPONENT =
-        "com.google.android.googlequicksearchbox/.VoiceSearchActivity"
 
     /**
      * One way to reach an assistant. [requiresAssistantRole] is upstream's configured-assistant
@@ -78,11 +69,6 @@ object AssistantLaunch {
             packageName = ownPackage,
             actions = listOf(ACTION_VOICE_ASSIST, ACTION_ASSIST),
             requiresAssistantRole = true,
-        )
-        PowerAssistantTarget.GEMINI -> Target(
-            packageName = GEMINI_PACKAGE,
-            actions = listOf(ACTION_ASSIST, ACTION_VOICE_COMMAND),
-            component = GEMINI_ASSIST_COMPONENT,
         )
     }
 

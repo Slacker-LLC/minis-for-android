@@ -11,6 +11,7 @@ import com.openminis.app.data.model.ModelSlot
 import com.openminis.app.data.model.hasAudioInput
 import com.openminis.app.data.model.hasAudioOutput
 import com.openminis.app.data.model.hasImageInput
+import com.openminis.app.data.model.hasImageOutput
 import com.openminis.app.data.model.ProviderConfig
 import com.openminis.app.data.model.SystemVoiceEntries
 import com.openminis.app.data.repository.ProviderRepository
@@ -89,6 +90,7 @@ class ModelSlotsCollection(
             ModelSlot.vision -> entry.model.hasImageInput
             ModelSlot.voiceInput -> entry.model.hasAudioInput
             ModelSlot.voiceOutput -> entry.model.hasAudioOutput
+            ModelSlot.image -> entry.model.hasImageOutput
         }
     }
 

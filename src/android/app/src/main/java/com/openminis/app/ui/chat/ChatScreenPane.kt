@@ -471,6 +471,16 @@ internal fun androidx.compose.foundation.layout.ColumnScope.ChatMessagePane(
                 viewModel.dismissMentionMenu()
             }
         }
+        // A long press on a reply's text selects in place (handles + the floating Copy bar), like any text.
+        // The reply's action menu is one tap further: "Reply actions" in that bar's overflow.
+        val currentMessages by androidx.compose.runtime.rememberUpdatedState(messages)
+        val openReplyMenu = remember {
+            { shardMessageId: String ->
+                val id = originalMessageId(shardMessageId)
+                val message = currentMessages.firstOrNull { it.id == id }
+                if (message != null && message.role == "assistant" && !message.isStreaming) messageMenuTarget = id
+            }
+        }
         // (selectionController declared above, before markdownToolbar.)
         androidx.compose.runtime.CompositionLocalProvider(
             LocalMessageBoundsRegistry provides messageBounds,
@@ -525,20 +535,6 @@ internal fun androidx.compose.foundation.layout.ColumnScope.ChatMessagePane(
                 )
             }
         }
-        // A long press on a reply's text opens its menu (the redesign) instead of selecting a word.
-        val currentMessages by androidx.compose.runtime.rememberUpdatedState(messages)
-        val longPressOnText = remember {
-            { shard: TextShardId ->
-                val id = originalMessageId(shard.messageId)
-                val message = currentMessages.firstOrNull { it.id == id }
-                if (message != null && message.role == "assistant" && !message.isStreaming) {
-                    messageMenuTarget = id
-                    true
-                } else {
-                    false
-                }
-            }
-        }
         ChatMessageList(
             grayedMap = grayedMap,
             sessionId = sessionId,
@@ -580,7 +576,6 @@ internal fun androidx.compose.foundation.layout.ColumnScope.ChatMessagePane(
             perfFirstLayoutFired = perfFirstLayoutFired,
             lastAssistantMessageId = lastAssistantMessageId,
             actionsFor = actionsFor,
-            longPressOnText = longPressOnText,
             sharedEffect = sharedEffect,
         )
         } // AlwaysStretchOverscrollBox
@@ -605,6 +600,7 @@ internal fun androidx.compose.foundation.layout.ColumnScope.ChatMessagePane(
             selectionController = selectionController,
             selectionReader = selectionReader,
             listRootCoordsState = listRootCoords_st,
+            onOpenReplyMenu = openReplyMenu,
         )
         // iOS-style selection handle dots, one at each endpoint.
         MinisSelectionHandlesHost(

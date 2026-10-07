@@ -94,31 +94,6 @@ fun OffloadPermissionScreen(
             )
         }
 
-        SettingsSection(header = stringResource(R.string.perm_section_android_grants)) {
-            var granting by remember { mutableStateOf(false) }
-            SettingsRow(
-                title = stringResource(R.string.perm_grant_all_title),
-                subtitle = stringResource(R.string.perm_grant_all_sub),
-                onClick = if (granting) null else ({
-                    granting = true
-                    scope.launch {
-                        val result = com.openminis.app.permissions.RuntimePermissionGranter.grantAll(context)
-                        granting = false
-                        val message = when {
-                            result.unavailable != null -> context.getString(R.string.perm_grant_all_no_root)
-                            result.failed.isNotEmpty() -> context.getString(
-                                R.string.perm_grant_all_failed, result.failed.joinToString(", "),
-                            )
-                            else -> context.getString(R.string.perm_grant_all_done, result.succeeded, result.attempted)
-                        }
-                        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
-                    }
-                }),
-                showChevron = false,
-                showDivider = false,
-            )
-        }
-
         SettingsSection(
             header = stringResource(R.string.perm_section_config_tool),
         ) {

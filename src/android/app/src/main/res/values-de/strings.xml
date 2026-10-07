@@ -315,9 +315,6 @@
     <string name="perm_autonomy_smart_sub">Normale Einstellungen ohne Nachfrage; Schlüssel, Tokens und riskante Änderungen werden weiterhin bestätigt.</string>
     <string name="perm_autonomy_full">Vollautomatisch</string>
     <string name="perm_autonomy_full_sub">Nie nach Einstellungsänderungen fragen. Sie werden protokolliert und lassen sich rückgängig machen.</string>
-    <string name="perm_section_android_grants">Android-Berechtigungen</string>
-    <string name="perm_grant_all_title">Alle Android-Berechtigungen erteilen</string>
-    <string name="perm_grant_all_sub">Erteilt per Root alle vom App deklarierten Berechtigungen, damit das System nicht einzeln nachfragt.</string>
     <string name="perm_grant_all_done">Erteilt: %1$d / %2$d</string>
     <string name="perm_grant_all_failed">Einige Berechtigungen konnten nicht erteilt werden: %1$s</string>
     <string name="perm_grant_all_no_root">Root ist nicht verfügbar, die Berechtigungen können nicht automatisch erteilt werden.</string>
@@ -1404,7 +1401,6 @@
     <string name="module_settings_assistant_footer">Nur das lange Drücken der Ein-/Aus-Taste wird übernommen; alle anderen Kurzbefehle bleiben unverändert.</string>
     <string name="module_settings_target_oem">Der eigene Assistent des Geräts</string>
     <string name="module_settings_target_minis">Minis</string>
-    <string name="module_settings_target_gemini">Google Gemini</string>
     <string name="module_settings_not_connected">Xposed-Framework nicht verbunden: Diese Schalter lassen sich nicht schreiben. Installiere das Framework und aktiviere Minis im Scope.</string>
     <string name="module_settings_write_failed">Das Framework hat die Änderung nicht bestätigt</string>
     <string name="module_settings_assistant_role">System-Assistent</string>
@@ -2160,4 +2156,13 @@
     <string name="agent_models_footer">Der Assistent kann Subagenten auf diesen Modellen laufen lassen und sie mit minis-model-use aufrufen. Ein Subagent mit festem Modell nutzt immer dieses. Zum Sortieren lange drücken.</string>
     <string name="agent_models_no_credential">Kein API-Schlüssel</string>
     <string name="agent_models_cli_only">Nur minis-model-use (kein Chatmodell)</string>
+    <string name="oneclick_header">Ein-Tipp-Freigabe</string>
+    <string name="oneclick_title">Alles freigeben</string>
+    <string name="oneclick_sub">Erteilt per Root alle vom App deklarierten Android-Berechtigungen und erlaubt alle Agent-Werkzeuge, auch Bedienungshilfen, Shizuku und den virtuellen Bildschirm. Beim Ausschalten kehren die Agent-Werkzeuge zu ihren Standardwerten zurück; die Android-Berechtigungen bleiben.</string>
+    <string name="oneclick_working">Wird erteilt…</string>
+    <string name="module_settings_restart_title">Minis neu starten, um zu verbinden</string>
+    <string name="module_settings_restart_sub">Nutze das, wenn du das Modul aktiviert hast, während Minis schon lief.</string>
+    <string name="work_process_failed_only">Schritt %1$d fehlgeschlagen</string>
+    <string name="model_slot_image">Bild</string>
+    <string name="selection_reply_actions">Antwort-Aktionen</string>
 </resources>

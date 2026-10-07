@@ -33,20 +33,6 @@ class AssistantLaunchTest {
     }
 
     @Test
-    fun `gemini is reached through the standard assist action`() {
-        val target = AssistantLaunch.targetFor(PowerAssistantTarget.GEMINI)
-
-        assertEquals(AssistantLaunch.GEMINI_PACKAGE, target?.packageName)
-        assertEquals(
-            "upstream tries the voice command as well",
-            listOf(AssistantLaunch.ACTION_ASSIST, AssistantLaunch.ACTION_VOICE_COMMAND),
-            target?.actions,
-        )
-        assertEquals(AssistantLaunch.GEMINI_ASSIST_COMPONENT, target?.component)
-        assertEquals(false, target?.requiresAssistantRole)
-    }
-
-    @Test
     fun `every target is either handled or deliberately left alone`() {
         PowerAssistantTarget.entries.forEach { target ->
             val handled = AssistantLaunch.targetFor(target) != null
@@ -64,12 +50,14 @@ class AssistantLaunchTest {
         assertEquals(PowerAssistantTarget.OEM, PowerAssistantTarget.parse(""))
         assertEquals(PowerAssistantTarget.OEM, PowerAssistantTarget.parse("  "))
         assertEquals(PowerAssistantTarget.OEM, PowerAssistantTarget.parse("chatgpt"))
+        // Gemini was an option in an earlier build; a stored value must not take over the button now.
+        assertEquals(PowerAssistantTarget.OEM, PowerAssistantTarget.parse("gemini"))
+        assertEquals(listOf("oem", "minis"), PowerAssistantTarget.entries.map { it.wire })
     }
 
     @Test
     fun `known settings parse case insensitively`() {
         assertEquals(PowerAssistantTarget.MINIS, PowerAssistantTarget.parse("MINIS"))
-        assertEquals(PowerAssistantTarget.GEMINI, PowerAssistantTarget.parse(" gemini "))
         assertEquals(PowerAssistantTarget.OEM, PowerAssistantTarget.parse("oem"))
     }
 }

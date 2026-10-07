@@ -1070,6 +1070,7 @@ fun ProviderRepository.mergeBackupProviderConfig(
                 vision = local.slots.vision.ifEmpty { restored.slots.vision },
                 voiceInput = local.slots.voiceInput.ifEmpty { restored.slots.voiceInput },
                 voiceOutput = local.slots.voiceOutput.ifEmpty { restored.slots.voiceOutput },
+                image = local.slots.image.ifEmpty { restored.slots.image },
             ),
             fallbackTrigger = if (local.slots.main.isEmpty()) restored.fallbackTrigger else local.fallbackTrigger,
             agentLoopModelEntryIds = mergedAgentEntries.toMutableList(),

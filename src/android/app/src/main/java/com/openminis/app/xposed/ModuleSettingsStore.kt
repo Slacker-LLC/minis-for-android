@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * on while the hooks read something else.
  */
 object ModuleSettingsStore {
+    private const val TAG = "ModuleSettings"
 
     /** The switches the settings screen owns, in the order it shows them. */
     val SWITCHES: List<String> = listOf(
@@ -56,11 +57,14 @@ object ModuleSettingsStore {
      * app wrote while it was the only place the switches existed.
      */
     fun attachService(context: Context, bound: XposedService) {
-        val preferences = runCatching { bound.getRemotePreferences(ModulePrefs.GROUP) }.getOrNull()
+        val preferences = runCatching { bound.getRemotePreferences(ModulePrefs.GROUP) }
+            .onFailure { android.util.Log.w(TAG, "framework service bound but remote preferences failed: $it") }
+            .getOrNull()
         if (preferences == null) {
             _connected.value = false
             return
         }
+        android.util.Log.i(TAG, "framework service bound; settings are committed through it")
         service = bound
         remote = preferences
         runCatching { reconcile(local(context), preferences, SWITCHES, STRING_KEYS) }

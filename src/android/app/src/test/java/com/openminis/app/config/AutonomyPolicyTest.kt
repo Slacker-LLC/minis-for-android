@@ -34,8 +34,8 @@ class AutonomyPolicyTest {
     }
 
     @Test
-    fun `an unknown or missing stored mode falls back to smart, never to full`() {
-        assertEquals(AutonomyMode.SMART, AutonomyMode.fromWire(null))
+    fun `a missing stored mode is the default (full) and an unreadable one falls back to smart, never to full`() {
+        assertEquals(AutonomyMode.FULL, AutonomyMode.fromWire(null))
         assertEquals(AutonomyMode.SMART, AutonomyMode.fromWire("yolo"))
         assertEquals(AutonomyMode.SMART, AutonomyMode.fromWire(""))
         assertEquals(AutonomyMode.FULL, AutonomyMode.fromWire("full"))

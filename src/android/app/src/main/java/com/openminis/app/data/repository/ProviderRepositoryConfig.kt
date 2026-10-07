@@ -480,6 +480,7 @@ internal fun ProviderRepository.copyConfig(config: ProviderConfig): ProviderConf
         vision = config.slots.vision.toList(),
         voiceInput = config.slots.voiceInput.toList(),
         voiceOutput = config.slots.voiceOutput.toList(),
+        image = config.slots.image.toList(),
     ),
     agentLoopModelEntryIds = config.agentLoopModelEntryIds.toMutableList(),
 )
@@ -505,6 +506,7 @@ internal fun ProviderRepository.canonicalizeConfig(config: ProviderConfig): Prov
         vision = canonical.slots.vision.map { idMap[it] ?: it },
         voiceInput = canonical.slots.voiceInput.map { idMap[it] ?: it },
         voiceOutput = canonical.slots.voiceOutput.map { idMap[it] ?: it },
+        image = canonical.slots.image.map { idMap[it] ?: it },
     )
     for (index in canonical.agentLoopModelEntryIds.indices) {
         val entryId = canonical.agentLoopModelEntryIds[index]
@@ -593,6 +595,7 @@ internal fun ProviderRepository.workingCopy(): ProviderConfig {
             vision = live.slots.vision.toList(),
             voiceInput = live.slots.voiceInput.toList(),
             voiceOutput = live.slots.voiceOutput.toList(),
+            image = live.slots.image.toList(),
         ),
         agentLoopModelEntryIds = live.agentLoopModelEntryIds.toMutableList(),
     )
@@ -786,6 +789,7 @@ fun ProviderRepository.removeInstance(instanceId: String): Unit = synchronized(c
             vision = config.slots.vision.filterNot { it in removedEntryIds },
             voiceInput = config.slots.voiceInput.filterNot { it in removedEntryIds },
             voiceOutput = config.slots.voiceOutput.filterNot { it in removedEntryIds },
+            image = config.slots.image.filterNot { it in removedEntryIds },
         )
         config.agentLoopModelEntryIds.removeAll { it in removedEntryIds }
     }
@@ -1054,6 +1058,7 @@ fun ProviderRepository.replaceEntries(instanceId: String, models: List<LLMModel>
                 vision = config.slots.vision.filterNot { it in prunedEntryIds },
                 voiceInput = config.slots.voiceInput.filterNot { it in prunedEntryIds },
                 voiceOutput = config.slots.voiceOutput.filterNot { it in prunedEntryIds },
+                image = config.slots.image.filterNot { it in prunedEntryIds },
             )
             // T171: same cascade for agent-loop direct-entry pins —
             // mirrors iOS ProviderConfigStore.replaceEntries (L716).
@@ -1154,6 +1159,7 @@ fun ProviderRepository.removeEntry(entryId: String): Unit = synchronized(configL
         vision = config.slots.vision.filterNot { it == entryId },
         voiceInput = config.slots.voiceInput.filterNot { it == entryId },
         voiceOutput = config.slots.voiceOutput.filterNot { it == entryId },
+        image = config.slots.image.filterNot { it == entryId },
     )
     // T171: cascade-clean the agent-loop direct-entry pin so the
     // AgentLoopModelsScreen never surfaces a checkmark on a model that

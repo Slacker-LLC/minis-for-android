@@ -90,6 +90,10 @@ val LLMModel.hasAudioOutput: Boolean
 val LLMModel.hasImageInput: Boolean
     get() = normalizedInputs?.contains("image") == true
 
+/** True when this model emits images (image generation). The Image slot filters its candidates by this. */
+val LLMModel.hasImageOutput: Boolean
+    get() = normalizedOutputs?.contains("image") == true
+
 /** True when this model has ANY audio modality — the "voice model" predicate
  *  behind Voice Services shadow visibility (iOS hasVoiceModels). */
 val LLMModel.hasVoiceModality: Boolean
