@@ -811,7 +811,7 @@ class ChatViewModel(
 
     /**
      * Request-level image-budget events (T-request-imgsize). Emitted by
-     * [applyRequestImageBudget] when the cumulative history image payload
+     * [RequestImageBudget.apply] when the cumulative history image payload
      * exceeds [ImageBudget.MAX_REQUEST_BYTES] and older images had to be
      * elided to text placeholders. Distinct from [imageBudgetEvent] so the
      * UI Snackbar can show a different message ("older images compacted")
@@ -1589,29 +1589,7 @@ class ChatViewModel(
     suspend fun loadSessionTokenStats(): SessionTokenStats {
         val sid = realSessionId.ifEmpty { sessionId }
         if (sid.isEmpty()) return SessionTokenStats(0, 0, 0, 0, 0, 0)
-        val usages = chatRepository.sessionTokenUsages(sid)
-        var input = 0L
-        var output = 0L
-        var cacheRead = 0L
-        var cacheWrite = 0L
-        var context = 0
-        for (json in usages) {
-            try {
-                val obj = org.json.JSONObject(json)
-                input += obj.optLong("inputTokens", 0L)
-                output += obj.optLong("outputTokens", 0L)
-                cacheRead += obj.optLong("cacheReadTokens", 0L)
-                cacheWrite += obj.optLong("cacheCreationTokens", 0L)
-                val ctx = obj.optInt("latestContextTokens", 0)
-                if (ctx > 0) context = ctx
-            } catch (_: Exception) { /* skip malformed row */ }
-        }
-        val snapshot = _messages.value
-        val assistantCount = snapshot.count { it.role == "assistant" }
-        val toolCalls = snapshot.filter { it.role == "assistant" }
-            .sumOf { msg -> msg.toolBlocks.count { it.kind != "text" && it.kind != "info" } }
-        val loops = maxOf(toolCalls, assistantCount)
-        return SessionTokenStats(input, output, cacheRead, cacheWrite, context, loops)
+        return SessionTokenStatsCalc.aggregate(chatRepository.sessionTokenUsages(sid), _messages.value)
     }
 
     // [T-android-split-chat] toggleMemorySheet / dismissMemorySheet moved to ChatViewModelUiStateExt.kt.
@@ -2434,130 +2412,6 @@ class ChatViewModel(
      * marker had already replaced; that's what made follow-up turns appear
      * to lose continuity (the model got confused by the dual representation).
      */
-    /**
-     * Apply the request-level image-byte budget to a fully-resolved
-     * message list before handing it to a provider. Images that don't
-     * fit under [ImageBudget.MAX_REQUEST_BYTES] (oldest first) are
-     * replaced in-place with a text placeholder that, when the original
-     * bytes were offloaded to disk, points the model back to the linux
-     * path so it can re-fetch via `read_image` if needed. Images that
-     * never had a linuxPath are spilled to
-     * `attachments/spillover/<sha1>.<ext>` lazily so the placeholder
-     * still carries an addressable reference.
-     *
-     * Returns the budgeted message list. When nothing was elided this
-     * is the same instance as [messages].
-     *
-     * Emits a one-shot [requestBudgetEvent] for the UI Snackbar so the
-     * user knows older images were compacted into placeholders.
-     */
-    private suspend fun applyRequestImageBudget(messages: List<LLMMessage>): List<LLMMessage> {
-        // Collect every image in chronological order so the planner can
-        // walk in reverse and protect the most recent images.
-        data class ImageRef(val msgIdx: Int, val partIdx: Int, val image: ImageBudget.BudgetImage)
-        val images = mutableListOf<ImageRef>()
-        messages.forEachIndexed { mi, msg ->
-            msg.contentParts.forEachIndexed { pi, part ->
-                when (part) {
-                    is AgentContentPart.ImageData -> {
-                        images.add(
-                            ImageRef(
-                                mi, pi,
-                                ImageBudget.BudgetImage(part.data, part.linuxPath, part.mimeType),
-                            )
-                        )
-                    }
-                    is AgentContentPart.ToolResult -> {
-                        val img = part.imageData
-                        if (img != null) {
-                            images.add(
-                                ImageRef(
-                                    mi, pi,
-                                    ImageBudget.BudgetImage(
-                                        img,
-                                        part.imageLinuxPath,
-                                        part.imageMimeType ?: "image/jpeg",
-                                    ),
-                                )
-                            )
-                        }
-                    }
-                    else -> Unit
-                }
-            }
-        }
-        if (images.isEmpty()) return messages
-
-        val plan = ImageBudget.planRequestBudget(images.map { it.image })
-        if (!plan.mutated) return messages
-
-        // For dropped images without a linuxPath, lazily spill through the
-        // App-owned guest file API
-        // so the placeholder still gives the model an addressable reference.
-        val resolvedPaths = HashMap<ImageBudget.ImagePartId, String?>()
-        for (ref in images) {
-            val id = ImageBudget.ImagePartId.of(ref.image.data)
-            if (id !in plan.droppedIds) continue
-            val existing = ref.image.linuxPath
-            if (existing != null) {
-                resolvedPaths[id] = existing
-            } else {
-                val spilloverPath = ImageBudget.spilloverPath(ref.image.data, ref.image.mimeType)
-                resolvedPaths[id] = if (spilloverPath == null) {
-                    null
-                } else {
-                    runCatching {
-                        val existing = WorkspaceFileClient.info(activeSessionId, spilloverPath)
-                        if (existing.optString("type") != "file") {
-                            WorkspaceFileClient.writeBytes(activeSessionId, spilloverPath, ref.image.data)
-                        }
-                        spilloverPath
-                    }.getOrNull()
-                }
-            }
-        }
-
-        // Build a new message list with dropped image parts replaced by
-        // text placeholders. Same-message multiple drops collapse cleanly
-        // because we never touch parts whose ids weren't in droppedIds.
-        val byMsg = images.groupBy { it.msgIdx }
-        val mutated = messages.toMutableList()
-        for ((mi, refs) in byMsg) {
-            val msg = mutated[mi]
-            val newParts = msg.contentParts.toMutableList()
-            for (ref in refs) {
-                val id = ImageBudget.ImagePartId.of(ref.image.data)
-                if (id !in plan.droppedIds) continue
-                val path = resolvedPaths[id]
-                val placeholder = AgentContentPart.Text(ImageBudget.elidedImagePlaceholder(path))
-                val originalPart = newParts[ref.partIdx]
-                newParts[ref.partIdx] = when (originalPart) {
-                    is AgentContentPart.ImageData -> placeholder
-                    is AgentContentPart.ToolResult -> originalPart.copy(
-                        // Strip the bytes but keep the structural ToolResult
-                        // role; append the elision marker into content so
-                        // the model sees it next to the rest of the tool
-                        // output. linux path remains in the part for any
-                        // subsequent diagnostic round-trip.
-                        imageData = null,
-                        imageMimeType = null,
-                        content = originalPart.content +
-                            (if (originalPart.content.isEmpty()) "" else "\n") +
-                            ImageBudget.elidedImagePlaceholder(path),
-                    )
-                    else -> originalPart
-                }
-            }
-            mutated[mi] = msg.copy(contentParts = newParts)
-        }
-
-        _requestBudgetEvent.tryEmit(plan)
-        AppLogger.info(
-            TAG,
-            "applyRequestImageBudget: dropped=${plan.droppedCount}/${plan.totalCount} keptBytes=${plan.keptBytes}B elidedBytes=${plan.elidedBytes}B",
-        )
-        return mutated
-    }
 
     /**
      * [T-android-compact-orphan-toolcall] The outgoing history, with tool
@@ -6698,7 +6552,7 @@ class ChatViewModel(
                     // [_compactSummary] is prepended as a `<context-summary>`
                     // user message. Falls through to the raw agentHistory when
                     // no compact has happened, so the common path stays zero-copy.
-                    val requestMessages = applyRequestImageBudget(effectiveAgentHistory())
+                    val requestMessages = RequestImageBudget.apply(effectiveAgentHistory(), activeSessionId) { _requestBudgetEvent.tryEmit(it) }
                     // [T-eta-character-cards] A bound character adds its block and any lore or
                     // depth projection to THIS request only - the stored transcript and the
                     // history the next turn reads back are untouched.
