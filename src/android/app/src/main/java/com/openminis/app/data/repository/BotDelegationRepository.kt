@@ -83,6 +83,9 @@ class BotDelegationRepository(private val dao: BotDelegationDao) {
     suspend fun claim(id: String, targetSessionId: String): Boolean =
         dao.claim(id, targetSessionId, System.currentTimeMillis()) == 1
 
+    suspend fun listNonTerminalForRootTask(rootTaskId: String): List<BotDelegationEntity> =
+        dao.listNonTerminalForRootTask(rootTaskId)
+
     suspend fun cancelUnsettledAfterProcessStart(): Int =
         dao.cancelUnsettledAfterProcessStart(System.currentTimeMillis())
 

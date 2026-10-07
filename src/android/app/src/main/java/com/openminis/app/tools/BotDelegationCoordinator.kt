@@ -309,6 +309,24 @@ class BotDelegationCoordinator private constructor(
         }
     }
 
+    /**
+     * The user cancels a task. The task is marked first, so from that moment no member can be started (the
+     * claim itself checks it); members that had not started are cancelled, and a member that is running
+     * is told to stop, which ends its worker through the normal cancelled path. Returns whether the task
+     * was cancelled. Pausing is different on purpose: it does not interrupt work already under way.
+     */
+    suspend fun cancelRootTask(rootTaskId: String): Boolean {
+        if (!taskRepository.cancel(rootTaskId)) return false
+        delegationRepository.listNonTerminalForRootTask(rootTaskId).forEach { delegation ->
+            if (delegation.status == BotDelegationEntity.STATUS_RUNNING) {
+                delegation.targetSessionId?.let { AgentRunner.cancel(application, it) }
+            } else if (delegationRepository.cancel(delegation.id, "task was cancelled")) {
+                deliverReceipt(delegationRepository.get(delegation.id))
+            }
+        }
+        return true
+    }
+
     private suspend fun dispatchForSource(sourceSessionId: String, sourceRunId: String?) {
         delegationRepository.listForSourceSession(sourceSessionId)
             .filter {
