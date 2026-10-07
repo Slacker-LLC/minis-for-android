@@ -728,7 +728,7 @@
     <string name="modelgroup_speech_transcription">Sprachtranskription</string>
     <string name="modelgroup_text_generation">Textgenerierung</string>
     <string name="common_default">Standard</string>
-    <string name="settings_agent_loop_models">Agent-Loop-Modelle</string>
+    <string name="settings_agent_loop_models">Agent-Modelle</string>
 
     <!-- T172-A parameterized strings -->
     <string name="add_custom_model_id_footer">Die Model ID ist der API-Bezeichner, der an %1$s gesendet wird. Der Anzeigename ist das benutzerfreundlichere Label in der Auswahl; bei leerer Angabe wird auf die Model ID zurückgegriffen.</string>
@@ -1849,8 +1849,8 @@
     <string name="model_slot_fallback_title">Fallback bei Fehlern</string>
     <string name="model_slot_fallback_always">Bei jedem Fehler</string>
     <string name="model_slot_fallback_default">Bei Rate-Limits und Serverfehlern</string>
-    <string name="agent_loop_models_slots_footer">Nur einzeln ausgewählte Einträge sind für den Agent-Loop verfügbar.</string>
-    <string name="agent_loop_models_slots_subtitle">Wähle die Modelle für Agent-Tools aus</string>
+    <string name="agent_loop_models_slots_footer">Der Assistent kann nur Modelle wählen, die du hier hinzufügst.</string>
+    <string name="agent_loop_models_slots_subtitle">Subagenten und minis-model-use können diese nutzen</string>
     <string name="model_slot_selected_models">Ausgewählte Modelle</string>
     <string name="model_slot_order_footer">Modelle werden in dieser Reihenfolge versucht. Ändere die Priorität mit den Pfeilen.</string>
     <string name="model_slot_legacy_unresolved">Nicht verfügbarer Eintrag aus der vorhandenen Konfiguration beibehalten</string>
@@ -1859,7 +1859,7 @@
     <string name="model_slot_no_candidates">Keine kompatiblen Modelle verfügbar</string>
     <string name="model_slot_system_entry">Integrierte Geräte-Sprachfunktion</string>
     <string name="model_slot_provider_disabled">Anbieter deaktiviert</string>
-    <string name="agent_loop_models_title">Agent-Loop-Modelle</string>
+    <string name="agent_loop_models_title">Agent-Modelle</string>
     <string name="model_slot_follow_default">Slot-Standard verwenden</string>
     <string name="model_slot_follow_default_footer">Verwendet den ersten verfügbaren Eintrag dieses Sprach-Slots.</string>
     <string name="agent_loop_add_models_count">%1$d Modelle hinzufügen</string>
@@ -2027,7 +2027,7 @@
     <string name="first_run_step_chat">Chat starten</string>
     <string name="first_run_step_chat_locked">Erst die Schritte oben abschließen</string>
     <string name="first_run_done">Erledigt</string>
-    <string name="settings_agent_loop_models_subtitle">Modelle wählen, die Agent-Werkzeuge nutzen dürfen</string>
+    <string name="settings_agent_loop_models_subtitle">Subagenten und minis-model-use können diese nutzen</string>
     <string name="settings_thinking_rules">Denkregeln</string>
     <string name="settings_thinking_rules_subtitle">Denkparameter je Anbieter</string>
     <string name="settings_models_stats_header">Statistik</string>
@@ -2126,7 +2126,7 @@
     <string name="sub_agent_model">Modell</string>
     <string name="sub_agent_model_auto">Automatisch</string>
     <string name="sub_agent_model_missing">Modell nicht verfügbar</string>
-    <string name="sub_agent_model_footer">Automatisch wählt der Assistent, normalerweise das Modell dieser Unterhaltung. Ein festes Modell wird immer verwendet.</string>
+    <string name="sub_agent_model_footer">Automatisch wählt der Assistent: normalerweise das Modell dieser Unterhaltung oder eines aus „Agent-Modelle“. Ein festes Modell wird immer verwendet.</string>
     <string name="sub_agent_thinking">Denkstufe</string>
     <string name="sub_agent_thinking_default">Standard</string>
     <string name="sub_agent_thinking_footer">Standard folgt dem Modell. Eine höhere Stufe denkt länger und kostet mehr.</string>
@@ -2154,4 +2154,9 @@
     <string name="restore_stop">Wiederherstellung stoppen</string>
     <string name="restore_stop_title">Wiederherstellung stoppen?</string>
     <string name="restore_stop_message">Bereits Wiederhergestelltes bleibt erhalten. Der laufende Teil wird vollständig zurückgesetzt, es bleibt nichts halb geschrieben. Du kannst die Wiederherstellung später erneut starten.</string>
+    <string name="agent_models_selected_header">Hinzugefügte Modelle</string>
+    <string name="agent_models_empty">Noch keine Modelle hinzugefügt.</string>
+    <string name="agent_models_footer">Der Assistent kann Subagenten auf diesen Modellen laufen lassen und sie mit minis-model-use aufrufen. Ein Subagent mit festem Modell nutzt immer dieses. Zum Sortieren lange drücken.</string>
+    <string name="agent_models_no_credential">Kein API-Schlüssel</string>
+    <string name="agent_models_cli_only">Nur minis-model-use (kein Chatmodell)</string>
 </resources>

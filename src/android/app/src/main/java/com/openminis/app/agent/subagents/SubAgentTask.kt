@@ -40,6 +40,8 @@ data class SubAgentTaskArgs(
     val context: String,
     val agent: String?,
     val modelChoice: SubAgentModelChoice,
+    /** A model named from the user's list (`subagent.model`), or null. Checked against that list before use. */
+    val model: String? = null,
     val maxMinutes: Int,
     val wait: Boolean,
     /** none | frequent | moderate; background runs only. */
@@ -109,6 +111,7 @@ object SubAgentTask {
                 context = o.optString("context", "").trim(),
                 agent = o.optString("agent", "").trim().ifEmpty { null },
                 modelChoice = SubAgentModelChoice.parse(o.optString("model_choice", "")),
+                model = o.optString("model", "").trim().ifEmpty { null },
                 maxMinutes = minutes.coerceIn(1, MAX_MINUTES),
                 wait = o.optBoolean("wait", false),
                 progressReport = o.optString("progress_report", "none").trim().lowercase()
@@ -254,6 +257,22 @@ object SubAgentTask {
             lines.add("- ${def.name} — $desc Model: ${modelNote(def)}.")
         }
         lines.add("Prefer a specific sub agent when its description matches; otherwise use the general one.")
+        return lines.joinToString("\n") + "\n"
+    }
+
+    /**
+     * The "which model for which sub agent" section of the system prompt, built from the SAME list the
+     * tool's `model` enum comes from. Empty when the user made no models available.
+     */
+    fun callableModelsSection(models: List<CallableModel>): String {
+        if (models.isEmpty()) return ""
+        val lines = mutableListOf("Models you can run a sub agent on (pass the name as $TOOL_NAME.model; no other model is accepted):")
+        for (m in models) lines.add("- ${m.handle} — ${m.summary}")
+        lines.add(
+            "Leave `model` out unless the user asked for one of these, or the task clearly needs what a listed model " +
+                "offers and this conversation's model lacks (image input, a much larger context), or is plainly " +
+                "mechanical work a cheaper listed model can do. A sub agent the user pinned to a model ignores it.",
+        )
         return lines.joinToString("\n") + "\n"
     }
 

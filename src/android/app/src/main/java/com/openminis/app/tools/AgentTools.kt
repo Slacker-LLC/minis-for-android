@@ -40,6 +40,9 @@ object AgentTools {
         // (Settings); null offers the older single-shot `subagent` schema instead. Same tool name
         // either way, so transcripts and permissions stay valid.
         subAgentRosterNames: List<String>? = null,
+        // Names the delegating model may pass as `subagent.model` (the user's agent model list); empty
+        // leaves that parameter out. Only used with [subAgentRosterNames].
+        subAgentModelHandles: List<String> = emptyList(),
         // True for a sub agent's own child session: delegation is one level deep, so no `subagent`
         // tool is offered there in any form.
         subAgentChild: Boolean = false,
@@ -72,7 +75,12 @@ object AgentTools {
         if (subAgentChild) {
             // no delegation tool
         } else if (subAgentRosterNames != null) {
-            add(com.openminis.app.agent.subagents.SubAgentToolSchema.definition(subAgentRosterNames))
+            add(
+                com.openminis.app.agent.subagents.SubAgentToolSchema.definition(
+                    subAgentRosterNames,
+                    modelHandles = subAgentModelHandles,
+                ),
+            )
         } else {
             add(subagentDefinition())
         }

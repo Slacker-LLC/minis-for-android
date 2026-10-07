@@ -18,6 +18,8 @@ object SubAgentToolSchema {
     fun definition(
         rosterNames: List<String> = listOf(SubAgentDefinition.BUILT_IN_NAME),
         name: String = SubAgentDefinition.TOOL_NAME,
+        /** Names from [CallableModels]; empty = the `model` parameter is not offered at all. */
+        modelHandles: List<String> = emptyList(),
     ): AgentToolDefinition = AgentToolDefinition(
         name = name,
         description = "Delegate a self-contained task to a sub agent — its own isolated context and tool loop, in a separate child session running concurrently with you — and inspect, steer or stop the ones you started. `action` defaults to `delegate`.\n\n" +
@@ -35,8 +37,22 @@ object SubAgentToolSchema {
             "progress_report" to AgentToolParam("string", "action=delegate only. Mid-run [Background task progress …] messages (status, current tool, latest message). \"none\" (default): final result only. \"frequent\": about every 15s when something changed. \"moderate\": about once a minute. Each one costs you a turn — leave it at none unless the user asked to follow along or you must react mid-way. Answer one with at most a short sentence, or just carry on; never re-delegate or poll because of one. Ignored when wait=true.", enumValues = SubAgentTask.PROGRESS_LEVELS),
             "job_id" to AgentToolParam("string", "action=status/steer/cancel/resume. The job_id this tool returned when it started the sub agent (a prefix is accepted). Required for steer and cancel; omit on status to list every sub agent of this conversation."),
             "message" to AgentToolParam("string", "action=steer only, required. The correction, phrased as an instruction to the running sub agent (e.g. 'focus on pricing, skip the migration notes'). Use when new information changes what it should do — it keeps the work already done, unlike cancelling and re-delegating. Read at its next turn, so a running tool call is not interrupted; if the run finishes first the correction is missed."),
-        ),
+        ) + modelParam(modelHandles),
         required = listOf("tool_title"),
-        propertyOrdering = listOf("tool_title", "action", "task", "agent", "model_choice", "context", "max_minutes", "wait", "progress_report", "job_id", "message"),
+        propertyOrdering = listOf("tool_title", "action", "task", "agent", "model_choice", "model", "context", "max_minutes", "wait", "progress_report", "job_id", "message")
+            .filter { it != "model" || modelHandles.isNotEmpty() },
     )
+
+    private fun modelParam(handles: List<String>): Map<String, AgentToolParam> =
+        if (handles.isEmpty()) emptyMap()
+        else mapOf(
+            "model" to AgentToolParam(
+                "string",
+                "action=delegate only, optional. Run the sub agent on this specific model from the list the user made available " +
+                    "(described in the system prompt). Takes precedence over model_choice; a sub agent the user pinned to a model ignores it. " +
+                    "Use it when the user asked for that model, or the task clearly needs what it offers. Leave it out otherwise — the " +
+                    "cost reasoning of model_choice applies.",
+                enumValues = handles,
+            ),
+        )
 }

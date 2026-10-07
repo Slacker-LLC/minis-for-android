@@ -1106,7 +1106,7 @@
     <string name="modelgroup_speech_transcription">Speech transcription</string>
     <string name="modelgroup_text_generation">Text generation</string>
     <string name="common_default">Default</string>
-    <string name="settings_agent_loop_models">Agent Loop Models</string>
+    <string name="settings_agent_loop_models">Agent Models</string>
 
     <!-- T172-A parameterized strings -->
     <string name="add_custom_model_id_footer">Model ID is the API identifier sent to %1$s. Display Name is the friendlier label shown in the picker; defaults to Model ID when left blank.</string>
@@ -2180,8 +2180,8 @@
     <string name="model_slot_fallback_title">Fallback on errors</string>
     <string name="model_slot_fallback_always">On any error</string>
     <string name="model_slot_fallback_default">On rate limits and server errors</string>
-    <string name="agent_loop_models_slots_footer">Only individually selected entries are exposed to the agent loop.</string>
-    <string name="agent_loop_models_slots_subtitle">Select the models available to agent tools</string>
+    <string name="agent_loop_models_slots_footer">The assistant can only pick models you add here.</string>
+    <string name="agent_loop_models_slots_subtitle">Sub agents and minis-model-use can use these</string>
     <string name="model_slot_selected_models">Selected models</string>
     <string name="model_slot_order_footer">Entries are tried in this order. Move entries to change priority.</string>
     <string name="model_slot_legacy_unresolved">Unavailable entry retained from existing configuration</string>
@@ -2190,7 +2190,7 @@
     <string name="model_slot_no_candidates">No compatible models available</string>
     <string name="model_slot_system_entry">Built-in device voice engine</string>
     <string name="model_slot_provider_disabled">Provider disabled</string>
-    <string name="agent_loop_models_title">Agent Loop models</string>
+    <string name="agent_loop_models_title">Agent Models</string>
     <string name="model_slot_follow_default">Follow slot default</string>
     <string name="model_slot_follow_default_footer">Uses the first available entry configured in this voice slot.</string>
     <string name="agent_loop_add_models_count">Add %1$d models</string>
@@ -2355,7 +2355,7 @@
     <string name="first_run_step_chat">Start chatting</string>
     <string name="first_run_step_chat_locked">Finish the steps above first</string>
     <string name="first_run_done">Done</string>
-    <string name="settings_agent_loop_models_subtitle">Choose the models the agent\'s tools may use</string>
+    <string name="settings_agent_loop_models_subtitle">Sub agents and minis-model-use can use these</string>
     <string name="settings_thinking_rules">Thinking rules</string>
     <string name="settings_thinking_rules_subtitle">How each provider\'s thinking parameters map</string>
     <string name="settings_models_stats_header">Statistics</string>
@@ -2454,7 +2454,7 @@
     <string name="sub_agent_model">Model</string>
     <string name="sub_agent_model_auto">Auto</string>
     <string name="sub_agent_model_missing">Model unavailable</string>
-    <string name="sub_agent_model_footer">Auto lets the assistant choose, normally this conversation’s own model. A pinned model is always used.</string>
+    <string name="sub_agent_model_footer">Auto lets the assistant choose: normally this conversation’s own model, or one you added under Agent Models. A pinned model is always used.</string>
     <string name="sub_agent_thinking">Reasoning level</string>
     <string name="sub_agent_thinking_default">Default</string>
     <string name="sub_agent_thinking_footer">Default follows the model. A higher level thinks longer and costs more.</string>
@@ -2482,4 +2482,9 @@
     <string name="restore_stop">Stop restoring</string>
     <string name="restore_stop_title">Stop the restore?</string>
     <string name="restore_stop_message">What has already been restored stays. The part in progress is rolled back, so nothing is left half-written. You can run the restore again later.</string>
+    <string name="agent_models_selected_header">Added models</string>
+    <string name="agent_models_empty">No models added yet.</string>
+    <string name="agent_models_footer">The assistant can run a sub agent on any of these and call them with minis-model-use. A sub agent you pinned to a model always uses that model. Long-press to reorder.</string>
+    <string name="agent_models_no_credential">No API key</string>
+    <string name="agent_models_cli_only">minis-model-use only (not a chat model)</string>
 </resources>

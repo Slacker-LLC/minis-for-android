@@ -931,7 +931,7 @@
     <string name="modelgroup_text_generation">文本生成</string>
     <string name="common_default">默认</string>
     <!-- [T-android-vision-group / GH#182] Vision Input slot label -->
-    <string name="settings_agent_loop_models">智能体循环模型</string>
+    <string name="settings_agent_loop_models">Agent 可调用的模型</string>
 
     <!-- T172-A parameterized strings -->
     <string name="add_custom_model_id_footer">Model ID 是发送到 %1$s 的 API 标识符。显示名称是模型选择器里更友好的标签；留空时回落到 Model ID。</string>
@@ -2091,8 +2091,8 @@
     <string name="model_slot_fallback_title">错误时回退</string>
     <string name="model_slot_fallback_always">任何错误时</string>
     <string name="model_slot_fallback_default">限流和服务器错误时</string>
-    <string name="agent_loop_models_slots_footer">只有单独选中的模型条目会提供给 Agent 循环使用。</string>
-    <string name="agent_loop_models_slots_subtitle">选择 Agent 工具可用的模型</string>
+    <string name="agent_loop_models_slots_footer">助手只能从这里添加的模型中选择。</string>
+    <string name="agent_loop_models_slots_subtitle">子代理和 minis-model-use 可以使用这些模型</string>
     <string name="model_slot_selected_models">已选模型</string>
     <string name="model_slot_order_footer">模型会按此顺序尝试。使用箭头调整优先级。</string>
     <string name="model_slot_legacy_unresolved">保留自现有配置的不可用条目</string>
@@ -2101,7 +2101,7 @@
     <string name="model_slot_no_candidates">没有兼容的模型</string>
     <string name="model_slot_system_entry">设备内置语音引擎</string>
     <string name="model_slot_provider_disabled">服务提供方已停用</string>
-    <string name="agent_loop_models_title">Agent Loop 模型</string>
+    <string name="agent_loop_models_title">Agent 可调用的模型</string>
     <string name="model_slot_follow_default">跟随槽位默认值</string>
     <string name="model_slot_follow_default_footer">使用此语音槽位中第一个可用条目。</string>
     <string name="agent_loop_add_models_count">添加 %1$d 个模型</string>
@@ -2265,7 +2265,7 @@
     <string name="first_run_step_chat">开始对话</string>
     <string name="first_run_step_chat_locked">请先完成前两步</string>
     <string name="first_run_done">已完成</string>
-    <string name="settings_agent_loop_models_subtitle">选择 Agent 工具可用的模型</string>
+    <string name="settings_agent_loop_models_subtitle">子代理和 minis-model-use 可以使用这些模型</string>
     <string name="settings_thinking_rules">思考规则</string>
     <string name="settings_thinking_rules_subtitle">不同服务商的思考参数格式</string>
     <string name="settings_models_stats_header">统计</string>
@@ -2364,7 +2364,7 @@
     <string name="sub_agent_model">模型</string>
     <string name="sub_agent_model_auto">自动</string>
     <string name="sub_agent_model_missing">模型不可用</string>
-    <string name="sub_agent_model_footer">自动由助手选择，通常是当前会话所用的模型。固定的模型则始终使用。</string>
+    <string name="sub_agent_model_footer">自动由助手选择：通常是当前会话所用的模型，也可以是你在“Agent 可调用的模型”里添加的模型。固定的模型则始终使用。</string>
     <string name="sub_agent_thinking">推理强度</string>
     <string name="sub_agent_thinking_default">默认</string>
     <string name="sub_agent_thinking_footer">默认跟随模型。强度越高，思考越久、成本越高。</string>
@@ -2392,4 +2392,9 @@
     <string name="restore_stop">停止恢复</string>
     <string name="restore_stop_title">停止恢复？</string>
     <string name="restore_stop_message">已经恢复的内容会保留；正在恢复的部分会整体回滚，不会留下写了一半的数据。之后可以重新恢复。</string>
+    <string name="agent_models_selected_header">已添加的模型</string>
+    <string name="agent_models_empty">还没有添加模型。</string>
+    <string name="agent_models_footer">助手可以让子代理用这些模型干活，也可以用 minis-model-use 调用它们。固定了模型的子代理始终用固定的模型。长按可调整顺序。</string>
+    <string name="agent_models_no_credential">未设置密钥</string>
+    <string name="agent_models_cli_only">仅限 minis-model-use（非对话模型）</string>
 </resources>

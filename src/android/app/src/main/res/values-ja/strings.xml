@@ -728,7 +728,7 @@
     <string name="modelgroup_speech_transcription">音声文字起こし</string>
     <string name="modelgroup_text_generation">テキスト生成</string>
     <string name="common_default">デフォルト</string>
-    <string name="settings_agent_loop_models">エージェントループモデル</string>
+    <string name="settings_agent_loop_models">エージェントが使えるモデル</string>
 
     <!-- T172-A parameterized strings -->
     <string name="add_custom_model_id_footer">Model ID は %1$s に送信される API 識別子です。表示名はモデルピッカーで使われる分かりやすいラベルで、空欄時は Model ID にフォールバックします。</string>
@@ -1846,8 +1846,8 @@
     <string name="model_slot_fallback_title">エラー時のフォールバック</string>
     <string name="model_slot_fallback_always">すべてのエラー</string>
     <string name="model_slot_fallback_default">レート制限とサーバーエラー</string>
-    <string name="agent_loop_models_slots_footer">Agent Loop で利用できるのは個別に選択したエントリのみです。</string>
-    <string name="agent_loop_models_slots_subtitle">Agent ツールで使うモデルを選択</string>
+    <string name="agent_loop_models_slots_footer">アシスタントが選べるのは、ここに追加したモデルだけです。</string>
+    <string name="agent_loop_models_slots_subtitle">サブエージェントと minis-model-use が使えるモデル</string>
     <string name="model_slot_selected_models">選択済みモデル</string>
     <string name="model_slot_order_footer">この順序でモデルを試します。矢印で優先順位を変更できます。</string>
     <string name="model_slot_legacy_unresolved">既存の設定から引き継いだ未使用可能なエントリ</string>
@@ -1856,7 +1856,7 @@
     <string name="model_slot_no_candidates">互換性のあるモデルがありません</string>
     <string name="model_slot_system_entry">端末内蔵の音声エンジン</string>
     <string name="model_slot_provider_disabled">プロバイダーは無効です</string>
-    <string name="agent_loop_models_title">Agent Loop モデル</string>
+    <string name="agent_loop_models_title">エージェントが使えるモデル</string>
     <string name="model_slot_follow_default">スロットの既定値を使用</string>
     <string name="model_slot_follow_default_footer">音声スロットの先頭の利用可能なエントリを使用します。</string>
     <string name="agent_loop_add_models_count">%1$d 個のモデルを追加</string>
@@ -2024,7 +2024,7 @@
     <string name="first_run_step_chat">会話を始める</string>
     <string name="first_run_step_chat_locked">先に上の手順を完了してください</string>
     <string name="first_run_done">完了</string>
-    <string name="settings_agent_loop_models_subtitle">エージェントのツールが使えるモデルを選択</string>
+    <string name="settings_agent_loop_models_subtitle">サブエージェントと minis-model-use が使えるモデル</string>
     <string name="settings_thinking_rules">思考ルール</string>
     <string name="settings_thinking_rules_subtitle">プロバイダごとの思考パラメータ形式</string>
     <string name="settings_models_stats_header">統計</string>
@@ -2123,7 +2123,7 @@
     <string name="sub_agent_model">モデル</string>
     <string name="sub_agent_model_auto">自動</string>
     <string name="sub_agent_model_missing">モデルを利用できません</string>
-    <string name="sub_agent_model_footer">自動ではアシスタントが選びます（通常はこの会話のモデル）。固定したモデルは常に使われます。</string>
+    <string name="sub_agent_model_footer">自動ではアシスタントが選びます（通常はこの会話のモデル、または「エージェントが使えるモデル」に追加したモデル）。固定したモデルは常に使われます。</string>
     <string name="sub_agent_thinking">推論レベル</string>
     <string name="sub_agent_thinking_default">デフォルト</string>
     <string name="sub_agent_thinking_footer">デフォルトはモデルに従います。高いほど長く考え、コストも増えます。</string>
@@ -2151,4 +2151,9 @@
     <string name="restore_stop">復元を停止</string>
     <string name="restore_stop_title">復元を停止しますか？</string>
     <string name="restore_stop_message">すでに復元された内容はそのまま残ります。処理中の部分はまとめて元に戻るため、書きかけのデータは残りません。後でもう一度復元できます。</string>
+    <string name="agent_models_selected_header">追加したモデル</string>
+    <string name="agent_models_empty">まだモデルを追加していません。</string>
+    <string name="agent_models_footer">アシスタントはこれらのモデルでサブエージェントを動かしたり、minis-model-use で呼び出したりできます。モデルを固定したサブエージェントは常にそのモデルを使います。長押しで並べ替え。</string>
+    <string name="agent_models_no_credential">API キー未設定</string>
+    <string name="agent_models_cli_only">minis-model-use 専用（チャットモデルではありません）</string>
 </resources>
