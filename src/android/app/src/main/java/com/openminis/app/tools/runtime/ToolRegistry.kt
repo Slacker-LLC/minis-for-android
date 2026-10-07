@@ -316,6 +316,13 @@ class LinuxShellHandler : ToolHandler {
             }
             return ToolExecutionResult("Error: 'command' is required", false)
         }
+        if (args.optBoolean("background", false)) {
+            // A scheduled read-only run may not leave anything running behind it.
+            if (readOnly) {
+                return ToolExecutionResult("Error: shell_denied_readonly_tier: background jobs", false)
+            }
+            return ShellBackground.start(args, command, sessionId)
+        }
         val requestedMs = if (args.has("timeout")) args.optLong("timeout") * 1_000L else null
         val timeoutMs = ToolTimeoutPolicy.resolve("linux.shell", callerOverrideMs = requestedMs).timeoutMs ?: 900_000L
         val commandToExecute = if (readOnly) {

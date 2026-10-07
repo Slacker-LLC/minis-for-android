@@ -1180,7 +1180,6 @@
     <string name="permissions_category_media">媒體</string>
     <string name="mention_scanning">正在掃描檔案…</string>
     <string name="mention_no_match">沒有匹配的檔案</string>
-    <string name="resume_banner_title">已中斷 - 點選「繼續」以恢復</string>
     <string name="resume_action">繼續</string>
     <string name="search_chats_placeholder">搜尋會話…</string>
     <string name="search_no_results">未找到 \"%1$s\" 的結果</string>
@@ -2374,4 +2373,5 @@
     <string name="work_process_failed_only">第 %1$d 步失敗</string>
     <string name="model_slot_image">圖像</string>
     <string name="selection_reply_actions">回覆操作</string>
+    <string name="chat_interrupted_short">已中斷</string>
 </resources>

@@ -48,7 +48,6 @@
     <string name="permissions_category_media">媒体</string>
     <string name="mention_scanning">正在扫描文件…</string>
     <string name="mention_no_match">没有匹配的文件</string>
-    <string name="resume_banner_title">已中断 - 点击「继续」以恢复</string>
     <string name="resume_action">继续</string>
     <string name="search_chats_placeholder">搜索会话…</string>
     <string name="search_no_results">未找到 \"%1$s\" 的结果</string>
@@ -2403,4 +2402,5 @@
     <string name="work_process_failed_only">第 %1$d 步失败</string>
     <string name="model_slot_image">图像</string>
     <string name="selection_reply_actions">回复操作</string>
+    <string name="chat_interrupted_short">已中断</string>
 </resources>

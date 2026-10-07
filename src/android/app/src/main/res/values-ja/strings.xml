@@ -48,7 +48,6 @@
     <string name="permissions_category_media">メディア</string>
     <string name="mention_scanning">ファイルをスキャン中…</string>
     <string name="mention_no_match">一致するファイルはありません</string>
-    <string name="resume_banner_title">中断されました — 「再開」をタップして続行</string>
     <string name="resume_action">再開</string>
     <string name="search_chats_placeholder">会話を検索…</string>
     <string name="search_no_results">\"%1$s\" の結果はありません</string>
@@ -2162,4 +2161,5 @@
     <string name="work_process_failed_only">ステップ %1$d が失敗</string>
     <string name="model_slot_image">画像</string>
     <string name="selection_reply_actions">返信の操作</string>
+    <string name="chat_interrupted_short">中断されました</string>
 </resources>

@@ -48,7 +48,6 @@
     <string name="permissions_category_media">Medien</string>
     <string name="mention_scanning">Dateien werden durchsucht…</string>
     <string name="mention_no_match">Keine passenden Dateien</string>
-    <string name="resume_banner_title">Unterbrochen — tippen Sie auf „Fortfahren“</string>
     <string name="resume_action">Fortfahren</string>
     <string name="search_chats_placeholder">Unterhaltungen suchen…</string>
     <string name="search_no_results">Keine Treffer für \"%1$s\"</string>
@@ -2165,4 +2164,5 @@
     <string name="work_process_failed_only">Schritt %1$d fehlgeschlagen</string>
     <string name="model_slot_image">Bild</string>
     <string name="selection_reply_actions">Antwort-Aktionen</string>
+    <string name="chat_interrupted_short">Unterbrochen</string>
 </resources>
