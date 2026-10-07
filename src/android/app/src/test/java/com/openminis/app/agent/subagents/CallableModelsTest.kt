@@ -27,8 +27,19 @@ class CallableModelsTest {
     fun `names stay unique even when provider and model are equal`() {
         val out = CallableModels.from(listOf(src("e1", "m", "P"), src("e2", "m", "P"), src("e3", "m", "p")))
         assertEquals(3, out.map { it.handle.lowercase() }.toSet().size)
-        assertEquals("P/m", out[0].handle)
-        assertTrue(out[1].handle.startsWith("P/m#"))
+        assertTrue(out.all { it.handle.startsWith("P/m#", ignoreCase = true) })
+    }
+
+    @Test
+    fun `a name keeps pointing at the same entry when the list is reordered`() {
+        val a = src("11112222", "m", "P")
+        val b = src("33334444", "m", "P")
+        val before = CallableModels.from(listOf(a, b)).associate { it.handle to it.entryId }
+        val after = CallableModels.from(listOf(b, a)).associate { it.handle to it.entryId }
+        assertEquals(before, after)
+        // And a bare duplicate-free name is not touched by the other entries.
+        val mixed = CallableModels.from(listOf(a, b, src("55556666", "other", "P"))).map { it.handle }
+        assertTrue("other" in mixed)
     }
 
     @Test

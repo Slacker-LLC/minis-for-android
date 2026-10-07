@@ -6232,11 +6232,20 @@ class ChatViewModel(
             // snapshot inside a long-running agent turn is exactly the iOS
             // fcc22b66 item-3 bug.
             effectiveContextWindowTokens()?.takeIf { it > 0 }?.let { window ->
-                ContextOffloader.offloadIfNeeded(
-                    context, activeSessionId, agentHistory,
+                val freed = ContextOffloader.offloadIfNeeded(
+                    SessionOffloadStore(context, activeSessionId), agentHistory,
                     contextWindow = window,
                     lastContextTokens = lastContextTokens,
                 )
+                if (freed > 0) {
+                    // The reading came from the previous response, before the offload. Take away what
+                    // the offload really freed so the in-loop guard judges the request that is about to
+                    // be sent, not the one that was.
+                    lastContextTokens = (lastContextTokens - freed).coerceAtLeast(0)
+                    if (_lastTurnContextTokens.value > 0) {
+                        _lastTurnContextTokens.value = (_lastTurnContextTokens.value - freed).coerceAtLeast(0)
+                    }
+                }
             }
 
             // [T-android-auto-compact-inloop] In-loop context guard (iOS

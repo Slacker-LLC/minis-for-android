@@ -490,6 +490,40 @@ class SubAgentRuntimeTest {
     }
 
     @Test
+    fun `a queued job whose named model was removed meanwhile does not start`() = runBlocking {
+        val port = FakePort().also { it.callable = listed }
+        val rt = runtime(port, maxConcurrent = 1)
+        rt.execute(args(), "chat-A")                                   // takes the only slot
+        until("first child started") { port.briefs.containsKey("child-1") }
+        val queued = rt.execute(args("model" to "deepseek-v4-flash"), "chat-A")
+        assertEquals("queued", json(queued).getString("status"))
+        val jobId = json(queued).getString("job_id")
+
+        port.callable = emptyList()                                     // the user removes it from Agent Models
+        port.finish("child-1", "done")
+
+        until("the queued job ended") { rt.registry.get(jobId)?.state?.isTerminal == true }
+        val job = rt.registry.get(jobId)!!
+        assertEquals(SubAgentJobState.FAILED, job.state)
+        assertTrue(job.resultText.orEmpty(), job.resultText.orEmpty().contains("no longer available"))
+        assertEquals("no second child was created", 1, port.created.size)
+    }
+
+    @Test
+    fun `a queued job whose named model is still listed does start`() = runBlocking {
+        val port = FakePort().also { it.callable = listed }
+        val rt = runtime(port, maxConcurrent = 1)
+        rt.execute(args(), "chat-A")
+        until("first child started") { port.briefs.containsKey("child-1") }
+        val queued = rt.execute(args("model" to "deepseek-v4-flash"), "chat-A")
+        port.finish("child-1", "done")
+        until("second child started") { port.briefs.containsKey("child-2") }
+        assertEquals("entry-flash", port.childModels.last().entryId)
+        port.finish("child-2", "ok")
+        until("done") { rt.registry.get(json(queued).getString("job_id"))?.state == SubAgentJobState.DONE }
+    }
+
+    @Test
     fun `a full queue is refused`() = runBlocking {
         val port = FakePort()
         val rt = runtime(port, maxConcurrent = 1, maxQueued = 1)

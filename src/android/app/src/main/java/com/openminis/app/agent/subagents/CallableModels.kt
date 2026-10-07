@@ -34,19 +34,32 @@ object CallableModels {
 
     /**
      * Names each entry by its model id, which is what models and users already call it. When two entries
-     * share a model id (the same model through two providers) both are qualified as `provider/model-id`,
-     * the form `minis-model-use run --model` also accepts; anything still equal gets a `#n` suffix.
+     * share a model id (the same model through two providers) they are qualified as `provider/model-id`,
+     * the form `minis-model-use run --model` also accepts. Entries still sharing a name (same provider
+     * label and model id) all get `#` plus a prefix of their own entry id, so a name never depends on the
+     * order of the list: reordering it cannot make an earlier name point at a different entry.
      * Comparison ignores case, because a model is likely to normalise case when it repeats a name.
      */
     fun from(sources: List<Source>): List<CallableModel> {
         val offered = sources.distinctBy { it.entryId }.take(MAX_OFFERED)
         val idCounts = offered.groupingBy { it.modelId.lowercase() }.eachCount()
+        val bases = offered.map { s ->
+            if ((idCounts[s.modelId.lowercase()] ?: 0) > 1) "${s.providerLabel}/${s.modelId}" else s.modelId
+        }
+        val sameBase = bases.groupingBy { it.lowercase() }.eachCount()
         val used = HashSet<String>()
-        return offered.map { s ->
-            val base = if ((idCounts[s.modelId.lowercase()] ?: 0) > 1) "${s.providerLabel}/${s.modelId}" else s.modelId
+        return offered.mapIndexed { i, s ->
+            val base = bases[i]
             var handle = base
-            var n = 2
-            while (!used.add(handle.lowercase())) handle = "$base#${n++}"
+            if ((sameBase[base.lowercase()] ?: 0) > 1) {
+                var len = 4
+                do {
+                    handle = "$base#${s.entryId.take(len)}"
+                    len++
+                } while (!used.add(handle.lowercase()) && len <= s.entryId.length + 1)
+            } else {
+                used.add(handle.lowercase())
+            }
             CallableModel(handle, s.entryId, s.displayName.ifBlank { s.modelId }, summary(s))
         }
     }

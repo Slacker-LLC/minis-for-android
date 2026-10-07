@@ -31,13 +31,16 @@ object ContextOffload {
     const val OFFLOADED_PREFIX = "[CONTEXT OFFLOADED]"
 
     /**
-     * Take the last 12 chars of [toolId] as a short, locally-unique suffix
-     * for the on-disk filename. Anthropic IDs are `toolu_01…` (constant
-     * 8-char prefix), so the trailing 12 chars are still distinguishing.
-     * Mirrors iOS `shortToolId(_:)`.
+     * A short, path-safe tag for the on-disk filename: the last 12 safe characters of [toolId] plus a
+     * hash of the WHOLE id when anything was cut or replaced. Two different ids with the same last 12
+     * characters (providers that share an id prefix and suffix) used to write the same file, so the later
+     * result overwrote the earlier one and its stub then read back the wrong content.
      */
-    private fun shortToolId(toolId: String): String =
-        if (toolId.length <= 12) toolId else toolId.takeLast(12)
+    internal fun shortToolId(toolId: String): String {
+        val safe = toolId.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        if (toolId.length <= 12 && safe == toolId) return toolId
+        return safe.takeLast(12) + "-" + Integer.toHexString(toolId.hashCode())
+    }
 
     private fun sanitize(name: String): String =
         name.ifEmpty { "tool" }.replace(Regex("[^A-Za-z0-9._-]"), "_")
@@ -45,8 +48,8 @@ object ContextOffload {
     /**
      * Write tool text content to disk and return the Linux-visible path
      * the model can later pass to `file_read`. Returns the empty string
-     * on any I/O failure — caller should still update the in-history part
-     * with a stub so the model isn't left holding the original bytes.
+     * on any I/O failure — the caller must then KEEP the original part: a stub
+     * that points at a file that was never written loses the content.
      */
     suspend fun offloadContent(
         context: Context,

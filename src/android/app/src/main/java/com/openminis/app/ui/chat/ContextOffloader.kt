@@ -13,6 +13,21 @@ import com.openminis.app.logging.AppLogger
  * history by stubs. Moved out of [ChatViewModel] unchanged; it works on a history list and a session
  * id handed in by the caller.
  */
+/** Where offloaded content is written. Each call returns the Linux path, or "" when the write failed. */
+internal interface OffloadStore {
+    suspend fun content(content: String, toolId: String, toolName: String): String
+    suspend fun image(bytes: ByteArray, toolId: String, mimeType: String): String
+}
+
+/** The real store: the session's offloads folder through the guest file API. */
+internal class SessionOffloadStore(private val context: Context, private val sessionId: String) : OffloadStore {
+    override suspend fun content(content: String, toolId: String, toolName: String) =
+        ContextOffload.offloadContent(context, sessionId, content, toolId = toolId, toolName = toolName)
+
+    override suspend fun image(bytes: ByteArray, toolId: String, mimeType: String) =
+        ContextOffload.offloadImage(context, sessionId, bytes, toolId = toolId, mimeType = mimeType)
+}
+
 internal object ContextOffloader {
     private const val TAG = "ContextOffloader"
 
@@ -105,19 +120,18 @@ internal object ContextOffloader {
      * post-compact code paths to slim down the kept-tail aggressively.
      */
     suspend fun offloadIfNeeded(
-        context: Context,
-        sid: String,
+        store: OffloadStore,
         history: MutableList<LLMMessage>,
         contextWindow: Int,
         lastContextTokens: Int,
         force: Boolean = false,
-    ) {
+    ): Int {
         val policy = ContextPolicy.forContextWindow(contextWindow)
 
         if (!force && policy.offloadThreshold == 0) {
             // Small-window tier: offload disabled — UI surfaces "exhausted"
             // when the user crosses the threshold. Nothing to do here.
-            return
+            return 0
         }
 
         val effectiveTokens =
@@ -126,7 +140,7 @@ internal object ContextOffloader {
         if (!force && effectiveTokens < policy.offloadThreshold) {
             // Below threshold — no work needed. Caller logs at debug level
             // via dynamicMaxTokens; we stay silent to keep logs readable.
-            return
+            return 0
         }
 
         val targetTokens = if (force) 0 else policy.offloadTarget
@@ -213,51 +227,55 @@ internal object ContextOffloader {
             val part = parts[candidate.partIdx]
             var linuxPath = ""
 
+            // A part is replaced only when what the stub points at was really written; a failed write
+            // keeps the original so the model never holds a stub for content that is gone.
             val newPart: AgentContentPart? = when (part) {
                 is AgentContentPart.ToolResult -> {
-                    if (part.content.length > 500) {
-                        linuxPath = ContextOffload.offloadContent(
-                            context, sid, part.content,
-                            toolId = part.id, toolName = part.name,
-                        )
-                    }
-                    val imgPath = part.imageData?.let { data ->
-                        if (data.size > 1024) {
-                            ContextOffload.offloadImage(
-                                context, sid, data,
-                                toolId = part.id,
-                                mimeType = part.imageMimeType ?: "image/png",
-                            )
-                        } else ""
+                    val largeContent = part.content.length > 500
+                    val contentPath = if (largeContent) {
+                        store.content(part.content, toolId = part.id, toolName = part.name)
+                    } else ""
+                    val largeImage = (part.imageData?.size ?: 0) > 1024
+                    val imgPath = part.imageData?.takeIf { largeImage }?.let { data ->
+                        store.image(data, toolId = part.id, mimeType = part.imageMimeType ?: "image/png")
                     } ?: ""
-                    if (linuxPath.isEmpty()) linuxPath = imgPath
-                    val stub = ContextOffload.stub(candidate.tokens, candidate.bytes, linuxPath)
-                    part.copy(content = stub, imageData = null, imageMimeType = null)
+                    val contentOk = !largeContent || contentPath.isNotEmpty()
+                    val imageOk = !largeImage || imgPath.isNotEmpty()
+                    linuxPath = contentPath.ifEmpty { imgPath }
+                    if (linuxPath.isEmpty() || !contentOk) {
+                        null
+                    } else {
+                        val stub = ContextOffload.stub(candidate.tokens, candidate.bytes, linuxPath)
+                        // A failed image write keeps the image; only the text becomes a stub.
+                        if (imageOk) part.copy(content = stub, imageData = null, imageMimeType = null)
+                        else part.copy(content = stub)
+                    }
                 }
                 is AgentContentPart.ToolUse -> {
                     val content = part.input.optString("content", "")
-                    linuxPath = ContextOffload.offloadContent(
-                        context, sid, content,
-                        toolId = part.id, toolName = part.name,
-                    )
-                    val newInput = org.json.JSONObject(part.input.toString())
-                    newInput.put(
-                        "content",
-                        ContextOffload.stub(candidate.tokens, candidate.bytes, linuxPath),
-                    )
-                    part.copy(input = newInput)
+                    linuxPath = store.content(content, toolId = part.id, toolName = part.name)
+                    if (linuxPath.isEmpty()) {
+                        null
+                    } else {
+                        val newInput = org.json.JSONObject(part.input.toString())
+                        newInput.put(
+                            "content",
+                            ContextOffload.stub(candidate.tokens, candidate.bytes, linuxPath),
+                        )
+                        part.copy(input = newInput)
+                    }
                 }
                 is AgentContentPart.ImageData -> {
-                    linuxPath = ContextOffload.offloadImage(
-                        context, sid, part.data,
-                        toolId = candidate.toolId,
-                        mimeType = part.mimeType,
-                    )
-                    // Bare ImageData has no toolUseId pairing — replace with a
-                    // text part carrying the stub. Mirrors iOS line 7653.
-                    AgentContentPart.Text(
-                        ContextOffload.stub(candidate.tokens, candidate.bytes, linuxPath),
-                    )
+                    linuxPath = store.image(part.data, toolId = candidate.toolId, mimeType = part.mimeType)
+                    if (linuxPath.isEmpty()) {
+                        null
+                    } else {
+                        // Bare ImageData has no toolUseId pairing — replace with a
+                        // text part carrying the stub. Mirrors iOS line 7653.
+                        AgentContentPart.Text(
+                            ContextOffload.stub(candidate.tokens, candidate.bytes, linuxPath),
+                        )
+                    }
                 }
                 is AgentContentPart.Text -> null
             }
@@ -266,8 +284,10 @@ internal object ContextOffloader {
             parts[candidate.partIdx] = newPart
             history[candidate.msgIdx] = msg.copy(contentParts = parts)
 
-            currentTokens -= candidate.tokens
-            freedTokens += candidate.tokens
+            // What was really freed: the part's tokens minus what its stub costs, on the same scale.
+            val freed = (candidate.tokens - OutgoingHistory.countPartTokens(newPart)).coerceAtLeast(0)
+            currentTokens -= freed
+            freedTokens += freed
             offloadedCount++
             val afterPct = (currentTokens.toLong() * 100 / contextWindow.coerceAtLeast(1)).toInt()
             AppLogger.info(
@@ -285,5 +305,6 @@ internal object ContextOffloader {
             AppLogger.info(TAG, "  After:  $currentTokens/$contextWindow ($afterPct%)")
             AppLogger.info(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         }
+        return freedTokens
     }
 }

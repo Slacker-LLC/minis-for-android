@@ -196,6 +196,12 @@ class SubAgentRuntime(
             var state = SubAgentJobState.FAILED
             var text: String? = null
             try {
+                // A model the delegating agent named was on the user's list when the job was accepted; a
+                // job that waited in the queue (or was resumed after a restart) must not start on a model
+                // the user has since removed or whose provider is gone.
+                if (job.modelOrigin == ORIGIN_NAMED && port.callableModels().none { it.entryId == job.modelEntryId }) {
+                    error("the model it was to run on (${job.modelLabel}) is no longer available to the agent. Nothing was started.")
+                }
                 // A resumed run continues in the child it already has; anything else (and a resumed run
                 // that never got a child) starts a fresh child with the original brief.
                 val existingChild = job.childSessionId.takeIf { job.resumed }
