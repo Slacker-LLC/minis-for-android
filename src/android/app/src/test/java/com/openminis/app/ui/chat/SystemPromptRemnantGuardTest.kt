@@ -7,15 +7,18 @@ import org.junit.Test
 
 class SystemPromptRemnantGuardTest {
 
-    private fun locateChatViewModelSource(): File {
+    /** The source of ChatViewModel and of the extension files its functions now live in, as one text. */
+    private fun chatViewModelSources(): String {
         val cwd = File(System.getProperty("user.dir")).canonicalFile
-        val candidates = listOf(
-            File(cwd, "src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt"),
-            File(cwd, "app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt"),
-            File(cwd, "src/android/app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt"),
-        )
-        return candidates.firstOrNull { it.isFile }
+        val dir = listOf(
+            File(cwd, "src/main/java/com/openminis/app/ui/chat"),
+            File(cwd, "app/src/main/java/com/openminis/app/ui/chat"),
+            File(cwd, "src/android/app/src/main/java/com/openminis/app/ui/chat"),
+        ).firstOrNull { File(it, "ChatViewModel.kt").isFile }
             ?: error("cannot find ChatViewModel.kt from ${cwd.path}")
+        return dir.listFiles { f -> f.name.startsWith("ChatViewModel") && f.name.endsWith(".kt") }!!
+            .sortedBy { it.name }
+            .joinToString("\n") { it.readText(Charsets.UTF_8) }
     }
 
     @Test
@@ -64,7 +67,7 @@ class SystemPromptRemnantGuardTest {
 
     @Test
     fun chatViewModelDelegatesTheStaticPromptToTheModuleComposer() {
-        val source = locateChatViewModelSource().readText(Charsets.UTF_8)
+        val source = chatViewModelSources()
 
         assertTrue(
             "ChatViewModel must assemble the static prompt through AgentSystemPrompt",

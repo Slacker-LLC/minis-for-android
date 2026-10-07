@@ -8705,12 +8705,12 @@
     <issue
         id="UseKtx"
         message="Use the KTX extension function `Bitmap.scale` instead?"
-        errorLine1="        val resized = android.graphics.Bitmap.createScaledBitmap(bmp, w, h, true)"
-        errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        errorLine1="    val resized = android.graphics.Bitmap.createScaledBitmap(bmp, w, h, true)"
+        errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt"
-            line="8622"
-            column="23"/>
+            file="src/main/java/com/openminis/app/ui/chat/ChatViewModelAgentLoop.kt"
+            line="1489"
+            column="19"/>
     </issue>
 
     <issue
