@@ -15,6 +15,7 @@
 - `root.shell` 是 local-only：本地 Agent 可以使用它完成需要 Root 的 Android 工具动作，MCP 不可见且不可调用；它不接受 `command` 字符串，不提供 host 文件或通用 RPC 面。
 - `root.shell` 的 tool 不得是会执行其它代码的程序：shell、`su` 类前端、`toybox`/`busybox` 等多合一程序、`env`/`xargs`/`nohup`/`nsenter` 等启动器、解释器，以及 `find -exec`、`tar --to-command`、`sqlite3 .shell`、`ip netns exec` 这类执行命令的参数。否则数组形式的 argv 照样等于 raw Root 命令。这是在可信路径与 argv 边界之上的拒绝清单，不代表其余 Root 工具无副作用。
 - `DirectRootRunner` 的内部脚本动作限于确实需要权限的 rootfs 探测/修复、namespace/bind/chroot、受控 legacy 数据迁移及同类明确基础设施需求；本地 Agent 的 `root.shell` 只走结构化 Android tool/argv 合同，不得被扩展成 raw shell、host 文件或通用 RPC。
+- 例外之一：`minis-apt`（guest CLI，经 `AptOffloadHandler`）。guest 以 App UID 运行、无法使用 apt，因此由 App 代为在 rootfs 的一次性 mount namespace 内以 Root 执行 `apt-get update|install|remove`。Agent 只给出包名，命令全部由 App 构造（`AptCommandPolicy`）：只接受 `^[a-z0-9][a-z0-9+.-]{0,62}$` 形式的纯包名（拒绝选项、版本/发行版指定、路径、shell 字符），每次最多 20 个；`remove` 先用 apt 的模拟结果检查，若会连带移除运行时必需的包（`UbuntuProvisioner.BASE_PACKAGES` 等）则在移除前拒绝；同一时间只运行一个；走与其它 guest CLI 相同的权限开关（`apt_cli`，设置里可关闭）；只影响 Ubuntu 环境，不触及 Android 系统与宿主文件。它不是通用 Root 执行入口，不接受原始命令。
 - Guest shell 进入 chroot 后必须通过 `setpriv` 切到真实 App UID/GID，清空 supplementary groups 与 Linux capabilities。
 - Root-provider identity 只是可用性信号；uid=0 不代表 SELinux、mount、namespace 或 capability 一定允许操作。
 

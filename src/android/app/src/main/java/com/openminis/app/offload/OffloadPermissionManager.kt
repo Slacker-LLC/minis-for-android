@@ -98,6 +98,9 @@ object OffloadPermissionManager {
         // is already authorized.
         ToolPermissionInfo("a11y_cli", "android-a11y-cli", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
         ToolPermissionInfo("shizuku_cli", "android-shizuku-cli", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
+        // minis-apt: the guest cannot run apt itself, so the App does it as Root for the agent. Allowed by
+        // default (a package install changes only the Ubuntu environment); the user can switch it off.
+        ToolPermissionInfo("apt_cli", "minis-apt", PermissionCategory.INTEGRATIONS, PermissionLevel.BYPASS),
         ToolPermissionInfo("android.vscreen.open", "VScreen: open virtual display", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
         ToolPermissionInfo("android.vscreen.launch", "VScreen: launch app", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
         ToolPermissionInfo("android.vscreen.close", "VScreen: close virtual display", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),

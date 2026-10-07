@@ -207,6 +207,14 @@ internal object UbuntuProvisioner {
             appendLine("printf 'ok\\n' > /$MARKER")
             appendLine("chmod 644 /$MARKER")
         }
+        return wrapInRootfsNamespace(rootfs, guest)
+    }
+
+    /**
+     * Wraps [guest] (a bash script) so it runs as Root inside [rootfs] in a short-lived private mount
+     * namespace with the standard /dev, /proc and /sys mounts. Nothing outlives the command.
+     */
+    internal fun wrapInRootfsNamespace(rootfs: String, guest: String): String {
         val inner = buildString {
             appendLine("set -eu")
             appendLine("ROOTFS=${shellQuote(rootfs)}")

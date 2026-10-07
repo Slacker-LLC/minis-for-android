@@ -559,6 +559,7 @@
     <!-- T336: dedicated SectionCard per integration CLI. -->
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
     <string name="perm_tool_shizuku_cli">android-shizuku-cli</string>
+    <string name="perm_tool_apt_cli">minis-apt</string>
     <string name="perm_section_a11y">無障礙</string>
     <string name="perm_a11y_section_footer">android-a11y-cli 讓 Agent 讀取螢幕 UI、模擬點擊與輸入、監聽系統事件。下方兩項都需配置:選擇 Agent 權限,並在系統設定啟用無障礙服務。</string>
     <string name="perm_shizuku_section_footer">android-shizuku-cli 透過 Shizuku 服務呼叫 Android 高權限 API(安裝應用、settings put、強制停止等)。Shizuku 由無線 ADB 或 root 啟動。下方兩項都需配置。</string>

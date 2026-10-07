@@ -548,6 +548,7 @@
     <string name="perm_grant_all_no_root">Root недоступен, поэтому разрешения нельзя выдать автоматически.</string>
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
     <string name="perm_tool_shizuku_cli">android-shizuku-cli</string>
+    <string name="perm_tool_apt_cli">minis-apt</string>
     <string name="perm_section_a11y">Специальные возможности</string>
     <string name="perm_a11y_section_footer">android-a11y-cli позволяет агенту считывать структуру UI на экране, выполнять нажатия и жесты, а также отслеживать системные события. Должны быть заданы обе строки ниже: выберите разрешение Агента и включите службу Специальных возможностей в системных Настройках.</string>
     <string name="perm_shizuku_section_footer">android-shizuku-cli предоставляет агенту привилегированные API Android (установка пакетов, settings put, принудительная остановка и др.) через службу Shizuku, авторизованную по беспроводному ADB или root. Должны быть заданы обе строки ниже.</string>
