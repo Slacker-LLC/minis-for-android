@@ -73,7 +73,9 @@ internal object AptCommandPolicy {
                 " -o ${shellQuote("Acquire::https::Proxy=$proxy")}"
         }
         val apt = "/usr/bin/apt-get -o APT::Sandbox::User=root$aptProxy" +
-            " -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30"
+            " -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30" +
+            // The throw-away namespace has no /dev/pts; without this dpkg warns about its pty log.
+            " -o Dpkg::Use-Pty=0"
         return buildString {
             appendLine("set -eu")
             appendLine("export DEBIAN_FRONTEND=noninteractive")

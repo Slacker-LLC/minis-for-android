@@ -17,6 +17,20 @@ class GuestCommandBridgeTest {
     }
 
     @Test
+    fun `install script stays far below the per-argument limit however many commands there are`() {
+        // The script travels as one `su -c` argument (kernel limit 128 KiB). It once carried a full wrapper copy
+        // per command and the on-device install died with E2BIG.
+        val wrapper = GuestCommandBridge.wrapperScriptForTest()
+        val names = (1..300).map { "cmd-$it" }.toSet()
+
+        val script = GuestCommandBridge.installScript("/rootfs", 10450, 10450, "cfg", wrapper, wrapper, names)
+
+        assertTrue("script is ${script.length} chars", script.length < 90_000)
+        // config, minis-config wrapper, first bridge wrapper, first URL wrapper: the rest are copies.
+        assertEquals(4, Regex("(?m)^printf %s ").findAll(script).count())
+    }
+
+    @Test
     fun `managed guest CLI set includes registered Android handlers and preview aliases`() {
         val names = GuestCommandBridge.managedCommandNames(
             setOf("android-device", "minis-scheduled", "unsafe/name"),
