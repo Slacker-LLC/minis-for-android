@@ -41,11 +41,16 @@ class BareUrlLinkTest {
 
     @Test
     fun `things that only look like addresses are left alone`() {
-        assertNull(bareUrlAt("https://", 0))
-        assertNull(bareUrlAt("http://", 0))
-        assertNull(bareUrlAt("xhttps://a.b", 1))
-        assertEquals(emptyList<String>(), urls("ftp://a.b and mailto:x@y.z"))
-        // A stray "<" is just a character: the address after it is still a bare address.
+        assertEquals(emptyList<String>(), urls("https:// and http://"))
+        assertEquals(emptyList<String>(), urls("xhttps://a.b"))
+        assertEquals(emptyList<String>(), urls("mailto:x and ftp:/a.b"))
+        // An unclosed "<" is not an angle autolink, but the address after it is still an address.
         assertEquals(listOf("https://a.b"), urls("<https://a.b"))
+    }
+
+    @Test
+    fun `www addresses and e-mail addresses are links too`() {
+        assertEquals(listOf("http://www.example.com/x"), urls("see www.example.com/x now"))
+        assertEquals(listOf("mailto:a.b@example.com"), urls("write to a.b@example.com."))
     }
 }

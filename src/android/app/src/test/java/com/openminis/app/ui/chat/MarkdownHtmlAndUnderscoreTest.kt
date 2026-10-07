@@ -52,7 +52,8 @@ class MarkdownHtmlAndUnderscoreTest {
         assertEquals("strong text", bold.text)
         assertTrue(bold.spanStyles.any { it.item.fontWeight == FontWeight.Bold })
         assertEquals("<foo>x</foo>", text("<foo>x</foo>"))
-        assertEquals("<b>still streaming", text("<b>still streaming"))
+        // an unclosed tag while a reply streams styles what follows; its text is never lost
+        assertEquals("still streaming", text("<b>still streaming"))
         assertEquals("a < b and c > d", text("a < b and c > d"))
         assertEquals("&unknown; &;", text("&unknown; &;"))
     }
