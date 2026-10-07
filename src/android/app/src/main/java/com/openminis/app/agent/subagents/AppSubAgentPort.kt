@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import com.openminis.app.ui.chat.enqueuePrompt
 
 /**
  * The app side of [SubAgentPort]: child sessions are ordinary sessions driven through [AgentRunner]

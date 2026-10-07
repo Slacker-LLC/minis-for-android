@@ -9,6 +9,7 @@ import com.openminis.app.remote.ChatTitleNormalizer
 import com.openminis.app.ui.chat.InputAttachment
 import org.json.JSONObject
 import java.io.File
+import com.openminis.app.ui.chat.sendMessage
 
 /**
  * Mutation handlers for `chat.*` RPC methods — Phase 2.

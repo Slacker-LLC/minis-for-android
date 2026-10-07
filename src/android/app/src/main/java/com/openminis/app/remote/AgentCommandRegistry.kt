@@ -12,6 +12,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import com.openminis.app.ui.chat.clearChat
+import com.openminis.app.ui.chat.toggleMemoryForCommand
+import com.openminis.app.ui.chat.toggleThinkingForCommand
 
 /**
  * Single Android-authoritative slash-command registry for the Web Remote

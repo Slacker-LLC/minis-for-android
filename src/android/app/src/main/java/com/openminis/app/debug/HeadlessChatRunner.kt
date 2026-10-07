@@ -21,6 +21,16 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
+import com.openminis.app.ui.chat.assistantMessageIdForToolBlock
+import com.openminis.app.ui.chat.cancelStream
+import com.openminis.app.ui.chat.compactBefore
+import com.openminis.app.ui.chat.rerunFromToolBlock
+import com.openminis.app.ui.chat.retryFromMessage
+import com.openminis.app.ui.chat.revertCompact
+import com.openminis.app.ui.chat.runCompactNow
+import com.openminis.app.ui.chat.selectEntry
+import com.openminis.app.ui.chat.setThinkingLevel
+import com.openminis.app.ui.chat.submitPrompt
 
 /**
  * Headless wrapper around [ChatViewModel] for the debug RPC layer.

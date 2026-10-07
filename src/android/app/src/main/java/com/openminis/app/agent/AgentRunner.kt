@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import com.openminis.app.ui.chat.acceptExternalMessage
+import com.openminis.app.ui.chat.awaitStreamExit
 
 /**
  * Product-facing agent execution seam.
