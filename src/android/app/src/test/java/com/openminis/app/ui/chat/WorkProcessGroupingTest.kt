@@ -62,16 +62,14 @@ class WorkProcessGroupingTest {
     }
 
     @Test
-    fun `text between tool calls stays inside the one turn row`() {
+    fun `text between tool calls ends a run and is shown as itself`() {
         val entries = grouped(
             listOf(thinking("t1"), tool("a"), text("x"), tool("b"), thinking("t2")),
         )
-        // [T-android-turn-work] One row for the whole turn: a question answered after two tool
-        // calls used to produce two rows and two durations. Text the model wrote between calls is
-        // narration and belongs inside the row (the panel renders it between the steps); only the
-        // trailing text after the last call is the answer, and here there is none.
-        assertEquals(1, entries.size)
-        assertEquals(listOf("t1", "a", "x", "b", "t2"), processes(entries).single().blocks.map { it.id })
+        assertEquals(3, entries.size)
+        assertEquals(listOf("t1", "a"), (entries[0] as AssistantTurnEntry.Process).process.blocks.map { it.id })
+        assertEquals("x", (entries[1] as AssistantTurnEntry.Single).block.id)
+        assertEquals(listOf("b", "t2"), (entries[2] as AssistantTurnEntry.Process).process.blocks.map { it.id })
     }
 
     @Test

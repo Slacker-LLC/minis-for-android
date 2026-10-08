@@ -319,14 +319,17 @@ internal sealed interface AssistantTurnEntry {
  * its own (thinking blocks are filtered later by the renderer, exactly as
  * before this change).
  *
- * [StepsPresentation.GROUPED] collapses a whole turn into ONE [WorkProcess]:
- * everything up to and including the last tool call, plus the narration the
- * model wrote between calls. The trailing text after that last call is the
- * turn's answer and stays outside the row. Codex splits a turn the same way
- * (work items collapse into one header, the AgentMessage does not), and this
- * app has to do it per message because the transcript already merges a turn's
- * assistant rows into one. Folding each text-interrupted run instead produced a
- * separate "用时 Ns" row per run - several durations for one question.
+ * [StepsPresentation.GROUPED] folds each maximal run of thinking + tool blocks into one [WorkProcess]
+ * row and leaves everything the model wrote in between where it happened, as ordinary visible text.
+ * That is how the agents this one is measured against show a turn: Codex keeps its commentary
+ * messages in the thread between the collapsed work groups, and Claude Code prints the text between
+ * tool calls. Folding the model's own sentences ("let me check X first") away with the tool calls hid
+ * what it said about what it was doing the moment the turn finished.
+ *
+ * The turn's clock belongs to the last run (the one next to the answer): it is the only row that
+ * reports a duration from the turn's own timestamps, and the only one that stays open while the turn
+ * is live. Earlier runs are finished by definition - the model went on to write something after them -
+ * and, if their steps carried timings, report their own.
  *
  * [thinkingVisible] mirrors the T300 rule: when the user turned Deep Thinking
  * off, thinking blocks render nothing, so in grouped mode they must not create
@@ -345,36 +348,40 @@ internal fun buildAssistantTurnEntries(
         return blocks.mapIndexed { index, block -> AssistantTurnEntry.Single(index, block) }
     }
 
-    // Everything up to the last work block belongs to the row; the text after it is the answer.
-    val lastWorkIndex = blocks.indexOfLast { block ->
-        isWorkProcessBlock(block) && (block.kind != THINKING_KIND || thinkingVisible)
-    }
-    if (lastWorkIndex < 0) {
-        // Nothing the agent did - every block is answer text.
-        return blocks.mapIndexed { index, block -> AssistantTurnEntry.Single(index, block) }
-    }
-    // Hidden thinking (Deep Thinking off) renders nothing, so it must not pad the row either.
-    val workBlocks = blocks.subList(0, lastWorkIndex + 1).filter { block ->
-        block.kind != THINKING_KIND || thinkingVisible
-    }
+    fun counts(block: AssistantBlock) = isWorkProcessBlock(block) && (block.kind != THINKING_KIND || thinkingVisible)
+    val lastWorkIndex = blocks.indexOfLast(::counts)
     val entries = mutableListOf<AssistantTurnEntry>()
-    entries.add(
-        AssistantTurnEntry.Process(
-            WorkProcess(
-                // Anchored on the first block so the row keeps the same
-                // LazyColumn key while the run grows, matching the
-                // key-stability rule the streaming rows depend on.
-                id = "$messageId:" + workBlocks.first().id,
-                blocks = workBlocks.toList(),
-                messageCreatedAtMs = messageCreatedAtMs,
-                messageUpdatedAtMs = messageUpdatedAtMs,
-                turnLive = turnLive,
+    var run = mutableListOf<AssistantBlock>()
+    fun flush(last: Boolean) {
+        if (run.isEmpty()) return
+        entries.add(
+            AssistantTurnEntry.Process(
+                WorkProcess(
+                    // Anchored on the first block so the row keeps the same LazyColumn key while the run
+                    // grows, matching the key-stability rule the streaming rows depend on.
+                    id = "$messageId:" + run.first().id,
+                    blocks = run.toList(),
+                    messageCreatedAtMs = if (last) messageCreatedAtMs else 0L,
+                    messageUpdatedAtMs = if (last) messageUpdatedAtMs else null,
+                    turnLive = last && turnLive,
+                ),
             ),
-        ),
-    )
-    for (index in (lastWorkIndex + 1) until blocks.size) {
-        entries.add(AssistantTurnEntry.Single(index, blocks[index]))
+        )
+        run = mutableListOf()
     }
+    blocks.forEachIndexed { index, block ->
+        when {
+            counts(block) -> run.add(block)
+            // Hidden thinking (Deep Thinking off) renders nothing, so it neither pads a run nor ends one.
+            block.kind == THINKING_KIND -> if (index > lastWorkIndex) entries.add(AssistantTurnEntry.Single(index, block))
+            else -> {
+                // A run ends where the model wrote something; it is the turn's last run when no work follows.
+                flush(last = index > lastWorkIndex)
+                entries.add(AssistantTurnEntry.Single(index, block))
+            }
+        }
+    }
+    flush(last = true)
     return entries
 }
 

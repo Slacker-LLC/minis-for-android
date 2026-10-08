@@ -69,4 +69,29 @@ class RuntimePermissionGranterTest {
         )
         assertEquals(1, plan.size)
     }
+
+    @Test
+    fun `every special access the manifest declares goes through its app-op`() {
+        val declared = SpecialAccess.entries.map { Declared(it.permission, dangerous = false) }
+        val plan = RuntimePermissionGranter.plan(pkg, declared)
+        assertEquals(
+            SpecialAccess.entries.map { listOf("cmd", "appops", "set", pkg, it.appOp, "allow") },
+            plan,
+        )
+        assertTrue(plan.any { it.contains("GET_USAGE_STATS") && it.contains("allow") })
+    }
+
+    @Test
+    fun `battery and data-saver exemptions are fixed commands for this package and uid only`() {
+        assertEquals(
+            listOf(
+                listOf("cmd", "deviceidle", "whitelist", "+$pkg"),
+                listOf("cmd", "netpolicy", "add", "restrict-background-whitelist", "10234"),
+            ),
+            RuntimePermissionGranter.exemptionPlan(pkg, 10234),
+        )
+        assertTrue(RuntimePermissionGranter.exemptionPlan("evil; reboot", 10234).isEmpty())
+        assertTrue(RuntimePermissionGranter.exemptionPlan(pkg, 0).isEmpty())
+        assertTrue(RuntimePermissionGranter.exemptionPlan(pkg, -5).isEmpty())
+    }
 }
