@@ -737,7 +737,7 @@ internal suspend fun ChatViewModel.runRerunStreamTail(
                 request?.record(AgentTurnOutcome.Failed(e.message ?: "Unknown error"))
                 AppLogger.error(TAG_STREAM, "$label runAgentLoop EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                 Log.e(TAG, "Agent loop error ($label)", e)
-                setInlineError(e.message ?: "Unknown error")
+                setInlineError(e)
                 // T298: flag the upcoming setInactive() so the
                 // background completion notifier renders the ❌
                 // variant instead of a clean success.

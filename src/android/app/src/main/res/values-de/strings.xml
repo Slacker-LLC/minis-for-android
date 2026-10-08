@@ -2179,4 +2179,15 @@
     <string name="queued_delivery_queue">Wird nach Abschluss der Aufgabe gesendet</string>
     <string name="queued_delivery_switch_to_queue">Danach senden</string>
     <string name="queued_delivery_switch_to_steer">Jetzt lenken</string>
+    <string name="llm_err_auth">Der Anbieter hat den API-Schlüssel abgelehnt (401/403). Prüfe den Schlüssel unter Einstellungen → Anbieter.</string>
+    <string name="llm_err_rate_limit">Zu viele Anfragen oder das Kontingent ist aufgebraucht (429). Warte einen Moment oder wechsle das Modell.</string>
+    <string name="llm_err_network">Der Anbieter ist nicht erreichbar. Prüfe das Netzwerk und versuche es erneut.</string>
+    <string name="llm_err_server">Der Server des Anbieters hat ein vorübergehendes Problem (%1$s). Versuche es gleich noch einmal.</string>
+    <string name="llm_err_bad_request">Der Anbieter hat die Anfrage abgelehnt (400). Meist liegt es an Modellname, Denkstufe, einem Anhang oder einer zu langen Unterhaltung.</string>
+    <string name="llm_err_not_found">Modell oder Adresse nicht gefunden (404). Prüfe Modellname und Endpunkt unter Einstellungen → Anbieter.</string>
+    <string name="llm_err_too_large">Die Anfrage ist für den Anbieter zu groß (413). Kürze die Unterhaltung oder entferne große Anhänge.</string>
+    <string name="llm_err_rejected">Der Anbieter hat die Anfrage abgelehnt (%1$s).</string>
+    <string name="llm_err_decoding">Die Antwort des Anbieters konnte nicht gelesen werden. Versuche es erneut.</string>
+    <string name="llm_err_detail">Details: %1$s</string>
+    <string name="compact_failed">Komprimierung fehlgeschlagen: %1$s</string>
 </resources>

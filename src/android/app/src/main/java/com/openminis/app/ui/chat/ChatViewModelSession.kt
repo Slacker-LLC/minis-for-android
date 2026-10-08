@@ -540,6 +540,7 @@ internal fun ChatViewModel.loadSession() {
             val shape = InterruptedTailDetector.classify(lastEntry)
             if (shape != InterruptedTailShape.NONE) {
                 _canResume.value = true
+                _resumeAfterCrash.value = com.openminis.app.diagnostics.LaunchCycleBeacon.lastCycleWasCrash
                 Log.i(TAG, "loadSession: detected interrupted agent loop, canResume=true (shape=$shape)")
             }
         }

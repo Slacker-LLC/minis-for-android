@@ -38,7 +38,7 @@ internal fun QuoteCard(
     modifier: Modifier = Modifier,
     onRemove: (() -> Unit)? = null,
 ) {
-    val bar = ChatColors.warn
+    val bar = MaterialTheme.colorScheme.primary
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))

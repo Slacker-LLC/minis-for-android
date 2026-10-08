@@ -213,45 +213,24 @@ internal object CompactionPlanner {
      * iconKind in toolBlocks[0].toolName.
      */
     fun markCompacted(messages: List<ChatMessage>, cutoffId: String): Divided {
-        var passedCutoff = false   // anchor is guaranteed non-null in v2
-        val cleaned = messages
-            .filterNot { msg ->
-                // Drop prior compact-divider rows; appendSystemInfo
-                // below will re-add the new one.
-                msg.role == "system" &&
-                    msg.toolBlocks.firstOrNull()?.toolName == "compact"
-            }
-            .map { msg ->
-                if (msg.role == "system") msg
-                else if (passedCutoff) msg
-                else {
-                    val grayed = if (msg.isCompactedHistory) msg
-                        else msg.copy(isCompactedHistory = true)
-                    if (msg.id == cutoffId) passedCutoff = true
-                    grayed
-                }
-            }
-        // T84: count UI bubbles in this pass's compacted range.
-        // Filters: role != system (dividers/notices don't count).
-        // Range: everything up to and including the cutoff row,
-        // since the kept-tail starts immediately after.
-        // Falls back to "all non-system" when cutoffId is null
-        // (compact-everything path), matching iOS dividerInsertIdx
-        // == messages.count behavior.
-        //
-        // We deliberately do NOT exclude `isCompactedHistory` rows.
-        // Back-to-back compacts (or compact after restoring a prior
-        // marker on session reload) leave the in-range rows already
-        // grayed; excluding them produced "0 messages compacted"
-        // even though `toCompact.size` was nonzero. The divider's
-        // count should reflect the size of THIS pass's range, not
-        // the delta of newly-grayed rows.
-        val cutoffIdx = cleaned.indexOfLast { it.id == cutoffId }
-        val compactedUICount = if (cutoffIdx < 0) {
-            cleaned.count { it.role != "system" }
-        } else {
-            cleaned.take(cutoffIdx + 1).count { it.role != "system" }
+        val withoutDividers = messages.filterNot { msg ->
+            // Drop prior compact-divider rows; appendSystemInfo below will re-add the new one.
+            msg.role == "system" && msg.toolBlocks.firstOrNull()?.toolName == "compact"
         }
+        // The cutoff is a stored message id. One bubble can stand for several stored rows (an assistant turn
+        // with its tool calls), so a bubble also matches through the ids it was built from. When nothing
+        // matches, nothing is grayed: graying the whole list for a cutoff that cannot be found hides the
+        // conversation the compaction just kept.
+        val cutoffIdx = withoutDividers.indexOfLast { it.id == cutoffId || cutoffId in it.sourceDbIds }
+        val cleaned = if (cutoffIdx < 0) {
+            withoutDividers
+        } else {
+            withoutDividers.mapIndexed { idx, msg ->
+                if (idx > cutoffIdx || msg.role == "system" || msg.isCompactedHistory) msg
+                else msg.copy(isCompactedHistory = true)
+            }
+        }
+        val compactedUICount = if (cutoffIdx < 0) 0 else cleaned.take(cutoffIdx + 1).count { it.role != "system" }
         return Divided(cleaned, compactedUICount)
     }
 }
