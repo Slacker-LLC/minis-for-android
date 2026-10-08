@@ -1458,7 +1458,7 @@
     <string name="chat_message_large_export">Export to file</string>
     <string name="chat_message_large_export_ok">Exported</string>
     <string name="chat_stream_degraded_notice">Performance protection: simplified rendering while streaming</string>
-    <string name="chat_resume_crash_warning">Last time this app became unresponsive while streaming. Tap again to resume anyway.</string>
+    <string name="chat_resume_crash_warning">The app became unresponsive while this reply was streaming. Resuming may stall again.</string>
     <string name="chat_message_large_export_fail">Export failed</string>
     <!-- T-android-update-check-403-hint — friendly update-check failure hints -->
     <string name="update_error_network_unreachable">Couldn\'t reach the update server. Check your network and try again.</string>
@@ -2507,4 +2507,15 @@
     <string name="queued_delivery_queue">Will be sent when the task is done</string>
     <string name="queued_delivery_switch_to_queue">Send when done</string>
     <string name="queued_delivery_switch_to_steer">Guide now</string>
+    <string name="llm_err_auth">The provider rejected the API key (401/403). Check the key under Settings → Providers.</string>
+    <string name="llm_err_rate_limit">Too many requests or the quota is used up (429). Wait a moment, or switch to another model.</string>
+    <string name="llm_err_network">Could not reach the provider. Check your network and try again.</string>
+    <string name="llm_err_server">The provider\'s server had a temporary problem (%1$s). Try again in a moment.</string>
+    <string name="llm_err_bad_request">The provider refused the request (400). Usually something it does not accept: the model name, the thinking level, an attachment, or a conversation that is too long.</string>
+    <string name="llm_err_not_found">Model or address not found (404). Check the model name and endpoint under Settings → Providers.</string>
+    <string name="llm_err_too_large">The request is too large for the provider (413). Shorten the conversation or remove large attachments.</string>
+    <string name="llm_err_rejected">The provider rejected the request (%1$s).</string>
+    <string name="llm_err_decoding">The provider\'s reply could not be read. Try again.</string>
+    <string name="llm_err_detail">Details: %1$s</string>
+    <string name="compact_failed">Compaction failed: %1$s</string>
 </resources>

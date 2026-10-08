@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -174,6 +175,7 @@ internal fun ChatMessageList(
     val generatingMessageId by generatingMessageIdState
     val replySpeechState by replySpeechStateState
     val canResume by canResumeState
+    val resumeAfterCrash by viewModel.resumeAfterCrash.collectAsState()
     val compactProgress by compactProgressState
     val error by errorState
     val inputText by inputTextState
@@ -304,7 +306,7 @@ internal fun ChatMessageList(
         }
         if (canResume && !isStreaming && error == null && !lastAssistantHasError) {
             item(key = "__resume_banner__", contentType = "resume_banner") {
-                ResumeBanner(onResume = {
+                ResumeBanner(showCrashWarning = resumeAfterCrash, onResume = {
                     viewModel.resume()
                     // T282: same dual-scroll trick as the regular
                     // send paths (T281). Resume kicks off a fresh

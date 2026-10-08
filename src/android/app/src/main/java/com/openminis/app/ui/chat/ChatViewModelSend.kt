@@ -129,7 +129,7 @@ internal suspend fun ChatViewModel.injectQueuedPromptsAsNewTurn(
         if (prompt.text.isNotEmpty()) {
             if (combinedText.isNotEmpty()) combinedText.append("\n\n")
             combinedText.append(prompt.text)
-            combinedParts.add(AgentContentPart.Text(prompt.text))
+            combinedParts.add(AgentContentPart.Text(expandPastePlaceholders(prompt.text, _pastedTexts.value).first))
         }
     }
     prepared.imageParts.forEachIndexed { idx, part ->
@@ -292,7 +292,7 @@ internal suspend fun ChatViewModel.drainQueuedPrompts(
             if (prompt.text.isNotEmpty()) {
                 if (combinedText.isNotEmpty()) combinedText.append("\n\n")
                 combinedText.append(prompt.text)
-                combinedParts.add(AgentContentPart.Text(prompt.text))
+                combinedParts.add(AgentContentPart.Text(expandPastePlaceholders(prompt.text, _pastedTexts.value).first))
             }
         }
         prepared.imageParts.forEachIndexed { idx, part ->
@@ -339,7 +339,7 @@ internal suspend fun ChatViewModel.drainQueuedPrompts(
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "Agent loop (queued-drain) error", e)
-            setInlineError(e.message ?: "Unknown error")
+            setInlineError(e)
             return AgentTurnOutcome.Failed(e.message ?: "queued_turn_failed")
         }
     }
@@ -434,6 +434,7 @@ internal fun ChatViewModel.sendMessage(
     // A fresh send supersedes any pending resume — mirror iOS which clears
     // canResume at the top of send().
     _canResume.value = false
+    _resumeAfterCrash.value = false
     // T185: clear the share-injected flag the moment the user actually
     // sends. Without this, the "Move to…" capsule (gated on
     // hasInjectedShareContent) keeps floating over the user-message row
@@ -543,7 +544,9 @@ internal fun ChatViewModel.sendMessage(
         // to bytes. Trailing <user-attached-files> XML block lets the
         // model see filenames/sizes without needing tool calls.
         val userContentParts = mutableListOf<AgentContentPart>()
-        if (trimmed.isNotEmpty()) userContentParts.add(AgentContentPart.Text(trimmed))
+        // The model gets the pasted bodies expanded; the composer text keeps its [Pasted#N] markers.
+        val bodyText = pasted?.modelText ?: trimmed
+        if (bodyText.isNotEmpty()) userContentParts.add(AgentContentPart.Text(bodyText))
         imageParts.forEachIndexed { idx, part ->
             val path = prepared.imageUploadPaths.getOrNull(idx)
             if (path != null) userContentParts.add(AgentContentPart.Text("[attached image: $path]"))
@@ -641,7 +644,7 @@ internal fun ChatViewModel.sendMessage(
                     acceptedTurn.record(AgentTurnOutcome.Failed(e.message ?: "Unknown error"))
                     AppLogger.error(TAG_STREAM, "send runAgentLoop EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                     Log.e(TAG, "Agent loop error (all fallbacks exhausted)", e)
-                    setInlineError(e.message ?: "Unknown error")
+                    setInlineError(e)
                     // T298: completion notifier should show the ❌ variant.
                     SessionActivityTracker.markStreamError(activeSessionId)
                 } finally {
@@ -1001,7 +1004,7 @@ fun ChatViewModel.retryLast() {
                 } catch (e: Exception) {
                     AppLogger.error(TAG_STREAM, "retryLast runAgentLoop EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                     Log.e(TAG, "Agent loop error (retryLast)", e)
-                    setInlineError(e.message ?: "Unknown error")
+                    setInlineError(e)
                     // T298: completion notifier should show the ❌ variant.
                     SessionActivityTracker.markStreamError(activeSessionId)
                 } finally {

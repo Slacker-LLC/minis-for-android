@@ -2075,4 +2075,15 @@
     <string name="queued_delivery_queue">Sera envoyé une fois la tâche terminée</string>
     <string name="queued_delivery_switch_to_queue">Envoyer après</string>
     <string name="queued_delivery_switch_to_steer">Guider maintenant</string>
+    <string name="llm_err_auth">Le fournisseur a refusé la clé API (401/403). Vérifiez la clé dans Réglages → Fournisseurs.</string>
+    <string name="llm_err_rate_limit">Trop de requêtes ou quota épuisé (429). Patientez un instant ou changez de modèle.</string>
+    <string name="llm_err_network">Impossible de joindre le fournisseur. Vérifiez le réseau et réessayez.</string>
+    <string name="llm_err_server">Le serveur du fournisseur rencontre un problème temporaire (%1$s). Réessayez dans un instant.</string>
+    <string name="llm_err_bad_request">Le fournisseur a refusé la requête (400). Souvent à cause du nom du modèle, du niveau de réflexion, d\'une pièce jointe ou d\'une conversation trop longue.</string>
+    <string name="llm_err_not_found">Modèle ou adresse introuvable (404). Vérifiez le nom du modèle et le point d\'accès dans Réglages → Fournisseurs.</string>
+    <string name="llm_err_too_large">La requête est trop volumineuse pour le fournisseur (413). Raccourcissez la conversation ou retirez les grosses pièces jointes.</string>
+    <string name="llm_err_rejected">Le fournisseur a rejeté la requête (%1$s).</string>
+    <string name="llm_err_decoding">La réponse du fournisseur est illisible. Réessayez.</string>
+    <string name="llm_err_detail">Détails : %1$s</string>
+    <string name="compact_failed">Échec de la compaction : %1$s</string>
 </resources>

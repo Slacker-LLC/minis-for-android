@@ -899,7 +899,7 @@ internal fun rememberBrowserLiveSnapshot(
  * the same on both themes).
  */
 @Composable
-internal fun ResumeBanner(onResume: () -> Unit) {
+internal fun ResumeBanner(showCrashWarning: Boolean, onResume: () -> Unit) {
     // [T-android-c3a-resume-one-tap] Crash-aware resume. When the previous app
     // cycle ended in crash_or_stall we surface a one-line warning as CONTEXT
     // (the user is about to re-enter the load that killed the last cycle), but
@@ -907,7 +907,6 @@ internal fun ResumeBanner(onResume: () -> Unit) {
     // is itself an explicit user action, so it resumes in one tap. (Previously
     // the first tap only armed the warning and a second tap was required; that
     // extra confirm was friction on an already-explicit gesture.)
-    val showCrashWarning = com.openminis.app.diagnostics.LaunchCycleBeacon.lastCycleWasCrash
     // In the chat's own voice: a quiet line of grey text (red for a crash) and one capsule button, the same
     // capsule the send hint uses. Not a coloured alert box with a warning triangle.
     Row(

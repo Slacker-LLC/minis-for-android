@@ -608,6 +608,10 @@ class ChatViewModel(
     internal val _canResume = MutableStateFlow(false)
     val canResume: StateFlow<Boolean> = _canResume.asStateFlow()
 
+    /** The resume offered now follows a crash or stall of the previous app run, not a stop in this one. */
+    internal val _resumeAfterCrash = MutableStateFlow(false)
+    val resumeAfterCrash: StateFlow<Boolean> = _resumeAfterCrash.asStateFlow()
+
     /**
      * T187: id of a user message currently being re-edited via the
      * long-press → Edit context menu. While non-null, the composer

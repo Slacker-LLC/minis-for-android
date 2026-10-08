@@ -2176,4 +2176,15 @@
     <string name="queued_delivery_queue">タスク完了後に送信されます</string>
     <string name="queued_delivery_switch_to_queue">完了後に送る</string>
     <string name="queued_delivery_switch_to_steer">今すぐ誘導</string>
+    <string name="llm_err_auth">プロバイダーが API キーを拒否しました（401/403）。「設定 → プロバイダー」でキーを確認してください。</string>
+    <string name="llm_err_rate_limit">リクエストが多すぎるか、利用枠を使い切りました（429）。少し待つか、別のモデルに切り替えてください。</string>
+    <string name="llm_err_network">プロバイダーに接続できません。ネットワークを確認して再試行してください。</string>
+    <string name="llm_err_server">プロバイダーのサーバーで一時的な問題が発生しました（%1$s）。しばらくしてから再試行してください。</string>
+    <string name="llm_err_bad_request">プロバイダーがリクエストを拒否しました（400）。モデル名、思考レベル、添付ファイル、会話が長すぎることなどが原因のことが多いです。</string>
+    <string name="llm_err_not_found">モデルまたはアドレスが見つかりません（404）。「設定 → プロバイダー」でモデル名とエンドポイントを確認してください。</string>
+    <string name="llm_err_too_large">リクエストがプロバイダーの上限を超えています（413）。会話を短くするか、大きな添付ファイルを外してください。</string>
+    <string name="llm_err_rejected">プロバイダーがリクエストを拒否しました（%1$s）。</string>
+    <string name="llm_err_decoding">プロバイダーの応答を読み取れませんでした。再試行してください。</string>
+    <string name="llm_err_detail">詳細：%1$s</string>
+    <string name="compact_failed">会話の圧縮に失敗しました：%1$s</string>
 </resources>

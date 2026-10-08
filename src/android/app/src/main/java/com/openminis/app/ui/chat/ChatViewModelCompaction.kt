@@ -290,7 +290,7 @@ internal inline fun ChatViewModel.compactAllImpl(
             Log.w(TAG, "Compact failed", e)
             withContext(Dispatchers.Main) {
                 appendSystemInfo(
-                    text = "Compaction failed: ${e.message ?: e.javaClass.simpleName}",
+                    text = context.getString(R.string.compact_failed, LLMErrorPresenter.summary(context, e).ifBlank { e.javaClass.simpleName }),
                     iconKind = "compact",
                 )
             }

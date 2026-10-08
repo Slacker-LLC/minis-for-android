@@ -2396,4 +2396,15 @@
     <string name="queued_delivery_queue">Будет отправлено после завершения задачи</string>
     <string name="queued_delivery_switch_to_queue">Отправить после</string>
     <string name="queued_delivery_switch_to_steer">Направить сейчас</string>
+    <string name="llm_err_auth">Провайдер отклонил API-ключ (401/403). Проверьте ключ в Настройки → Провайдеры.</string>
+    <string name="llm_err_rate_limit">Слишком много запросов или исчерпана квота (429). Подождите немного или выберите другую модель.</string>
+    <string name="llm_err_network">Не удаётся связаться с провайдером. Проверьте сеть и повторите попытку.</string>
+    <string name="llm_err_server">На сервере провайдера временная неполадка (%1$s). Повторите чуть позже.</string>
+    <string name="llm_err_bad_request">Провайдер отклонил запрос (400). Чаще всего причина в названии модели, уровне размышления, вложении или слишком длинной беседе.</string>
+    <string name="llm_err_not_found">Модель или адрес не найдены (404). Проверьте название модели и адрес в Настройки → Провайдеры.</string>
+    <string name="llm_err_too_large">Запрос слишком велик для провайдера (413). Сократите беседу или уберите большие вложения.</string>
+    <string name="llm_err_rejected">Провайдер отклонил запрос (%1$s).</string>
+    <string name="llm_err_decoding">Не удалось прочитать ответ провайдера. Повторите попытку.</string>
+    <string name="llm_err_detail">Подробности: %1$s</string>
+    <string name="compact_failed">Не удалось сжать беседу: %1$s</string>
 </resources>

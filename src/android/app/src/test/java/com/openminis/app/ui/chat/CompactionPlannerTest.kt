@@ -99,9 +99,17 @@ class CompactionPlannerTest {
     }
 
     @Test
-    fun `a cutoff that is not in the list counts every non system row`() {
+    fun `a cutoff that is not in the list grays nothing`() {
         val out = CompactionPlanner.markCompacted(listOf(row("u1"), row("a1", "assistant")), "missing")
+        assertEquals(0, out.compactedUiCount)
+        assertTrue(out.messages.none { it.isCompactedHistory })
+    }
+
+    @Test
+    fun `a cutoff stored inside a merged bubble grays up to that bubble only`() {
+        val merged = row("a1", "assistant").copy(sourceDbIds = listOf("db-a1", "db-a1-tool", "db-a1-final"))
+        val out = CompactionPlanner.markCompacted(listOf(row("u1"), merged, row("u2"), row("a2", "assistant")), "db-a1-tool")
+        assertEquals(listOf(true, true, false, false), out.messages.map { it.isCompactedHistory })
         assertEquals(2, out.compactedUiCount)
-        assertTrue(out.messages.all { it.isCompactedHistory })
     }
 }

@@ -174,8 +174,9 @@ internal class UserAttachmentPreparer(
             "attachments/uploads",
         ).apply { mkdirs() }
         // Metadata captured per attachment for the <user-attached-files> XML.
-        data class UploadMeta(val linuxPath: String, val size: Long, val modifiedIso: String)
+        data class UploadMeta(val linuxPath: String, val size: Long, val modifiedIso: String, val body: InlineText?)
         val metas = mutableListOf<UploadMeta>()
+        var inlineBudget = INLINE_TEXT_TOTAL_CHARS
         val nowMs = System.currentTimeMillis()
         val isoFormatter = java.text.SimpleDateFormat(
             "yyyy-MM-dd'T'HH:mm:ss'Z'",
@@ -237,7 +238,7 @@ internal class UserAttachmentPreparer(
                 val linuxPath = if (uploadOk) "/var/minis/attachments/uploads/$safeName" else null
                 if (linuxPath != null) {
                     imageUploadPaths.add(linuxPath)
-                    metas.add(UploadMeta(linuxPath = linuxPath, size = rawBytes.size.toLong(), modifiedIso = nowStr))
+                    metas.add(UploadMeta(linuxPath = linuxPath, size = rawBytes.size.toLong(), modifiedIso = nowStr, body = null))
                 }
 
                 imageParts.add(LLMMessage.ImagePart(inferenceBytes, attachment.mimeType, linuxPath = linuxPath))
@@ -297,7 +298,14 @@ internal class UserAttachmentPreparer(
             }
 
             val linuxPath = "/var/minis/attachments/uploads/$safeName"
-            metas.add(UploadMeta(linuxPath = linuxPath, size = dest.length(), modifiedIso = nowStr))
+            // A text file's head goes to the model with the message; a binary or oversize one stays
+            // metadata-only, and the model reads it from linuxPath when it needs more.
+            val body = if (inlineBudget > 0 && isTextLikeAttachment(attachment.fileName, attachment.mimeType)) {
+                readInlineText(dest, minOf(INLINE_TEXT_PER_FILE_CHARS, inlineBudget))?.also { inlineBudget -= it.text.length }
+            } else {
+                null
+            }
+            metas.add(UploadMeta(linuxPath = linuxPath, size = dest.length(), modifiedIso = nowStr, body = body))
         }
 
         // T-imgsize: byte-level budget enforcement. The resizeImageBytes pass
@@ -337,9 +345,9 @@ internal class UserAttachmentPreparer(
         }
 
         // Build the <user-attached-files> XML block (iOS parity). One <file>
-        // per attachment (image and non-image) that successfully landed in
-        // the iSH uploads dir — gives the model a metadata-only inventory
-        // it can resolve via shell tools when content is needed.
+        // per attachment that landed in the iSH uploads dir. Text files carry
+        // their head inside the element; everything else is an inventory
+        // entry the model can resolve via shell tools.
         val xml = if (metas.isEmpty()) null else buildString {
             append("<user-attached-files>\n")
             for (m in metas) {
@@ -352,7 +360,17 @@ internal class UserAttachmentPreparer(
                 append(m.size)
                 append("\" modified=\"")
                 append(m.modifiedIso)
-                append("\" />\n")
+                val body = m.body
+                if (body == null) {
+                    append("\" />\n")
+                } else {
+                    append("\">\n")
+                    if (body.truncated) {
+                        append("[truncated: the first ${body.text.length} characters are shown; the file is ${body.totalBytes} bytes. Read the rest from ${m.linuxPath} with a tool.]\n")
+                    }
+                    append(escapeInlineBody(body.text))
+                    append("\n  </file>\n")
+                }
             }
             append("</user-attached-files>")
         }

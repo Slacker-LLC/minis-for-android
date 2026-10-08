@@ -200,7 +200,7 @@ internal fun ChatViewModel.resumeQueueAfterCancel() {
                 } catch (e: Exception) {
                     AppLogger.error(TAG_STREAM, "resumeQueueAfterCancel drain EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                     Log.e(TAG, "Queued drain error (resumeQueueAfterCancel)", e)
-                    setInlineError(e.message ?: "Unknown error")
+                    setInlineError(e)
                 } finally {
                     AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel streamJob FINALLY enter")
                     // [T-android-overlay-reply-status-34599] Surface
@@ -447,6 +447,7 @@ fun ChatViewModel.resume() {
         return
     }
     _canResume.value = false
+    _resumeAfterCrash.value = false
     _error.value = null
     // [T-error-persist-android] resume() follows finalizeAtTurnLimit's
     // setInlineError (which persisted an error sticker on the last assistant
@@ -525,7 +526,7 @@ fun ChatViewModel.resume() {
                 } catch (e: Exception) {
                     AppLogger.error(TAG_STREAM, "resume runAgentLoop EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                     Log.e(TAG, "Agent loop error (resume)", e)
-                    setInlineError(e.message ?: "Unknown error")
+                    setInlineError(e)
                 } finally {
                     AppLogger.info(TAG_STREAM, "resume streamJob FINALLY enter")
                     // [T-android-overlay-reply-status-34599] Surface
