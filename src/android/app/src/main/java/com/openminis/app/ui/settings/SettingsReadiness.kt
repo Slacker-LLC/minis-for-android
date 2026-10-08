@@ -47,6 +47,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.openminis.app.R
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.offload.OffloadPermissionManager
+import com.openminis.app.permissions.SpecialAccess
 import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.power.PowerOptimizationManager
 import com.openminis.app.runtime.ubuntu.RootAccess
@@ -62,6 +63,8 @@ import com.openminis.app.ui.theme.ChatColors
 enum class ReadinessId {
     ROOT, SHIZUKU, ALL_FILES, ACCESSIBILITY, OVERLAY, ASSISTANT_ROLE, BACKGROUND, NOTIFICATIONS,
     CALENDAR, LOCATION, CONTACTS, PHOTOS,
+    // The "special access" switches of Android's system settings (see SpecialAccess); all optional.
+    INSTALL_APPS, EXACT_ALARM, USAGE_STATS, FULL_SCREEN, WRITE_SETTINGS, DATA_SAVER,
 }
 
 data class ReadinessItem(val id: ReadinessId, val ok: Boolean) {
@@ -107,6 +110,16 @@ object SettingsReadiness {
         else -> emptyList()
     }
 
+    /** The special-access switch behind a readiness item, or null for the other kinds. */
+    internal fun specialAccessFor(id: ReadinessId): SpecialAccess? = when (id) {
+        ReadinessId.INSTALL_APPS -> SpecialAccess.INSTALL_APPS
+        ReadinessId.EXACT_ALARM -> SpecialAccess.EXACT_ALARM
+        ReadinessId.USAGE_STATS -> SpecialAccess.USAGE_STATS
+        ReadinessId.FULL_SCREEN -> SpecialAccess.FULL_SCREEN
+        ReadinessId.WRITE_SETTINGS -> SpecialAccess.WRITE_SETTINGS
+        else -> null
+    }
+
     /** Agent tool (Settings > Agent permissions) behind each runtime-grant item. */
     internal fun toolNameFor(id: ReadinessId): String? = when (id) {
         ReadinessId.CALENDAR -> "calendar"
@@ -138,6 +151,11 @@ object SettingsReadiness {
                 ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
             }
         }
+        for (id in ReadinessId.entries) {
+            val access = specialAccessFor(id) ?: continue
+            if (access.applies) results[id] = runCatching { access.isGranted(context) }.getOrDefault(false)
+        }
+        results[ReadinessId.DATA_SAVER] = runCatching { SpecialAccess.dataSaverExempt(context) }.getOrDefault(true)
         return assemble(results)
     }
 }
@@ -179,6 +197,12 @@ private fun ReadinessItem.subtitle(): String = stringResource(
         ReadinessId.NOTIFICATIONS -> if (ok) R.string.settings_ready_notif_ok else R.string.settings_ready_notif_bad
         ReadinessId.CALENDAR, ReadinessId.LOCATION, ReadinessId.CONTACTS, ReadinessId.PHOTOS ->
             if (ok) R.string.settings_ready_tool_ok else R.string.settings_ready_tool_bad
+        ReadinessId.INSTALL_APPS -> if (ok) R.string.settings_ready_special_ok else R.string.settings_ready_install_bad
+        ReadinessId.EXACT_ALARM -> if (ok) R.string.settings_ready_special_ok else R.string.settings_ready_alarm_bad
+        ReadinessId.USAGE_STATS -> if (ok) R.string.settings_ready_special_ok else R.string.settings_ready_usage_bad
+        ReadinessId.FULL_SCREEN -> if (ok) R.string.settings_ready_special_ok else R.string.settings_ready_fullscreen_bad
+        ReadinessId.WRITE_SETTINGS -> if (ok) R.string.settings_ready_special_ok else R.string.settings_ready_write_bad
+        ReadinessId.DATA_SAVER -> if (ok) R.string.settings_ready_special_ok else R.string.settings_ready_datasaver_bad
     },
 )
 
@@ -212,12 +236,20 @@ private fun ReadinessId.titleRes(): Int = when (this) {
     ReadinessId.LOCATION -> R.string.perm_tool_location
     ReadinessId.CONTACTS -> R.string.perm_tool_contacts
     ReadinessId.PHOTOS -> R.string.perm_tool_photos
+    ReadinessId.INSTALL_APPS -> R.string.settings_ready_install_title
+    ReadinessId.EXACT_ALARM -> R.string.settings_ready_alarm_title
+    ReadinessId.USAGE_STATS -> R.string.settings_ready_usage_title
+    ReadinessId.FULL_SCREEN -> R.string.settings_ready_fullscreen_title
+    ReadinessId.WRITE_SETTINGS -> R.string.settings_ready_write_title
+    ReadinessId.DATA_SAVER -> R.string.settings_ready_datasaver_title
 }
 
 /** Items whose button reads "Grant" (they ask for a permission); the rest send the user to a settings page. */
 private val GRANT_LABEL = setOf(
     ReadinessId.ROOT, ReadinessId.ALL_FILES, ReadinessId.OVERLAY, ReadinessId.ASSISTANT_ROLE,
     ReadinessId.CALENDAR, ReadinessId.LOCATION, ReadinessId.CONTACTS, ReadinessId.PHOTOS,
+    ReadinessId.INSTALL_APPS, ReadinessId.EXACT_ALARM, ReadinessId.USAGE_STATS,
+    ReadinessId.FULL_SCREEN, ReadinessId.WRITE_SETTINGS, ReadinessId.DATA_SAVER,
 )
 
 /** Runs the action that fixes [item]: the system page for a grant, or the app's own page. */
@@ -246,6 +278,12 @@ private fun fixReadiness(context: Context, item: ReadinessItem, onOpenBackground
             context,
             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")),
         )
+        ReadinessId.INSTALL_APPS, ReadinessId.EXACT_ALARM, ReadinessId.USAGE_STATS,
+        ReadinessId.FULL_SCREEN, ReadinessId.WRITE_SETTINGS -> {
+            val access = SettingsReadiness.specialAccessFor(item.id)!!
+            startSettings(context, access.settingsIntent(context))
+        }
+        ReadinessId.DATA_SAVER -> startSettings(context, SpecialAccess.dataSaverIntent(context))
     }
 }
 

@@ -224,15 +224,6 @@ internal fun WorkProcessRowView(
                             isThinking = true,
                             isStreaming = summary.isRunning && block.id == trailingBlockId,
                         )
-                        // [T-android-turn-work] Text the model wrote between tool calls is part
-                        // of the turn's work, not its answer - it belongs in here with the steps.
-                        "text" -> if (block.content.isNotBlank()) {
-                            OneLineNote(
-                                block = block,
-                                isThinking = false,
-                                isStreaming = summary.isRunning && block.id == trailingBlockId,
-                            )
-                        }
                         else -> if (block.kind == TOOL_USE_KIND) {
                             Column {
                                 ToolCallPill(

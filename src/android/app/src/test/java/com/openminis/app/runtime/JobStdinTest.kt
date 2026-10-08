@@ -63,6 +63,9 @@ class JobStdinTest {
     private fun runWrapped(command: String, pipe: File, stdinText: String?): String {
         val script = JobStdin.wrap(command, pipe.path)
         val process = ProcessBuilder("sh", "-c", script).redirectErrorStream(true).start()
+        // A shell that waits for a writer that never comes must fail the test, not hang the whole suite.
+        Thread { if (!process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)) process.destroyForcibly() }
+            .apply { isDaemon = true; start() }
         if (stdinText != null) Thread { pipe.outputStream().use { it.write(stdinText.toByteArray()) } }.start()
         return String(process.inputStream.readBytes()).trim()
     }
@@ -74,7 +77,8 @@ class JobStdinTest {
             val pipe = File(dir, "in")
             hostMkfifo(pipe)
             assertEquals("hello", runWrapped("cat", pipe, "hello"))
-            assertEquals("multi\nline", runWrapped("echo multi\necho line", pipe, null))
+            // the pipe has a reader (the job) and a writer (the app); a command that ignores stdin is unaffected
+            assertEquals("multi\nline", runWrapped("echo multi\necho line", pipe, ""))
             pipe.delete()
             assertEquals("still runs", runWrapped("echo still runs", pipe, null))
         } finally {

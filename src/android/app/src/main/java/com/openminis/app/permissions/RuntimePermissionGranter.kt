@@ -18,10 +18,10 @@ object RuntimePermissionGranter {
     /** A permission the manifest declares, and whether the system treats it as a runtime ("dangerous") one. */
     data class Declared(val name: String, val dangerous: Boolean)
 
-    private val SPECIAL_APPOPS = mapOf(
+    private val SPECIAL_APPOPS: Map<String, String> = mapOf(
         "android.permission.MANAGE_EXTERNAL_STORAGE" to "MANAGE_EXTERNAL_STORAGE",
         "android.permission.SYSTEM_ALERT_WINDOW" to "SYSTEM_ALERT_WINDOW",
-    )
+    ) + SpecialAccess.entries.associate { it.permission to it.appOp }
     private val NAME = Regex("[A-Za-z0-9_.]{1,200}")
 
     /** The commands to run, as argv, in order. Names that are not plain identifiers are dropped. */
@@ -37,6 +37,18 @@ object RuntimePermissionGranter {
             }
         }
         return out
+    }
+
+    /**
+     * Two exemptions that are neither permissions nor app-ops: the battery-optimisation allow-list and Data Saver's
+     * "unrestricted data" list, both of which the system keeps by package / uid.
+     */
+    internal fun exemptionPlan(packageName: String, uid: Int): List<List<String>> {
+        if (!NAME.matches(packageName) || uid <= 0) return emptyList()
+        return listOf(
+            listOf("cmd", "deviceidle", "whitelist", "+$packageName"),
+            listOf("cmd", "netpolicy", "add", "restrict-background-whitelist", uid.toString()),
+        )
     }
 
     data class Result(
@@ -61,13 +73,16 @@ object RuntimePermissionGranter {
         }
     }
 
-    /** Whether every runtime permission the manifest declares, and the two special accesses, are already granted. */
+    /** Whether every runtime permission the manifest declares, and the special accesses, are already granted. */
     fun allGranted(context: Context): Boolean = runCatching {
-        declaredPermissions(context).all { d ->
+        com.openminis.app.power.PowerOptimizationManager.isIgnoringBatteryOptimizations(context) &&
+            SpecialAccess.dataSaverExempt(context) &&
+            declaredPermissions(context).all { d ->
             when {
                 d.name == "android.permission.MANAGE_EXTERNAL_STORAGE" ->
                     android.os.Build.VERSION.SDK_INT < 30 || android.os.Environment.isExternalStorageManager()
                 d.name == "android.permission.SYSTEM_ALERT_WINDOW" -> android.provider.Settings.canDrawOverlays(context)
+                SpecialAccess.forPermission(d.name) != null -> SpecialAccess.forPermission(d.name)!!.let { !it.applies || it.isGranted(context) }
                 d.dangerous ->
                     context.checkSelfPermission(d.name) == PackageManager.PERMISSION_GRANTED
                 else -> true
@@ -76,7 +91,8 @@ object RuntimePermissionGranter {
     }.getOrDefault(false)
 
     suspend fun grantAll(context: Context): Result {
-        val commands = plan(context.packageName, declaredPermissions(context))
+        val commands = plan(context.packageName, declaredPermissions(context)) +
+            exemptionPlan(context.packageName, android.os.Process.myUid())
         var succeeded = 0
         val failed = mutableListOf<String>()
         for (argv in commands) {

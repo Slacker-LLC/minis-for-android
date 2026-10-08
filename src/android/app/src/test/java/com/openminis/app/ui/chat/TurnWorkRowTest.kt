@@ -36,7 +36,7 @@ class TurnWorkRowTest {
     )
 
     @Test
-    fun `narration, tools and an answer fold into one row plus the answer`() {
+    fun `what the model wrote between steps stays visible, in order, between the work rows`() {
         val entries = entries(
             listOf(
                 text("t1", "先跑一条命令"),
@@ -46,27 +46,36 @@ class TurnWorkRowTest {
                 text("t3", "结论：都跑完了"),
             ),
         )
-        val processes = entries.filterIsInstance<AssistantTurnEntry.Process>()
-        assertEquals("one duration line for the whole turn", 1, processes.size)
         assertEquals(
-            "every step of the turn, narration included, is inside that one row",
-            listOf("t1", "c1", "t2", "c2"),
-            processes.single().process.blocks.map { it.id },
+            "narration is shown where it happened, not folded into the work",
+            listOf("single:t1", "process:c1", "single:t2", "process:c2", "single:t3"),
+            entries.map {
+                when (it) {
+                    is AssistantTurnEntry.Single -> "single:" + it.block.id
+                    is AssistantTurnEntry.Process -> "process:" + it.process.blocks.joinToString(",") { b -> b.id }
+                }
+            },
         )
-        assertEquals(
-            "the turn's duration spans all of its steps",
-            1_500L,
-            processes.single().process.durationMs,
+    }
+
+    @Test
+    fun `only the last work row carries the turn's clock and stays open while the turn is live`() {
+        val entries = buildAssistantTurnEntries(
+            messageId = "m1",
+            blocks = listOf(tool("c1", startTimeMs = 1_000L), text("t2", "再确认一下"), tool("c2", startTimeMs = 2_000L), text("t3", "结论")),
+            presentation = StepsPresentation.GROUPED,
+            thinkingVisible = true,
+            messageCreatedAtMs = 500L,
+            messageUpdatedAtMs = 9_500L,
+            turnLive = true,
         )
-        assertEquals(
-            "only the trailing text is the answer",
-            listOf("t3"),
-            entries.filterIsInstance<AssistantTurnEntry.Single>().map { it.block.id },
-        )
-        assertTrue(
-            "and it renders after the row, not inside it",
-            entries.last() is AssistantTurnEntry.Single,
-        )
+        val processes = entries.filterIsInstance<AssistantTurnEntry.Process>().map { it.process }
+        assertEquals(2, processes.size)
+        assertEquals("an earlier run is finished: the model went on to write after it", false, processes[0].turnLive)
+        assertEquals("the run next to the answer follows the turn", true, processes[1].turnLive)
+        assertEquals(0L, processes[0].messageCreatedAtMs)
+        assertEquals(500L, processes[1].messageCreatedAtMs)
+        assertEquals("an earlier run reports its own steps' time", 500L, processes[0].copy(turnLive = false).durationMs)
     }
 
     @Test
@@ -77,13 +86,13 @@ class TurnWorkRowTest {
     }
 
     @Test
-    fun `a turn that ends on a tool call keeps everything in the row`() {
+    fun `a turn that ends on a tool call has its opening sentence outside the row`() {
         val entries = entries(listOf(text("t1", "开始"), tool("c1")))
         assertEquals(1, entries.filterIsInstance<AssistantTurnEntry.Process>().size)
         assertEquals(
-            "nothing is left outside when the model never answered",
-            0,
-            entries.filterIsInstance<AssistantTurnEntry.Single>().size,
+            "the opening sentence is visible text before the work row",
+            listOf("t1"),
+            entries.filterIsInstance<AssistantTurnEntry.Single>().map { it.block.id },
         )
     }
 }

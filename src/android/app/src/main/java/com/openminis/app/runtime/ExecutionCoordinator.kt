@@ -178,8 +178,11 @@ object ExecutionCoordinator {
             return ShellJobs.JobProcess.Result(ran.exitCode, timedOut)
         }
 
-        override suspend fun writeInput(data: String, eof: Boolean): String? =
-            stdin?.write(data, eof) ?: "this job has no input pipe"
+        override suspend fun writeInput(data: String, eof: Boolean): String? {
+            // null from write() is success, so the missing pipe is decided before it, not with an elvis after it.
+            val input = stdin ?: return "this job has no input pipe"
+            return input.write(data, eof)
+        }
 
         override fun stop() {
             shell.stop()
