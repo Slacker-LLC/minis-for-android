@@ -983,10 +983,6 @@
    <string name="selection_copied_toast">已复制：%1$s</string>
    <string name="selection_copied_as_markdown_toast">已复制为 Markdown</string>
    <string name="selection_copied_as_rich_text_toast">已复制为富文本</string>
-    <string name="selection_copy_full_text">复制全文</string>
-    <string name="selection_copy_as_markdown">复制为 Markdown</string>
-    <string name="selection_copy_as_rich_text">复制为富文本</string>
-    <string name="selection_copy_as_plain_text">复制为纯文本</string>
     <!-- [T-android-markdown-table-copy-actions] 长按表格上下文菜单 -->
     <string name="markdown_table_copy_table">复制表格</string>
     <string name="markdown_table_copy_table_image">复制表格图片</string>
@@ -1484,6 +1480,10 @@
     <string name="assistant_menu_delete">删除消息</string>
     <!-- [T-android-reply-speech] -->
     <string name="reply_speech_title">AI 回复 %1$d</string>
+    <string name="selection_quote">引用</string>
+    <string name="reply_speech_selection">选中内容</string>
+    <string name="reply_speech_auto">朗读回复</string>
+    <string name="reply_speech_preparing">正在合成语音</string>
     <string name="reply_speech_reading">正在朗读</string>
     <string name="reply_speech_paused">已暂停</string>
     <string name="reply_speech_completed">已读完</string>
@@ -2412,7 +2412,6 @@
     <string name="module_settings_restart_sub">在 Minis 已经运行时才启用模块的话，点这里重启一次。</string>
     <string name="work_process_failed_only">第 %1$d 步失败</string>
     <string name="model_slot_image">图像</string>
-    <string name="selection_reply_actions">回复操作</string>
     <string name="chat_interrupted_short">已中断</string>
     <string name="queued_delivery_steer">将在下一步引导任务</string>
     <string name="queued_delivery_queue">任务完成后发送</string>

@@ -643,6 +643,9 @@ class ChatViewModel(
    internal val _attachments = MutableStateFlow<List<InputAttachment>>(emptyList())
    val attachments: StateFlow<List<InputAttachment>> = _attachments.asStateFlow()
 
+    /** Selections quoted for the next message; shown as cards above the composer, sent as a leading quote. */
+    internal val _quotedTexts = MutableStateFlow<List<String>>(emptyList())
+    val quotedTexts: StateFlow<List<String>> = _quotedTexts.asStateFlow()
     internal val _pastedTexts = MutableStateFlow<List<PastedText>>(emptyList())
     val pastedTexts: StateFlow<List<PastedText>> = _pastedTexts.asStateFlow()
     internal var nextPasteId: Int = 1

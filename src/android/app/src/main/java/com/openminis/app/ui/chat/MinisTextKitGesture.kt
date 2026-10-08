@@ -871,36 +871,10 @@ private class HandlePositionProvider(
 data class SelectionToolbarActions(
     /** Resolve the markdown source of the message that owns the active selection, or null on cross-message selections. */
     val resolveSelectionMarkdown: () -> String?,
-    /** Append the currently-selected plain text to the chat composer. Null hides the button. */
-    val onAddToInput: ((String) -> Unit)? = null,
-    /**
-     * [T-android-selection-readaloud] Speak the currently-selected plain text
-     * through Minis TTS. Null hides the button. Mirrors iOS's "Read Selection".
-     */
+    /** Quote the currently-selected plain text into the chat composer, to be answered under it. Null hides the button. */
+    val onQuote: ((String) -> Unit)? = null,
+    /** Read the currently-selected plain text aloud (the same player and control bar as a whole reply). Null hides the button. */
     val onReadAloud: ((String) -> Unit)? = null,
-    /**
-     * [T-android-readaloud-selection-vs-reply] Speak the WHOLE message that
-     * owns the selection, from its beginning — iOS's "Read from Start".
-     *
-     * Separate from [onReadAloud] because the two differ in scope, not in
-     * mechanism: one speaks the highlighted range, the other restarts the
-     * entire reply. Android previously offered only the first, under the
-     * ambiguous label "Read Aloud", so a user who wanted the reply narrated
-     * had to select the whole thing by hand.
-     *
-     * Receives the message's markdown source; the TTS layer sanitizes markdown
-     * on enqueue (VoiceTextSanitizer), which is the same contract the existing
-     * read-aloud paths rely on. Null hides the button — the caller passes null
-     * while the reply is still streaming, matching iOS, where replaying a
-     * half-arrived answer would narrate a truncated text.
-     */
-    val onReadFromStart: ((String) -> Unit)? = null,
-    /**
-     * Open the reply-actions menu (regenerate, branch, share, delete, …) of the message that owns the
-     * selection. Selecting in place replaced the long-press menu, so this keeps those actions one tap away.
-     * Receives the owning message's id; null hides the entry.
-     */
-    val onOpenReplyMenu: ((String) -> Unit)? = null,
 )
 
 @Composable
@@ -1080,19 +1054,11 @@ fun MinisSelectionToolbarHost(
                     if (text.length > 40) text.take(37) + "…" else text
 
                 val labelCopy = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_copy)
-                val labelAddToInput = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_add_to_chat_input)
-                val labelCopyFullText = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_copy_full_text)
-                val labelCopyAsMarkdown = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_copy_as_markdown)
-                val labelCopyAsRichText = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_copy_as_rich_text)
-                val labelCopyAsPlainText = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_copy_as_plain_text)
+                val labelQuote = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_quote)
+                val labelCopyFullMarkdown = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_copy_full_markdown)
+                val labelCopyFullRichText = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_copy_full_rich_text)
+                val labelCopyFullPlainText = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_copy_full_plain_text)
                 val toastCopiedAsPlainText = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_copied_as_plain_text_toast)
-                // [T-android-readaloud-selection-vs-reply] Three labels: the
-                // group parent keeps the plain "Read Aloud" wording (which is
-                // exactly right for a container), while the children carry the
-                // scope. selection_read_aloud is now "Read Selection".
-                val labelReadSelection = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_read_aloud)
-                val labelReadFromStart = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_read_from_start)
-                val labelReplyActions = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_reply_actions)
                 val labelReadAloud = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.read_aloud_group)
                 val toastCopiedAsMarkdown = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_copied_as_markdown_toast)
                 val toastCopiedAsRichText = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.selection_copied_as_rich_text_toast)
@@ -1118,43 +1084,26 @@ fun MinisSelectionToolbarHost(
                 // trail, table actions last (they apply to the whole table, not
                 // to what the user just selected).
                 val items = buildList {
-                    add(SelectionAction(labelCopy) {
-                        val text = controller.selectedPlainText()
-                        if (text.isNotEmpty()) {
-                            clipboard.setText(AnnotatedString(text))
-                            haptics.performHapticFeedback(
-                                androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
-                            )
-                            toast(context.getString(
-                                com.openminis.app.R.string.selection_copied_toast, preview(text)))
-                        }
-                        controller.clearSelection()
-                    })
-                    // Copy Markdown / Copy Rich Text are ALWAYS offered when the
-                    // selection contains rendered text. Earlier we gated them on
-                    // resolveSelectionMarkdown() returning non-null, but that hid
-                    // them in common cases (user bubbles before SideEffect
-                    // publish, the recompose race after a previous click, cross-
-                    // shard selections where the cache briefly hadn't populated).
-                    // Resolve lazily at click time and fall back to plain text.
-                    // [T-android-selection-copy-full-submenu] The three
-                    // whole-message copies live under one "Copy Full Text"
-                    // parent rather than sitting loose beside plain "Copy",
-                    // mirroring iOS's grouped edit menu.
-                    //
-                    // Grouping is what makes the labels honest. These actions
-                    // copy the ENTIRE message (resolveSelectionMarkdown returns
-                    // the owning message's source), while the bar they appear on
-                    // was raised BY a selection and sits inches from "Copy". Flat
-                    // entries reading "Copy Markdown" let a user who highlighted
-                    // one sentence walk away with the whole reply and nothing in
-                    // the UI explaining the gap. Under a parent that says "Full
-                    // Text", the scope is stated once and inherited by all three.
+                    // Copy is a split button: the label copies what is selected, the chevron next to it opens the
+                    // copies of the WHOLE message (the entries say "full", so a highlighted sentence never silently
+                    // copies the reply). Read aloud and Quote complete the three actions the bar is for.
                     add(
                         SelectionAction(
-                            label = labelCopyFullText,
+                            label = labelCopy,
+                            onClick = {
+                                val text = controller.selectedPlainText()
+                                if (text.isNotEmpty()) {
+                                    clipboard.setText(AnnotatedString(text))
+                                    haptics.performHapticFeedback(
+                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
+                                    )
+                                    toast(context.getString(
+                                        com.openminis.app.R.string.selection_copied_toast, preview(text)))
+                                }
+                                controller.clearSelection()
+                            },
                             children = listOf(
-                                SelectionAction(labelCopyAsMarkdown) {
+                                SelectionAction(labelCopyFullMarkdown) {
                                     val source = actions?.resolveSelectionMarkdown?.invoke()
                                         ?: controller.selectedPlainText()
                                     if (source.isNotEmpty()) {
@@ -1163,7 +1112,7 @@ fun MinisSelectionToolbarHost(
                                     }
                                     controller.clearSelection()
                                 },
-                                SelectionAction(labelCopyAsRichText) {
+                                SelectionAction(labelCopyFullRichText) {
                                     val source = actions?.resolveSelectionMarkdown?.invoke()
                                         ?: controller.selectedPlainText()
                                     if (source.isNotEmpty()) {
@@ -1172,14 +1121,9 @@ fun MinisSelectionToolbarHost(
                                     }
                                     controller.clearSelection()
                                 },
-                                // Plain Text copies the RENDERED text — headings,
-                                // lists and quotes as the user sees them, with no
-                                // `#`/`-`/`**`/`>` left behind. This bar never
-                                // offered it; the other selection toolbar
-                                // (MinisMarkdownTextToolbar) already did, so the
-                                // same long-press could yield two different menus
-                                // depending on which path raised it.
-                                SelectionAction(labelCopyAsPlainText) {
+                                // Plain text is the RENDERED text: headings, lists and quotes as seen, with no
+                                // `#` / `-` / `**` / `>` left behind.
+                                SelectionAction(labelCopyFullPlainText) {
                                     val source = actions?.resolveSelectionMarkdown?.invoke()
                                         ?: controller.selectedPlainText()
                                     if (source.isNotEmpty()) {
@@ -1189,78 +1133,21 @@ fun MinisSelectionToolbarHost(
                                     controller.clearSelection()
                                 },
                             ),
+                            split = true,
                         ),
                     )
-                    // [T-android-readaloud-selection-vs-reply] The read-aloud
-                    // PAIR, mirroring iOS: "Read Selection" speaks the
-                    // highlighted range, "Read from Start" replays the whole
-                    // reply. Grouped under one parent rather than sitting as
-                    // two loose entries.
-                    //
-                    // Grouped for the same reason "Copy Full Text" is: the two
-                    // differ only in SCOPE, and a flat pair puts a
-                    // whole-message action inches from a selection-scoped one
-                    // with nothing but the label to separate them. The parent
-                    // also costs one bar slot instead of two — which is what
-                    // lets read-aloud sit inline at all, instead of being
-                    // stranded in the overflow where it was.
-                    //
-                    // A single child collapses to a flat entry (see below), so
-                    // a user message — no whole-reply action — still gets a
-                    // direct "Read Selection" button rather than a submenu
-                    // wrapping one item.
-                    run {
-                        val readChildren = buildList {
-                            if (actions?.onReadAloud != null) {
-                                add(SelectionAction(labelReadSelection) {
-                                    val text = controller.selectedPlainText()
-                                    if (text.isNotEmpty()) actions.onReadAloud.invoke(text)
-                                    controller.clearSelection()
-                                })
-                            }
-                            if (actions?.onReadFromStart != null) {
-                                add(SelectionAction(labelReadFromStart) {
-                                    // The message's own source, NOT the
-                                    // selection — that is the whole point of
-                                    // this entry. Falls back to the selected
-                                    // text when the owning message cannot be
-                                    // resolved (a cross-message selection), so
-                                    // the button still does something honest
-                                    // rather than silently nothing.
-                                    val source = actions.resolveSelectionMarkdown()
-                                        ?: controller.selectedPlainText()
-                                    if (source.isNotEmpty()) actions.onReadFromStart.invoke(source)
-                                    controller.clearSelection()
-                                })
-                            }
-                        }
-                        when (readChildren.size) {
-                            0 -> Unit
-                            1 -> add(readChildren.single())
-                            else -> add(
-                                SelectionAction(labelReadAloud, children = readChildren),
-                            )
-                        }
-                    }
-                    // Ordered AFTER read-aloud on purpose. Only three actions
-                    // stay on the bar; read-aloud used to be fourth and so was
-                    // permanently stranded in the overflow, which is what the
-                    // user hit ("把朗读也放出来吧"). Both are secondary to Copy,
-                    // but a narration the user cannot find is worse than one
-                    // extra tap for Add to Input, which is also discoverable
-                    // from the composer itself.
-                    if (actions?.onAddToInput != null) {
-                        add(SelectionAction(labelAddToInput) {
+                    if (actions?.onReadAloud != null) {
+                        add(SelectionAction(labelReadAloud) {
                             val text = controller.selectedPlainText()
-                            if (text.isNotEmpty()) actions.onAddToInput.invoke(text)
+                            if (text.isNotEmpty()) actions.onReadAloud.invoke(text)
                             controller.clearSelection()
                         })
                     }
-                    val replyOwner = controller.singleMessageId()
-                    if (actions?.onOpenReplyMenu != null && replyOwner != null) {
-                        add(SelectionAction(labelReplyActions) {
+                    if (actions?.onQuote != null) {
+                        add(SelectionAction(labelQuote) {
+                            val text = controller.selectedPlainText()
+                            if (text.isNotEmpty()) actions.onQuote.invoke(text)
                             controller.clearSelection()
-                            actions.onOpenReplyMenu.invoke(replyOwner)
                         })
                     }
                     if (tableActions != null) {
@@ -1319,8 +1206,11 @@ fun MinisSelectionToolbarHost(
                             mutableStateOf(false)
                         }
                         var childAnchor by remember { mutableStateOf(Offset.Zero) }
+                        // A split button keeps its label as the action itself; only the chevron opens the menu.
+                        if (item.split) MinisToolbarButton(label = item.label, endPadding = 6.dp, onClick = item.onClick)
                         MinisToolbarButton(
-                            label = item.label + "  ›",
+                            label = if (item.split) "▾" else item.label + "  ›",
+                            startPadding = if (item.split) 6.dp else 14.dp,
                             modifier = Modifier.onGloballyPositioned { coords ->
                                 val pos = coords.positionOnScreen()
                                 childAnchor = Offset(
@@ -1540,6 +1430,8 @@ fun MinisSelectionToolbarHost(
 private class SelectionAction(
     val label: String,
     val children: List<SelectionAction> = emptyList(),
+    /** With [children]: the label still fires [onClick], and a chevron beside it opens the children. */
+    val split: Boolean = false,
     val onClick: () -> Unit = {},
 )
 
@@ -1567,6 +1459,8 @@ private fun MinisToolbarDivider() {
 private fun MinisToolbarButton(
     label: String,
     modifier: Modifier = Modifier,
+    startPadding: androidx.compose.ui.unit.Dp = 14.dp,
+    endPadding: androidx.compose.ui.unit.Dp = 14.dp,
     onClick: () -> Unit,
 ) {
     Text(
@@ -1577,7 +1471,7 @@ private fun MinisToolbarButton(
         softWrap = false,
         modifier = modifier
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(start = startPadding, end = endPadding, top = 10.dp, bottom = 10.dp),
     )
 }
 

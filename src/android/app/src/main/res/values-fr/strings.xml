@@ -1144,10 +1144,6 @@
         <item quantity="one">Ce message et tout ce qui suit seront supprimés. %d message au total. Cette action est irréversible.</item>
         <item quantity="other">Ce message et tout ce qui suit seront supprimés. %d messages au total. Cette action est irréversible.</item>
     </plurals>
-    <string name="selection_copy_full_text">Copier tout le texte</string>
-    <string name="selection_copy_as_markdown">Copier au format Markdown</string>
-    <string name="selection_copy_as_rich_text">Copier en texte enrichi</string>
-    <string name="selection_copy_as_plain_text">Copier en texte brut</string>
     <!-- [T-android-assistant-action-bar] -->
     <string name="assistant_action_copy">Copier</string>
     <string name="assistant_action_regenerate">Régénérer</string>
@@ -1164,6 +1160,10 @@
     <string name="assistant_menu_delete">Supprimer le message</string>
     <!-- [T-android-reply-speech] -->
     <string name="reply_speech_title">Réponse IA %1$d</string>
+    <string name="selection_quote">Citer</string>
+    <string name="reply_speech_selection">Texte sélectionné</string>
+    <string name="reply_speech_auto">Lecture de la réponse</string>
+    <string name="reply_speech_preparing">Préparation de la voix</string>
     <string name="reply_speech_reading">Lecture en cours</string>
     <string name="reply_speech_paused">En pause</string>
     <string name="reply_speech_completed">Terminé</string>
@@ -2070,7 +2070,6 @@
     <string name="module_settings_restart_sub">À utiliser après avoir activé le module alors que Minis tournait déjà.</string>
     <string name="work_process_failed_only">Étape %1$d échouée</string>
     <string name="model_slot_image">Image</string>
-    <string name="selection_reply_actions">Actions de la réponse</string>
     <string name="chat_interrupted_short">Interrompu</string>
     <string name="queued_delivery_steer">Guidera la tâche à la prochaine étape</string>
     <string name="queued_delivery_queue">Sera envoyé une fois la tâche terminée</string>

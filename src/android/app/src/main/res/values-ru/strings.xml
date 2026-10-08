@@ -1475,10 +1475,6 @@
         <item quantity="many">Это сообщение и всё после него будет удалено. Всего %d сообщений. Отменить будет нельзя.</item>
         <item quantity="other">Это сообщение и всё после него будет удалено. Всего %d сообщения. Отменить будет нельзя.</item>
     </plurals>
-    <string name="selection_copy_full_text">Скопировать весь текст</string>
-    <string name="selection_copy_as_markdown">Скопировать как Markdown</string>
-    <string name="selection_copy_as_rich_text">Скопировать как форматированный текст</string>
-    <string name="selection_copy_as_plain_text">Скопировать как обычный текст</string>
     <!-- [T-android-assistant-action-bar] -->
     <string name="assistant_action_copy">Копировать</string>
     <string name="assistant_action_regenerate">Перегенерировать</string>
@@ -1495,6 +1491,10 @@
     <string name="assistant_menu_delete">Удалить сообщение</string>
     <!-- [T-android-reply-speech] -->
     <string name="reply_speech_title">Ответ ИИ %1$d</string>
+    <string name="selection_quote">Цитировать</string>
+    <string name="reply_speech_selection">Выделенный текст</string>
+    <string name="reply_speech_auto">Чтение ответа</string>
+    <string name="reply_speech_preparing">Подготовка голоса</string>
     <string name="reply_speech_reading">Чтение</string>
     <string name="reply_speech_paused">Приостановлено</string>
     <string name="reply_speech_completed">Завершено</string>
@@ -2391,7 +2391,6 @@
     <string name="module_settings_restart_sub">Используйте, если модуль включён, когда Minis уже работал.</string>
     <string name="work_process_failed_only">Шаг %1$d не удался</string>
     <string name="model_slot_image">Изображения</string>
-    <string name="selection_reply_actions">Действия с ответом</string>
     <string name="chat_interrupted_short">Прервано</string>
     <string name="queued_delivery_steer">Направит задачу на следующем шаге</string>
     <string name="queued_delivery_queue">Будет отправлено после завершения задачи</string>

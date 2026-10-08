@@ -803,9 +803,7 @@ internal fun SelectionToolbarOverlay(
     viewModel: com.openminis.app.ui.chat.ChatViewModel,
     inputFocusRequester: androidx.compose.ui.focus.FocusRequester,
     selectionController: com.openminis.app.ui.chat.SelectionController,
-    selectionReader: com.openminis.app.ui.chat.LazyReadAloudPlayer,
     listRootCoordsState: androidx.compose.runtime.MutableState<androidx.compose.ui.layout.LayoutCoordinates?>,
-    onOpenReplyMenu: kotlin.Function1<kotlin.String, kotlin.Unit>,
 ) {
     var listRootCoords by listRootCoordsState
     MinisSelectionToolbarHost(
@@ -842,16 +840,14 @@ internal fun SelectionToolbarOverlay(
                 // entries are removed on shard dispose.
                 selectionController.selectionMessageMarkdown()
             },
-            onAddToInput = { snippet ->
-                viewModel.appendToInputText(snippet)
+            // Quote: the selection goes into the composer as a Markdown quote, ready to be answered under.
+            onQuote = { snippet ->
+                viewModel.quoteIntoInput(snippet)
                 try { inputFocusRequester.requestFocus() } catch (_: IllegalStateException) {}
                 keyboardController?.show()
             },
-            // [T-android-selection-readaloud] Speak the selection
-            // through the same screen-scoped lazy player the
-            // Compose-SelectionContainer toolbar uses.
-            onReadAloud = { snippet -> selectionReader.speak(snippet) },
-            onOpenReplyMenu = onOpenReplyMenu,
+            // The same player, state and control bar as reading a whole reply.
+            onReadAloud = { snippet -> viewModel.readSelectionAloud(snippet) },
         ),
     )
 }

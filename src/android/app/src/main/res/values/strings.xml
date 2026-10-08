@@ -1163,10 +1163,6 @@
    <string name="selection_copied_toast">Copied: %1$s</string>
    <string name="selection_copied_as_markdown_toast">Copied as Markdown</string>
    <string name="selection_copied_as_rich_text_toast">Copied as Rich Text</string>
-    <string name="selection_copy_full_text">Copy Full Text</string>
-    <string name="selection_copy_as_markdown">Copy as Markdown</string>
-    <string name="selection_copy_as_rich_text">Copy as Rich Text</string>
-    <string name="selection_copy_as_plain_text">Copy as Plain Text</string>
     <!-- [T-markdown-table-copy-actions] Long-press menu actions and toasts on rendered markdown tables. -->
     <string name="markdown_table_copy_table">Copy Table</string>
     <string name="markdown_table_copy_table_image">Copy Table Image</string>
@@ -1626,6 +1622,10 @@
     <string name="assistant_menu_delete">Delete Message</string>
     <!-- [T-android-reply-speech] -->
     <string name="reply_speech_title">AI Reply %1$d</string>
+    <string name="selection_quote">Quote</string>
+    <string name="reply_speech_selection">Selected text</string>
+    <string name="reply_speech_auto">Reading the reply</string>
+    <string name="reply_speech_preparing">Preparing voice</string>
     <string name="reply_speech_reading">Reading</string>
     <string name="reply_speech_paused">Paused</string>
     <string name="reply_speech_completed">Completed</string>
@@ -2502,7 +2502,6 @@
     <string name="module_settings_restart_sub">Use this after enabling the module while Minis was already running.</string>
     <string name="work_process_failed_only">Step %1$d failed</string>
     <string name="model_slot_image">Image</string>
-    <string name="selection_reply_actions">Reply actions</string>
     <string name="chat_interrupted_short">Interrupted</string>
     <string name="queued_delivery_steer">Will guide the task at its next step</string>
     <string name="queued_delivery_queue">Will be sent when the task is done</string>

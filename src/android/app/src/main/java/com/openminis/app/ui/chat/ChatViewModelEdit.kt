@@ -58,6 +58,7 @@ fun ChatViewModel.clearChat() {
     toolLoopDetector.reset()
     _canResume.value = false
     _attachments.value = emptyList()
+    _quotedTexts.value = emptyList()
     _promptQueue.value = emptyList()
     _hasInjectedShareContent.value = false
     // T261: tool-detail sheet is per-session UI state — clear it so a
@@ -495,6 +496,17 @@ internal fun ChatViewModel.startReplySpeech(messageId: String, displayIndex: Int
         }
     }
 }
+
+/**
+ * Reads the selected text through the same player, state and control bar as a whole reply, so there is one
+ * thing that speaks and one place to pause, change the voice or the speed, or stop it.
+ */
+fun ChatViewModel.readSelectionAloud(text: String) {
+    if (text.isBlank()) return
+    startReplySpeech(SELECTION_SPEECH_ID, 0, text)
+}
+
+internal const val SELECTION_SPEECH_ID = "selection"
 
 fun ChatViewModel.stopReplySpeech() {
     replySpeechJob?.cancel()

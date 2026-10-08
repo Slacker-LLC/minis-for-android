@@ -407,17 +407,7 @@ internal fun androidx.compose.foundation.layout.ColumnScope.ChatMessagePane(
         // scrolling back in re-registers the shard and the highlight
         // redraws automatically.
         val selectionController = remember { SelectionController() }
-        // [T-android-selection-readaloud] Player backing the selection
-        // toolbar's "Read Aloud". Screen-scoped and independent of the
-        // voice panel's own player (that one only exists while voice
-        // mode is active), so reading a selection works any time. Built
-        // lazily on first use — an unused ChatScreen never binds a TTS
-        // engine — and shut down with the screen.
-        val selectionReader = remember { LazyReadAloudPlayer(context) }
-        DisposableEffect(selectionReader) {
-            onDispose { selectionReader.shutdown() }
-        }
-        val markdownToolbar = remember(context, messageBounds, viewModel, inputFocusRequester, keyboardController, selectionController, selectionReader) {
+        val markdownToolbar = remember(context, messageBounds, viewModel, inputFocusRequester, keyboardController, selectionController) {
             MinisMarkdownTextToolbar(
                 context = context,
                 registry = messageBounds,
@@ -431,8 +421,8 @@ internal fun androidx.compose.foundation.layout.ColumnScope.ChatMessagePane(
                     }
                     keyboardController?.show()
                 },
-                 onReadAloud = { snippet -> selectionReader.speak(snippet) },
-                  onReadFromStart = { fullText -> selectionReader.speak(fullText) },
+                 onReadAloud = { snippet -> viewModel.readSelectionAloud(snippet) },
+                  onReadFromStart = { fullText -> viewModel.readSelectionAloud(fullText) },
                   isStreamingNow = { viewModel.isStreaming.value },
                  selectionController = selectionController,
             )
@@ -469,16 +459,6 @@ internal fun androidx.compose.foundation.layout.ColumnScope.ChatMessagePane(
             }
             if (mentionMenuOpenForSpy) {
                 viewModel.dismissMentionMenu()
-            }
-        }
-        // A long press on a reply's text selects in place (handles + the floating Copy bar), like any text.
-        // The reply's action menu is one tap further: "Reply actions" in that bar's overflow.
-        val currentMessages by androidx.compose.runtime.rememberUpdatedState(messages)
-        val openReplyMenu = remember {
-            { shardMessageId: String ->
-                val id = originalMessageId(shardMessageId)
-                val message = currentMessages.firstOrNull { it.id == id }
-                if (message != null && message.role == "assistant" && !message.isStreaming) messageMenuTarget = id
             }
         }
         // (selectionController declared above, before markdownToolbar.)
@@ -598,9 +578,7 @@ internal fun androidx.compose.foundation.layout.ColumnScope.ChatMessagePane(
             viewModel = viewModel,
             inputFocusRequester = inputFocusRequester,
             selectionController = selectionController,
-            selectionReader = selectionReader,
             listRootCoordsState = listRootCoords_st,
-            onOpenReplyMenu = openReplyMenu,
         )
         // iOS-style selection handle dots, one at each endpoint.
         MinisSelectionHandlesHost(
@@ -670,39 +648,6 @@ internal fun androidx.compose.foundation.layout.ColumnScope.ChatMessagePane(
         } else {
             SideEffect { toolBarHeightPx = 0 }
         }
-
-        // [T-android-tts-capsule] Floating speech-player control for
-        // "Read replies" TTS — expand/compact capsule with mute, model
-        // switch and speed cycling. Mounted LAST in this Box so it
-        // draws above the list, the FABs and the floating tool bar
-        // (iOS mounts its SpeechPlayerControl at app root; chat-screen
-        // scope is the Android first pass).
-        // [T-android-tts-capsule-avoid] toolBarHeightPx is the same
-        // measurement bottomReserve uses — the capsule lifts above the
-        // floating tool bar instead of covering its trailing edge.
-        // [T-android-tts-capsule-avoid-fabs] The scroll FABs share the
-        // capsule's bottom-end corner and OVERLAPPED it (user report:
-        // capsule stacked on the jump-to-user-message / scroll-to-
-        // bottom buttons). Mirror their exact placement math — same
-        // visibility predicates, same base offsets as the FAB blocks
-        // below — so the capsule clears the TOP of whatever part of
-        // the FAB stack is currently visible, and drops back when the
-        // FABs hide. This is the Android stand-in for iOS's
-        // protectedRects: derived from the same layout constants
-        // instead of measured rects, which keeps it deterministic.
-        val upFabVisible = messages.isNotEmpty() && !isNearBottom.value
-        val downFabVisible =
-            userScrolledAway && contentOverflows.value && messages.isNotEmpty()
-        val fabBaseDp = if (lastToolBlocks.isNotEmpty()) 80.dp else 8.dp
-        val fabStackTopDp = when {
-            upFabVisible -> fabBaseDp + 46.dp + 36.dp
-            downFabVisible -> fabBaseDp + 36.dp
-            else -> 0.dp
-        }
-        com.openminis.app.ui.chat.voice.SpeechPlayerCapsule(
-            bottomObstructionPx = toolBarHeightPx,
-            additionalObstructionDp = fabStackTopDp,
-        )
 
         // T261: tool-detail sheet hoisted out of LazyColumn item
         // scope. Visibility driven by ViewModel state so streaming /
