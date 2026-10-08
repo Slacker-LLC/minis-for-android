@@ -2518,4 +2518,15 @@
     <string name="llm_err_decoding">The provider\'s reply could not be read. Try again.</string>
     <string name="llm_err_detail">Details: %1$s</string>
     <string name="compact_failed">Compaction failed: %1$s</string>
+    <string name="chat_no_provider">No model provider is set up. Add one in Settings → Providers.</string>
+    <string name="chat_provider_rejected">The provider configuration was rejected.</string>
+    <string name="chat_turn_limit">Stopped to prevent runaway tool use (turn limit: %1$d). The model kept calling tools without finishing. Tap Resume to continue from here, or send a new message to start over.</string>
+    <string name="compact_no_provider">No model provider is set up, so the conversation cannot be compacted.</string>
+    <string name="compact_nothing">Nothing to compact yet.</string>
+    <string name="compact_timeout">Compaction timed out after %1$d s. Try again later.</string>
+    <string name="compact_rejected">Compaction was rejected; the original conversation is kept.</string>
+    <string name="compact_wait_send">Wait for the current compaction to finish before sending.</string>
+    <string name="compact_revert_busy">Cannot undo the compaction while a reply or a compaction is in progress.</string>
+    <string name="compact_revert_none">There is no compaction to undo in this conversation.</string>
+    <string name="compact_revert_failed">Could not undo the compaction: its record was not found.</string>
 </resources>

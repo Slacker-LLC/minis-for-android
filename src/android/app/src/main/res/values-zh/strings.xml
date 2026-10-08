@@ -2428,4 +2428,15 @@
     <string name="llm_err_decoding">无法读取服务商的回复，请重试。</string>
     <string name="llm_err_detail">详情：%1$s</string>
     <string name="compact_failed">压缩对话失败：%1$s</string>
+    <string name="chat_no_provider">还没有配置模型服务商。请到「设置 → 服务商」添加。</string>
+    <string name="chat_provider_rejected">服务商配置被拒绝。</string>
+    <string name="chat_turn_limit">已在 %1$d 轮后停止，以防工具调用失控。模型一直在调用工具而没有收尾。点「继续」从这里接着做，或发一条新消息重新开始。</string>
+    <string name="compact_no_provider">没有配置模型服务商，无法压缩对话。</string>
+    <string name="compact_nothing">还没有可压缩的内容。</string>
+    <string name="compact_timeout">压缩对话超时（%1$d 秒）。请稍后再试。</string>
+    <string name="compact_rejected">压缩被拒绝，原对话保持不变。</string>
+    <string name="compact_wait_send">请等当前的压缩完成后再发送。</string>
+    <string name="compact_revert_busy">回复或压缩进行中，无法撤销压缩。</string>
+    <string name="compact_revert_none">这个对话里没有可撤销的压缩。</string>
+    <string name="compact_revert_failed">无法撤销压缩：找不到它的记录。</string>
 </resources>

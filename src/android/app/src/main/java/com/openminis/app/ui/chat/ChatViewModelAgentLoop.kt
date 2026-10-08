@@ -1205,11 +1205,7 @@ internal fun ChatViewModel.finalizeAtTurnLimit(
     if (_streamingById.value.containsKey(assistantId)) {
         _streamingById.value = _streamingById.value - assistantId
     }
-    setInlineError(
-        "Stopped after $MAX_AGENT_TURNS agent turns to prevent runaway " +
-        "tool use. The model kept calling tools without finishing — tap " +
-        "Resume to continue from here, or send a new message to start over.",
-    )
+    setInlineError(context.getString(R.string.chat_turn_limit, MAX_AGENT_TURNS))
     _canResume.value = true
 }
 

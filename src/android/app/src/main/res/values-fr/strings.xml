@@ -2086,4 +2086,15 @@
     <string name="llm_err_decoding">La réponse du fournisseur est illisible. Réessayez.</string>
     <string name="llm_err_detail">Détails : %1$s</string>
     <string name="compact_failed">Échec de la compaction : %1$s</string>
+    <string name="chat_no_provider">Aucun fournisseur de modèle configuré. Ajoutez-en un dans Réglages → Fournisseurs.</string>
+    <string name="chat_provider_rejected">La configuration du fournisseur a été refusée.</string>
+    <string name="chat_turn_limit">Arrêt après %1$d tours d\'agent pour éviter une boucle d\'outils. Touchez Reprendre pour continuer ou envoyez un nouveau message.</string>
+    <string name="compact_no_provider">Aucun fournisseur de modèle : impossible de compacter la conversation.</string>
+    <string name="compact_nothing">Rien à compacter pour le moment.</string>
+    <string name="compact_timeout">La compaction a expiré après %1$d s. Réessayez plus tard.</string>
+    <string name="compact_rejected">Compaction refusée ; la conversation d\'origine est conservée.</string>
+    <string name="compact_wait_send">Attendez la fin de la compaction avant d\'envoyer.</string>
+    <string name="compact_revert_busy">Impossible d\'annuler la compaction pendant une réponse ou une compaction.</string>
+    <string name="compact_revert_none">Aucune compaction à annuler dans cette conversation.</string>
+    <string name="compact_revert_failed">Annulation impossible : enregistrement introuvable.</string>
 </resources>

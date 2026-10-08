@@ -1671,7 +1671,7 @@ internal fun ChatComposer(
                     Icon(
                         Icons.Default.Stop,
                         contentDescription = stringResource(R.string.common_stop),
-                        tint = ChatColors.background,
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(20.dp),
                     )
                 }
@@ -1706,7 +1706,7 @@ internal fun ChatComposer(
                     Icon(
                         Icons.Default.ArrowUpward,
                         contentDescription = stringResource(R.string.send),
-                        tint = ChatColors.background,
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(20.dp),
                     )
                 }

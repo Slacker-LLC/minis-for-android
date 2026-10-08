@@ -1,5 +1,6 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.R
 import android.content.Context
 import android.util.Log
 import androidx.compose.material.icons.outlined.Build
@@ -553,7 +554,7 @@ internal fun ChatViewModel.loadSession() {
             Log.w(TAG, "provider configuration rejected while loading session: " + e.message)
             currentProvider = null
             _activeEntryId.value = null
-            _error.value = e.message ?: "Provider configuration rejected"
+            _error.value = e.message ?: context.getString(R.string.chat_provider_rejected)
         } finally {
             // T201: open the gate even on early `return@launch` (draft path,
             // missing-session path) and on exception, so the init-time

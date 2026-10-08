@@ -180,12 +180,12 @@ internal inline fun ChatViewModel.compactAllImpl(
         return
     }
     val provider = currentProvider ?: run {
-        appendSystemInfo("No provider configured. Cannot compact.", "compact")
+        appendSystemInfo(context.getString(R.string.compact_no_provider), "compact")
         return
     }
     val history = agentHistory.toList()
     if (history.isEmpty()) {
-        appendSystemInfo("Nothing to compact — the session is empty.", "compact")
+        appendSystemInfo(context.getString(R.string.compact_nothing), "compact")
         return
     }
     val contextWindow = effectiveContextWindowTokens()
@@ -265,7 +265,7 @@ internal inline fun ChatViewModel.compactAllImpl(
             Log.w(TAG, "Compact timed out after ${compactTimeoutMs}ms", e)
             withContext(Dispatchers.Main) {
                 appendSystemInfo(
-                    text = "Compaction timed out after ${compactTimeoutMs / 1_000}s. Try again later.",
+                    text = context.getString(R.string.compact_timeout, (compactTimeoutMs / 1_000).toInt()),
                     iconKind = "compact",
                 )
             }
@@ -281,7 +281,7 @@ internal inline fun ChatViewModel.compactAllImpl(
             withContext(Dispatchers.Main) {
                 appendSystemInfo(
                     text = e.message.orEmpty().ifEmpty {
-                        "Compaction was rejected; the original context is kept."
+                        context.getString(R.string.compact_rejected)
                     },
                     iconKind = "compact",
                 )
@@ -300,7 +300,7 @@ internal inline fun ChatViewModel.compactAllImpl(
             Log.w(TAG, "provider configuration rejected while loading session: " + e.message)
             currentProvider = null
             _activeEntryId.value = null
-            _error.value = e.message ?: "Provider configuration rejected"
+            _error.value = e.message ?: context.getString(R.string.chat_provider_rejected)
         } finally {
             _isCompacting.value = false
             _compactProgress.value = null
@@ -343,15 +343,15 @@ internal inline fun ChatViewModel.compactAllImpl(
  */
 fun ChatViewModel.revertCompact() {
     if (_isStreaming.value) {
-        appendSystemInfo("Cannot revert compact while a response is in progress.", "compact")
+        appendSystemInfo(context.getString(R.string.compact_revert_busy), "compact")
         return
     }
     if (_isCompacting.value) {
-        appendSystemInfo("Cannot revert compact while compaction is in progress.", "compact")
+        appendSystemInfo(context.getString(R.string.compact_revert_busy), "compact")
         return
     }
     val current = _cachedLatestMarker ?: run {
-        appendSystemInfo("Nothing to revert — no compact marker on this session.", "compact")
+        appendSystemInfo(context.getString(R.string.compact_revert_none), "compact")
         return
     }
     val sid = realSessionId.ifEmpty { sessionId }
@@ -363,7 +363,7 @@ fun ChatViewModel.revertCompact() {
         if (removed <= 0) {
             Log.w(TAG, "[Compact] revert: deleteCompactMarker returned 0 rows for id=${current.id.take(8)}")
             withContext(Dispatchers.Main) {
-                appendSystemInfo("Revert failed: marker not found in DB.", "compact")
+                appendSystemInfo(context.getString(R.string.compact_revert_failed), "compact")
             }
             return@launch
         }
