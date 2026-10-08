@@ -17,10 +17,13 @@ parentheses in its address, a four-backtick fence, `2026 年…` read as a list)
    reference form, footnote references, `~strike~`, and `http(s)://`, `www.` and e-mail autolinks.
 3. **Adapter** (`ui/chat/MarkdownBlockAdapter.kt`, `MarkdownInlineRender.kt`): turns the parse into the blocks and
    styled text the renderer draws, and adds what only the chat knows:
-   - display math (`$$…$$`, `\[…\]`) is lifted out before parsing so LaTeX never meets Markdown; inline math
+   - display math (`$$…$$`, `\[…\]`) is lifted out before parsing so LaTeX never meets Markdown, and stays
+     block-level: `$$x$$` in the middle of a line is not read as math (`InlineLatexTest`); inline math
      (`$…$`, `\(…\)`) is an extension hook of the inline parser;
    - a line that is only `![alt](url)` or a sandbox file link becomes a media/file card; wide inline math becomes
      a display block;
+   - `<details>` / `<summary>` become a collapsible block (closed by default, the summary is the header, the body is
+     parsed as Markdown again); the whole fragment is kept in one piece when a long reply is split into blocks;
    - HTML blocks show their content (`<summary>` bold, `<br>` a break, comments dropped, other tags removed);
      inline HTML styles text (`<b>`, `<i>`, `<sub>`, `<sup>`, `<kbd>`, `<a href>` …) and any other tag, such as the
      `<String>` of `Optional<String>`, stays as typed;
@@ -35,3 +38,6 @@ parentheses in its address, a four-backtick fence, `2026 年…` read as a list)
 to filter. Failing examples are written to `app/build/md-spec-*.txt` by the test.
 
 `MarkdownBlockAdapterTest`, `BareUrlLinkTest` and `MarkdownHtmlAndUnderscoreTest` cover the chat additions.
+
+There is one Markdown parser. The older line-based renderer (`ui/markdown/MarkdownParser.kt`, `MarkdownText.kt`,
+`SyntaxHighlighter.kt`) was removed on 2026-10-08; a second implementation drifts from the first.

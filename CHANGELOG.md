@@ -19,6 +19,59 @@ Builds before 1.0 (`1.01-beta.*`) are not offered 1.0 by the in-app updater, bec
 newer than `1.0`. Install the 1.0 APK over them by hand: its `versionCode` is higher (1000099 against 40 or less), so it upgrades in place
 and keeps your data.
 
+### Rebuild of 1.0 — 2026-10-08
+
+The 1.0 release was rebuilt from `main` and replaces the first build. `versionName` (1.0) and `versionCode`
+(1000099) are unchanged and the signing key is the same, so the new APK installs over any 1.0 and keeps its data.
+The in-app updater does not offer it, because it compares versions; install it by hand. Everything below came in
+after the first 1.0 build (more than 130 merged pull requests, #36 to #165).
+
+**Chat**
+- Full CommonMark 0.31.2 and GitHub Flavored Markdown rendering, including collapsible `<details>`, tables, task
+  lists, footnotes and autolinks; one parser (#159, #160).
+- A message sent while the agent is working can steer the running turn or queue behind it (#158).
+- Selecting text in a reply offers **Copy** (Markdown, rich text or plain text), **Read aloud** and **Quote**.
+  Quote adds a removable card above the composer and a card above the sent message, not raw `>` text. Reading a
+  reply or a selection aloud uses one control bar (#162).
+- Visible narration between the folded work-process rows, as Codex and Claude Code show it (#161).
+- Send, stop and resume buttons follow the accent colour (#164).
+- Model failures are explained in plain language with the provider's own words after them (400, 401/403, 404,
+  413, 429, 5xx) in all eight locales; the remaining English notices (no provider, turn limit, compaction) are
+  translated (#163, #164).
+
+**Agent and tools**
+- Read-only tool calls of one turn run at the same time (#157).
+- Background shell jobs with a persistent input pipe: `job_input` writes to a running job and can close its input (#156, #160).
+- `minis-apt` installs and removes Ubuntu packages inside the guest (#149).
+- Autonomy mode, risk-tiered confirmation of configuration changes and one-tap permission grants (#134, #155).
+- The special accesses (install apps, exact alarms, usage statistics, full-screen notifications, system settings,
+  battery optimisation, Data Saver) are part of the readiness check and can be granted in one tap (#161).
+- The delegating model can name a model from the Agent Models list for a sub agent (#140).
+
+**Fixes that matter**
+- A text file attached to a message, or a long paste that became a file, now reaches the model: its head is sent
+  inside `<user-attached-files>` (60,000 characters per file, 120,000 per message); binary and larger files stay
+  as a path (#163).
+- The file browser (chat files from the home menu, Settings > File management) no longer crashes when it opens (#165).
+- Browse chat files shows only the chat's own folders that hold something, and no longer lists the empty mount
+  points (`attachments`, `offloads`, `browser`) that sit inside `workspace`.
+- A compaction no longer grays the whole conversation when its cutoff sits inside a merged bubble (#163).
+- The resume banner warns about a crash only when the interruption was found after a crash (#163).
+
+**Robustness and security** (about 90 pull requests, #38 to #133): backup and restore bounds and atomicity; bot
+delegation recovery; MCP transport, OAuth and token handling; `root.shell` refuses shells, interpreters and exec
+wrappers; the unauthenticated guest offload socket was retired; credentials, OAuth codes and sensitive tool
+payloads stay out of logs, intents and summaries; files, calendar, notifications, scheduled tasks, sessions,
+speech and sharing each had their findings closed.
+
+**Internal**: `ChatViewModel`, `ChatScreen` and seven other oversized classes were split by concern (#136 to
+#153); the older Markdown renderer and the unused code it left were removed (#53, #160).
+
+**Verification**: 3,379 unit tests and the emulator instrumentation suite pass; `lintDebug` reports no errors.
+Checked on a Xiaomi phone: selection toolbar and quote, one read-aloud bar, send-button accent, one-tap special
+access grants, background job input, chat file browser. The localized model-error text and the compaction
+cutoff fix have unit tests but were not triggered on a device; see `docs/contracts/06-CURRENT-GAPS.md`.
+
 ### Backup covers the rest of what a reinstall would lose — 2026-10-02
 
 - Backups now also carry: interface and behaviour preferences (an explicit allowlist), the custom system prompt

@@ -1209,6 +1209,25 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败** + `:app:lintDebug` **0 error** + `:app:assembleDebug`（期间 lint 抓到 `chat_context_overflow_retry` 的格式串缺占位符 `StringFormatInvalid`，已补 `%1$d/%2$d` 修掉） |
 | 仍写死中文（未做） | 宠物控制页与浮窗（约 60 条）、内置提示词模块标题（16 条）、系统提示词模块页少量 |
 
+## 四点六、1.0 重新构建（2026-10-08）
+
+自 1.0 首次发布（2026-10-02，`6ca985b8`）起合入 130 多个 PR（#36–#165）。逐项说明见 `CHANGELOG.md` 的 “Rebuild of 1.0”，这里只记状态与验证级别。
+
+| 项 | 内容 | 验证 |
+|---|---|---|
+| 聊天渲染 | 完整 CommonMark + GFM，`<details>` 可折叠，只留一个 Markdown 解析器（#159、#160） | ✅ `MarkdownSpecTest` 652/652 + GFM 23/24；`<details>` 在小米手机上展开验证 |
+| 选中工具栏与朗读 | 复制▾ / 朗读 / 引用；引用成卡片；朗读只剩一个控制条（#162） | ✅ 单测；小米手机验证 |
+| 附件正文进模型 | 文本附件与长粘贴转文件的正文进请求（#163） | ✅ `AttachedTextReachesModelTest`（去掉修复会失败）；真实服务商的 token 开销未验证 |
+| 模型错误文案 | `LLMErrorPresenter`，8 语言（#163、#164） | 🟡 单测；未在真机触发 |
+| 压缩灰化 | 截止点按气泡合并的存储 id 匹配（#163） | 🟡 单测；未在真机复现原场景 |
+| 文件浏览器闪退 | `latestLoad` 声明在 `init` 之后导致 NPE（#165） | ✅ 单测（去掉修复会失败）；小米手机验证 |
+| 后台作业 stdin | `job_input`、命名管道（#156、#160） | ✅ 单测；小米手机验证写入与 EOF |
+| 特殊权限 | 就绪检查与一键授予（#161） | 🟡 手机验证 3 项，其余未验证 |
+| 并行只读工具、转向/排队、minis-apt、自治模式 | #157、#158、#149、#134 | ✅ 单测 |
+| 审计整改 | #38–#133，覆盖备份、Bot、MCP、OAuth、文件、日历、通知、会话、语音、隐私 | ✅ 各自的回归测试 |
+
+基线：`:app:testDebugUnitTest` 3379 例 0 失败；`:app:lintDebug` 0 error（394 warning 为既有）；模拟器 instrumentation 套件通过。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |

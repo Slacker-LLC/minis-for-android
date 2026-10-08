@@ -80,6 +80,21 @@ Typical flow:
 
 Conversation speech should respect temporary mute and microphone echo-protection state, but it should not depend on whether the user enabled automatic read-aloud for ordinary chat replies.
 
+## Reading a reply or a selection aloud (chat)
+
+There is one read-aloud pipeline in the chat. `ChatViewModel.startReplySpeech(messageId, displayIndex, text)` starts a
+reply; `readSelectionAloud(text)` starts the text selected in a reply through the same function (message id
+`selection`). Both drive `ReplySpeechState`, and `ui/chat/ReplySpeechControlBar.kt` is the only control surface: the
+title ("AI reply N", "Selected text" or "Read aloud replies"), a status line, pause, close, the voice chip (opens the
+voice picker), the speed chip, mute and a progress bar. The floating speaker button and the second player capsule of
+earlier builds were removed.
+
+- The bar shows for a reading you started and for automatic read-aloud while it is speaking or synthesising.
+- Close ends the reading that was started by hand. In automatic mode it turns "read replies aloud" off, because
+  stopping one sentence of an automatic reading would only be followed by the next.
+- The selection toolbar offers **Copy** (with a menu for Markdown, rich text and plain text), **Read aloud** and
+  **Quote**; the older reply menu entries for these were removed.
+
 ## Desktop-pet voice flow
 
 ```text

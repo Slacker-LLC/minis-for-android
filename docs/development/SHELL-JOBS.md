@@ -13,9 +13,12 @@ and a timeout kills that shell together with its state. For long or parallel wor
 - The command runs as a **job**: its own guest shell process (same chroot, App UID, workspace and
   environment), independent of the persistent shell and of every other job. The call returns at once with a
   `job_id` and whatever the job printed in its first moments.
-- A job has no stdin and does not see the persistent shell's `cd`/`export` state.
+- A job does not see the persistent shell's `cd`/`export` state. Its stdin is a named pipe in the session's `/tmp`:
+  the agent writes to it with `job_input {job_id, input, eof}` (`eof=true` closes it, which is how a program that
+  reads until end-of-file is finished). The wrapper falls back to no stdin if the pipe cannot be created, so a job
+  never fails to start because of it.
 - The agent reads jobs with the **existing** `job_output` / `job_list` / `job_kill` tools. They are backed by
-  `JobRegistry` (so the Web Remote `agent.jobs.*` RPC sees them too). `job_output` takes an `offset` and
+  `JobRegistry` (so the `agent.jobs.*` RPC sees them too). `job_output` takes an `offset` and
   answers `[next_offset: N]` plus the failure reason in its status trailer, so a long job is read
   incrementally; `wait=true` blocks until the job ends (up to `timeout_ms`).
 - Output is a bounded tail (the newest 200,000 characters). Positions count from the first character, so an
@@ -27,7 +30,7 @@ and a timeout kills that shell together with its state. For long or parallel wor
   process dies they die with it.
 - A scheduled read-only run may not start a job.
 
-Code: `runtime/ShellJobs.kt` (process and lifetime), `ExecutionCoordinator.newJobProcess` (the guest shell),
+Code: `runtime/ShellJobs.kt` (process and lifetime), `runtime/JobStdin.kt` (the input pipe), `ExecutionCoordinator.newJobProcess` (the guest shell),
 `tools/runtime/ShellBackground.kt` (the tool reply), `tools/JobRegistry.kt` / `JobTools.kt` (state and tools).
 
 ## Parallel tool calls
