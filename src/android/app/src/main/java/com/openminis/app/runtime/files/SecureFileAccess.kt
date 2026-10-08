@@ -16,6 +16,7 @@ import java.nio.file.SecureDirectoryStream
 import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.BasicFileAttributeView
 import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.attribute.PosixFileAttributeView
 import java.util.UUID
 
 /**
@@ -553,12 +554,37 @@ internal object SecureFileAccess {
         if (existing != null && existing.isDirectory && !existing.isSymbolicLink) {
             throw WorkspaceFileClient.Failure("BAD_PARAMS", "destination is a directory: ${target.fileName}")
         }
+        if (existing != null && existing.isRegularFile) inheritPermissions(targetParent, target, sourceParent, source)
         try {
             sourceParent.move(source, targetParent, target)
         } catch (error: java.nio.file.FileSystemException) {
             if (existing == null) throw error
             deleteEntryIfPresent(targetParent, target)
             sourceParent.move(source, targetParent, target)
+        }
+    }
+
+    /**
+     * A replacement is a new file, so it would come out with the platform's default mode and an edited script
+     * would lose its execute bit. The replaced file's permission bits are put on the new file before the rename.
+     * A provider without POSIX views keeps the default: there is nothing to carry.
+     */
+    private fun inheritPermissions(
+        targetParent: SecureDirectoryStream<Path>,
+        target: Path,
+        sourceParent: SecureDirectoryStream<Path>,
+        source: Path,
+    ) {
+        val permissions = try {
+            targetParent.getFileAttributeView(target, PosixFileAttributeView::class.java, *NOFOLLOW)
+                ?.readAttributes()?.permissions()
+        } catch (_: Exception) {
+            null
+        } ?: return
+        try {
+            sourceParent.getFileAttributeView(source, PosixFileAttributeView::class.java, *NOFOLLOW)
+                ?.setPermissions(permissions)
+        } catch (_: Exception) {
         }
     }
 

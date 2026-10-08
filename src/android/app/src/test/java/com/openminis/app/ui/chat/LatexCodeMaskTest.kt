@@ -1,4 +1,8 @@
-package com.openminis.app.ui.markdown
+package com.openminis.app.ui.chat
+
+import com.openminis.app.ui.chat.md.INode
+import com.openminis.app.ui.chat.md.IType
+import kotlinx.coroutines.runBlocking
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -17,11 +21,26 @@ import org.junit.Test
  */
 class LatexCodeMaskTest {
 
-    private fun latexOf(md: String): List<String> =
-        MarkdownParser.parseWithMath(md).mathSpans.map { it.latex }
+    /** The display formulas of the document, and the inline ones of its paragraphs. */
+    private fun latexOf(md: String): List<String> {
+        val display = extractDisplayMath(md).blocks.map { it.latex }
+        val inline = mutableListOf<String>()
+        fun walk(n: INode) {
+            var c = n.first
+            while (c != null) {
+                if (c.type == IType.MATH) inline += c.literal
+                walk(c)
+                c = c.next
+            }
+        }
+        val root = INode(IType.TEXT)
+        newChatInlineParser().parse(extractDisplayMath(md).text, root)
+        walk(root)
+        return display + inline
+    }
 
     private fun renderedText(md: String): String =
-        MarkdownParser.parseWithMath(md).blocks.joinToString("\n") { it.toString() }
+        runBlocking { parseMarkdownBlocks(md) }.joinToString("\n") { it.raw }
 
     @Test
     fun `unclosed dollar-dollar does not pair with one inside a later code fence`() {
@@ -52,7 +71,7 @@ class LatexCodeMaskTest {
 
     @Test
     fun `ordinary single-line display math still renders`() {
-        val md = "Mass energy: ${'$'}${'$'}E = mc^2${'$'}${'$'} done."
+        val md = "Mass energy:\n${'$'}${'$'}E = mc^2${'$'}${'$'}\ndone."
         assertEquals(listOf("E = mc^2"), latexOf(md))
     }
 

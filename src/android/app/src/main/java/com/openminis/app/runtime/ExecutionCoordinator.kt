@@ -152,6 +152,7 @@ object ExecutionCoordinator {
      */
     fun newJobProcess(sessionId: String): ShellJobs.JobProcess = object : ShellJobs.JobProcess {
         private val shell = RootPersistentShell(sessionId)
+        private var stdin: JobStdin? = null
 
         override suspend fun run(
             command: String,
@@ -168,12 +169,30 @@ object ExecutionCoordinator {
                 putAll(RootNetworkProxy.proxyEnv())
             }
             if (env.isNotEmpty()) shell.applyEnvironment(env)
-            val ran = shell.executeCommand(command, timeoutMs) { line -> onLine(shellOutputForModel(line)) }
+            // The command reads its input from a pipe the app writes to (job_input), not from the shell's own stdin.
+            val input = openStdin(sessionId)
+            stdin = input
+            val script = if (input == null) command else JobStdin.wrap(command, input.guestPath)
+            val ran = shell.executeCommand(script, timeoutMs) { line -> onLine(shellOutputForModel(line)) }
             val timedOut = ran.exitCode == 124 && ran.output.startsWith("command timed out after")
             return ShellJobs.JobProcess.Result(ran.exitCode, timedOut)
         }
 
-        override fun stop() = shell.stop()
+        override suspend fun writeInput(data: String, eof: Boolean): String? =
+            stdin?.write(data, eof) ?: "this job has no input pipe"
+
+        override fun stop() {
+            shell.stop()
+            stdin?.close()
+        }
+    }
+
+    /** A new stdin pipe in the session's `/tmp` for a job; null when it cannot be made (the job then runs without one). */
+    private fun openStdin(sessionId: String): JobStdin? {
+        val name = ".minis-job-${java.util.UUID.randomUUID().toString().replace("-", "")}.in"
+        val host = com.openminis.app.runtime.ubuntu.UbuntuPaths.resolveSessionHostPath(sessionId, "/tmp/$name") ?: return null
+        host.parentFile?.mkdirs()
+        return JobStdin(host, "/tmp/$name").takeIf { it.create() }
     }
 
     private fun acquireSessionState(sessionId: String): SessionState? = synchronized(sessionStateLock) {

@@ -818,7 +818,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         )
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.runtime.SystemJobsHandler(),
-            aliasNames = listOf("job_list", "job_kill", "job_output"),
+            aliasNames = listOf("job_list", "job_kill", "job_output", "job_input"),
             aliasesAreActions = true,
         )
         com.openminis.app.tools.runtime.ToolRegistry.register(

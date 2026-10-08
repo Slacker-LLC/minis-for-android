@@ -1933,7 +1933,6 @@
     <string name="common_play">Play</string>
     <string name="common_pause">Pause</string>
     <string name="common_revert">Revert</string>
-    <string name="common_copy_code">Copy code</string>
     <string name="common_copied_preview">Copied: %1$s</string>
     <string name="chat_scroll_to_previous">Scroll to previous message</string>
     <string name="chat_scroll_to_bottom">Scroll to bottom</string>
@@ -1994,7 +1993,6 @@
     <string name="file_preview_entries_count">%1$d entries  •  %2$s</string>
     <string name="file_preview_image_dimensions">%1$d x %2$d px  |  %3$s</string>
     <string name="md_math_label">Math: %1$s</string>
-    <string name="md_play_video">Play video</string>
     <string name="mcp_server_local_title">Local MCP server</string>
     <string name="mcp_access_token_label">Access token</string>
     <string name="mcp_token_create_failed">Could not create MCP access token</string>

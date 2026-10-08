@@ -56,8 +56,11 @@ object DebugScreenshotRing {
     suspend fun capture(activity: Activity, label: String, scale: Float): Entry {
         val bitmap = withContext(Dispatchers.Main) { captureBitmap(activity, scale) }
         val baos = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
-        bitmap.recycle()
+        try {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
+        } finally {
+            bitmap.recycle()
+        }
         val entry = Entry(
             id = nextId.getAndIncrement(),
             label = label,
@@ -74,11 +77,20 @@ object DebugScreenshotRing {
             val width = (rootView.width * scale).toInt().coerceAtLeast(1)
             val height = (rootView.height * scale).toInt().coerceAtLeast(1)
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            // The copy target belongs to this call until it is handed to the caller: a failed copy hands over the
+            // canvas fallback instead and frees the target, and a cancelled caller never receives either.
             PixelCopy.request(
                 activity.window, bitmap,
                 { result ->
-                    if (result == PixelCopy.SUCCESS) cont.resume(bitmap)
-                    else cont.resume(canvasCapture(rootView, scale))
+                    if (result == PixelCopy.SUCCESS) {
+                        if (cont.isActive) cont.resume(bitmap) else bitmap.recycle()
+                    } else {
+                        bitmap.recycle()
+                        if (cont.isActive) {
+                            val fallback = canvasCapture(rootView, scale)
+                            cont.resume(fallback)
+                        }
+                    }
                 },
                 Handler(Looper.getMainLooper()),
             )

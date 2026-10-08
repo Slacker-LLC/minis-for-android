@@ -31,4 +31,16 @@ class BotRecoveryPagingTest {
         }) { }
         assertEquals("two full pages, then the empty one ends it", 3, fetches)
     }
+
+    @Test
+    fun `a failed receipt delivery is retried a bounded number of times, with growing pauses`() {
+        val pauses = generateSequence(1) { it + 1 }
+            .map { BotDelegationCoordinator.receiptRetryDelayMs(it) }
+            .takeWhile { it != null }
+            .toList()
+        assertEquals(4, pauses.size)
+        assertEquals(pauses.sortedBy { it }, pauses)
+        assertEquals(null, BotDelegationCoordinator.receiptRetryDelayMs(5))
+        assertEquals(null, BotDelegationCoordinator.receiptRetryDelayMs(0))
+    }
 }

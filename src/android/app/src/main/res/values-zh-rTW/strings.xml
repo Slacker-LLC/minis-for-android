@@ -1811,7 +1811,6 @@
     <string name="common_play">播放</string>
     <string name="common_pause">暫停</string>
     <string name="common_revert">撤銷</string>
-    <string name="common_copy_code">複製程式碼</string>
     <string name="common_copied_preview">已複製：%1$s</string>
     <string name="chat_scroll_to_previous">滾動到上一條訊息</string>
     <string name="chat_scroll_to_bottom">回到底部</string>
@@ -1872,7 +1871,6 @@
     <string name="file_preview_entries_count">%1$d 個條目  •  %2$s</string>
     <string name="file_preview_image_dimensions">%1$d x %2$d 畫素  |  %3$s</string>
     <string name="md_math_label">公式：%1$s</string>
-    <string name="md_play_video">播放影片</string>
     <string name="mcp_server_local_title">本地 MCP 伺服器</string>
     <string name="mcp_access_token_label">訪問令牌</string>
     <string name="mcp_token_create_failed">無法建立 MCP 訪問令牌</string>

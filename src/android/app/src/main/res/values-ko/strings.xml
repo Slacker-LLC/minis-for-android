@@ -1591,7 +1591,6 @@
     <string name="common_play">재생</string>
     <string name="common_pause">일시정지</string>
     <string name="common_revert">되돌리기</string>
-    <string name="common_copy_code">코드 복사</string>
     <string name="common_copied_preview">복사됨: %1$s</string>
     <string name="chat_scroll_to_previous">이전 메시지로 이동</string>
     <string name="chat_scroll_to_bottom">맨 아래로</string>
@@ -1652,7 +1651,6 @@
     <string name="file_preview_entries_count">%1$d개 항목  •  %2$s</string>
     <string name="file_preview_image_dimensions">%1$d x %2$d px  |  %3$s</string>
     <string name="md_math_label">수식: %1$s</string>
-    <string name="md_play_video">동영상 재생</string>
     <string name="mcp_server_local_title">로컬 MCP 서버</string>
     <string name="mcp_access_token_label">액세스 토큰</string>
     <string name="mcp_token_create_failed">MCP 액세스 토큰을 만들 수 없습니다</string>

@@ -270,6 +270,7 @@ internal object MarkdownParseCaches {
                     b.rows.forEach { row -> row.forEach { inline(it, colors); mathLatex(it) } }
                 }
                 is MdBlock.BlockQuote -> prewarm(b.innerBlocks, colors)
+                is MdBlock.Details -> { inline(b.summary, colors); prewarm(b.inner, colors) }
                 else -> Unit // code blocks / media / HR / math-display don't inline-parse
             }
         }

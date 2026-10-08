@@ -1602,7 +1602,6 @@
     <string name="common_play">Abspielen</string>
     <string name="common_pause">Pause</string>
     <string name="common_revert">Rückgängig</string>
-    <string name="common_copy_code">Code kopieren</string>
     <string name="common_copied_preview">Kopiert: %1$s</string>
     <string name="chat_scroll_to_previous">Zur vorherigen Nachricht</string>
     <string name="chat_scroll_to_bottom">Nach unten</string>
@@ -1663,7 +1662,6 @@
     <string name="file_preview_entries_count">%1$d Einträge  •  %2$s</string>
     <string name="file_preview_image_dimensions">%1$d x %2$d px  |  %3$s</string>
     <string name="md_math_label">Formel: %1$s</string>
-    <string name="md_play_video">Video abspielen</string>
     <string name="mcp_server_local_title">Lokaler MCP-Server</string>
     <string name="mcp_access_token_label">Zugriffstoken</string>
     <string name="mcp_token_create_failed">MCP-Zugriffstoken konnte nicht erstellt werden</string>

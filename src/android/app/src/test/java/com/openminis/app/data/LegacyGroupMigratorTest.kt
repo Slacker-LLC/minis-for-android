@@ -122,6 +122,36 @@ class LegacyGroupMigratorTest {
     }
 
     @Test
+    fun entryBindingsThatNameAPreMigrationUuidFollowTheEntryToItsDurableId() {
+        val state = LegacyState(
+            config = ProviderConfig(modelEntries = mutableListOf(entry("provider/model-one", "model-one"))),
+            groups = emptyList(),
+            pointers = LegacyGroupPointers(),
+            agentLoopGroupIds = emptyList(),
+            entryIdAliases = mapOf("legacy-one" to "provider/model-one"),
+            availableEntryIds = setOf("provider/model-one"),
+            sessionBindings = listOf(
+                LegacyBindingRecord("s", """{"type":"entry","entryId":"legacy-one"}""", "model-one"),
+                LegacyBindingRecord("s-durable", """{"type":"entry","entryId":"provider/model-one"}""", "model-one"),
+                LegacyBindingRecord("s-unknown", """{"type":"entry","entryId":"nobody"}""", "model-one"),
+            ),
+            botBindings = listOf(LegacyBindingRecord("b", """{"type":"entry","entryId":"legacy-one"}""", "model-one")),
+            scheduledBindings = listOf(LegacyBindingRecord("t", """{"type":"entry","entryId":"legacy-one"}""", "model-one")),
+        )
+        val result = LegacyGroupMigrator.migrate(state)
+        val durable = """{"type":"entry","entryId":"provider/model-one"}"""
+        assertEquals(durable, result.sessionBindings.first { it.id == "s" }.binding)
+        assertEquals(durable, result.botBindings.first { it.id == "b" }.binding)
+        assertEquals(durable, result.scheduledBindings.first { it.id == "t" }.binding)
+        assertEquals("a durable id is kept as it is", durable, result.sessionBindings.first { it.id == "s-durable" }.binding)
+        assertEquals(
+            "an id that is no alias is not guessed at",
+            """{"type":"entry","entryId":"nobody"}""",
+            result.sessionBindings.first { it.id == "s-unknown" }.binding,
+        )
+    }
+
+    @Test
     fun migrationIsIdempotentAndKeepsSystemVoiceIdsVerbatim() {
         val systemVoice = "__builtin_system_speech__/system-asr-offline"
         val first = LegacyGroupMigrator.migrate(

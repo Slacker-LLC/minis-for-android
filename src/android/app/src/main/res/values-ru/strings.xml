@@ -1817,7 +1817,6 @@
     <string name="common_play">Воспроизвести</string>
     <string name="common_pause">Пауза</string>
     <string name="common_revert">Отменить</string>
-    <string name="common_copy_code">Копировать код</string>
     <string name="common_copied_preview">Скопировано: %1$s</string>
     <string name="chat_scroll_to_previous">К предыдущему сообщению</string>
     <string name="chat_scroll_to_bottom">Вниз</string>
@@ -1878,7 +1877,6 @@
     <string name="file_preview_entries_count">%1$d элементов  •  %2$s</string>
     <string name="file_preview_image_dimensions">%1$d x %2$d px  |  %3$s</string>
     <string name="md_math_label">Формула: %1$s</string>
-    <string name="md_play_video">Воспроизвести видео</string>
     <string name="mcp_server_local_title">Локальный MCP-сервер</string>
     <string name="mcp_access_token_label">Токен доступа</string>
     <string name="mcp_token_create_failed">Не удалось создать токен доступа MCP</string>

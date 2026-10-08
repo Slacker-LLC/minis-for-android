@@ -589,17 +589,19 @@ class AgentAskHandler : ToolHandler {
 class SystemJobsHandler : ToolHandler {
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "system.jobs",
-        description = "Manage background jobs. Pass action=job_list (list all), job_kill (cancel by job_id), or job_output (read output by job_id; wait=true blocks until terminal status, up to timeout_ms).",
+        description = "Manage background jobs. Pass action=job_list (list all), job_kill (cancel by job_id), job_input (send text to a shell job's stdin by job_id; eof=true closes it), or job_output (read output by job_id; wait=true blocks until terminal status, up to timeout_ms).",
         parameters = mapOf(
             "tool_title" to com.openminis.app.data.model.AgentToolParam("string", "Short summary of this call, shown to the user."),
-            "action" to com.openminis.app.data.model.AgentToolParam("string", "job_list | job_kill | job_output."),
+            "action" to com.openminis.app.data.model.AgentToolParam("string", "job_list | job_kill | job_input | job_output."),
             "job_id" to com.openminis.app.data.model.AgentToolParam("string", "The id of the background job (job_kill/job_output)."),
             "wait" to com.openminis.app.data.model.AgentToolParam("boolean", "Block until the job reaches a terminal status (job_output, default false)."),
             "timeout_ms" to com.openminis.app.data.model.AgentToolParam("integer", "Maximum wait in milliseconds when wait=true (default 30000)."),
             "reason" to com.openminis.app.data.model.AgentToolParam("string", "Optional short reason for job_kill."),
+            "input" to com.openminis.app.data.model.AgentToolParam("string", "Text to send as it is (job_input)."),
+            "eof" to com.openminis.app.data.model.AgentToolParam("boolean", "Close the job's stdin after sending (job_input, default false)."),
         ),
         required = listOf("tool_title", "action"),
-        propertyOrdering = listOf("tool_title", "action", "job_id", "wait", "timeout_ms", "reason"),
+        propertyOrdering = listOf("tool_title", "action", "job_id", "wait", "timeout_ms", "reason", "input", "eof"),
         timeoutMs = 120_000L,
     )
     override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult =
