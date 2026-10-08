@@ -364,7 +364,12 @@ internal fun UserMessageBubble(
                     )
                 }
 
-                if (message.content.isNotBlank()) {
+                // What the user quoted (a leading `>` block) is a card above the bubble, not raw marks inside it.
+                val (quotes, bodyText) = remember(message.content) { splitLeadingQuotes(message.content) }
+                quotes.forEach { quote ->
+                    QuoteCard(text = quote, modifier = Modifier.widthIn(max = bubbleMaxWidth).padding(bottom = 4.dp))
+                }
+                if (bodyText.isNotBlank() || (quotes.isNotEmpty() && isQueued)) {
                     // Queued: transparent bg + dashed border + dimmed text +
                     // a red withdraw button alongside. Mirrors iOS
                     // AIChatView.swift queued-bubble overlay.
@@ -419,16 +424,16 @@ internal fun UserMessageBubble(
                             // up text layout the same way large assistant content
                             // does. User bubbles never stream so isStreaming=false.
                             LargeContentGuard(
-                                content = message.content,
+                                content = bodyText,
                                 isStreaming = false,
                                 stableKey = "user:${message.id}",
                             ) {
                                 // 17 / 25.5 on a 14 x 9 padded pill, as long as its longest line: a wrapped message used to
                                 // fill the whole maximum width however short its last line was.
                                 val bubbleTextStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 17.sp, lineHeight = 25.5.sp)
-                                val shrink = shrinkWrappedWidth(message.content, bubbleTextStyle, bubbleMaxWidth - 28.dp)
+                                val shrink = shrinkWrappedWidth(bodyText, bubbleTextStyle, bubbleMaxWidth - 28.dp)
                                 Text(
-                                    text = message.content,
+                                    text = bodyText,
                                     color = textColor,
                                     style = bubbleTextStyle,
                                     modifier = bubbleModifier

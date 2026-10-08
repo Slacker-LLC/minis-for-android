@@ -1275,10 +1275,6 @@
     <plurals name="chat_delete_from_here_dialog_body">
         <item quantity="other">이 메시지와 이후의 모든 내용을 삭제합니다. 총 %d개입니다. 이 작업은 되돌릴 수 없습니다.</item>
     </plurals>
-    <string name="selection_copy_full_text">전체 텍스트 복사</string>
-    <string name="selection_copy_as_markdown">Markdown으로 복사</string>
-    <string name="selection_copy_as_rich_text">서식 있는 텍스트로 복사</string>
-    <string name="selection_copy_as_plain_text">일반 텍스트로 복사</string>
     <!-- [T-android-assistant-action-bar] -->
     <string name="assistant_action_copy">복사</string>
     <string name="assistant_action_regenerate">다시 생성</string>
@@ -1295,6 +1291,10 @@
     <string name="assistant_menu_delete">메시지 삭제</string>
     <!-- [T-android-reply-speech] -->
     <string name="reply_speech_title">AI 답변 %1$d</string>
+    <string name="selection_quote">인용</string>
+    <string name="reply_speech_selection">선택한 텍스트</string>
+    <string name="reply_speech_auto">답변 읽는 중</string>
+    <string name="reply_speech_preparing">음성 준비 중</string>
     <string name="reply_speech_reading">읽는 중</string>
     <string name="reply_speech_paused">일시 중지됨</string>
     <string name="reply_speech_completed">완료됨</string>
@@ -2163,7 +2163,6 @@
     <string name="module_settings_restart_sub">Minis가 실행 중일 때 모듈을 활성화한 경우 사용하세요.</string>
     <string name="work_process_failed_only">%1$d단계 실패</string>
     <string name="model_slot_image">이미지</string>
-    <string name="selection_reply_actions">답변 작업</string>
     <string name="chat_interrupted_short">중단됨</string>
     <string name="queued_delivery_steer">다음 단계에서 작업을 안내합니다</string>
     <string name="queued_delivery_queue">작업이 끝난 뒤 전송됩니다</string>

@@ -93,6 +93,63 @@ fun ChatViewModel.appendToInputText(snippet: String) {
     _inputText.value = joined
 }
 
+/** [text] as a Markdown quote: one `> ` per line, blank lines kept as a bare `>` so the quote stays one block. */
+internal fun quoteForReply(text: String): String =
+    text.trim().lines().joinToString("\n") { line -> if (line.isBlank()) ">" else "> $line" }
+
+/**
+ * Quotes the selected text for the next message: it shows as a card above the composer (with a remove button)
+ * and goes out as a Markdown quote ahead of what the user types, instead of raw `>` lines in the text box.
+ */
+fun ChatViewModel.quoteIntoInput(selection: String) {
+    val text = selection.trim().take(MAX_QUOTE_CHARS)
+    if (text.isEmpty() || text in _quotedTexts.value) return
+    _quotedTexts.value = (_quotedTexts.value + text).takeLast(MAX_QUOTES)
+}
+
+fun ChatViewModel.removeQuote(index: Int) {
+    _quotedTexts.value = _quotedTexts.value.filterIndexed { i, _ -> i != index }
+}
+
+fun ChatViewModel.clearQuotes() {
+    _quotedTexts.value = emptyList()
+}
+
+/**
+ * [text] with the pending quotes in front of it, which are then spent. A send that carries nothing of its own
+ * (no text, no attachment) is left alone, so the quote stays for when the user has typed something.
+ */
+internal fun ChatViewModel.takeQuotedText(text: String): String {
+    val quotes = _quotedTexts.value
+    if (quotes.isEmpty() || (text.isBlank() && _attachments.value.isEmpty())) return text
+    _quotedTexts.value = emptyList()
+    return withQuotes(quotes, text)
+}
+
+internal const val MAX_QUOTES = 5
+internal const val MAX_QUOTE_CHARS = 6_000
+
+internal fun withQuotes(quotes: List<String>, text: String): String =
+    (quotes.map(::quoteForReply) + text.trim()).filter { it.isNotEmpty() }.joinToString("\n\n")
+
+/**
+ * The quotes a message starts with and the rest of it: leading blocks whose every line begins with `>` are quotes
+ * (the marks removed), the first block that is not ends them. How a sent message tells its quote from its reply.
+ */
+internal fun splitLeadingQuotes(content: String): Pair<List<String>, String> {
+    val blocks = content.trim().split(Regex("\n\\s*\n"))
+    val quotes = ArrayList<String>()
+    var used = 0
+    for (block in blocks) {
+        val lines = block.lines()
+        if (lines.isEmpty() || !lines.all { it.trimStart().startsWith(">") }) break
+        quotes += lines.joinToString("\n") { it.trimStart().removePrefix(">").removePrefix(" ") }.trim()
+        used++
+    }
+    if (quotes.isEmpty()) return emptyList<String>() to content
+    return quotes to blocks.drop(used).joinToString("\n\n").trim()
+}
+
 fun ChatViewModel.stashPastedText(text: String): String {
     val entry = PastedText(id = nextPasteId++, text = text)
     _pastedTexts.value = _pastedTexts.value + entry

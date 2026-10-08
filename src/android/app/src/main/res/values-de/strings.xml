@@ -1277,10 +1277,6 @@
         <item quantity="one">Diese Nachricht und alles danach wird gelöscht. Insgesamt %d Nachricht. Dies kann nicht rückgängig gemacht werden.</item>
         <item quantity="other">Diese Nachricht und alles danach wird gelöscht. Insgesamt %d Nachrichten. Dies kann nicht rückgängig gemacht werden.</item>
     </plurals>
-    <string name="selection_copy_full_text">Gesamten Text kopieren</string>
-    <string name="selection_copy_as_markdown">Als Markdown kopieren</string>
-    <string name="selection_copy_as_rich_text">Als formatierten Text kopieren</string>
-    <string name="selection_copy_as_plain_text">Als reinen Text kopieren</string>
     <!-- [T-android-assistant-action-bar] -->
     <string name="assistant_action_copy">Kopieren</string>
     <string name="assistant_action_regenerate">Neu generieren</string>
@@ -1297,6 +1293,10 @@
     <string name="assistant_menu_delete">Nachricht löschen</string>
     <!-- [T-android-reply-speech] -->
     <string name="reply_speech_title">KI-Antwort %1$d</string>
+    <string name="selection_quote">Zitieren</string>
+    <string name="reply_speech_selection">Markierter Text</string>
+    <string name="reply_speech_auto">Antwort wird vorgelesen</string>
+    <string name="reply_speech_preparing">Stimme wird vorbereitet</string>
     <string name="reply_speech_reading">Wird vorgelesen</string>
     <string name="reply_speech_paused">Pausiert</string>
     <string name="reply_speech_completed">Vorgelesen</string>
@@ -2174,7 +2174,6 @@
     <string name="module_settings_restart_sub">Nutze das, wenn du das Modul aktiviert hast, während Minis schon lief.</string>
     <string name="work_process_failed_only">Schritt %1$d fehlgeschlagen</string>
     <string name="model_slot_image">Bild</string>
-    <string name="selection_reply_actions">Antwort-Aktionen</string>
     <string name="chat_interrupted_short">Unterbrochen</string>
     <string name="queued_delivery_steer">Lenkt die Aufgabe im nächsten Schritt</string>
     <string name="queued_delivery_queue">Wird nach Abschluss der Aufgabe gesendet</string>

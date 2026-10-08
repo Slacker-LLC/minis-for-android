@@ -346,11 +346,11 @@ internal suspend fun ChatViewModel.drainQueuedPrompts(
     return AgentTurnOutcome.Completed
 }
 
-fun ChatViewModel.sendMessage(text: String) = sendMessage(text, skipContextCheck = false)
+fun ChatViewModel.sendMessage(text: String) = sendMessage(takeQuotedText(text), skipContextCheck = false)
 
 /** Send [text]; while the agent is working it is held and delivered as [delivery] says. */
 fun ChatViewModel.sendMessage(text: String, delivery: PendingDelivery) =
-    sendMessage(text, skipContextCheck = false, delivery = delivery)
+    sendMessage(takeQuotedText(text), skipContextCheck = false, delivery = delivery)
 
 /**
  * A programmatic prompt (background callback, routine, RPC). It owns exactly [text] and

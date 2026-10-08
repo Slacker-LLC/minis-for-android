@@ -406,6 +406,17 @@ internal fun ChatComposer(
                 }
             }
         }
+        // Selections quoted for this message (selection bar > Quote): one card each, removable.
+        val quotedTexts by viewModel.quotedTexts.collectAsState()
+        quotedTexts.forEachIndexed { index, quote ->
+            QuoteCard(
+                text = quote,
+                onRemove = { viewModel.removeQuote(index) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 12.dp, top = 8.dp),
+            )
+        }
         if (pastedTexts.isNotEmpty()) {
             androidx.compose.foundation.lazy.LazyRow(
                 modifier = Modifier

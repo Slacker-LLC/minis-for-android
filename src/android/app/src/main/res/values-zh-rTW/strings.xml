@@ -797,10 +797,6 @@
     <plurals name="chat_delete_from_here_dialog_body">
         <item quantity="other">將刪除本則訊息及其之後的全部內容，共 %d 則訊息。此操作無法復原。</item>
     </plurals>
-    <string name="selection_copy_full_text">複製全文</string>
-    <string name="selection_copy_as_markdown">以 Markdown 複製</string>
-    <string name="selection_copy_as_rich_text">以格式化文字複製</string>
-    <string name="selection_copy_as_plain_text">以純文字複製</string>
     <!-- [T-android-assistant-action-bar] -->
     <string name="assistant_action_copy">複製</string>
     <string name="assistant_action_regenerate">重新生成</string>
@@ -817,6 +813,10 @@
     <string name="assistant_menu_delete">刪除訊息</string>
     <!-- [T-android-reply-speech] -->
     <string name="reply_speech_title">AI 回覆 %1$d</string>
+    <string name="selection_quote">引用</string>
+    <string name="reply_speech_selection">選取內容</string>
+    <string name="reply_speech_auto">朗讀回覆</string>
+    <string name="reply_speech_preparing">正在合成語音</string>
     <string name="reply_speech_reading">正在朗讀</string>
     <string name="reply_speech_paused">已暫停</string>
     <string name="reply_speech_completed">已讀完</string>
@@ -2383,7 +2383,6 @@
     <string name="module_settings_restart_sub">在 Minis 已經執行時才啟用模組的話，點這裡重新啟動一次。</string>
     <string name="work_process_failed_only">第 %1$d 步失敗</string>
     <string name="model_slot_image">圖像</string>
-    <string name="selection_reply_actions">回覆操作</string>
     <string name="chat_interrupted_short">已中斷</string>
     <string name="queued_delivery_steer">將在下一步引導任務</string>
     <string name="queued_delivery_queue">任務完成後傳送</string>
