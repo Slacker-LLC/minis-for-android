@@ -25,6 +25,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import com.openminis.app.data.repository.awaitConfigLoaded
+import com.openminis.app.logging.AppLogger
 
 class BotDelegationCoordinator private constructor(
     private val application: Application,
@@ -37,6 +38,7 @@ class BotDelegationCoordinator private constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val receiptMutex = Mutex()
+    private val receiptAttempts = ConcurrentHashMap<String, Int>()
     private val targetDispatchLocks = ConcurrentHashMap<String, Mutex>()
     private val waitingTasks = ConcurrentHashMap.newKeySet<String>()
     private val wakingTasks = WakeTaskRegistry()
@@ -489,14 +491,16 @@ class BotDelegationCoordinator private constructor(
     }
     private suspend fun deliverReceipt(delegation: BotDelegationEntity?) {
         if (delegation == null || delegation.deliveredAt != null) return
+        var orphanedRoot: String? = null
         receiptMutex.withLock {
             val current = delegationRepository.get(delegation.id) ?: return@withLock
             if (current.deliveredAt != null) return@withLock
             if (chatRepository.getSession(current.sourceSessionId) == null) {
-                // The source conversation was explicitly deleted, so there
-                // is no valid place to append a receipt. Consume it rather
-                // than retrying an impossible delivery forever.
+                // The source conversation was deleted, so there is no place to append a receipt and nobody
+                // to wake. Consume the receipt, and end the task that was waiting on it: left as it is, the
+                // task would show as active for ever with every member finished.
                 delegationRepository.markDelivered(current.id)
+                orphanedRoot = current.rootTaskId
                 return@withLock
             }
             val marker = "委托 ID：${current.id}"
@@ -519,14 +523,48 @@ class BotDelegationCoordinator private constructor(
                 current.errorText?.takeIf { it.isNotBlank() }?.let { append("\n错误：$it") }
             }
             val parts = JSONArray().put(JSONObject().put("type", "text").put("value", body)).toString()
-            runCatching {
+            // What must survive is the stored card, the inbox event and the delivered mark; showing the card
+            // in an open chat is only a projection of it. The two are kept apart so that a projection that
+            // throws cannot stop the result from reaching the inbox, and a persistence failure is retried
+            // instead of waiting for the next process start.
+            try {
                 val message = chatRepository.appendMessage(current.sourceSessionId, "assistant", parts,
                     idempotencyKey = "bot-receipt:${current.id}")
-                AgentRunner.notifyExternalMessage(application, message)
+                try {
+                    AgentRunner.notifyExternalMessage(application, message)
+                } catch (error: Exception) {
+                    AppLogger.warning("BotReceipt", "card for ${current.id} not shown live: ${error.message}")
+                }
                 val event = publishInboxEvent(current)
                 delegationRepository.markDelivered(current.id)
+                receiptAttempts.remove(current.id)
                 event?.let(wakeDispatcher::onInboxEventPublished)
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                AppLogger.warning("BotReceipt", "delivering ${current.id} failed: ${error.message}")
+                scheduleReceiptRetry(current.id)
             }
+        }
+        orphanedRoot?.let { rootTaskId ->
+            // Only a task whose own conversation is gone is orphaned; a member's source being deleted while
+            // the task's conversation lives does not end the task.
+            val task = taskRepository.get(rootTaskId) ?: return
+            if (chatRepository.getSession(task.originSessionId) == null) cancelRootTask(rootTaskId)
+        }
+    }
+
+    /** Tries the delivery again after a growing pause, a bounded number of times; a start of the app tries it once more. */
+    private fun scheduleReceiptRetry(delegationId: String) {
+        val attempt = receiptAttempts.merge(delegationId, 1, Int::plus) ?: 1
+        val pause = receiptRetryDelayMs(attempt)
+        if (pause == null) {
+            receiptAttempts.remove(delegationId)
+            return
+        }
+        scope.launch {
+            kotlinx.coroutines.delay(pause)
+            deliverReceipt(delegationRepository.get(delegationId))
         }
     }
 
@@ -584,6 +622,11 @@ class BotDelegationCoordinator private constructor(
         )
         private const val MAX_FANOUT_PER_RUN = 4
         private const val MAX_DISPATCH_BATCH = 32
+
+        private val RECEIPT_RETRY_DELAYS_MS = longArrayOf(2_000L, 10_000L, 60_000L, 300_000L)
+
+        /** The pause before retry number [attempt] (1-based) of a failed receipt delivery, or null once the retries are used up. */
+        internal fun receiptRetryDelayMs(attempt: Int): Long? = RECEIPT_RETRY_DELAYS_MS.getOrNull(attempt - 1)
 
         /**
          * Walk a keyset-paged query to its end: [fetch] gets the previous page's last item (null for

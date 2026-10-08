@@ -243,6 +243,39 @@ internal fun RenderBlock(block: MdBlock) {
             }
         }
 
+        is MdBlock.Details -> {
+            var open by remember(block.raw) { mutableStateOf(false) }
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { open = !open }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = if (open) "\u25BE  " else "\u25B8  ",
+                        fontSize = BaseFontSize,
+                        color = ChatColors.secondaryText,
+                    )
+                    MdText(
+                        text = MarkdownParseCaches.inline(block.summary, colors),
+                        fontSize = BaseFontSize,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = BaseLineHeight,
+                        color = colors.text,
+                        modifier = Modifier.weight(1f),
+                        inlineContent = rememberKatexInlineContent(BaseFontSize, MarkdownParseCaches.mathLatex(block.summary)),
+                    )
+                }
+                if (open) {
+                    Column(modifier = Modifier.padding(start = 18.dp)) {
+                        block.inner.forEach { inner -> RenderBlock(inner) }
+                    }
+                }
+            }
+        }
+
         is MdBlock.UnorderedList -> {
             Column(modifier = Modifier.padding(bottom = 8.dp)) {
                 block.items.forEach { item ->

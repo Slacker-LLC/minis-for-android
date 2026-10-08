@@ -1,5 +1,6 @@
 package com.openminis.app.runtime.ubuntu
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -84,5 +85,44 @@ class UbuntuKernelPrivilegeDropTest {
         assertTrue(command.contains("copy_tree '/data/adb/minis/home' '/data/user/0/pkg/files/minis/home' 1-home"))
         // The destination link check still guards a tree that has not been copied yet.
         assertTrue(command.contains("[ -z \"\$LINKS\" ] || return 75"))
+    }
+
+    /** Runs the destination link check of the migration script on a real shell, against a source and destination tree. */
+    private fun linkCheck(source: java.io.File, destination: java.io.File): Int {
+        val script = "check() { SRC='${source.path}'; DST='${destination.path}'; " +
+            UbuntuKernel.LEGACY_LINK_CHECK.replace("/system/bin/find", "find") + "return 0; }; check"
+        val process = ProcessBuilder("sh", "-c", script).redirectErrorStream(true).start()
+        process.inputStream.readBytes()
+        return process.waitFor()
+    }
+
+    @Test
+    fun `a link the legacy copy itself left behind does not block the retry, any other link does`() {
+        val root = java.nio.file.Files.createTempDirectory("minis-link-check").toFile()
+        try {
+            val source = root.resolve("src").apply { mkdirs() }
+            val destination = root.resolve("dst").apply { mkdirs() }
+            fun link(dir: java.io.File, name: String, target: String) =
+                java.nio.file.Files.createSymbolicLink(dir.resolve(name).toPath(), java.nio.file.Paths.get(target))
+            try {
+                link(source, "tool", "bin/real")
+            } catch (error: Exception) {
+                org.junit.Assume.assumeNoException("Symbolic links are unavailable on this test host", error)
+            }
+            assertEquals("no links at all", 0, linkCheck(source, destination))
+
+            link(destination, "tool", "bin/real")
+            assertEquals("the copy of a source link", 0, linkCheck(source, destination))
+
+            link(destination, "planted", "/data/adb")
+            assertEquals("a link the source never had", 75, linkCheck(source, destination))
+
+            destination.resolve("planted").delete()
+            destination.resolve("tool").delete()
+            link(destination, "tool", "/data/adb")
+            assertEquals("a source link retargeted to somewhere else", 75, linkCheck(source, destination))
+        } finally {
+            root.deleteRecursively()
+        }
     }
 }

@@ -12,6 +12,8 @@ import org.junit.Test
 import java.io.File
 import java.nio.file.FileSystemException
 import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermission
+import java.nio.file.attribute.PosixFilePermissions
 
 class SecureFileAccessTest {
     @Test
@@ -128,4 +130,36 @@ class SecureFileAccessTest {
         error is UnsupportedOperationException ||
             error is SecurityException ||
             (System.getProperty("os.name").orEmpty().startsWith("Windows") && error is FileSystemException)
+
+    @Test
+    fun `replacing a file keeps its permission bits and a new file gets no execute bit`() = runBlocking {
+        val root = Files.createTempDirectory("minis-secure-mode").toFile()
+        try {
+            val workspace = root.resolve("workspace").apply { mkdirs() }
+            UbuntuPaths.useLayoutForTest(root)
+            fun mode(name: String) = Files.getPosixFilePermissions(workspace.resolve(name).toPath())
+            val script = workspace.resolve("run.sh").apply { writeText("echo one\n") }
+            val secret = workspace.resolve("secret.txt").apply { writeText("a") }
+            try {
+                Files.setPosixFilePermissions(script.toPath(), PosixFilePermissions.fromString("rwx------"))
+                Files.setPosixFilePermissions(secret.toPath(), PosixFilePermissions.fromString("r--------"))
+            } catch (error: UnsupportedOperationException) {
+                assumeNoException("POSIX permissions are unavailable on this test host", error)
+            }
+            suspend fun path(name: String) = UbuntuPaths.resolveSecureForFileAccess(null, "/workspace/$name")!!
+            val before = mode("run.sh")
+
+            SecureFileAccess.writeBytes(path("run.sh"), "echo two\n".toByteArray(), 1024)
+            SecureFileAccess.writeBytes(path("secret.txt"), "b".toByteArray(), 1024)
+            SecureFileAccess.writeBytes(path("fresh.txt"), "c".toByteArray(), 1024)
+
+            assertEquals("echo two\n", script.readText())
+            assertEquals(before, mode("run.sh"))
+            assertEquals(PosixFilePermissions.fromString("r--------"), mode("secret.txt"))
+            assertTrue(PosixFilePermission.OWNER_EXECUTE !in mode("fresh.txt"))
+        } finally {
+            UbuntuPaths.resetLayoutForTest()
+            root.deleteRecursively()
+        }
+    }
 }

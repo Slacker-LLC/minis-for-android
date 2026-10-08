@@ -93,6 +93,7 @@ object AgentTools {
         add(JobTools.jobOutputDefinition())
         add(JobTools.jobListDefinition())
         add(JobTools.jobKillDefinition())
+        add(JobTools.jobInputDefinition())
         if (memoryEnabled) {
             add(memoryWriteDefinition())
             add(memoryGetDefinition())
@@ -138,7 +139,7 @@ object AgentTools {
             "Workspace is the session-scoped /workspace backed by app-private storage. " +
             "Commands run in a persistent Bash shell with stdout and stderr merged, one at a time; cd/export carry over to the next command. Default timeout is 15 minutes. " +
             "For anything long-running (a build, a server, a download) or to run several things in parallel, set background=true: the command then runs as its own job, " +
-            "independent of this shell and of other jobs, the call returns at once with a job_id, and job_output / job_list / job_kill read its output, wait for it or stop it.",
+            "independent of this shell and of other jobs, the call returns at once with a job_id, and job_output / job_list / job_kill read its output, wait for it or stop it; job_input types into its stdin (for a program that asks questions).",
         parameters = mapOf(
             "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Install Python data analysis packages', 'List files in home directory'). Use the same language as the user."),
             "command" to AgentToolParam("string", "The shell command to execute. Supports multi-line commands directly — no special escaping needed. Keep under 1000 chars; for longer scripts, write to a file with file_write first, then run it."),

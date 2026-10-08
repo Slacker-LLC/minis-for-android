@@ -758,8 +758,7 @@ internal object UbuntuKernel {
                     "if [ -e \"\$DST\" ] && [ ! -d \"\$DST\" ]; then return 74; fi; " +
                     "mkdir -p \"\$DST\"; " +
                     "[ ! -L \"\$DST\" ] || return 73; " +
-                    "LINKS=\$(/system/bin/find \"\$DST\" -type l -print -quit 2>/dev/null || true); " +
-                    "[ -z \"\$LINKS\" ] || return 75; " +
+                    LEGACY_LINK_CHECK +
                     // -n: a file the user already wrote in the new location (before the runtime first
                     // became ready) is newer than the legacy copy and is kept.
                     "cp -a -n \"\$SRC\"/. \"\$DST\"/; " +
@@ -776,6 +775,19 @@ internal object UbuntuKernel {
             }
         }
     }
+
+    /**
+     * Refuses a symlink in the destination tree that the legacy copy did not put there. A link that is also in the
+     * source at the same place, with the same target, is a copy of it: an attempt that was interrupted after copying
+     * one leaves it behind, and refusing it would refuse every retry (exit 75) for ever. Any other link, one an
+     * App process planted, is what Root must not follow.
+     */
+    internal const val LEGACY_LINK_CHECK =
+        "LINKS=\$(/system/bin/find \"\$DST\" -type l 2>/dev/null | while IFS= read -r L; do " +
+            "R=\"\${L#\"\$DST\"}\"; R=\"\${R#/}\"; " +
+            "if [ -L \"\$SRC/\$R\" ] && [ \"\$(readlink \"\$L\")\" = \"\$(readlink \"\$SRC/\$R\")\" ]; " +
+            "then :; else echo \"\$L\"; break; fi; done); " +
+            "[ -z \"\$LINKS\" ] || return 75; "
 
     private fun guardedMigrationParentDirectories(destinations: List<String>): List<String> {
         require(destinations.isNotEmpty()) { "migration destinations must not be empty" }

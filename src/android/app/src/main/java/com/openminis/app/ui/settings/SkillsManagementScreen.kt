@@ -96,7 +96,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.openminis.app.data.repository.SkillRepository
-import com.openminis.app.ui.markdown.MarkdownText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -873,10 +872,9 @@ fun SkillDetailScreen(
             if (preview.isNotEmpty()) {
                 DetailSection(header = "Description") {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        MarkdownText(
-                            markdown = preview,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
+                        com.openminis.app.ui.chat.StreamingMarkdownText(
+                            content = preview,
+                            isStreaming = false,
                         )
                     }
                 }

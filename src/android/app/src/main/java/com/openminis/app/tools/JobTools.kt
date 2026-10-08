@@ -21,6 +21,7 @@ object JobTools {
     const val NAME_OUTPUT = "job_output"
     const val NAME_LIST = "job_list"
     const val NAME_KILL = "job_kill"
+    const val NAME_INPUT = "job_input"
 
     /** Default wait budget for `job_output` with wait=true (milliseconds). */
     private const val DEFAULT_WAIT_TIMEOUT_MS = 30_000L
@@ -41,6 +42,7 @@ object JobTools {
             NAME_OUTPUT -> jobOutput(argsJson)
             NAME_LIST -> jobList()
             NAME_KILL -> jobKill(argsJson)
+            NAME_INPUT -> jobInput(argsJson, sessionId)
             else -> ToolExecutionResult("job: unknown action " + name, false)
         }
 
@@ -91,6 +93,24 @@ object JobTools {
         timeoutMs = 10_000L,
     )
 
+    fun jobInputDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = NAME_INPUT,
+        description = "Send text to the standard input of a running background shell job (one started with " +
+            "shell_execute background=true), the way typing into it would: a program that reads a line gets it and " +
+            "waits for the next. Nothing is added to the text, so end a line with \\n. Set eof=true to close its " +
+            "input afterwards (or alone, with no input) for programs that read until end-of-file. Read what the job " +
+            "answered with job_output.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user. Use the same language as the user."),
+            "job_id" to AgentToolParam("string", "The id of the job to send input to."),
+            "input" to AgentToolParam("string", "Text to send, sent as it is."),
+            "eof" to AgentToolParam("boolean", "Close the job's input after sending (default false)."),
+        ),
+        required = listOf("tool_title", "job_id"),
+        propertyOrdering = listOf("tool_title", "job_id", "input", "eof"),
+        timeoutMs = 30_000L,
+    )
+
     // ── Executors ───────────────────────────────────────────────────────────
 
     internal suspend fun jobOutput(argsJson: String): ToolExecutionResult {
@@ -136,6 +156,22 @@ object JobTools {
             job.id + " [" + job.kind + "] " + job.status.name + " \u2014 " + job.label
         }
         return ToolExecutionResult(lines, true)
+    }
+
+    private suspend fun jobInput(argsJson: String, sessionId: String?): ToolExecutionResult {
+        val args = runCatching { JSONObject(argsJson) }.getOrNull()
+            ?: return ToolExecutionResult("job_input: invalid arguments JSON", false)
+        val jobId = args.optString("job_id").trim()
+        if (jobId.isEmpty()) return ToolExecutionResult("job_input: missing 'job_id'", false)
+        val input = args.optString("input", "")
+        val eof = args.optBoolean("eof", false)
+        if (input.isEmpty() && !eof) return ToolExecutionResult("job_input: give 'input' or eof=true", false)
+        val error = com.openminis.app.runtime.ShellJobs.writeInput(sessionId, jobId, input, eof)
+        return if (error == null) {
+            ToolExecutionResult(if (eof) "sent; input closed" else "sent", true)
+        } else {
+            ToolExecutionResult("job_input: $error", false)
+        }
     }
 
     private fun jobKill(argsJson: String): ToolExecutionResult {

@@ -130,8 +130,10 @@ class MarkdownBlockAdapterTest {
     @Test
     fun `html blocks show their content, not their markup`() {
         val b = blocks("<details>\n<summary>More</summary>\n\nHidden **text**\n\n</details>")
-        assertTrue(b.any { it is MdBlock.Paragraph && "More" in it.raw })
-        assertTrue(b.any { it is MdBlock.Paragraph && "Hidden **text**" in it.raw })
+        val details = b.single() as MdBlock.Details
+        assertEquals("More", details.summary)
+        assertTrue(details.inner.any { it is MdBlock.Paragraph && "Hidden **text**" in it.raw })
+        assertTrue(blocks("<div>plain <b>words</b></div>").any { it is MdBlock.Paragraph && "plain" in it.raw })
         assertEquals(emptyList<String>(), kinds("<!-- a note for later -->"))
     }
 
@@ -152,5 +154,45 @@ class MarkdownBlockAdapterTest {
     fun `generic types and stray tags are text, not markup`() {
         assertEquals("Optional<String> and Map<K, V>", parseInline("Optional<String> and Map<K, V>", colors).text)
         assertEquals("a<br>b".replace("<br>", "\n"), parseInline("a<br>b", colors).text)
+    }
+
+    @Test
+    fun `details with markdown content is one collapsible block`() {
+        val md = "before\n\n<details>\n<summary>More **info**</summary>\n\nHidden *text*.\n\n- a\n- b\n\n</details>\n\nafter"
+        assertEquals(listOf("Paragraph", "Details", "Paragraph"), kinds(md))
+        val d = blocks(md)[1] as MdBlock.Details
+        assertEquals("More **info**", d.summary)
+        assertEquals(listOf("Paragraph", "UnorderedList"), d.inner.map { it::class.simpleName })
+    }
+
+    @Test
+    fun `details written on one line and nested details`() {
+        val one = blocks("<details><summary>S</summary>body text</details>")
+        assertEquals(1, one.size)
+        val d = one[0] as MdBlock.Details
+        assertEquals("S", d.summary)
+        assertEquals("body text", (d.inner.single() as MdBlock.Paragraph).raw)
+
+        val nested = blocks("<details>\n<summary>outer</summary>\n\n<details>\n<summary>inner</summary>\n\ndeep\n\n</details>\n\ntail\n\n</details>\n\nout")
+        assertEquals(listOf("Details", "Paragraph"), nested.map { it::class.simpleName })
+        val outer = nested[0] as MdBlock.Details
+        assertEquals(listOf("Details", "Paragraph"), outer.inner.map { it::class.simpleName })
+        assertEquals("deep", ((outer.inner[0] as MdBlock.Details).inner.single() as MdBlock.Paragraph).raw)
+    }
+
+    @Test
+    fun `an unclosed details still collapses what follows and a stray closing tag is not content`() {
+        val open = blocks("<details>\n<summary>never closed</summary>\n\nbody")
+        assertEquals(listOf("Details"), open.map { it::class.simpleName })
+        assertEquals(listOf("Paragraph"), (open[0] as MdBlock.Details).inner.map { it::class.simpleName })
+        assertEquals(listOf("Paragraph"), kinds("text\n\n</details>\n\nmore").let { it.take(1) })
+    }
+
+    @Test
+    fun `a details element is never cut apart into streaming fragments`() {
+        val md = "intro\n\n<details>\n<summary>S</summary>\n\nbody one\n\nbody two\n\n</details>\n\noutro"
+        val fragments = splitMarkdownIntoBlockTexts(md)
+        assertEquals(3, fragments.size)
+        assertTrue(fragments[1].startsWith("<details>") && fragments[1].endsWith("</details>"))
     }
 }

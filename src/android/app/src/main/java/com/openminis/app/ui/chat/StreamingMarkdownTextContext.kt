@@ -1,5 +1,6 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.ui.chat.md.BNode
 import com.openminis.app.ui.chat.md.BlockParser
 import com.openminis.app.ui.chat.md.MdDocument
 import android.net.Uri
@@ -415,7 +416,15 @@ fun splitMarkdownIntoBlockTexts(content: String): List<String> {
     if (doc.footnoteLabels.isNotEmpty()) return listOf(content.trimEnd('\n'))
     // One fragment per top-level block, cut where the parser says each block starts, so a list with blank lines
     // between its items, an item holding several paragraphs, a fence with blank lines in it stay in one piece.
-    val starts = doc.root.children.map { (it.startLine - 1).coerceIn(0, lines.size - 1) }.distinct().sorted()
+    // A `<details>` element is one piece however many blocks its content has: it collapses as a whole.
+    val top = doc.root.children
+    val kept = ArrayList<BNode>(top.size)
+    var t = 0
+    while (t < top.size) {
+        kept += top[t]
+        t = if (opensDetails(top[t])) detailsGroupEnd(top, t) + 1 else t + 1
+    }
+    val starts = kept.map { (it.startLine - 1).coerceIn(0, lines.size - 1) }.distinct().sorted()
     if (starts.isEmpty()) return listOf(content.trimEnd('\n'))
     val definitions = referenceDefinitionLines(doc)
     // the definitions' own lines render as nothing; they are re-added, canonical, where a fragment may use them
@@ -826,6 +835,8 @@ internal sealed class MdBlock(val raw: String) {
     class OrderedList(raw: String, val items: List<ListItem>, val startNum: Int = 1) : MdBlock(raw)
     class TaskList(raw: String, val items: List<TaskItem>) : MdBlock(raw)
     class HorizontalRule(raw: String) : MdBlock(raw)
+    /** A `<details>` element: [summary] is inline Markdown, [inner] the blocks shown when it is opened. */
+    class Details(raw: String, val summary: String, val inner: List<MdBlock>) : MdBlock(raw)
     class Table(
         raw: String,
         val headers: List<String>,

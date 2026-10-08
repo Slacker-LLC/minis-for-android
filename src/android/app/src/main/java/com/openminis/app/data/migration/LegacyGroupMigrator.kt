@@ -165,7 +165,7 @@ internal object LegacyGroupMigrator {
             return MigratedBinding(record.id, null)
         }
         when (val parsed = ModelBinding.parse(raw)) {
-            is ModelBinding.Entry -> return MigratedBinding(record.id, raw, record.modelId)
+            is ModelBinding.Entry -> return migrateEntryBinding(record, raw, parsed, canonical)
             is ModelBinding.Group -> {
                 val group = groups[parsed.groupId] ?: return MigratedBinding(record.id, null, record.modelId)
                 val members = group.memberEntryIds.map(canonical)
@@ -197,8 +197,9 @@ internal object LegacyGroupMigrator {
         entriesById: Map<String, ModelEntry>,
     ): MigratedBinding {
         val parsed = ModelBinding.parse(record.binding)
+        if (parsed is ModelBinding.Entry) return migrateEntryBinding(record, record.binding, parsed, canonical)
         if (parsed !is ModelBinding.Group) {
-            // Already-entry bindings and null/unknown payloads are intentionally preserved.
+            // Null/unknown payloads are intentionally preserved.
             return MigratedBinding(record.id, record.binding, record.modelId)
         }
         val group = groups[parsed.groupId]
@@ -214,6 +215,22 @@ internal object LegacyGroupMigrator {
             binding = entryBinding(selected),
             modelId = modelId ?: record.modelId,
         )
+    }
+
+    /**
+     * An entry binding is already in the new format, but the entry it names may still carry the random id the
+     * model entry had before migration, which the migrated catalog no longer contains. It is renamed to the durable
+     * id; one that is not an alias (already durable, or unknown) is kept as it is.
+     */
+    private fun migrateEntryBinding(
+        record: LegacyBindingRecord,
+        raw: String?,
+        parsed: ModelBinding.Entry,
+        canonical: (String) -> String,
+    ): MigratedBinding {
+        val durable = canonical(parsed.entryId)
+        if (durable == parsed.entryId) return MigratedBinding(record.id, raw, record.modelId)
+        return MigratedBinding(record.id, entryBinding(durable), record.modelId)
     }
 
     private fun entryBinding(entryId: String): String = ModelBinding.encodeEntry(entryId)

@@ -48,7 +48,51 @@ internal class MarkdownBlockAdapter {
     private fun inl(text: String): String = if (needsRefs) inline.resolveReferences(text) else text
 
     private fun convertChildren(nodes: List<BNode>, out: MutableList<MdBlock>, depth: Int) {
-        for (node in nodes) convert(node, out, depth)
+        var i = 0
+        while (i < nodes.size) {
+            val node = nodes[i]
+            if (node.type == BType.HTML_BLOCK && DETAILS_OPEN.containsMatchIn(node.literal) && depth < MAX_NESTING) {
+                val end = detailsGroupEnd(nodes, i)
+                details(nodes.subList(i, end + 1), out, depth)
+                i = end + 1
+            } else {
+                convert(node, out, depth)
+                i++
+            }
+        }
+    }
+
+    /**
+     * A `<details>` element. Its opening tag, its content and its closing tag are separate blocks whenever the
+     * content is Markdown (a blank line ends an HTML block), so the group is read from the sibling blocks
+     * [group] holds: the first block carries the opening tag and the `<summary>`, the last one the closing tag.
+     */
+    private fun details(group: List<BNode>, out: MutableList<MdBlock>, depth: Int) {
+        var head = group.first().literal
+        val net = group.sumOf { n ->
+            if (n.type != BType.HTML_BLOCK) 0 else DETAILS_OPEN.findAll(n.literal).count() - DETAILS_CLOSE.findAll(n.literal).count()
+        }
+        val closed = net <= 0
+        val summary = SUMMARY.find(head)?.groupValues?.get(1)?.let { stripTags(it) }?.trim().orEmpty()
+        head = head.replaceFirst(DETAILS_OPEN, "").replaceFirst(SUMMARY, "")
+        var tail = ""
+        if (group.size == 1) {
+            head = head.dropLastClosingTag()
+        } else if (closed) {
+            tail = group.last().literal.dropLastClosingTag()
+        }
+        val inner = ArrayList<MdBlock>()
+        if (head.isNotBlank()) inner += MarkdownBlockAdapter().convertDocument(htmlToMarkdown(head), depth + 1)
+        val middle = if (group.size > 1) group.subList(1, group.size - if (closed) 1 else 0) else emptyList()
+        convertChildren(middle, inner, depth + 1)
+        if (tail.isNotBlank()) inner += MarkdownBlockAdapter().convertDocument(htmlToMarkdown(tail), depth + 1)
+        val title = summary.ifEmpty { "Details" }
+        out += MdBlock.Details(title + "\n" + inner.joinToString("\n") { it.raw }, title, inner)
+    }
+
+    private fun String.dropLastClosingTag(): String {
+        val last = DETAILS_CLOSE.findAll(this).lastOrNull() ?: return this
+        return removeRange(last.range)
     }
 
     private fun convert(node: BNode, out: MutableList<MdBlock>, depth: Int) {
@@ -312,6 +356,28 @@ internal fun extractDisplayMath(content: String): ExtractedMath {
     }
     return ExtractedMath(out.joinToString("\n"), blocks)
 }
+
+private val DETAILS_OPEN = Regex("<details\\b[^>]*>", RegexOption.IGNORE_CASE)
+private val DETAILS_CLOSE = Regex("</details\\s*>", RegexOption.IGNORE_CASE)
+private val SUMMARY = Regex("<summary[^>]*>([\\s\\S]*?)</summary>", RegexOption.IGNORE_CASE)
+private fun stripTags(s: String) = s.replace(Regex("<[^>]+>"), "")
+
+/**
+ * The index of the block that closes the `<details>` element opened by `nodes[from]`, counting nested elements; the
+ * last block when it is never closed (a message still streaming, or a model that forgot the closing tag).
+ */
+internal fun detailsGroupEnd(nodes: List<BNode>, from: Int): Int {
+    var open = 0
+    for (k in from until nodes.size) {
+        if (nodes[k].type != BType.HTML_BLOCK) continue
+        open += DETAILS_OPEN.findAll(nodes[k].literal).count() - DETAILS_CLOSE.findAll(nodes[k].literal).count()
+        if (open <= 0) return k
+    }
+    return nodes.lastIndex
+}
+
+/** Whether this block opens a `<details>` element (the check [detailsGroupEnd] starts from). */
+internal fun opensDetails(node: BNode) = node.type == BType.HTML_BLOCK && DETAILS_OPEN.containsMatchIn(node.literal)
 
 private val FENCE_OPEN = Regex("^(?:`{3,}(?!.*`)|~{3,})")
 private val FENCE_CLOSE = Regex("^(?:`{3,}|~{3,})(?=[ \\t]*$)")

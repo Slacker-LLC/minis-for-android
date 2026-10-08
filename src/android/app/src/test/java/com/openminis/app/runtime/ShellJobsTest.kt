@@ -28,6 +28,15 @@ class ShellJobsTest {
             return end.await()
         }
 
+        val received = StringBuilder()
+        @Volatile var inputClosed = false
+
+        override suspend fun writeInput(data: String, eof: Boolean): String? {
+            received.append(data)
+            if (eof) inputClosed = true
+            return null
+        }
+
         override fun stop() {
             stopped = true
             end.cancel()
@@ -187,5 +196,25 @@ class ShellJobsTest {
         val done = JobTools.jobOutput("""{"tool_title":"t","job_id":"$id","offset":99}""")
         assertTrue(done.output.contains("[status: FAILED — exit code 3]"))
         assertNotNull(done.output)
+    }
+
+    @Test
+    fun `input reaches only a running job of the same session`() = runBlocking {
+        val process = FakeProcess()
+        val id = start("s1", process)
+        waitFor("running") { status(id) == JobRegistry.JobStatus.RUNNING }
+
+        assertEquals(null, ShellJobs.writeInput("s1", id, "yes\n", eof = false))
+        assertEquals(null, ShellJobs.writeInput("s1", id, "", eof = true))
+        assertEquals("yes\n", process.received.toString())
+        assertTrue(process.inputClosed)
+
+        assertTrue("another session is refused", ShellJobs.writeInput("s2", id, "x", false)!!.contains("another session"))
+        assertTrue("an unknown job is refused", ShellJobs.writeInput("s1", "nope", "x", false)!!.contains("no such job"))
+        assertEquals("yes\n", process.received.toString())
+
+        process.end.complete(ShellJobs.JobProcess.Result(0))
+        waitFor("completion") { status(id) == JobRegistry.JobStatus.COMPLETED }
+        assertTrue("a finished job takes no input", ShellJobs.writeInput("s1", id, "late", false)!!.isNotEmpty())
     }
 }

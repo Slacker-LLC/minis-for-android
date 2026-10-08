@@ -1599,7 +1599,6 @@
     <string name="common_play">再生</string>
     <string name="common_pause">一時停止</string>
     <string name="common_revert">元に戻す</string>
-    <string name="common_copy_code">コードをコピー</string>
     <string name="common_copied_preview">コピーしました: %1$s</string>
     <string name="chat_scroll_to_previous">前のメッセージへ</string>
     <string name="chat_scroll_to_bottom">一番下へ</string>
@@ -1660,7 +1659,6 @@
     <string name="file_preview_entries_count">%1$d 件  •  %2$s</string>
     <string name="file_preview_image_dimensions">%1$d x %2$d px  |  %3$s</string>
     <string name="md_math_label">数式: %1$s</string>
-    <string name="md_play_video">動画を再生</string>
     <string name="mcp_server_local_title">ローカル MCP サーバー</string>
     <string name="mcp_access_token_label">アクセストークン</string>
     <string name="mcp_token_create_failed">MCP アクセストークンを作成できませんでした</string>

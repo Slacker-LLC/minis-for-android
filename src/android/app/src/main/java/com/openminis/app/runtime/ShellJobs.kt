@@ -32,6 +32,9 @@ object ShellJobs {
 
         /** Kills the process (and what it started). Safe to call at any time, more than once. */
         fun stop()
+
+        /** Sends [data] to the process's stdin, then closes it when [eof]. Null on success, otherwise the reason it failed. */
+        suspend fun writeInput(data: String, eof: Boolean): String? = "this job cannot take input"
     }
 
     class LimitExceeded(message: String) : Exception(message)
@@ -111,6 +114,18 @@ object ShellJobs {
             }
         }
         return id
+    }
+
+    /** Sends input to a running job of [sessionId]. Null on success, otherwise what to tell the agent. */
+    suspend fun writeInput(sessionId: String?, jobId: String, data: String, eof: Boolean): String? {
+        val entry = entries[jobId]
+        val job = JobRegistry.get(jobId)
+        if (entry == null || job == null) {
+            return if (job == null) "no such job: $jobId" else "job $jobId is not a shell job started in this session"
+        }
+        if (sessionId != null && entry.sessionId != sessionId) return "job $jobId belongs to another session"
+        if (job.status != JobRegistry.JobStatus.RUNNING) return "job $jobId is not running (${job.status.name})"
+        return entry.process.writeInput(data, eof)
     }
 
     /** The session ended: nothing of it may keep running. */
