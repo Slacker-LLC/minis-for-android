@@ -226,7 +226,7 @@ internal fun ChatViewModel.rerunFromToolBlock(assistantMessageId: String, blockI
 
     val initialProvider = currentProvider
     if (initialProvider == null) {
-        _error.value = "No provider configured"
+        _error.value = context.getString(R.string.chat_no_provider)
         request?.reject("no_provider")
         return false
     }
@@ -539,7 +539,7 @@ internal fun ChatViewModel.retryFromMessage(messageId: String, request: AgentTur
     val initialProvider = currentProvider
     if (!canRetryMessage(message, initialProvider != null)) {
         if (message.role == "user" && message.content.isNotBlank() && initialProvider == null) {
-            _error.value = "No provider configured"
+            _error.value = context.getString(R.string.chat_no_provider)
         }
         request?.reject(if (initialProvider == null) "no_provider" else "message_not_retryable")
         return false

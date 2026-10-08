@@ -2187,4 +2187,15 @@
     <string name="llm_err_decoding">プロバイダーの応答を読み取れませんでした。再試行してください。</string>
     <string name="llm_err_detail">詳細：%1$s</string>
     <string name="compact_failed">会話の圧縮に失敗しました：%1$s</string>
+    <string name="chat_no_provider">モデルプロバイダーが未設定です。「設定 → プロバイダー」で追加してください。</string>
+    <string name="chat_provider_rejected">プロバイダーの設定が拒否されました。</string>
+    <string name="chat_turn_limit">ツールの暴走を防ぐため %1$d ターンで停止しました。モデルが終了せずにツールを呼び続けています。「続ける」で再開するか、新しいメッセージで最初からやり直してください。</string>
+    <string name="compact_no_provider">モデルプロバイダーが未設定のため、会話を圧縮できません。</string>
+    <string name="compact_nothing">圧縮する内容がまだありません。</string>
+    <string name="compact_timeout">圧縮が %1$d 秒でタイムアウトしました。後でもう一度お試しください。</string>
+    <string name="compact_rejected">圧縮は拒否されました。元の会話はそのままです。</string>
+    <string name="compact_wait_send">送信は現在の圧縮が終わるまでお待ちください。</string>
+    <string name="compact_revert_busy">返信または圧縮の実行中は、圧縮を元に戻せません。</string>
+    <string name="compact_revert_none">この会話には元に戻せる圧縮がありません。</string>
+    <string name="compact_revert_failed">圧縮を元に戻せません：記録が見つかりません。</string>
 </resources>

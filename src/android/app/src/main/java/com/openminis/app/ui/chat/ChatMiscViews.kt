@@ -939,7 +939,7 @@ internal fun ResumeBanner(showCrashWarning: Boolean, onResume: () -> Unit) {
                 text = stringResource(R.string.resume_action),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
-                color = ChatColors.background,
+                color = MaterialTheme.colorScheme.onPrimary,
             )
         }
     }
@@ -977,7 +977,7 @@ internal fun SwipeToSendHint(
     if (progress <= 0f) return
     val palette = ChatColors
     val chipBg = palette.sendButton
-    val chipFg = palette.background
+    val chipFg = MaterialTheme.colorScheme.onPrimary
     // Capsule full opacity at `armFraction`. Linear from
     // `armFraction - 0.4` -> `armFraction`.
     val capsuleStart = (armFraction - 0.4f).coerceAtLeast(0f)

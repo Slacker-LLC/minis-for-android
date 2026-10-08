@@ -395,7 +395,7 @@ internal fun ChatViewModel.sendMessage(
     if (_isCompacting.value) {
         request?.reject("session_compacting")
         appendSystemInfo(
-            text = "Wait for the current compact to finish before sending.",
+            text = context.getString(R.string.compact_wait_send),
             iconKind = "compact",
         )
         return
@@ -447,7 +447,7 @@ internal fun ChatViewModel.sendMessage(
 
     val initialProvider = currentProvider
     if (initialProvider == null) {
-        _error.value = "No provider configured"
+        _error.value = context.getString(R.string.chat_no_provider)
         request?.reject("no_provider_configured")
         return
     }

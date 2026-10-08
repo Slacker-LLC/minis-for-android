@@ -2399,4 +2399,15 @@
     <string name="llm_err_decoding">無法讀取服務商的回覆，請重試。</string>
     <string name="llm_err_detail">詳情：%1$s</string>
     <string name="compact_failed">壓縮對話失敗：%1$s</string>
+    <string name="chat_no_provider">尚未設定模型服務商。請到「設定 → 服務商」新增。</string>
+    <string name="chat_provider_rejected">服務商設定被拒絕。</string>
+    <string name="chat_turn_limit">已在 %1$d 輪後停止，以防工具呼叫失控。模型一直在呼叫工具而沒有收尾。點「繼續」從這裡接著做，或傳一則新訊息重新開始。</string>
+    <string name="compact_no_provider">沒有設定模型服務商，無法壓縮對話。</string>
+    <string name="compact_nothing">還沒有可壓縮的內容。</string>
+    <string name="compact_timeout">壓縮對話逾時（%1$d 秒）。請稍後再試。</string>
+    <string name="compact_rejected">壓縮被拒絕，原對話保持不變。</string>
+    <string name="compact_wait_send">請等目前的壓縮完成後再傳送。</string>
+    <string name="compact_revert_busy">回覆或壓縮進行中，無法復原壓縮。</string>
+    <string name="compact_revert_none">這個對話裡沒有可復原的壓縮。</string>
+    <string name="compact_revert_failed">無法復原壓縮：找不到它的記錄。</string>
 </resources>

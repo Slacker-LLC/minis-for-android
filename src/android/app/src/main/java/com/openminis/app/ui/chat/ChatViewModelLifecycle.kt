@@ -443,7 +443,7 @@ fun ChatViewModel.resume() {
     if (deferUntilMediaCommitted { resume() }) return
     if (_isStreaming.value || !_canResume.value) return
     val provider = currentProvider ?: run {
-        _error.value = "No provider configured"
+        _error.value = context.getString(R.string.chat_no_provider)
         return
     }
     _canResume.value = false

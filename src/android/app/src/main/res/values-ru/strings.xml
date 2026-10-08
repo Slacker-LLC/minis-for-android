@@ -2407,4 +2407,15 @@
     <string name="llm_err_decoding">Не удалось прочитать ответ провайдера. Повторите попытку.</string>
     <string name="llm_err_detail">Подробности: %1$s</string>
     <string name="compact_failed">Не удалось сжать беседу: %1$s</string>
+    <string name="chat_no_provider">Провайдер модели не настроен. Добавьте его в Настройки → Провайдеры.</string>
+    <string name="chat_provider_rejected">Настройка провайдера отклонена.</string>
+    <string name="chat_turn_limit">Остановлено после %1$d ходов агента, чтобы избежать бесконечных вызовов инструментов. Нажмите «Продолжить» или отправьте новое сообщение.</string>
+    <string name="compact_no_provider">Провайдер модели не настроен, беседу нельзя сжать.</string>
+    <string name="compact_nothing">Пока нечего сжимать.</string>
+    <string name="compact_timeout">Сжатие прервано по тайм-ауту (%1$d с). Повторите позже.</string>
+    <string name="compact_rejected">Сжатие отклонено; исходная беседа сохранена.</string>
+    <string name="compact_wait_send">Дождитесь окончания сжатия перед отправкой.</string>
+    <string name="compact_revert_busy">Нельзя отменить сжатие, пока идёт ответ или сжатие.</string>
+    <string name="compact_revert_none">В этой беседе нет сжатия для отмены.</string>
+    <string name="compact_revert_failed">Не удалось отменить сжатие: запись не найдена.</string>
 </resources>

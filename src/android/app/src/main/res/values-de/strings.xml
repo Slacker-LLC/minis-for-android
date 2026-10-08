@@ -2190,4 +2190,15 @@
     <string name="llm_err_decoding">Die Antwort des Anbieters konnte nicht gelesen werden. Versuche es erneut.</string>
     <string name="llm_err_detail">Details: %1$s</string>
     <string name="compact_failed">Komprimierung fehlgeschlagen: %1$s</string>
+    <string name="chat_no_provider">Kein Modellanbieter eingerichtet. Füge unter Einstellungen → Anbieter einen hinzu.</string>
+    <string name="chat_provider_rejected">Die Anbieterkonfiguration wurde abgelehnt.</string>
+    <string name="chat_turn_limit">Nach %1$d Agentenrunden gestoppt, um außer Kontrolle geratene Tool-Aufrufe zu verhindern. Tippe auf Fortsetzen oder sende eine neue Nachricht.</string>
+    <string name="compact_no_provider">Kein Modellanbieter eingerichtet, die Unterhaltung kann nicht komprimiert werden.</string>
+    <string name="compact_nothing">Noch nichts zu komprimieren.</string>
+    <string name="compact_timeout">Komprimierung nach %1$d s abgebrochen. Versuche es später erneut.</string>
+    <string name="compact_rejected">Komprimierung abgelehnt; die ursprüngliche Unterhaltung bleibt erhalten.</string>
+    <string name="compact_wait_send">Warte mit dem Senden, bis die Komprimierung fertig ist.</string>
+    <string name="compact_revert_busy">Die Komprimierung kann nicht rückgängig gemacht werden, solange eine Antwort oder Komprimierung läuft.</string>
+    <string name="compact_revert_none">In dieser Unterhaltung gibt es nichts rückgängig zu machen.</string>
+    <string name="compact_revert_failed">Rückgängig nicht möglich: Der Eintrag wurde nicht gefunden.</string>
 </resources>

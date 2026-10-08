@@ -234,7 +234,8 @@ fun MinisTheme(
 ) {
     val colorScheme = (if (darkTheme) DarkColorScheme else LightColorScheme).withAccent(accent, darkTheme)
     val typography = scaledTypography(fontScale)
-    val chatPalette = if (darkTheme) DarkChatPalette else LightChatPalette
+    // The send, stop and resume buttons are the chat's main action: they take the accent, not a fixed black/white.
+    val chatPalette = (if (darkTheme) DarkChatPalette else LightChatPalette).copy(sendButton = colorScheme.primary)
 
     MaterialTheme(
         colorScheme = colorScheme,
