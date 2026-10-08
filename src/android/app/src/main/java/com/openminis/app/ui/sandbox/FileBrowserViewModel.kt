@@ -223,6 +223,10 @@ class FileBrowserViewModel(
     private val guestSessionId: String? = null,
 ) : ViewModel() {
 
+    // Declared before `init`: the init block starts the first listing, and properties are initialised in the order
+    // they are written, so a declaration below it would still be null when that listing asks for a ticket.
+    private val latestLoad = LatestRequest()
+
     private val _uiState = MutableStateFlow(FileBrowserUiState())
     val uiState: StateFlow<FileBrowserUiState> = _uiState.asStateFlow()
 
@@ -437,7 +441,6 @@ class FileBrowserViewModel(
     }
 
     /** Only the newest directory load may publish; a slow earlier one must not overwrite it. */
-    private val latestLoad = LatestRequest()
 
     private fun loadItems() {
         _uiState.value = _uiState.value.copy(isLoading = true)
