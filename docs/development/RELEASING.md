@@ -81,6 +81,18 @@ gh release create vX.Y --verify-tag --title "X.Y" --notes-file NOTES.md path/to/
 
 beta 加 `--prerelease`。
 
+## 重发一个已发布的版本（覆盖）
+
+默认做法是发补丁（`X.Y.Z`），不改已发布的 tag。只有所有者明确决定"用当前 `main` 重做 `X.Y`"时才覆盖，并按下面做；这是对外可见、难以撤回的操作，所以要先留退路：
+
+1. 把现有的 APK 和 Release 说明下载到本地备份（`gh release download vX.Y`、`gh release view vX.Y --json body`）。
+2. 文档、`CHANGELOG.md` 先经 PR 合并；在 `CHANGELOG.md` 的该版本下写一节"重新构建"，说明与首次发布的差别。
+3. 在合并后的 `main` 上用生产密钥构建，`scripts/verify-android-release.sh` 通过后再动 tag。
+4. 移动 tag（`Protect release tags` 只允许管理员）：`git tag -fa vX.Y -m "Minis for Android X.Y"`，`git push --force origin vX.Y`。
+5. `gh release edit vX.Y --notes-file NOTES.md`，再 `gh release upload vX.Y <新 apk> --clobber`，并核对 Release 上的 APK SHA-256 与本地一致。
+
+覆盖发布的限制：`versionName` 与 `versionCode` 不变（1.0 是 1000099），所以已安装旧 1.0 的设备不会被应用内更新器提示更新，只能手动安装新 APK；签名密钥相同，可直接覆盖安装并保留数据。需要让用户自动收到更新时，应改发 `X.Y.1`。
+
 ## APK 与签名
 
 - 只有用项目生产密钥签名的构建才能作为 APK 附在 Release 上。构建需要环境变量 `RELEASE_KEYSTORE`、`RELEASE_STORE_PASSWORD`、`RELEASE_KEY_ALIAS`、`RELEASE_KEY_PASSWORD`，缺任何一个都会失败，而不是回退到 debug 密钥。

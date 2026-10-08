@@ -1,6 +1,6 @@
 # 开发状态
 
-> 更新：2026-09-20。当前主线是 `Slacker-LLC/minis-for-android` 的 `main`；Eta 能力已经并入这个独立产品。本文的运行时结论仍是 Direct Ubuntu 24.04 chroot、App-owned 数据与结构化 `root.shell`。历史基线：Direct Ubuntu 审计提交 `53dada42` 经合并提交 `422cc29f` 进入旧主线（2026-09-12）；真机记录保留各自测试范围，不用宿主构建替代设备验收。逐片进度见 `development/PROGRESS.md`，项目全貌见 `PROJECT.md`。
+> 更新：2026-10-08。当前主线是 `Slacker-LLC/minis-for-android` 的 `main`；Eta 能力已经并入这个独立产品。本文的运行时结论仍是 Direct Ubuntu 24.04 chroot、App-owned 数据与结构化 `root.shell`。历史基线：Direct Ubuntu 审计提交 `53dada42` 经合并提交 `422cc29f` 进入旧主线（2026-09-12）；真机记录保留各自测试范围，不用宿主构建替代设备验收。逐片进度见 `development/PROGRESS.md`，项目全貌见 `PROJECT.md`。
 
 ## 项目状态
 
@@ -68,7 +68,7 @@ PR #235 合入前，Direct Ubuntu 迁移已经通过既有 CI，包括 rootfs/pa
 
 该设备的 HyperOS 拒绝安装 instrumentation APK，因此真机手测不能替代 instrumentation 执行证据。
 
-当前分支基线（2026-09-20，Debug）：`:app:testDebugUnitTest` **2432 例 0 失败**；`:app:lintDebug` **0 error**（186 warning / 6 hint 为既有）；`:app:assembleDebug` 产出约 **114 MB** APK（含 runtime payload）。
+当前分支基线（2026-10-08，Debug）：`:app:testDebugUnitTest` **3379 例 0 失败**；`:app:lintDebug` **0 error**（394 warning / 7 hint 为既有，记录在 `app/lint-baseline.xml`）；模拟器 instrumentation 套件通过；`:app:assembleDebug` 产出含 runtime payload 的 APK。2026-10-08 在小米手机上抽查过：选中文字工具栏与引用卡片、统一朗读条、发送按钮的强调色、特殊权限的一键授予、聊天文件浏览器；模型错误文案只有单元测试，没有在手机上触发过。其余设备缺口仍按下节处理。
 
 合并提交 `422cc29f` 的宿主 JVM 测试与 `assembleDebug` 已通过。合并后的 APK 没有额外完成一轮全功能真机验收；下列设备缺口不因合并而自动关闭。
 

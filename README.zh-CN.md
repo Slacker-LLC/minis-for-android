@@ -17,8 +17,8 @@
 
 主线为 `Slacker-LLC/minis-for-android` 的 `main`；Eta 能力线已经并入这个独立产品。
 
-当前基线（2026-09-20，Debug）：`:app:testDebugUnitTest` **2432 例 0 失败**；`:app:lintDebug` **0 error**
-（186 warning / 6 hint 为既有）；`app-debug.apk` 约 **114 MB**（含 runtime payload）。界面文案走资源，共
+当前基线（2026-10-08，Debug）：`:app:testDebugUnitTest` **3379 例 0 失败**；`:app:lintDebug` **0 error**
+（394 warning / 7 hint 为既有，记录在 `app/lint-baseline.xml`）；模拟器 instrumentation 套件通过。界面文案走资源，共
 **8 个语言目录**：英文默认 + 简体 / 繁體 / 日 / 韩 / 德 / 法 / 俄；简体与繁體已 100% 覆盖，其余五种仍有存量缺口
 （见 [docs/I18N.md](docs/I18N.md)）。
 
@@ -82,7 +82,7 @@ Ubuntu 24.04 userspace
 
 基础包和 Android Guest 命令见[执行环境](docs/EXECUTION-ENVIRONMENT.md)。`minis-mcp-cli` 仍缺失，完整真机功能矩阵也未完成；[当前缺口](docs/contracts/06-CURRENT-GAPS.md)明确区分这些项目与已经通过的检查。
 
-**1.0** 是第一个正式版本（`versionName` 1.0、`versionCode` 1000099）。版本说明见 [GitHub Releases](https://github.com/Slacker-LLC/minis-for-android/releases) 与 [CHANGELOG.md](CHANGELOG.md)，以发版 tag 对应的源码树为准。只有用项目生产密钥签名的构建才会作为 APK 附在 Release 上，绝不使用 debug 密钥；你也可以自行构建。隐私政策见 [PRIVACY.zh-CN.md](PRIVACY.zh-CN.md)，开源软件说明见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。构建见 [BUILDING.zh-CN.md](BUILDING.zh-CN.md) / [BUILDING.md](BUILDING.md)。运行时见 [docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md)，安全边界见 [docs/SECURITY.md](docs/SECURITY.md)。
+**1.0** 是第一个正式版本（`versionName` 1.0、`versionCode` 1000099）；2026-10-08 已用当前 `main` 重新构建并覆盖发布，改动见 [CHANGELOG.md](CHANGELOG.md)。版本说明见 [GitHub Releases](https://github.com/Slacker-LLC/minis-for-android/releases) 与 [CHANGELOG.md](CHANGELOG.md)，以发版 tag 对应的源码树为准。只有用项目生产密钥签名的构建才会作为 APK 附在 Release 上，绝不使用 debug 密钥；你也可以自行构建。隐私政策见 [PRIVACY.zh-CN.md](PRIVACY.zh-CN.md)，开源软件说明见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。构建见 [BUILDING.zh-CN.md](BUILDING.zh-CN.md) / [BUILDING.md](BUILDING.md)。运行时见 [docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md)，安全边界见 [docs/SECURITY.md](docs/SECURITY.md)。
 
 ## 许可证
 

@@ -497,16 +497,21 @@ class FileBrowserViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val showHidden = _uiState.value.showHidden
-                val entries = if (guestSessionId != null && directory == SESSION_GUEST_ROOT) {
-                    // The guest API refuses the bare /var/minis, so a chat's files root is a
-                    // synthetic listing of the per-session folders that exist.
-                    SESSION_GUEST_FOLDERS.mapNotNull { name ->
-                        val ok = runCatching { WorkspaceFileClient.info(guestSessionId, "$SESSION_GUEST_ROOT/$name") }
+                val entries = if (guestSessionId != null && directory == ChatFilesScope.ROOT) {
+                    // The guest API refuses the bare /var/minis, so a chat's files root is a synthetic
+                    // listing of the chat's folders, and only the ones that hold something.
+                    ChatFilesScope.FOLDERS.mapNotNull { name ->
+                        val path = "${ChatFilesScope.ROOT}/$name"
+                        val isDir = runCatching { WorkspaceFileClient.info(guestSessionId, path) }
                             .getOrNull()?.optString("type") == "dir"
-                        if (ok) JSONObject().put("name", name).put("type", "dir").put("size", 0).put("modified", 0) else null
+                        val holdsFiles = isDir && runCatching { WorkspaceFileClient.listAll(guestSessionId, path) }
+                            .getOrDefault(emptyList())
+                            .any { !ChatFilesScope.isMountPoint(path, it.optString("name"), it.optString("type")) }
+                        if (holdsFiles) JSONObject().put("name", name).put("type", "dir").put("size", 0).put("modified", 0) else null
                     }
                 } else {
                     WorkspaceFileClient.listAll(guestSessionId.orEmpty(), directory)
+                        .filterNot { ChatFilesScope.isMountPoint(directory, it.optString("name"), it.optString("type")) }
                 }
                 val files = entries.mapNotNull { entry ->
                     guestItem(directory, entry, showHidden)
@@ -614,8 +619,6 @@ class FileBrowserViewModel(
     }
 }
 
-private const val SESSION_GUEST_ROOT = "/var/minis"
-private val SESSION_GUEST_FOLDERS = listOf("workspace", "attachments", "offloads", "browser")
 
 /** Hands out tickets for a series of loads; only the holder of the newest ticket may publish. */
 internal class LatestRequest {
