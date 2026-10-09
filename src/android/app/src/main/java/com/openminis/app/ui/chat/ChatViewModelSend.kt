@@ -726,6 +726,7 @@ internal fun ChatViewModel.setInlineError(errorText: String) {
             error = safeError,
             isStreaming = false,
             isAwaitingModelResponse = false,
+            updatedAtMs = System.currentTimeMillis(),
         )
         _messages.value = msgs
         // [T-error-persist-android] Persist the terminal error onto the
