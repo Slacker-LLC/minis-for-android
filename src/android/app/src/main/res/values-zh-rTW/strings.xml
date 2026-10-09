@@ -888,7 +888,6 @@
     <!-- T-android-work-process / T-android-assistant-home / lint MissingTranslation -->
     <string name="work_process_running_step">正在執行第 %1$d 步 · %2$s</string>
     <string name="work_process_running_thinking">正在思考…</string>
-    <string name="work_process_failed_step">第 %1$d 步失敗 · %2$s</string>
     <plurals name="work_process_completed_steps">
         <item quantity="other">已完成 %d 個步驟</item>
     </plurals>
@@ -1109,7 +1108,6 @@
         <item quantity="other">%1$d 次委派</item>
     </plurals>
     <string name="work_process_duration">耗時 %1$s</string>
-    <string name="work_process_duration_failed">耗時 %1$s · 第 %2$d 步失敗</string>
     <string name="work_process_elapsed">已處理 %1$s</string>
     <string name="appearance_tool_status_bar_title">工具狀態列</string>
     <string name="appearance_tool_status_bar_sub">輸入框上方那條顯示執行中工具與結果的橫條。</string>
@@ -2314,6 +2312,9 @@
     <string name="vscreen_viewer_open_failed">無法開啟虛擬螢幕：%1$s</string>
     <string name="vscreen_viewer_fps">%1$d 幀/秒</string>
     <string name="work_status_running">正在工作</string>
+    <string name="work_status_step">第 %1$d 步</string>
+    <string name="work_status_thinking">思考中</string>
+    <string name="work_status_list_separator">、</string>
     <string name="work_status_done">已完成</string>
     <string name="assistant_menu_branch_here">從這裡分支</string>
     <string name="chat_input_placeholder">輸入訊息，或用 / 調用技能</string>
@@ -2381,7 +2382,6 @@
     <string name="oneclick_working">正在授權…</string>
     <string name="module_settings_restart_title">重新啟動 Minis 以連接框架</string>
     <string name="module_settings_restart_sub">在 Minis 已經執行時才啟用模組的話，點這裡重新啟動一次。</string>
-    <string name="work_process_failed_only">第 %1$d 步失敗</string>
     <string name="model_slot_image">圖像</string>
     <string name="chat_interrupted_short">已中斷</string>
     <string name="queued_delivery_steer">將在下一步引導任務</string>

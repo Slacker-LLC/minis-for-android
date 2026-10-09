@@ -1536,7 +1536,6 @@
     <!-- T-android-work-process / T-android-assistant-home / lint MissingTranslation -->
     <string name="work_process_running_step">Шаг %1$d выполняется · %2$s</string>
     <string name="work_process_running_thinking">Размышление…</string>
-    <string name="work_process_failed_step">Шаг %1$d не выполнен · %2$s</string>
     <plurals name="work_process_completed_steps">
         <item quantity="one">%d шаг выполнен</item>
         <item quantity="few">%d шага выполнено</item>
@@ -1783,7 +1782,6 @@
         <item quantity="other">%1$d делегирований</item>
     </plurals>
     <string name="work_process_duration">Заняло %1$s</string>
-    <string name="work_process_duration_failed">Заняло %1$s · шаг %2$d не удался</string>
     <string name="work_process_elapsed">Обработка %1$s</string>
     <string name="appearance_tool_status_bar_title">Строка состояния инструментов</string>
     <string name="appearance_tool_status_bar_sub">Полоса над полем ввода: какой инструмент работает и с каким результатом.</string>
@@ -2322,6 +2320,9 @@
     <string name="vscreen_viewer_open_failed">Не удалось открыть виртуальный экран: %1$s</string>
     <string name="vscreen_viewer_fps">%1$d к/с</string>
     <string name="work_status_running">Работаю</string>
+    <string name="work_status_step">Шаг %1$d</string>
+    <string name="work_status_thinking">Думает</string>
+    <string name="work_status_list_separator">", "</string>
     <string name="work_status_done">Готово</string>
     <string name="assistant_menu_branch_here">Ответвить отсюда</string>
     <string name="chat_input_placeholder">Сообщение или / для навыков</string>
@@ -2389,7 +2390,6 @@
     <string name="oneclick_working">Выдача разрешений…</string>
     <string name="module_settings_restart_title">Перезапустить Minis для подключения</string>
     <string name="module_settings_restart_sub">Используйте, если модуль включён, когда Minis уже работал.</string>
-    <string name="work_process_failed_only">Шаг %1$d не удался</string>
     <string name="model_slot_image">Изображения</string>
     <string name="chat_interrupted_short">Прервано</string>
     <string name="queued_delivery_steer">Направит задачу на следующем шаге</string>

@@ -1336,7 +1336,6 @@
     <!-- T-android-work-process / T-android-assistant-home / lint MissingTranslation -->
     <string name="work_process_running_step">단계 %1$d 실행 중 · %2$s</string>
     <string name="work_process_running_thinking">생각 중…</string>
-    <string name="work_process_failed_step">단계 %1$d 실패 · %2$s</string>
     <plurals name="work_process_completed_steps">
         <item quantity="other">%d단계 완료</item>
     </plurals>
@@ -1557,7 +1556,6 @@
         <item quantity="other">위임 %1$d회</item>
     </plurals>
     <string name="work_process_duration">%1$s 소요</string>
-    <string name="work_process_duration_failed">%1$s 소요 · %2$d단계 실패</string>
     <string name="work_process_elapsed">%1$s 처리 중</string>
     <string name="appearance_tool_status_bar_title">도구 상태 표시줄</string>
     <string name="appearance_tool_status_bar_sub">입력창 위에 실행 중인 도구와 결과를 표시하는 띠입니다.</string>
@@ -2094,6 +2092,9 @@
     <string name="vscreen_viewer_open_failed">가상 화면을 열 수 없습니다: %1$s</string>
     <string name="vscreen_viewer_fps">%1$d fps</string>
     <string name="work_status_running">작업 중</string>
+    <string name="work_status_step">%1$d단계</string>
+    <string name="work_status_thinking">생각 중</string>
+    <string name="work_status_list_separator">", "</string>
     <string name="work_status_done">완료</string>
     <string name="assistant_menu_branch_here">여기서 분기</string>
     <string name="chat_input_placeholder">메시지를 입력하거나 /로 스킬 호출</string>
@@ -2161,7 +2162,6 @@
     <string name="oneclick_working">권한 부여 중…</string>
     <string name="module_settings_restart_title">Minis를 재시작하여 연결</string>
     <string name="module_settings_restart_sub">Minis가 실행 중일 때 모듈을 활성화한 경우 사용하세요.</string>
-    <string name="work_process_failed_only">%1$d단계 실패</string>
     <string name="model_slot_image">이미지</string>
     <string name="chat_interrupted_short">중단됨</string>
     <string name="queued_delivery_steer">다음 단계에서 작업을 안내합니다</string>

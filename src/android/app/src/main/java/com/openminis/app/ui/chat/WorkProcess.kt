@@ -79,9 +79,6 @@ internal val WORK_PROCESS_FAILED_STATUSES: Set<ToolBlockStatus> = setOf(
 internal data class WorkProcess(
     val id: String,
     val blocks: List<AssistantBlock>,
-    /** [T-android-turn-work] The turn's row timestamps, used when the steps carry none. */
-    val messageCreatedAtMs: Long = 0L,
-    val messageUpdatedAtMs: Long? = null,
     /**
      * The turn this run belongs to is still being generated. The row is "running" for the whole turn,
      * not only while a tool call is in flight: between two calls, and while the model writes its final
@@ -105,20 +102,6 @@ internal data class WorkProcess(
     /** True while a step is executing or the turn is still being generated. */
     val isRunning: Boolean get() = runningTool != null || turnLive
 
-    /** The last failing tool block — what the collapsed row has to explain. */
-    val failedTool: AssistantBlock?
-        get() = blocks.lastOrNull {
-            it.kind == TOOL_USE_KIND && it.toolStatus in WORK_PROCESS_FAILED_STATUSES
-        }
-
-    /**
-     * A failure the turn did not recover from: the LAST tool step failed. A step that failed and was
-     * followed by working steps is history - it stays visible inside the panel but does not claim the
-     * header, which would otherwise hide the duration for the rest of the turn.
-     */
-    val unrecoveredFailure: AssistantBlock?
-        get() = toolBlocks.lastOrNull()?.takeIf { it.toolStatus in WORK_PROCESS_FAILED_STATUSES }
-
     /** 1-based ordinal of [block] among the tool steps, or null when it is not one. */
     private fun toolStepNumber(block: AssistantBlock): Int? {
         if (block.kind != TOOL_USE_KIND) return null
@@ -131,62 +114,26 @@ internal data class WorkProcess(
         return seen.takeIf { it > 0 }
     }
 
-    /**
-     * [T-android-work-items] How long the run took, from the first step's start to the last step's
-     * end. Null while a step is still running (there is no end yet) and when the blocks carry no
-     * timings at all - the header then keeps its step wording instead of inventing a duration.
-     */
-    /**
-     * When the turn started: the first step's clock, or the row's own created-at when the steps
-     * carry no timings (a reloaded session has only the database timestamps).
-     */
-    val startedAtMs: Long?
-        get() = messageCreatedAtMs.takeIf { it > 0L }
-            ?: toolBlocks.mapNotNull { it.startTimeMs.takeIf { t -> t > 0L } }.minOrNull()
-
-    val durationMs: Long?
-        get() {
-            if (isRunning) return null
-            // [T-android-turn-work] The turn's own clock wins: a turn starts when the user sent the
-            // message and ends when its last row was written, which is what Codex's duration_ms
-            // measures and what survives a reload. Summing the steps' own timings instead reported
-            // 1s for a turn whose single command slept for 20 (the per-block clocks are in-memory
-            // and only cover the calls that carried one).
-            val turnStart = messageCreatedAtMs.takeIf { it > 0L }
-            val turnEnd = messageUpdatedAtMs?.takeIf { it > 0L }
-            if (turnStart != null && turnEnd != null && turnEnd > turnStart) return turnEnd - turnStart
-            val started = toolBlocks.mapNotNull { it.startTimeMs.takeIf { t -> t > 0L } }.minOrNull()
-            val finished = toolBlocks
-                .filter { it.startTimeMs > 0L && it.durationMs > 0L }
-                .maxOfOrNull { it.startTimeMs + it.durationMs }
-            return if (started != null && finished != null) (finished - started).takeIf { it > 0L } else null
-        }
-
     /** [T-android-work-items] Steps per kind, in enum order. */
     val tallies: Map<WorkItemKind, Int>
         get() = blocks.groupingBy(::workItemKindOf).eachCount()
 
+    /** The step the status line names while the run works: the call in flight, or the thinking being written. */
+    private fun currentActivity(): String? {
+        runningTool?.let { return it.toolTitle.trim().ifBlank { toolDisplayName(it.toolName) } }
+        return null
+    }
+
     /** A snapshot of everything the collapsed row renders. */
-    fun summary(maxFailureChars: Int = DEFAULT_FAILURE_CHARS): WorkProcessSummary {
+    fun summary(): WorkProcessSummary {
         val running = runningTool
-        val failed = unrecoveredFailure
         return WorkProcessSummary(
             toolCount = toolBlocks.size,
             thinkingCount = blocks.size - toolBlocks.size,
             isRunning = isRunning,
             runningStepNumber = running?.let(::toolStepNumber),
-            runningToolName = running?.let {
-                it.toolTitle.trim().ifBlank { toolDisplayName(it.toolName) }
-            },
-            failedStepNumber = failed?.let(::toolStepNumber),
-            failedToolName = failed?.let {
-                it.toolTitle.trim().ifBlank { toolDisplayName(it.toolName) }
-            },
-            // A running step outranks an earlier failure: the row must describe
-            // what is happening now, and the failure stays visible inside the
-            // panel. Only a finished run reports its failure on the header.
-            failureReason = if (!isRunning) failed?.let { failureSummary(it, maxFailureChars) } else null,
-            durationMs = durationMs,
+            runningToolName = currentActivity(),
+            thinking = isRunning && running == null && blocks.last().kind == THINKING_KIND,
             tallies = tallies,
         )
     }
@@ -275,30 +222,11 @@ internal data class WorkProcessSummary(
     val isRunning: Boolean,
     val runningStepNumber: Int? = null,
     val runningToolName: String? = null,
-    val failedStepNumber: Int? = null,
-    val failedToolName: String? = null,
-    val failureReason: String? = null,
-    /** [T-android-work-items] Wall time of the finished run, when the steps carried timings. */
-    val durationMs: Long? = null,
-    /** [T-android-work-items] Steps per kind, for the expanded summary line. */
+    /** The run is between calls writing its thinking, so the line can say so. */
+    val thinking: Boolean = false,
+    /** Steps per kind, for the finished line. */
     val tallies: Map<WorkItemKind, Int> = emptyMap(),
-) {
-    val hasFailure: Boolean get() = failureReason != null || failedStepNumber != null
-}
-
-/**
- * One-liner describing why a tool step failed: the first non-blank line of the
- * tool result, else the step's own title, else the tool's display name. Always
- * non-empty and never longer than [maxChars] so it can sit on the collapsed row.
- */
-internal fun failureSummary(block: AssistantBlock, maxChars: Int = DEFAULT_FAILURE_CHARS): String {
-    val firstLine = block.content.lineSequence().firstOrNull { it.isNotBlank() }?.trim()
-    val text = firstLine
-        ?.takeIf { it.isNotEmpty() }
-        ?: block.toolTitle.trim().takeIf { it.isNotEmpty() }
-        ?: toolDisplayName(block.toolName)
-    return if (text.length <= maxChars) text else text.take(maxChars).trimEnd() + "…"
-}
+)
 
 /** A block that belongs to a work process (thinking or tool call). */
 internal fun isWorkProcessBlock(block: AssistantBlock): Boolean =
@@ -326,10 +254,9 @@ internal sealed interface AssistantTurnEntry {
  * tool calls. Folding the model's own sentences ("let me check X first") away with the tool calls hid
  * what it said about what it was doing the moment the turn finished.
  *
- * The turn's clock belongs to the last run (the one next to the answer): it is the only row that
- * reports a duration from the turn's own timestamps, and the only one that stays open while the turn
- * is live. Earlier runs are finished by definition - the model went on to write something after them -
- * and, if their steps carried timings, report their own.
+ * The last run is the one that stays open while the turn is live; earlier runs are finished by definition -
+ * the model went on to write something after them. The turn's time is not here: it has its own line above
+ * the reply ([FlatChatItem.TurnClock]).
  *
  * [thinkingVisible] mirrors the T300 rule: when the user turned Deep Thinking
  * off, thinking blocks render nothing, so in grouped mode they must not create
@@ -340,8 +267,6 @@ internal fun buildAssistantTurnEntries(
     blocks: List<AssistantBlock>,
     presentation: StepsPresentation,
     thinkingVisible: Boolean,
-    messageCreatedAtMs: Long = 0L,
-    messageUpdatedAtMs: Long? = null,
     turnLive: Boolean = false,
 ): List<AssistantTurnEntry> {
     if (presentation == StepsPresentation.PER_TOOL) {
@@ -361,8 +286,6 @@ internal fun buildAssistantTurnEntries(
                     // grows, matching the key-stability rule the streaming rows depend on.
                     id = "$messageId:" + run.first().id,
                     blocks = run.toList(),
-                    messageCreatedAtMs = if (last) messageCreatedAtMs else 0L,
-                    messageUpdatedAtMs = if (last) messageUpdatedAtMs else null,
                     turnLive = last && turnLive,
                 ),
             ),
@@ -388,5 +311,3 @@ internal fun buildAssistantTurnEntries(
 internal const val TOOL_USE_KIND = "tool_use"
 internal const val THINKING_KIND = "thinking"
 
-/** Collapsed-row failure text budget — long tool errors must not wrap the row. */
-internal const val DEFAULT_FAILURE_CHARS = 120

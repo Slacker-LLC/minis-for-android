@@ -255,6 +255,7 @@ internal suspend fun ChatViewModel.runAgentLoop(
         } else {
             val assistantPlaceholder = ChatMessage(
                 id = assistantId, role = "assistant", content = "", isStreaming = true,
+                createdAtMs = System.currentTimeMillis(),
                 isAwaitingModelResponse = true,
                 thinkingLevel = turnThinkingLevel,
             )

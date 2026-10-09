@@ -1668,7 +1668,6 @@
     <!-- [T-android-work-process] Collapsed work-process row (thinking + tool steps). -->
     <string name="work_process_running_step">Running step %1$d · %2$s</string>
     <string name="work_process_running_thinking">Thinking…</string>
-    <string name="work_process_failed_step">Step %1$d failed · %2$s</string>
     <plurals name="work_process_completed_steps">
         <item quantity="one">%d step completed</item>
         <item quantity="other">%d steps completed</item>
@@ -1899,7 +1898,6 @@
         <item quantity="other">%1$d delegations</item>
     </plurals>
     <string name="work_process_duration">Took %1$s</string>
-    <string name="work_process_duration_failed">Took %1$s · step %2$d failed</string>
     <string name="work_process_elapsed">Working for %1$s</string>
     <string name="appearance_tool_status_bar_title">Tool status bar</string>
     <string name="appearance_tool_status_bar_sub">The strip above the composer that reports the running tool and its result.</string>
@@ -2433,6 +2431,9 @@
     <string name="vscreen_viewer_open_failed">Could not open the virtual screen: %1$s</string>
     <string name="vscreen_viewer_fps">%1$d fps</string>
     <string name="work_status_running">Working</string>
+    <string name="work_status_step">Step %1$d</string>
+    <string name="work_status_thinking">Thinking</string>
+    <string name="work_status_list_separator">", "</string>
     <string name="work_status_done">Done</string>
     <string name="assistant_menu_branch_here">Branch from here</string>
     <string name="chat_input_placeholder">Message, or type / for skills</string>
@@ -2500,7 +2501,6 @@
     <string name="oneclick_working">Granting…</string>
     <string name="module_settings_restart_title">Restart Minis to connect</string>
     <string name="module_settings_restart_sub">Use this after enabling the module while Minis was already running.</string>
-    <string name="work_process_failed_only">Step %1$d failed</string>
     <string name="model_slot_image">Image</string>
     <string name="chat_interrupted_short">Interrupted</string>
     <string name="queued_delivery_steer">Will guide the task at its next step</string>

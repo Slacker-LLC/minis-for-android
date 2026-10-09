@@ -515,13 +515,6 @@ internal fun ToolCallPill(
     // iOS: always shows tool-type icon, only changes color based on status
     val displayIcon = toolIcon
 
-    // Duration text (iOS: "0.4s" format)
-    val durationText = if (block.durationMs > 0 && !isRunning) {
-        val seconds = block.durationMs / 1000.0
-        if (seconds < 10) String.format("%.1fs", seconds)
-        else String.format("%.0fs", seconds)
-    } else null
-
     // [T-android-tool-bubble-longpress-menu] Long-press menu state, scoped
     // to this step. The menu is anchored to the row via the Box wrapper below.
     var showToolMenu by remember { mutableStateOf(false) }
@@ -535,7 +528,6 @@ internal fun ToolCallPill(
         StepRow(
             title = block.toolTitle.ifEmpty { block.toolName },
             titleColor = if (isFailed) ToolErrorColor else ChatColors.primaryText,
-            note = durationText,
             leading = {
                 if (isRunning) {
                     CircularProgressIndicator(
