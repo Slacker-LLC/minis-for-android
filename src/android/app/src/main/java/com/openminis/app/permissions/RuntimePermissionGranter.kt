@@ -3,12 +3,24 @@ package com.openminis.app.permissions
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.pm.PermissionInfo
+import com.openminis.app.accessibility.MinisAccessibilityService
+import com.openminis.app.offload.MinisNotificationListenerService
+import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.tools.android.CommandRisk
 import com.openminis.app.tools.android.PrivilegedCommandRunner
+import com.openminis.app.tools.android.vscreen.VirtualScreenClientProvider
+import com.openminis.app.ui.settings.assistantRoleAvailable
+import com.openminis.app.ui.settings.assistantRoleHeld
+import com.openminis.app.ui.settings.assistantRoleManagerOrNull
+import com.openminis.app.xposed.ModuleSettingsStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * One-tap "grant every permission the app declares", for a rooted phone: instead of the system asking
- * once per permission as the agent first needs it, the user grants them all from Settings.
+ * once per permission as the agent first needs it, the user grants them all from Settings. Besides the
+ * permissions it opens this app's own accesses: the accessibility service, notification access, the default
+ * assistant role, the module switches, Shizuku's permission and the virtual screen.
  *
  * It only issues fixed `pm grant` / `cmd appops set` argv for THIS package's own declared permissions;
  * nothing the agent or a model supplies reaches it, and it goes through the structured privileged runner
@@ -51,6 +63,54 @@ object RuntimePermissionGranter {
         )
     }
 
+    private val COMPONENT = Regex("[A-Za-z0-9_.]{1,200}/[A-Za-z0-9_.$]{1,200}")
+    private const val ASSISTANT_ROLE = "android.app.role.ASSISTANT"
+
+    /**
+     * [current] (the system's `enabled_accessibility_services`) with [component] added, or null when the current
+     * value holds an entry that is not a plain component name: the list is rewritten as a whole, so one entry
+     * this code cannot vouch for must not be lost or altered. Already present: [current] as is.
+     */
+    internal fun withAccessibilityService(current: String?, component: String): String? {
+        if (!COMPONENT.matches(component)) return null
+        val entries = current.orEmpty().split(':').filter { it.isNotEmpty() && it != "null" }
+        if (entries.any { !COMPONENT.matches(it) }) return null
+        return if (entries.any { it.equals(component, ignoreCase = true) }) entries.joinToString(":")
+        else (entries + component).joinToString(":")
+    }
+
+    /**
+     * The commands that open this app's own accesses: its accessibility service, its notification-listener
+     * services and, when the phone has the role, the default assistant. Only this package's own component
+     * names go in; anything else yields no command.
+     */
+    internal fun accessPlan(
+        packageName: String,
+        accessibilityComponent: String,
+        listenerComponents: List<String>,
+        currentAccessibility: String?,
+        assistantRoleAvailable: Boolean,
+    ): List<List<String>> {
+        if (!NAME.matches(packageName)) return emptyList()
+        val own = "$packageName/"
+        val out = mutableListOf<List<String>>()
+        if (accessibilityComponent.startsWith(own)) {
+            withAccessibilityService(currentAccessibility, accessibilityComponent)?.let { merged ->
+                out += listOf("settings", "put", "secure", "enabled_accessibility_services", merged)
+                out += listOf("settings", "put", "secure", "accessibility_enabled", "1")
+            }
+        }
+        for (component in listenerComponents.distinct()) {
+            if (component.startsWith(own) && COMPONENT.matches(component)) {
+                out += listOf("cmd", "notification", "allow_listener", component)
+            }
+        }
+        if (assistantRoleAvailable) {
+            out += listOf("cmd", "role", "add-role-holder", "--user", "0", ASSISTANT_ROLE, packageName)
+        }
+        return out
+    }
+
     data class Result(
         val attempted: Int,
         val succeeded: Int,
@@ -73,8 +133,22 @@ object RuntimePermissionGranter {
         }
     }
 
+    /** The accesses that are not permissions: accessibility, notification access, the assistant role, modules. */
+    private fun ownAccessesOn(context: Context): Boolean {
+        if (!MinisAccessibilityService.isEnabled(context)) return false
+        if (!MinisNotificationListenerService.isEnabled(context)) return false
+        val role = context.assistantRoleManagerOrNull()
+        if (role != null && role.assistantRoleAvailable() && !role.assistantRoleHeld()) return false
+        if (!ModuleSettingsStore.SWITCHES.all { ModuleSettingsStore.isEnabled(context, it) }) return false
+        // Shizuku and the virtual screen only count when Shizuku is there to be used.
+        if (ShizukuManager.isInstalled() && !ShizukuManager.isReady()) return false
+        if (ShizukuManager.isReady() && !VirtualScreenClientProvider.get(context).isEnabled()) return false
+        return true
+    }
+
     /** Whether every runtime permission the manifest declares, and the special accesses, are already granted. */
     fun allGranted(context: Context): Boolean = runCatching {
+        ownAccessesOn(context) &&
         com.openminis.app.power.PowerOptimizationManager.isIgnoringBatteryOptimizations(context) &&
             SpecialAccess.dataSaverExempt(context) &&
             declaredPermissions(context).all { d ->
@@ -91,8 +165,23 @@ object RuntimePermissionGranter {
     }.getOrDefault(false)
 
     suspend fun grantAll(context: Context): Result {
+        val role = context.assistantRoleManagerOrNull()
+        val listeners = listOf(
+            android.content.ComponentName(context, MinisNotificationListenerService::class.java).flattenToString(),
+            "${context.packageName}/com.openminis.app.notifications.MinisNotificationListenerService",
+        )
         val commands = plan(context.packageName, declaredPermissions(context)) +
-            exemptionPlan(context.packageName, android.os.Process.myUid())
+            exemptionPlan(context.packageName, android.os.Process.myUid()) +
+            accessPlan(
+                packageName = context.packageName,
+                accessibilityComponent = android.content.ComponentName(context, MinisAccessibilityService::class.java).flattenToString(),
+                listenerComponents = listeners,
+                currentAccessibility = android.provider.Settings.Secure.getString(
+                    context.contentResolver,
+                    android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+                ),
+                assistantRoleAvailable = role != null && runCatching { role.assistantRoleAvailable() }.getOrDefault(false),
+            )
         var succeeded = 0
         val failed = mutableListOf<String>()
         for (argv in commands) {
@@ -106,8 +195,42 @@ object RuntimePermissionGranter {
                 rootOnly = true,
             )
             result.unavailableReason?.let { return Result(commands.size, succeeded, failed, unavailable = it) }
-            if (result.success) succeeded++ else failed += argv.takeLast(if (argv[0] == "pm") 1 else 2).first()
+            if (result.success) succeeded++ else failed += label(argv)
         }
-        return Result(commands.size, succeeded, failed)
+        var attempted = commands.size
+
+        // The module's switches live in the app, not in the system.
+        for (key in ModuleSettingsStore.SWITCHES) {
+            attempted++
+            if (runCatching { ModuleSettingsStore.setEnabled(context, key, true) }.getOrDefault(false)) succeeded++ else failed += "module:$key"
+        }
+
+        // The virtual screen needs Shizuku up and a passing device probe. Shizuku's own service is not started
+        // from here: that would run a script from shared storage as root.
+        ShizukuManager.refresh()
+        if (ShizukuManager.isReady()) {
+            attempted++
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    val client = VirtualScreenClientProvider.get(context)
+                    client.runProbe()
+                    client.setEnabled(true)
+                    client.isEnabled()
+                }.getOrDefault(false)
+            }
+            if (ok) succeeded++ else failed += "virtual-screen"
+        } else if (ShizukuManager.isInstalled()) {
+            failed += "shizuku-not-running"
+            attempted++
+        }
+        return Result(attempted, succeeded, failed)
+    }
+
+    /** What to call a failed command in the message: the permission or setting it was about. */
+    private fun label(argv: List<String>): String = when (argv[0]) {
+        "pm" -> argv.last()
+        "settings" -> argv.getOrElse(3) { "settings" }
+        "cmd" -> if (argv.getOrNull(1) == "appops") argv.getOrElse(4) { "appops" } else argv.getOrElse(2) { "cmd" }
+        else -> argv.last()
     }
 }

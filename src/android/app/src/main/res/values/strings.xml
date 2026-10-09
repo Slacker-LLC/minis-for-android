@@ -2496,7 +2496,7 @@
     <string name="agent_models_cli_only">minis-model-use only (not a chat model)</string>
     <string name="oneclick_header">One-tap authorize</string>
     <string name="oneclick_title">Authorize everything</string>
-    <string name="oneclick_sub">Grants every Android permission the app declares (needs root) and allows every Agent tool, including accessibility, Shizuku and the virtual screen. Switching off puts the Agent tools back to their defaults; Android grants stay.</string>
+    <string name="oneclick_sub">Needs root. Grants every Android permission the app declares, turns on its accessibility service, notification access and default-assistant role, enables the module switches and the virtual screen (Shizuku must be running), and allows every Agent tool. Switching off puts the Agent tools back to their defaults; Android grants stay.</string>
     <string name="oneclick_working">Granting…</string>
     <string name="module_settings_restart_title">Restart Minis to connect</string>
     <string name="module_settings_restart_sub">Use this after enabling the module while Minis was already running.</string>

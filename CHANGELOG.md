@@ -4,6 +4,10 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+- One-tap authorize now also turns on the app's accessibility service, notification access and default-assistant
+  role, the module switches, and the virtual screen (when Shizuku is running), next to the Android permissions and
+  the Agent tool permissions. Shizuku's own service is not started from here.
+
 ### Repository permissions — 2026-10-02
 
 - Only the owner/administrator can merge pull requests, create or update `main` and `release/**`, and create,
