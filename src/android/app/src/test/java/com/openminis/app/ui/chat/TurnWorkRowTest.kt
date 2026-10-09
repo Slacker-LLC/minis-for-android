@@ -2,7 +2,6 @@ package com.openminis.app.ui.chat
 
 import com.openminis.app.data.StepsPresentation
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -59,37 +58,17 @@ class TurnWorkRowTest {
         )
     }
 
-    private fun processes(live: Boolean, updated: Long?) = buildAssistantTurnEntries(
-        messageId = "m1",
-        blocks = listOf(tool("c1", startTimeMs = 1_000L), text("t2", "再确认一下"), tool("c2", startTimeMs = 2_000L), text("t3", "结论")),
-        presentation = StepsPresentation.GROUPED,
-        thinkingVisible = true,
-        messageCreatedAtMs = 500L,
-        messageUpdatedAtMs = updated,
-        turnLive = live,
-    ).filterIsInstance<AssistantTurnEntry.Process>().map { it.process }
-
     @Test
-    fun `the first work row carries the turn's one clock, the last one stays open while the turn is live`() {
-        val processes = processes(live = true, updated = 9_500L)
-        assertEquals(2, processes.size)
-        assertEquals("only the run next to the answer follows the turn", listOf(false, true), processes.map { it.turnLive })
-        assertEquals("the clock sits on the run under the user's message", listOf(500L, 0L), processes.map { it.messageCreatedAtMs })
-        assertEquals(listOf(true, false), processes.map { it.clockLive })
-        assertEquals(listOf(true, false), processes.map { it.carriesClock })
-    }
-
-    @Test
-    fun `a finished turn shows its total time once, on the first row only`() {
-        val processes = processes(live = false, updated = 9_500L)
-        assertEquals("send to the end of the whole reply", 9_000L, processes[0].durationMs)
-        assertNull("no other row shows a time, not even from its own steps", processes[1].durationMs)
-        assertNull(processes[1].summary().durationMs)
-    }
-
-    @Test
-    fun `while the turn is live no row has a final time`() {
-        assertEquals(listOf<Long?>(null, null), processes(live = true, updated = 9_500L).map { it.durationMs })
+    fun `only the last work row follows the live turn`() {
+        val entries = buildAssistantTurnEntries(
+            messageId = "m1",
+            blocks = listOf(tool("c1", startTimeMs = 1_000L), text("t2", "再确认一下"), tool("c2", startTimeMs = 2_000L), text("t3", "结论")),
+            presentation = StepsPresentation.GROUPED,
+            thinkingVisible = true,
+            turnLive = true,
+        )
+        val processes = entries.filterIsInstance<AssistantTurnEntry.Process>().map { it.process }
+        assertEquals("an earlier run is finished: the model went on to write after it", listOf(false, true), processes.map { it.turnLive })
     }
 
     @Test

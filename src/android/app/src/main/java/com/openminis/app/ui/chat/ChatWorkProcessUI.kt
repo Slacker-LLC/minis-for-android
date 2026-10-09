@@ -33,7 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,22 +87,8 @@ internal fun WorkProcessRowView(
 ) {
     // Everything the summary reads: the blocks, whether the turn is still live, and the turn's end time (the
     // duration). Keyed on the blocks alone it kept saying "working" after the turn had ended.
-    val summary = remember(process.blocks, process.turnLive, process.messageUpdatedAtMs, process.messageCreatedAtMs) {
+    val summary = remember(process.blocks, process.turnLive) {
         process.summary()
-    }
-    // One clock per turn, on the run under the user's message: it ticks from the send until the whole reply is done.
-    val startedAt = process.startedAtMs
-    val clockRunning = process.clockLive && startedAt != null
-    var elapsedSec by remember(process.id, clockRunning, startedAt) { mutableStateOf(0L) }
-    LaunchedEffect(process.id, clockRunning, startedAt) {
-        if (!clockRunning || startedAt == null) {
-            elapsedSec = 0L
-        } else {
-            while (true) {
-                elapsedSec = ((System.currentTimeMillis() - startedAt) / 1000L).coerceAtLeast(0L)
-                delay(1_000L)
-            }
-        }
     }
     var expanded by rememberSaveable(process.id) { mutableStateOf(summary.isRunning) }
     var userToggled by rememberSaveable(process.id) { mutableStateOf(false) }
@@ -114,7 +99,7 @@ internal fun WorkProcessRowView(
         if (!userToggled) expanded = summary.isRunning
     }
 
-    val statusText = workStatusText(summary, elapsedSec.takeIf { clockRunning })
+    val statusText = workStatusText(summary)
 
     // The redesign's status line: one small grey line above the reply, "已完成 · 用时 12s" with a chevron
     // (right when folded, down when open), or "正在工作 ..." while the turn runs. No bar, no rule under it.
@@ -139,7 +124,7 @@ internal fun WorkProcessRowView(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            if (summary.isRunning || clockRunning) {
+            if (summary.isRunning) {
                 Spacer(Modifier.width(6.dp))
                 Box(modifier = Modifier.height(20.dp), contentAlignment = Alignment.Center) { BouncingDots(ChatColors.secondaryText) }
             }
@@ -327,23 +312,20 @@ internal fun notePreview(content: String, latest: Boolean, maxChars: Int = 200):
 }
 
 /**
- * The status line's words. Running: "Working · 12s · step 3 · <what the step does>" - the time only on the run that
- * carries the turn's clock. Finished: "Completed 5 steps · read 3 files, ran 2 commands · took 38s", the time again
- * only on that run. The wording rules live here so they stay in one place.
+ * The status line's words, without any time (the turn's time is its own line above the reply). Running: "Step 3 ·
+ * <what the step does>" or "Thinking", "Working" when nothing is known yet. Finished: "Completed 5 steps · read 3 files,
+ * ran 2 commands". The wording rules live here so they stay in one place.
  */
 @Composable
-internal fun workStatusText(summary: WorkProcessSummary, clockElapsedSec: Long? = null): String {
-    val parts = ArrayList<String>(4)
-    if (summary.isRunning || clockElapsedSec != null) {
-        parts.add(stringResource(R.string.work_status_running))
-        if (clockElapsedSec != null) parts.add(formatStepDuration(clockElapsedSec, stillRunning = false))
-        if (summary.isRunning) {
-            summary.runningStepNumber?.let { parts.add(stringResource(R.string.work_status_step, it)) }
-            when {
-                summary.runningToolName != null -> parts.add(summary.runningToolName)
-                summary.thinking -> parts.add(stringResource(R.string.work_status_thinking))
-            }
+internal fun workStatusText(summary: WorkProcessSummary): String {
+    val parts = ArrayList<String>(3)
+    if (summary.isRunning) {
+        summary.runningStepNumber?.let { parts.add(stringResource(R.string.work_status_step, it)) }
+        when {
+            summary.runningToolName != null -> parts.add(summary.runningToolName)
+            summary.thinking -> parts.add(stringResource(R.string.work_status_thinking))
         }
+        if (parts.isEmpty()) parts.add(stringResource(R.string.work_status_running))
         return parts.joinToString(" · ")
     }
     parts.add(
@@ -358,9 +340,6 @@ internal fun workStatusText(summary: WorkProcessSummary, clockElapsedSec: Long? 
         val labels = ArrayList<String>(groups.size)
         for (index in groups.indices) labels.add(workItemTallyLabel(groups[index].first, groups[index].second))
         parts.add(labels.joinToString(stringResource(R.string.work_status_list_separator)))
-    }
-    summary.durationMs?.let {
-        parts.add(stringResource(R.string.work_process_duration, formatStepDuration(it / 1000L, stillRunning = false)))
     }
     return parts.joinToString(" · ")
 }

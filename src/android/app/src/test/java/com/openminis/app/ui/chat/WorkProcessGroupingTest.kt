@@ -165,7 +165,6 @@ class WorkProcessGroupingTest {
         assertTrue(live.isRunning)
         assertTrue(live.summary().isRunning)
         assertNull(live.summary().runningStepNumber)
-        assertNull("no duration until the turn ends", live.durationMs)
         assertFalse(WorkProcess("p", blocks, turnLive = false).isRunning)
     }
 

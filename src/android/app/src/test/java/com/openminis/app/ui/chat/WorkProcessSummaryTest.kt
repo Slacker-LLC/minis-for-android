@@ -1,7 +1,6 @@
 package com.openminis.app.ui.chat
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -49,29 +48,6 @@ class WorkProcessSummaryTest {
             workItemKindOf(tool("i", "mcp.docs.search")),
         )
         assertEquals(WorkItemKind.OTHER, workItemKindOf(tool("j", "something_new")))
-    }
-
-    @Test
-    fun `step timings never become a time, only the turn clock does`() {
-        val steps = listOf(
-            tool("a", "shell_execute", startTimeMs = 1_000L, durationMs = 2_000L),
-            tool("b", "file_read", startTimeMs = 4_000L, durationMs = 1_000L),
-        )
-        assertNull("a row without the turn's clock shows no time", WorkProcess(id = "p1", blocks = steps).durationMs)
-        assertEquals(
-            "the turn's clock: from the user's send to the end of the reply",
-            9_000L,
-            WorkProcess(id = "p1", blocks = steps, messageCreatedAtMs = 500L, messageUpdatedAtMs = 9_500L).durationMs,
-        )
-    }
-
-    @Test
-    fun `the clock has no final time while the turn runs or when the row has no timestamps`() {
-        val steps = listOf(tool("a", "shell_execute"))
-        assertNull(
-            WorkProcess(id = "p1", blocks = steps, messageCreatedAtMs = 500L, messageUpdatedAtMs = 9_500L, clockLive = true).durationMs,
-        )
-        assertNull(WorkProcess(id = "p2", blocks = steps, messageCreatedAtMs = 500L).durationMs)
     }
 
     @Test
