@@ -566,6 +566,12 @@ internal fun ChatViewModel.sendMessage(
            dbMessageId = persistedUser.id,
        ))
 
+        // The provider this chat talks to, for the agent's provider_quota tool.
+        com.openminis.app.provider.quota.ActiveChatProvider.set(
+            sessionId,
+            _activeEntryId.value?.let { id -> providerRepository.config.value.modelEntries.find { it.id == id }?.providerInstanceId },
+        )
+
         // Refresh OAuth token if needed before sending (mirrors iOS validAccessToken)
         if ((provider as? com.openminis.app.provider.anthropic.AnthropicProvider)?.isOAuth == true) {
             try {

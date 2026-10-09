@@ -21,10 +21,11 @@ class ProviderQuotaHandler : ToolHandler {
         name = NAME,
         description = "Read what is left on the user's model providers: the remaining balance (DeepSeek, Moonshot, SiliconFlow, OpenRouter, " +
             "relay services) or the remaining share of a subscription's windows (ChatGPT, Claude, Kimi Code), with when each resets. " +
+            "Without a provider it answers for the model this chat is talking to (provider=all for every provider). " +
             "Answers are cached for a few minutes; refresh=true reads them again. A provider the service gives no balance API for says so.",
         parameters = mapOf(
             "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this call does, shown to the user. Use the same language as the user."),
-            "provider" to AgentToolParam("string", "Only the provider whose label contains this text (case-insensitive). Omit for all."),
+            "provider" to AgentToolParam("string", "Only the provider whose label contains this text (case-insensitive); \"all\" for every provider. Omit for the provider this chat uses."),
             "refresh" to AgentToolParam("boolean", "Read again instead of using the cached answer (default false)."),
         ),
         required = listOf("tool_title"),
@@ -37,13 +38,16 @@ class ProviderQuotaHandler : ToolHandler {
         val title = args.optString("tool_title", "provider quota")
         val providers = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull
             ?: return ToolExecutionResult("provider_quota: providers are not loaded yet", false, toolTitle = title)
-        val filter = args.optString("provider").trim().lowercase().takeIf { it.isNotEmpty() }
+        val asked = args.optString("provider").trim().lowercase().takeIf { it.isNotEmpty() }
+        val filter = asked.takeIf { it != "all" }
+        val activeId = if (asked == null) com.openminis.app.provider.quota.ActiveChatProvider.get(sessionId) else null
         val force = args.optBoolean("refresh", false)
         val enabled = providers.config.value.instances.filter { it.isEnabled }
-        val matching = enabled.filter { filter == null || it.label.lowercase().contains(filter) || it.providerType.displayName.lowercase().contains(filter) }
+        val matching = enabled.filter { (activeId == null || it.id == activeId) && (filter == null || it.label.lowercase().contains(filter) || it.providerType.displayName.lowercase().contains(filter)) }
         val supported = matching.filter { ProviderQuotaRepository.supported(context, it) }
         if (supported.isEmpty()) {
-            val why = if (filter != null && matching.isEmpty()) "no enabled provider matches '$filter'" else "none of ${matching.size} provider(s) has a balance source"
+            val why = if (activeId != null) "the provider of this chat has no balance source (provider=all checks the others)"
+            else if (filter != null && matching.isEmpty()) "no enabled provider matches '$filter'" else "none of ${matching.size} provider(s) has a balance source"
             return ToolExecutionResult("provider_quota: $why", filter == null, toolTitle = title)
         }
         coroutineScope {
@@ -53,7 +57,11 @@ class ProviderQuotaHandler : ToolHandler {
             ProviderQuotaText.describe(instance.label.ifBlank { instance.providerType.displayName }, ProviderQuotaRepository.stateOf(instance.id))
         }
         val others = matching.size - supported.size
-        val footer = if (others > 0 && filter == null) "\n($others other provider(s) have no balance source)" else ""
+        val footer = when {
+            activeId != null -> "\n(this is the provider of this chat; provider=all lists every provider)"
+            others > 0 && filter == null -> "\n($others other provider(s) have no balance source)"
+            else -> ""
+        }
         return ToolExecutionResult(lines.joinToString("\n") + footer, true, toolTitle = title)
     }
 

@@ -95,6 +95,23 @@ class RuntimePermissionGranterTest {
         assertTrue(RuntimePermissionGranter.exemptionPlan(pkg, -5).isEmpty())
     }
 
+    @Test
+    fun `background plan is the standard app-ops everywhere and the vendor ones only on Xiaomi`() {
+        val common = listOf(
+            listOf("cmd", "appops", "set", pkg, "RUN_IN_BACKGROUND", "allow"),
+            listOf("cmd", "appops", "set", pkg, "RUN_ANY_IN_BACKGROUND", "allow"),
+        )
+        assertEquals(common, RuntimePermissionGranter.backgroundPlan(pkg, "samsung"))
+        assertEquals(
+            common + listOf(
+                listOf("cmd", "appops", "set", pkg, "10008", "allow"),
+                listOf("cmd", "appops", "set", pkg, "10021", "allow"),
+            ),
+            RuntimePermissionGranter.backgroundPlan(pkg, "Xiaomi"),
+        )
+        assertTrue(RuntimePermissionGranter.backgroundPlan("evil; reboot", "Xiaomi").isEmpty())
+    }
+
     private val a11y = "$pkg/com.openminis.app.accessibility.MinisAccessibilityService"
     private val listener = "$pkg/com.openminis.app.offload.MinisNotificationListenerService"
 

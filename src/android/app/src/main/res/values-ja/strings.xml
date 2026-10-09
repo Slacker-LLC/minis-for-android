@@ -2213,4 +2213,9 @@
     <string name="quota_window_left">%1$s ウィンドウ：残り %2$d%%</string>
     <string name="quota_unlimited">無制限</string>
     <string name="quota_open_console">プロバイダーのサイトで残高を確認</string>
+    <string name="add_provider_group_china">中国本土</string>
+    <string name="add_provider_group_coding">コーディングプラン</string>
+    <string name="add_provider_group_global">海外</string>
+    <string name="add_provider_group_gateway">ゲートウェイ / アグリゲーター</string>
+    <string name="add_provider_group_local">この端末 / ローカルネットワーク</string>
 </resources>

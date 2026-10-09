@@ -2425,4 +2425,9 @@
     <string name="quota_window_left">%1$s 視窗：剩餘 %2$d%%</string>
     <string name="quota_unlimited">額度不限</string>
     <string name="quota_open_console">到服務商官網查看餘額</string>
+    <string name="add_provider_group_china">中國大陸服務商</string>
+    <string name="add_provider_group_coding">程式訂閱（Coding Plan）</string>
+    <string name="add_provider_group_global">海外服務商</string>
+    <string name="add_provider_group_gateway">閘道與聚合平台</string>
+    <string name="add_provider_group_local">本機 / 區域網路</string>
 </resources>

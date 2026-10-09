@@ -88,4 +88,31 @@ class ProviderBridgeTest {
         assertEquals("", ProviderBridge.withManagedBlock("", null))
         assertFalse(ProviderBridge.withManagedBlock("", ProviderBridge.BLOCK_BODY).isEmpty())
     }
+
+    @Test
+    fun `a known service is exported under the name its own tools read`() {
+        val out = env(
+            p("glm", ProviderType.openAI, "https://open.bigmodel.cn/api/paas/v4"),
+            p("groq", ProviderType.openAI, "https://api.groq.com/openai/v1"),
+            p("qwen", ProviderType.openAI, "https://coding.dashscope.aliyuncs.com/v1"),
+            p("ark", ProviderType.openAI, "https://ark.cn-beijing.volces.com/api/coding/v3"),
+            p("mini", ProviderType.anthropic, "https://api.minimax.io/anthropic"),
+            p("kimi", ProviderType.kimiCode),
+        )
+        assertEquals("key-glm", out["ZHIPU_API_KEY"])
+        assertEquals("key-groq", out["GROQ_API_KEY"])
+        assertEquals("key-qwen", out["ALIBABA_CODING_PLAN_API_KEY"])
+        assertEquals("key-ark", out["ARK_CODING_PLAN_API_KEY"])
+        assertEquals("key-mini", out["MINIMAX_API_KEY"])
+        assertEquals("key-kimi", out["KIMI_API_KEY"])
+        assertEquals("https://api.kimi.com/coding/v1", out["KIMI_BASE_URL"])
+        assertNull("known services are not relays", out["OPENAI_BASE_URL"])
+    }
+
+    @Test
+    fun `a host that merely contains a known name is not that service`() {
+        assertNull(ProviderBridge.serviceVariable("https://api.groq.com.evil.example/v1"))
+        assertNull(ProviderBridge.serviceVariable("https://evil.example/api.groq.com"))
+        assertNull(ProviderBridge.serviceVariable("not a url"))
+    }
 }

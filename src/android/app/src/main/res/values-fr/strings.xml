@@ -2112,4 +2112,9 @@
     <string name="quota_window_left">Fenêtre %1$s : %2$d%% restant</string>
     <string name="quota_unlimited">Illimité</string>
     <string name="quota_open_console">Voir le solde sur le site du fournisseur</string>
+    <string name="add_provider_group_china">Chine continentale</string>
+    <string name="add_provider_group_coding">Forfaits de code</string>
+    <string name="add_provider_group_global">International</string>
+    <string name="add_provider_group_gateway">Passerelles et agrégateurs</string>
+    <string name="add_provider_group_local">Ce téléphone / réseau local</string>
 </resources>

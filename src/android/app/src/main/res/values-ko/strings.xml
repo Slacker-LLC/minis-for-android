@@ -2205,4 +2205,9 @@
     <string name="quota_window_left">%1$s 구간: %2$d%% 남음</string>
     <string name="quota_unlimited">제한 없음</string>
     <string name="quota_open_console">공급자 웹사이트에서 잔액 확인</string>
+    <string name="add_provider_group_china">중국 본토</string>
+    <string name="add_provider_group_coding">코딩 플랜</string>
+    <string name="add_provider_group_global">해외</string>
+    <string name="add_provider_group_gateway">게이트웨이 / 애그리게이터</string>
+    <string name="add_provider_group_local">이 기기 / 로컬 네트워크</string>
 </resources>

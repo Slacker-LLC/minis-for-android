@@ -113,6 +113,18 @@ object PromptModuleRegistry {
             gapBefore = PromptGap.TIGHT,
         ),
         PromptModule(
+            id = "tools.terminal",
+            title = "真终端工具（terminal）",
+            description = "terminal 工具的用法：打开真实终端运行 pi / Claude Code / Codex / OpenCode 等交互程序，发送按键、读取屏幕、数量上限。关闭后模型仍可调用该工具，只是不再收到这段使用说明。",
+            group = GROUP_TOOLS,
+        ),
+        PromptModule(
+            id = "tools.providerQuota",
+            title = "服务商余额工具（provider_quota）",
+            description = "provider_quota 工具的用法：查询当前或指定服务商还剩多少余额 / 订阅额度。关闭后模型仍可调用该工具，只是不再收到这段使用说明。",
+            group = GROUP_TOOLS,
+        ),
+        PromptModule(
             id = "env.variables",
             title = "环境变量与设置深链",
             description = "禁止回显密钥、缺失变量的提示方式，以及 minis://settings 深链路径清单。",

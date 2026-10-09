@@ -106,6 +106,8 @@ fun AddProviderScreen(
     var selectedVoiceTemplate by remember {
         mutableStateOf<com.openminis.app.data.model.VoiceProviderTemplate?>(null)
     }
+    // A well-known service picked from the list: fills the label and endpoint of an ordinary OpenAI/Anthropic instance.
+    var selectedPreset by remember { mutableStateOf<com.openminis.app.data.model.ProviderPreset?>(null) }
 
     // Unified back handler: reuse each step's onBack so predictive-back gesture
     // and the top-bar arrow behave identically (go back to prior step, not exit).
@@ -117,6 +119,7 @@ fun AddProviderScreen(
                 step = AddProviderStep.CHOOSE_TYPE
                 selectedType = null
                 selectedVoiceTemplate = null
+                selectedPreset = null
                 selectedCredential = null
             }
         }
@@ -134,6 +137,12 @@ fun AddProviderScreen(
                 selectedCredential = availableCredentials(type).first()
                 step = AddProviderStep.CONFIGURE
             },
+            onSelectPreset = { preset ->
+                selectedPreset = preset
+                selectedType = preset.providerType
+                selectedCredential = ProviderCredential.apiKey
+                step = AddProviderStep.CONFIGURE
+            },
             onSelectVoiceTemplate = { template ->
                 // Mirror iOS applyVoiceTemplate: pick the underlying protocol,
                 // force API-key credential, jump straight to configure.
@@ -149,6 +158,7 @@ fun AddProviderScreen(
             onCredentialChange = { selectedCredential = it },
             providerRepository = providerRepository,
             voiceTemplate = selectedVoiceTemplate,
+            preset = selectedPreset,
             onBack = handleBack,
             onSaved = onSaved,
         )
@@ -215,6 +225,7 @@ private fun ChooseProviderScreen(
     onBack: () -> Unit,
     onSelect: (ProviderType) -> Unit,
     onSelectVoiceTemplate: (com.openminis.app.data.model.VoiceProviderTemplate) -> Unit = {},
+    onSelectPreset: (com.openminis.app.data.model.ProviderPreset) -> Unit = {},
 ) {
     SettingsScaffold(
         title = stringResource(R.string.provider_list_add_provider),
@@ -265,6 +276,34 @@ private fun ChooseProviderScreen(
             }
         }
 
+        // More services that speak the OpenAI / Anthropic format: one row each, endpoint pre-filled.
+        com.openminis.app.data.model.ProviderPreset.Group.entries.forEach { group ->
+            val presets = com.openminis.app.data.model.ProviderPreset.all.filter { it.group == group }
+            if (presets.isEmpty()) return@forEach
+            SettingsSection(
+                header = stringResource(
+                    when (group) {
+                        com.openminis.app.data.model.ProviderPreset.Group.CHINA -> R.string.add_provider_group_china
+                        com.openminis.app.data.model.ProviderPreset.Group.CODING_PLAN -> R.string.add_provider_group_coding
+                        com.openminis.app.data.model.ProviderPreset.Group.GLOBAL -> R.string.add_provider_group_global
+                        com.openminis.app.data.model.ProviderPreset.Group.GATEWAY -> R.string.add_provider_group_gateway
+                        com.openminis.app.data.model.ProviderPreset.Group.LOCAL -> R.string.add_provider_group_local
+                    },
+                ),
+            ) {
+                presets.forEachIndexed { index, preset ->
+                    SettingsRow(
+                        title = preset.name,
+                        subtitle = preset.baseURL.removePrefix("https://").removePrefix("http://"),
+                        icon = providerIcon(preset.providerType).first,
+                        iconColor = providerIcon(preset.providerType).second,
+                        onClick = { onSelectPreset(preset) },
+                        showDivider = index < presets.size - 1,
+                    )
+                }
+            }
+        }
+
         // [T-android-provider-voice] Voice Chat Providers — one row per voice
         // vendor template. Tapping prefills the underlying protocol + base URL
         // and jumps to configure (mirrors iOS voiceProviderSection).
@@ -305,6 +344,7 @@ private fun ConfigureProviderScreen(
     onCredentialChange: (ProviderCredential) -> Unit,
     providerRepository: ProviderRepository,
     voiceTemplate: com.openminis.app.data.model.VoiceProviderTemplate? = null,
+    preset: com.openminis.app.data.model.ProviderPreset? = null,
     onBack: () -> Unit,
     onSaved: () -> Unit,
 ) {
@@ -312,7 +352,7 @@ private fun ConfigureProviderScreen(
     // A voice template preseeds its vendor name instead of the protocol name.
     val config by providerRepository.config.collectAsState()
     val defaultLabel = remember(config) {
-        val baseName = voiceTemplate?.name ?: providerType.displayName
+        val baseName = voiceTemplate?.name ?: preset?.name ?: providerType.displayName
         val existingLabels = config.instances.map { it.label }.toSet()
         if (baseName !in existingLabels) baseName
         else {
@@ -340,7 +380,7 @@ private fun ConfigureProviderScreen(
         if (!labelEdited) label = defaultLabel
     }
     var apiKey by remember { mutableStateOf("") }
-    var customBaseURL by remember { mutableStateOf(voiceTemplate?.baseURL ?: "") }
+    var customBaseURL by remember { mutableStateOf(voiceTemplate?.baseURL ?: preset?.baseURL ?: "") }
 
     SettingsScaffold(
         title = stringResource(R.string.add_provider_configure_provider, providerType.displayName),
@@ -349,7 +389,7 @@ private fun ConfigureProviderScreen(
     ) {
         // More than one way to sign in (API key / OAuth): a switch on the form, not a page of its own.
         val credentials = availableCredentials(providerType)
-        if (voiceTemplate == null && credentials.size > 1) {
+        if (voiceTemplate == null && preset == null && credentials.size > 1) {
             SettingsSegmented(
                 options = credentials.map { if (it == ProviderCredential.apiKey) stringResource(R.string.provider_list_api_key) else "OAuth" },
                 selectedIndex = credentials.indexOf(credentialType).coerceAtLeast(0),
@@ -386,7 +426,7 @@ private fun ConfigureProviderScreen(
                 customBaseURL = customBaseURL,
                 onCustomBaseURLChange = { customBaseURL = it },
                 providerRepository = providerRepository,
-                initialAppendV1 = voiceTemplate?.appendV1,
+                initialAppendV1 = voiceTemplate?.appendV1 ?: preset?.appendV1,
                 onSaved = onSaved,
             )
             ProviderCredential.oauth -> OAuthConfigSection(

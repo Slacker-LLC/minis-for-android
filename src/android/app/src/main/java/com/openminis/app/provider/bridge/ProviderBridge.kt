@@ -33,6 +33,8 @@ object ProviderBridge {
     private const val KEY_ENABLED = "enabled"
     private const val DIR = ".minis"
     private const val ENV_FILE = "agent-env.sh"
+    private const val PI_MODELS = ".pi/agent/models.json"
+    private const val COMMANDCODE_PROVIDERS = ".commandcode/providers.json"
     internal const val BLOCK_BEGIN = "# >>> minis provider env (managed by Minis; switch off one-tap authorize to remove) >>>"
     internal const val BLOCK_END = "# <<< minis provider env <<<"
     internal const val BLOCK_BODY = "[ -f \"\$HOME/.minis/agent-env.sh\" ] && . \"\$HOME/.minis/agent-env.sh\""
@@ -48,8 +50,8 @@ object ProviderBridge {
     /** The variables for the agent's own shells; empty while the bridge is off. */
     fun currentEnv(): Map<String, String> = env
 
-    /** Values to keep out of anything the model reads (Privacy Mode). */
-    fun secrets(): Collection<String> = env.values
+    /** Values to keep out of anything the model reads (Privacy Mode): the keys, not the config text that only names them. */
+    fun secrets(): Collection<String> = env.filterKeys { it != AgentProviderConfigs.OPENCODE_ENV }.values
 
     fun enable(context: Context, providers: ProviderRepository) {
         prefs(context).edit().putBoolean(KEY_ENABLED, true).apply()
@@ -87,11 +89,14 @@ object ProviderBridge {
     }
 
     private fun sync(context: Context, providers: ProviderRepository) {
-        val next = envFor(providers.config.value.instances) { id -> providers.loadApiKey(id) }
+        val config = providers.config.value
+        val keyOf = { id: String -> providers.loadApiKey(id) }
+        val custom = AgentProviderConfigs.collect(config.instances, config.modelEntries, keyOf)
+        val next = envFor(config.instances, keyOf) + AgentProviderConfigs.env(custom)
         env = next
         runCatching {
             UbuntuPaths.initialize(context)
-            writeFiles(UbuntuPaths.hostHome, next)
+            writeFiles(UbuntuPaths.hostHome, next, custom)
         }
     }
 
@@ -109,19 +114,25 @@ object ProviderBridge {
         val openAiRelay = ArrayList<Pair<ProviderInstance, String>>()
         for (instance in instances) {
             val key = usable(instance) ?: continue
-            val host = instance.customBaseURL?.toHttpUrlOrNull()?.host
             when (instance.providerType) {
-                ProviderType.anthropic -> if ("ANTHROPIC_API_KEY" !in out) {
-                    out["ANTHROPIC_API_KEY"] = key
-                    anthropicBase(instance.customBaseURL)?.let { out["ANTHROPIC_BASE_URL"] = it }
+                ProviderType.anthropic -> {
+                    if ("ANTHROPIC_API_KEY" !in out) {
+                        out["ANTHROPIC_API_KEY"] = key
+                        anthropicBase(instance.customBaseURL)?.let { out["ANTHROPIC_BASE_URL"] = it }
+                    }
+                    serviceVariable(instance.customBaseURL)?.let { out.putIfAbsent(it, key) }
+                }
+                ProviderType.kimiCode -> if ("KIMI_API_KEY" !in out) {
+                    out["KIMI_API_KEY"] = key
+                    out["KIMI_BASE_URL"] = "https://api.kimi.com/coding/v1"
                 }
                 ProviderType.gemini -> out.putIfAbsent("GEMINI_API_KEY", key)
                 ProviderType.openRouter -> out.putIfAbsent("OPENROUTER_API_KEY", key)
                 ProviderType.xAI -> out.putIfAbsent("XAI_API_KEY", key)
                 ProviderType.openAI, ProviderType.openAIResponses -> when {
-                    host == "api.deepseek.com" -> out.putIfAbsent("DEEPSEEK_API_KEY", key)
-                    host == "api.moonshot.cn" || host == "api.moonshot.ai" -> out.putIfAbsent("MOONSHOT_API_KEY", key)
                     instance.customBaseURL == null -> out.putIfAbsent("OPENAI_API_KEY", key)
+                    // A known service is exported under the name its own client (and OpenCode, from the models.dev catalogue) reads.
+                    serviceVariable(instance.customBaseURL) != null -> out.putIfAbsent(serviceVariable(instance.customBaseURL)!!, key)
                     else -> openAiRelay.add(instance to key)
                 }
                 else -> Unit
@@ -136,11 +147,71 @@ object ProviderBridge {
         return out
     }
 
-    /** Claude Code wants the origin the `/v1/messages` path hangs off, not the `/v1` the app appends itself. */
-    internal fun anthropicBase(customBase: String?): String? {
-        val base = customBase?.trim()?.trimEnd('/')?.removeSuffix("/v1")?.trimEnd('/')?.takeIf { it.isNotEmpty() } ?: return null
-        return base.takeIf { it.startsWith("https://") }
+    /**
+     * The variable a known service's own tools read its key from (the names the models.dev catalogue lists, which OpenCode loads
+     * providers by), or null for a host this table does not know. Order matters: the first row that matches wins.
+     */
+    internal fun serviceVariable(customBase: String?): String? {
+        val url = customBase?.trim()?.toHttpUrlOrNull() ?: return null
+        val host = url.host
+        val path = url.encodedPath
+        return SERVICE_VARIABLES.firstOrNull { (suffix, pathPart, _) ->
+            (host == suffix || host.endsWith(".$suffix")) && (pathPart == null || path.contains(pathPart))
+        }?.third
     }
+
+    private val SERVICE_VARIABLES: List<Triple<String, String?, String>> = listOf(
+        Triple("api.deepseek.com", null, "DEEPSEEK_API_KEY"),
+        Triple("moonshot.cn", null, "MOONSHOT_API_KEY"),
+        Triple("moonshot.ai", null, "MOONSHOT_API_KEY"),
+        Triple("api.kimi.com", null, "KIMI_API_KEY"),
+        Triple("bigmodel.cn", null, "ZHIPU_API_KEY"),
+        Triple("api.z.ai", null, "ZHIPU_API_KEY"),
+        Triple("coding.dashscope.aliyuncs.com", null, "ALIBABA_CODING_PLAN_API_KEY"),
+        Triple("dashscope.aliyuncs.com", null, "DASHSCOPE_API_KEY"),
+        Triple("dashscope-intl.aliyuncs.com", null, "DASHSCOPE_API_KEY"),
+        Triple("volces.com", "/coding/", "ARK_CODING_PLAN_API_KEY"),
+        Triple("volces.com", null, "ARK_API_KEY"),
+        Triple("xiaomimimo.com", null, "XIAOMI_API_KEY"),
+        Triple("api.stepfun.com", null, "STEPFUN_API_KEY"),
+        Triple("api.stepfun.ai", null, "STEPFUN_API_KEY"),
+        Triple("api.siliconflow.cn", null, "SILICONFLOW_API_KEY"),
+        Triple("api.siliconflow.com", null, "SILICONFLOW_API_KEY"),
+        Triple("api-inference.modelscope.cn", null, "MODELSCOPE_API_KEY"),
+        Triple("api.longcat.chat", null, "LONGCAT_API_KEY"),
+        Triple("api.minimax.io", null, "MINIMAX_API_KEY"),
+        Triple("api.minimax.cn", null, "MINIMAX_API_KEY"),
+        Triple("api.lkeap.cloud.tencent.com", "/coding/", "TENCENT_CODING_PLAN_API_KEY"),
+        Triple("api.groq.com", null, "GROQ_API_KEY"),
+        Triple("api.cerebras.ai", null, "CEREBRAS_API_KEY"),
+        Triple("api.together.xyz", null, "TOGETHER_API_KEY"),
+        Triple("api.fireworks.ai", null, "FIREWORKS_API_KEY"),
+        Triple("api.mistral.ai", null, "MISTRAL_API_KEY"),
+        Triple("api.perplexity.ai", null, "PERPLEXITY_API_KEY"),
+        Triple("api.cohere.ai", null, "COHERE_API_KEY"),
+        Triple("api.deepinfra.com", null, "DEEPINFRA_API_KEY"),
+        Triple("integrate.api.nvidia.com", null, "NVIDIA_API_KEY"),
+        Triple("router.huggingface.co", null, "HF_TOKEN"),
+        Triple("api.novita.ai", null, "NOVITA_API_KEY"),
+        Triple("api.tokenfactory.nebius.com", null, "NEBIUS_API_KEY"),
+        Triple("api.llama.com", null, "LLAMA_API_KEY"),
+        Triple("ollama.com", null, "OLLAMA_API_KEY"),
+        Triple("ai-gateway.vercel.sh", null, "AI_GATEWAY_API_KEY"),
+        Triple("api.poe.com", null, "POE_API_KEY"),
+        Triple("aihubmix.com", null, "AIHUBMIX_API_KEY"),
+        Triple("zenmux.ai", null, "ZENMUX_API_KEY"),
+        Triple("router.requesty.ai", null, "REQUESTY_API_KEY"),
+        Triple("ai-gateway.helicone.ai", null, "HELICONE_API_KEY"),
+        Triple("api.kilo.ai", null, "KILO_API_KEY"),
+        Triple("opencode.ai", null, "OPENCODE_API_KEY"),
+    )
+
+    /** Claude Code wants the origin the `/v1/messages` path hangs off, not the `/v1` the app appends itself. */
+    internal fun anthropicBase(customBase: String?): String? = anthropicRoot(customBase)?.takeIf { it.startsWith("https://") }
+
+    /** [anthropicBase] without the https requirement (the config files also take a loopback http server). */
+    internal fun anthropicRoot(customBase: String?): String? =
+        customBase?.trim()?.trimEnd('/')?.removeSuffix("/v1")?.trimEnd('/')?.takeIf { it.isNotEmpty() }
 
     internal fun renderEnvFile(env: Map<String, String>): String = buildString {
         append("# Managed by Minis (one-tap authorize). Rewritten whenever a provider or its key changes.\n")
@@ -164,8 +235,10 @@ object ProviderBridge {
         return if (without.isEmpty()) block else without.trimEnd('\n') + "\n\n" + block
     }
 
-    private fun writeFiles(homePath: String, env: Map<String, String>) {
+    private fun writeFiles(homePath: String, env: Map<String, String>, custom: List<AgentProviderConfigs.CustomProvider>) {
         val home = File(homePath)
+        updateAgentConfig(File(home, PI_MODELS)) { AgentProviderConfigs.piModelsJson(it, custom) }
+        updateAgentConfig(File(home, COMMANDCODE_PROVIDERS)) { AgentProviderConfigs.commandCodeProvidersJson(it, custom) }
         val dir = File(home, DIR).apply { mkdirs() }
         val file = File(dir, ENV_FILE)
         file.writeText(renderEnvFile(env))
@@ -179,8 +252,25 @@ object ProviderBridge {
         }
     }
 
+    /** Rewrites [file] through [transform]: "" deletes it, null (a file it cannot vouch for) leaves it as it is. */
+    private fun updateAgentConfig(file: File, transform: (String?) -> String?) {
+        val current = if (file.isFile) file.readText() else null
+        val updated = transform(current) ?: return
+        when {
+            updated.isEmpty() -> file.delete()
+            updated != current -> {
+                file.parentFile?.mkdirs()
+                file.writeText(updated)
+                file.setReadable(false, false); file.setReadable(true, true)
+                file.setWritable(false, false); file.setWritable(true, true)
+            }
+        }
+    }
+
     private fun removeFiles(homePath: String) {
         val home = File(homePath)
+        updateAgentConfig(File(home, PI_MODELS)) { AgentProviderConfigs.piModelsJson(it, emptyList()) }
+        updateAgentConfig(File(home, COMMANDCODE_PROVIDERS)) { AgentProviderConfigs.commandCodeProvidersJson(it, emptyList()) }
         File(File(home, DIR), ENV_FILE).delete()
         for (name in listOf(".profile", ".bashrc")) {
             val target = File(home, name)
