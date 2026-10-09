@@ -457,6 +457,8 @@ internal sealed class FlatChatItem {
             if (messageId != other.messageId) return false
             if (process.id != other.process.id) return false
             if (process.turnLive != other.process.turnLive) return false
+            if (process.clockLive != other.process.clockLive) return false
+            if (process.messageCreatedAtMs != other.process.messageCreatedAtMs) return false
             if (process.messageUpdatedAtMs != other.process.messageUpdatedAtMs) return false
             val mine = process.blocks
             val theirs = other.process.blocks
@@ -478,6 +480,7 @@ internal sealed class FlatChatItem {
             hash = hash * 31 + process.id.hashCode()
             hash = hash * 31 + process.blocks.size
             hash = hash * 31 + process.turnLive.hashCode()
+            hash = hash * 31 + process.clockLive.hashCode()
             process.blocks.forEach { block ->
                 hash = hash * 31 + block.id.hashCode()
                 hash = hash * 31 + (block.toolStatus?.ordinal ?: -1)
@@ -509,7 +512,8 @@ internal sealed class FlatChatItem {
         override val contentType = "time"
     }
 
-    data class AssistantTyping(val messageId: String) : FlatChatItem() {
+    /** [startedAtMs] > 0: this line is the first thing under the user's message, so it carries the turn's clock. */
+    data class AssistantTyping(val messageId: String, val startedAtMs: Long = 0L) : FlatChatItem() {
         override val key = "typing:$messageId"
         override val contentType = "typing"
     }
@@ -661,7 +665,9 @@ internal fun buildFlatChatItems(
     }
     // [T-android-turn-work] Where the current turn began: the user message that opened it. The
     // turn's duration is measured from here, not from the assistant row's own timestamps.
-    var turnStartedAtMs = 0L
+    // A partial rebuild (fromIndex > 0) starts at the live reply, so look back for the user message that opened it.
+    var turnStartedAtMs = (fromIndex - 1 downTo 0).asSequence().map { messages[it] }
+        .firstOrNull { it.role == "user" }?.createdAtMs?.takeIf { it > 0L } ?: 0L
     for (idx in fromIndex until messages.size) {
         val message = messages[idx]
         // [T-android-perf-logging] Per-100-message progress breadcrumb.
@@ -684,6 +690,8 @@ internal fun buildFlatChatItems(
             }
         }
         if (message.role == "user") {
+            // The turn's clock starts at the send; the replies that follow measure from here.
+            if (message.createdAtMs > 0L) turnStartedAtMs = message.createdAtMs
             // [T-android-candidate-bubble-gap] Flag when the previous message
             // is also a user message so the bubble can add a separating top
             // gap — back-to-back candidate / queued sends otherwise have no
@@ -901,8 +909,12 @@ internal fun buildFlatChatItems(
                 else -> true // tool_use pills render immediately
             }
         }
-        if (message.isStreaming && (!hasVisibleContent || message.isAwaitingModelResponse)) {
-            out.add(dedupe(FlatChatItem.AssistantTyping(message.id)))
+        // A live work row already says "working", so the separate typing line is only for the turn's start,
+        // before any step exists. There it carries the turn's clock: the first line under the user's message.
+        val hasWorkRow = turnEntries.any { it is AssistantTurnEntry.Process }
+        if (message.isStreaming && (!hasVisibleContent || message.isAwaitingModelResponse) && !hasWorkRow) {
+            val clockStart = if (turnEntries.isEmpty()) turnStartedAtMs.takeIf { it > 0L } ?: message.createdAtMs else 0L
+            out.add(dedupe(FlatChatItem.AssistantTyping(message.id, startedAtMs = clockStart)))
         }
 
         // Legacy fallback: pre-migration sessions stored all text in message.content

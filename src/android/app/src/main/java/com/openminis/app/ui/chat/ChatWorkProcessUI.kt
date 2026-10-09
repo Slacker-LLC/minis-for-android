@@ -91,11 +91,12 @@ internal fun WorkProcessRowView(
     val summary = remember(process.blocks, process.turnLive, process.messageUpdatedAtMs, process.messageCreatedAtMs) {
         process.summary()
     }
-    // [T-android-turn-work] Wall-clock label while the turn runs; one tick a second is enough.
+    // One clock per turn, on the run under the user's message: it ticks from the send until the whole reply is done.
     val startedAt = process.startedAtMs
-    var elapsedSec by remember(process.id, summary.isRunning, startedAt) { mutableStateOf(0L) }
-    LaunchedEffect(process.id, summary.isRunning, startedAt) {
-        if (!summary.isRunning || startedAt == null) {
+    val clockRunning = process.clockLive && startedAt != null
+    var elapsedSec by remember(process.id, clockRunning, startedAt) { mutableStateOf(0L) }
+    LaunchedEffect(process.id, clockRunning, startedAt) {
+        if (!clockRunning || startedAt == null) {
             elapsedSec = 0L
         } else {
             while (true) {
@@ -113,8 +114,7 @@ internal fun WorkProcessRowView(
         if (!userToggled) expanded = summary.isRunning
     }
 
-    val failed = summary.failureReason != null && !summary.isRunning
-    val statusText = workStatusText(summary, elapsedSec.takeIf { summary.isRunning })
+    val statusText = workStatusText(summary, elapsedSec.takeIf { clockRunning })
 
     // The redesign's status line: one small grey line above the reply, "已完成 · 用时 12s" with a chevron
     // (right when folded, down when open), or "正在工作 ..." while the turn runs. No bar, no rule under it.
@@ -134,12 +134,12 @@ internal fun WorkProcessRowView(
                 text = statusText,
                 fontSize = 13.sp,
                 lineHeight = 20.sp,
-                color = if (failed) ToolErrorColor else ChatColors.secondaryText,
+                color = ChatColors.secondaryText,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            if (summary.isRunning) {
+            if (summary.isRunning || clockRunning) {
                 Spacer(Modifier.width(6.dp))
                 Box(modifier = Modifier.height(20.dp), contentAlignment = Alignment.Center) { BouncingDots(ChatColors.secondaryText) }
             }
@@ -153,24 +153,6 @@ internal fun WorkProcessRowView(
                 )
             }
         }
-        // An unrecovered failure is a second, red line: the first line keeps the step count and the time the
-        // turn took, which a failure used to replace.
-        if (failed) {
-            Text(
-                text = stringResource(
-                    R.string.work_process_failed_step,
-                    summary.failedStepNumber ?: 0,
-                    summary.failureReason.orEmpty(),
-                ),
-                fontSize = 12.sp,
-                lineHeight = 18.sp,
-                color = ToolErrorColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(end = 8.dp, bottom = 6.dp),
-            )
-        }
-
         AnimatedVisibility(
             visible = expanded,
             enter = fadeIn() + expandVertically(
@@ -195,26 +177,6 @@ internal fun WorkProcessRowView(
                     .heightIn(max = WORK_PANEL_MAX_HEIGHT)
                     .verticalScroll(panelScroll),
               ) {
-                // [T-android-work-items] What the run consisted of, by type - the same idea as
-                // Codex's grouped work items, in one line above the individual steps. The labels
-                // are resolved with a plain loop: a composable call inside joinToString's lambda
-                // is not a composable context.
-                val tallyGroups = tallyEntries(summary.tallies)
-                if (tallyGroups.isNotEmpty()) {
-                    val parts = ArrayList<String>(tallyGroups.size)
-                    for (index in tallyGroups.indices) {
-                        val (kind, count) = tallyGroups[index]
-                        parts.add(workItemTallyLabel(kind, count))
-                    }
-                    Text(
-                        text = parts.joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ChatColors.secondaryText,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                    )
-                }
                 val trailingBlockId = process.blocks.lastOrNull()?.id
                 process.blocks.forEach { block ->
                     when (block.kind) {
@@ -365,41 +327,42 @@ internal fun notePreview(content: String, latest: Boolean, maxChars: Int = 200):
 }
 
 /**
- * The status line's words: how the turn ended ("已完成 · 用时 12s", "已完成 5 个步骤 · 用时 38s"), where it
- * failed, or that it is still working. The wording rules live here so they stay in one place.
+ * The status line's words. Running: "Working · 12s · step 3 · <what the step does>" - the time only on the run that
+ * carries the turn's clock. Finished: "Completed 5 steps · read 3 files, ran 2 commands · took 38s", the time again
+ * only on that run. The wording rules live here so they stay in one place.
  */
 @Composable
-internal fun workStatusText(summary: WorkProcessSummary, runningElapsedSec: Long? = null): String = when {
-    summary.isRunning -> {
-        val running = stringResource(R.string.work_status_running)
-        if (runningElapsedSec != null && runningElapsedSec > 0L) {
-            "$running · ${formatStepDuration(runningElapsedSec, stillRunning = true)}"
-        } else {
-            running
+internal fun workStatusText(summary: WorkProcessSummary, clockElapsedSec: Long? = null): String {
+    val parts = ArrayList<String>(4)
+    if (summary.isRunning || clockElapsedSec != null) {
+        parts.add(stringResource(R.string.work_status_running))
+        if (clockElapsedSec != null) parts.add(formatStepDuration(clockElapsedSec, stillRunning = false))
+        if (summary.isRunning) {
+            summary.runningStepNumber?.let { parts.add(stringResource(R.string.work_status_step, it)) }
+            when {
+                summary.runningToolName != null -> parts.add(summary.runningToolName)
+                summary.thinking -> parts.add(stringResource(R.string.work_status_thinking))
+            }
         }
+        return parts.joinToString(" · ")
     }
-    else -> {
-        val done = if (summary.toolCount > 0) {
+    parts.add(
+        if (summary.toolCount > 0) {
             pluralStringResource(R.plurals.work_process_completed_steps, summary.toolCount, summary.toolCount)
         } else {
             stringResource(R.string.work_status_done)
-        }
-        // The first line always says how long the turn took, failed or not; the failure itself is the
-        // red line under it (and the step number rides along here so a folded row still shows it).
-        val seconds = summary.durationMs?.let { it / 1000L }
-        val failedStep = summary.failedStepNumber?.takeIf { summary.failureReason != null }
-        val took = when {
-            seconds != null && failedStep != null -> stringResource(
-                R.string.work_process_duration_failed, formatStepDuration(seconds, stillRunning = false), failedStep,
-            )
-            seconds != null -> stringResource(
-                R.string.work_process_duration, formatStepDuration(seconds, stillRunning = false),
-            )
-            failedStep != null -> stringResource(R.string.work_process_failed_only, failedStep)
-            else -> null
-        }
-        if (took != null) "$done · $took" else done
+        },
+    )
+    val groups = tallyEntries(summary.tallies)
+    if (groups.isNotEmpty()) {
+        val labels = ArrayList<String>(groups.size)
+        for (index in groups.indices) labels.add(workItemTallyLabel(groups[index].first, groups[index].second))
+        parts.add(labels.joinToString(", "))
     }
+    summary.durationMs?.let {
+        parts.add(stringResource(R.string.work_process_duration, formatStepDuration(it / 1000L, stillRunning = false)))
+    }
+    return parts.joinToString(" · ")
 }
 
 /**

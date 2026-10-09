@@ -1205,7 +1205,6 @@
     <!-- T-android-work-process / T-android-assistant-home / lint MissingTranslation -->
     <string name="work_process_running_step">Étape %1$d en cours · %2$s</string>
     <string name="work_process_running_thinking">Réflexion…</string>
-    <string name="work_process_failed_step">Échec de l’étape %1$d · %2$s</string>
     <plurals name="work_process_completed_steps">
         <item quantity="one">%d étape terminée</item>
         <item quantity="many">%d étapes terminées</item>
@@ -1464,7 +1463,6 @@
         <item quantity="other">%1$d délégations</item>
     </plurals>
     <string name="work_process_duration">Durée %1$s</string>
-    <string name="work_process_duration_failed">Durée %1$s · étape %2$d en échec</string>
     <string name="work_process_elapsed">En cours depuis %1$s</string>
     <string name="appearance_tool_status_bar_title">Barre d\'état des outils</string>
     <string name="appearance_tool_status_bar_sub">La bande au-dessus du champ de saisie qui indique l\'outil en cours et son résultat.</string>
@@ -2001,6 +1999,8 @@
     <string name="vscreen_viewer_open_failed">Impossible d’ouvrir l’écran virtuel : %1$s</string>
     <string name="vscreen_viewer_fps">%1$d i/s</string>
     <string name="work_status_running">En cours</string>
+    <string name="work_status_step">Étape %1$d</string>
+    <string name="work_status_thinking">Réflexion</string>
     <string name="work_status_done">Terminé</string>
     <string name="assistant_menu_branch_here">Brancher d’ici</string>
     <string name="chat_input_placeholder">Écrivez un message, ou / pour les compétences</string>
@@ -2068,7 +2068,6 @@
     <string name="oneclick_working">Autorisation en cours…</string>
     <string name="module_settings_restart_title">Redémarrer Minis pour se connecter</string>
     <string name="module_settings_restart_sub">À utiliser après avoir activé le module alors que Minis tournait déjà.</string>
-    <string name="work_process_failed_only">Étape %1$d échouée</string>
     <string name="model_slot_image">Image</string>
     <string name="chat_interrupted_short">Interrompu</string>
     <string name="queued_delivery_steer">Guidera la tâche à la prochaine étape</string>

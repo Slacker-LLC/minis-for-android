@@ -190,17 +190,28 @@ internal fun CompactProgressIndicator(
 
 
 /**
- * "正在工作 ..." before the first block of a reply arrives: the same small grey status line a running turn
- * shows, so the page does not change shape when the first step lands.
+ * "正在工作 · 3s ..." before the first block of a reply arrives: the same small grey status line a running turn
+ * shows, so the page does not change shape when the first step lands. [startedAtMs] is the moment the user
+ * sent the message; the clock starts from it at once and keeps counting in the work row that replaces this line.
  */
 @Composable
-internal fun WorkingStatusLine() {
+internal fun WorkingStatusLine(startedAtMs: Long = 0L) {
+    var elapsedSec by androidx.compose.runtime.remember(startedAtMs) { androidx.compose.runtime.mutableStateOf(0L) }
+    androidx.compose.runtime.LaunchedEffect(startedAtMs) {
+        if (startedAtMs > 0L) {
+            while (true) {
+                elapsedSec = ((System.currentTimeMillis() - startedAtMs) / 1000L).coerceAtLeast(0L)
+                kotlinx.coroutines.delay(1_000L)
+            }
+        }
+    }
+    val label = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.work_status_running)
     androidx.compose.foundation.layout.Row(
         modifier = androidx.compose.ui.Modifier.padding(bottom = 6.dp),
         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
     ) {
         androidx.compose.material3.Text(
-            text = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.work_status_running),
+            text = if (startedAtMs > 0L) "$label · ${formatStepDuration(elapsedSec, stillRunning = false)}" else label,
             fontSize = 13.sp,
             lineHeight = 20.sp,
             color = com.openminis.app.ui.theme.ChatColors.secondaryText,

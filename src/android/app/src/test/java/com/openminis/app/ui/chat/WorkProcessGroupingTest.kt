@@ -141,28 +141,10 @@ class WorkProcessGroupingTest {
         assertEquals(1, summary.toolCount)
         assertEquals(2, summary.thinkingCount)
         assertFalse(summary.isRunning)
-        assertFalse(summary.hasFailure)
-        assertNull(summary.failureReason)
     }
 
     @Test
-    fun `failure reason comes from the last failing tool and is numbered among tools`() {
-        val process = WorkProcess(
-            "p",
-            listOf(
-                thinking("t1"),
-                tool("a"),
-                tool("b", status = ToolBlockStatus.FAILED, content = "boom: permission denied\nmore detail"),
-            ),
-        )
-        val summary = process.summary()
-        assertEquals(2, summary.failedStepNumber)
-        assertEquals("boom: permission denied", summary.failureReason)
-        assertTrue(summary.hasFailure)
-    }
-
-    @Test
-    fun `a running step outranks an earlier failure on the collapsed row`() {
+    fun `a failed step adds nothing to the header, which names the step in flight`() {
         val summary = WorkProcess(
             "p",
             listOf(
@@ -172,28 +154,7 @@ class WorkProcessGroupingTest {
         ).summary()
         assertTrue(summary.isRunning)
         assertEquals(2, summary.runningStepNumber)
-        assertNull(summary.failureReason)
-    }
-
-    @Test
-    fun `long failure text is truncated and empty content falls back to the title`() {
-        val verbose = WorkProcess(
-            "p",
-            listOf(tool("a", status = ToolBlockStatus.FAILED, content = "x".repeat(400))),
-        ).summary(maxFailureChars = 20)
-        assertEquals(20, verbose.failureReason!!.removeSuffix("…").length)
-
-        val blank = WorkProcess(
-            "p",
-            listOf(tool("a", status = ToolBlockStatus.TIMEOUT, content = "   \n", title = "shell_execute")),
-        ).summary()
-        assertEquals("shell_execute", blank.failureReason)
-
-        val noTitle = WorkProcess(
-            "p",
-            listOf(tool("a", status = ToolBlockStatus.FAILED, content = "", title = "")),
-        ).summary()
-        assertEquals("terminal", noTitle.failureReason)
+        assertEquals(2, summary.toolCount)
     }
 
     @Test
@@ -206,40 +167,6 @@ class WorkProcessGroupingTest {
         assertNull(live.summary().runningStepNumber)
         assertNull("no duration until the turn ends", live.durationMs)
         assertFalse(WorkProcess("p", blocks, turnLive = false).isRunning)
-    }
-
-    @Test
-    fun `a live turn does not report a failure on its header`() {
-        val live = WorkProcess("p", listOf(tool("a", status = ToolBlockStatus.FAILED, content = "boom")), turnLive = true)
-        assertNull(live.summary().failureReason)
-    }
-
-    @Test
-    fun `a failed step the turn went on from does not claim the header`() {
-        val process = WorkProcess(
-            "p",
-            listOf(tool("a", status = ToolBlockStatus.FAILED, content = "boom"), tool("b")),
-            messageCreatedAtMs = 1_000L,
-            messageUpdatedAtMs = 13_000L,
-        )
-        val summary = process.summary()
-        assertNull("step b recovered it", summary.failureReason)
-        assertNull(summary.failedStepNumber)
-        assertEquals(12_000L, summary.durationMs)
-    }
-
-    @Test
-    fun `an unrecovered failure still reports its step and the duration together`() {
-        val process = WorkProcess(
-            "p",
-            listOf(tool("a"), tool("b", status = ToolBlockStatus.FAILED, content = "boom")),
-            messageCreatedAtMs = 1_000L,
-            messageUpdatedAtMs = 6_000L,
-        )
-        val summary = process.summary()
-        assertEquals(2, summary.failedStepNumber)
-        assertEquals("boom", summary.failureReason)
-        assertEquals(5_000L, summary.durationMs)
     }
 
     @Test

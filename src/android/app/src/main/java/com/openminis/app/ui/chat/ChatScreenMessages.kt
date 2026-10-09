@@ -713,7 +713,7 @@ internal fun ChatMessageList(
                         { viewModel.revertCompact() }
                     } else null,
                 )
-                is FlatChatItem.AssistantTyping -> WorkingStatusLine()
+                is FlatChatItem.AssistantTyping -> WorkingStatusLine(item.startedAtMs)
                 is FlatChatItem.TimeDivider -> TimeDividerLine(item.epochMs)
                 is FlatChatItem.AssistantError -> InlineErrorBanner(
                     error = item.error,

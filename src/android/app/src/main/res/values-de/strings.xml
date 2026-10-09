@@ -1338,7 +1338,6 @@
     <!-- T-android-work-process / T-android-assistant-home / lint MissingTranslation -->
     <string name="work_process_running_step">Schritt %1$d läuft · %2$s</string>
     <string name="work_process_running_thinking">Denkt nach…</string>
-    <string name="work_process_failed_step">Schritt %1$d fehlgeschlagen · %2$s</string>
     <plurals name="work_process_completed_steps">
         <item quantity="one">%d Schritt abgeschlossen</item>
         <item quantity="other">%d Schritte abgeschlossen</item>
@@ -1568,7 +1567,6 @@
         <item quantity="other">%1$d Delegationen</item>
     </plurals>
     <string name="work_process_duration">Dauer %1$s</string>
-    <string name="work_process_duration_failed">Dauer %1$s · Schritt %2$d fehlgeschlagen</string>
     <string name="work_process_elapsed">Läuft seit %1$s</string>
     <string name="appearance_tool_status_bar_title">Werkzeug-Statusleiste</string>
     <string name="appearance_tool_status_bar_sub">Der Streifen über dem Eingabefeld, der das laufende Werkzeug und sein Ergebnis zeigt.</string>
@@ -2105,6 +2103,8 @@
     <string name="vscreen_viewer_open_failed">Virtueller Bildschirm konnte nicht geöffnet werden: %1$s</string>
     <string name="vscreen_viewer_fps">%1$d fps</string>
     <string name="work_status_running">Arbeitet</string>
+    <string name="work_status_step">Schritt %1$d</string>
+    <string name="work_status_thinking">Denkt nach</string>
     <string name="work_status_done">Fertig</string>
     <string name="assistant_menu_branch_here">Von hier verzweigen</string>
     <string name="chat_input_placeholder">Nachricht eingeben oder / für Skills</string>
@@ -2172,7 +2172,6 @@
     <string name="oneclick_working">Wird erteilt…</string>
     <string name="module_settings_restart_title">Minis neu starten, um zu verbinden</string>
     <string name="module_settings_restart_sub">Nutze das, wenn du das Modul aktiviert hast, während Minis schon lief.</string>
-    <string name="work_process_failed_only">Schritt %1$d fehlgeschlagen</string>
     <string name="model_slot_image">Bild</string>
     <string name="chat_interrupted_short">Unterbrochen</string>
     <string name="queued_delivery_steer">Lenkt die Aufgabe im nächsten Schritt</string>
