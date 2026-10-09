@@ -24,6 +24,8 @@ class UserAttachmentPreparerTest {
         assertEquals("a_b_.txt", uniqueUploadFileName(dir, "a b?.txt"))
         assertEquals("evil.sh", uniqueUploadFileName(dir, "..\\..\\evil.sh"))
         assertEquals("image.jpg", uniqueUploadFileName(dir, ""))
+        assertEquals("季度报告 2026.docx".replace(' ', '_'), uniqueUploadFileName(dir, "季度报告 2026.docx"))
+        assertEquals("file", uniqueUploadFileName(dir, ".."))
         assertFalse(uniqueUploadFileName(dir, "../../etc/passwd").contains('/'))
     }
 

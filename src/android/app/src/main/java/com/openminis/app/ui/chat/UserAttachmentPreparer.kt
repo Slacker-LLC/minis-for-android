@@ -33,9 +33,11 @@ internal class UserAttachmentPreparer(
          */
         internal fun uniqueUploadFileName(dir: java.io.File, original: String): String {
             val raw = original.substringAfterLast('/').substringAfterLast('\\').ifBlank { "image.jpg" }
-            // Sanitize control / path-hostile chars without going overboard;
-            // safe POSIX path chars are kept.
-            val sanitized = raw.replace(Regex("[^A-Za-z0-9._-]"), "_")
+            // Sanitize control / path-hostile chars without going overboard: letters and digits of any
+            // script stay (a Chinese file name must not become a row of underscores), so do `.`, `_`, `-`.
+            val sanitized = raw.replace(Regex("[^\\p{L}\\p{N}._-]"), "_").let {
+                if (it.all { c -> c == '.' }) "file" else it
+            }
             if (!java.io.File(dir, sanitized).exists()) return sanitized
             val dot = sanitized.lastIndexOf('.')
             val base = if (dot > 0) sanitized.substring(0, dot) else sanitized
