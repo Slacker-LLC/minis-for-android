@@ -231,4 +231,38 @@ class ToolResultImageSerializationTest {
             typesIn(body).contains("image_url"),
         )
     }
+
+    @Test
+    fun `with parallel tool calls every tool message comes before the image turn`() {
+        // DeepSeek answered 400 "No tool output found for tool call <second id>" when a user message sat
+        // between the two tool messages of one assistant turn.
+        val history = listOf(
+            LLMMessage(LLMMessage.Role.USER, "look"),
+            LLMMessage(
+                role = LLMMessage.Role.ASSISTANT,
+                content = "",
+                contentParts = listOf(
+                    AgentContentPart.ToolUse(id = "call_a", name = "read_image", input = JSONObject()),
+                    AgentContentPart.ToolUse(id = "call_b", name = "shell_execute", input = JSONObject()),
+                ),
+            ),
+            LLMMessage(
+                role = LLMMessage.Role.USER,
+                content = "",
+                contentParts = listOf(
+                    AgentContentPart.ToolResult(
+                        id = "call_a", name = "read_image", content = "[meta]",
+                        imageData = pngBytes, imageMimeType = "image/png",
+                    ),
+                    AgentContentPart.ToolResult(id = "call_b", name = "shell_execute", content = "(4096, 3072)"),
+                ),
+            ),
+        )
+        val msgs = bodyOf(provider(visionModel), history).getJSONArray("messages")
+        val roles = (0 until msgs.length()).map { msgs.getJSONObject(it).optString("role") }
+        val firstTool = roles.indexOf("tool")
+        assertEquals("assistant, tool, tool, then the image turn", listOf("tool", "tool", "user"), roles.subList(firstTool, roles.size))
+        assertEquals("call_a", msgs.getJSONObject(firstTool).optString("tool_call_id"))
+        assertEquals("call_b", msgs.getJSONObject(firstTool + 1).optString("tool_call_id"))
+    }
 }
