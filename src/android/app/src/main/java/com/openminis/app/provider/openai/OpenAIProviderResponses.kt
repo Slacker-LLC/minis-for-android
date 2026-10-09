@@ -284,6 +284,8 @@ internal fun OpenAIProvider.buildResponsesAPIBody(
                     }
                 }
                 LLMMessage.Role.USER -> {
+                    // Same rule as Chat Completions: all outputs of one assistant turn first, the pixels after.
+                    val imageTurns = ArrayList<JSONObject>()
                     for (tr in msg.contentParts.filterIsInstance<AgentContentPart.ToolResult>()) {
                         val (callId, _) = splitResponsesAPIIds(tr.id)
                         input.put(JSONObject().apply {
@@ -296,7 +298,7 @@ internal fun OpenAIProvider.buildResponsesAPIBody(
                         // content item carrying input_image.
                         val trBytes = tr.imageData
                         if (trBytes != null && trBytes.isNotEmpty() && supportsImages) {
-                            input.put(JSONObject().apply {
+                            imageTurns.add(JSONObject().apply {
                                 put("role", "user")
                                 put("content", JSONArray().apply {
                                     put(JSONObject().apply {
@@ -315,6 +317,7 @@ internal fun OpenAIProvider.buildResponsesAPIBody(
                             })
                         }
                     }
+                    imageTurns.forEach { input.put(it) }
                     // T132: emit text + input_image content for the user
                     // turn so vision-capable Responses-API models actually
                     // see the bytes. Without the input_image branch the
