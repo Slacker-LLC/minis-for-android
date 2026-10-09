@@ -140,6 +140,9 @@ object ToolPermissionManager {
         "android.diagnose" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.deploy" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "system.jobs" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        // A real terminal is as much code execution as linux.shell: the local agent may use it, a remote caller
+        // only through the confirmation gate.
+        "terminal" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.diagnose.*" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.deploy.*" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.root.probe" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),

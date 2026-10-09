@@ -294,6 +294,8 @@ object ExecutionCoordinator {
         lastInjectedKeys.remove(sessionId)
         // A background job belongs to its session and ends with it.
         ShellJobs.killSession(sessionId)
+        // So do its terminals.
+        com.openminis.app.runtime.terminal.AgentTerminals.existing()?.closeSession(sessionId)
     }
 
     /** User-facing Stop. Kill the session shell; next command recreates it. Background jobs are left running on purpose. */

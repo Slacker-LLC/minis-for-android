@@ -121,6 +121,30 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
         _version.value = _version.value + 1
     }
 
+    /**
+     * The visible screen as plain text for a reader that is not looking at the canvas: one line per row, trailing
+     * blanks removed, blank rows at the bottom dropped. [scrollbackLines] more lines from above the screen come first.
+     */
+    fun screenText(scrollbackLines: Int = 0): String {
+        val buf = activeBuffer
+        fun rowText(row: Array<TerminalCell>): String {
+            val sb = StringBuilder(row.size)
+            for (cell in row) {
+                if (cell.isWideTrailer) continue
+                sb.appendCodePoint(if (cell.char <= 0) ' '.code else cell.char)
+            }
+            return sb.toString().trimEnd()
+        }
+        val lines = ArrayList<String>()
+        if (scrollbackLines > 0 && !isAlternateActive) {
+            val history = buf.scrollback
+            for (i in maxOf(0, history.size - scrollbackLines) until history.size) lines.add(rowText(history.elementAt(i)))
+        }
+        for (row in buf.grid) lines.add(rowText(row))
+        while (lines.isNotEmpty() && lines.last().isEmpty()) lines.removeAt(lines.lastIndex)
+        return lines.joinToString("\n")
+    }
+
     /** Current cursor position (in active buffer). */
     fun cursorPos(): Pair<Int, Int> = activeBuffer.cursorCol to activeBuffer.cursorRow
 
