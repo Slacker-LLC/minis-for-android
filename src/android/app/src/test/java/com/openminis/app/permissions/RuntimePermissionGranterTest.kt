@@ -94,4 +94,53 @@ class RuntimePermissionGranterTest {
         assertTrue(RuntimePermissionGranter.exemptionPlan(pkg, 0).isEmpty())
         assertTrue(RuntimePermissionGranter.exemptionPlan(pkg, -5).isEmpty())
     }
+
+    private val a11y = "$pkg/com.openminis.app.accessibility.MinisAccessibilityService"
+    private val listener = "$pkg/com.openminis.app.offload.MinisNotificationListenerService"
+
+    @Test
+    fun `own accesses become settings and cmd commands`() {
+        val plan = RuntimePermissionGranter.accessPlan(pkg, a11y, listOf(listener), "other.app/other.Service", true)
+        assertEquals(
+            listOf(
+                listOf("settings", "put", "secure", "enabled_accessibility_services", "other.app/other.Service:$a11y"),
+                listOf("settings", "put", "secure", "accessibility_enabled", "1"),
+                listOf("cmd", "notification", "allow_listener", listener),
+                listOf("cmd", "role", "add-role-holder", "--user", "0", "android.app.role.ASSISTANT", pkg),
+            ),
+            plan,
+        )
+    }
+
+    @Test
+    fun `the assistant role is left alone where the phone does not have it`() {
+        val plan = RuntimePermissionGranter.accessPlan(pkg, a11y, listOf(listener), null, false)
+        assertTrue(plan.none { it.contains("add-role-holder") })
+    }
+
+    @Test
+    fun `a service already on the list is not added twice`() {
+        assertEquals(a11y, RuntimePermissionGranter.withAccessibilityService(a11y, a11y))
+        assertEquals(a11y, RuntimePermissionGranter.withAccessibilityService("null", a11y))
+    }
+
+    @Test
+    fun `an accessibility list with an entry it cannot vouch for is not rewritten`() {
+        assertEquals(null, RuntimePermissionGranter.withAccessibilityService("x.y/z.W:evil; reboot", a11y))
+        val plan = RuntimePermissionGranter.accessPlan(pkg, a11y, emptyList(), "bad entry", false)
+        assertTrue(plan.isEmpty())
+    }
+
+    @Test
+    fun `only this package's own components are ever allowed`() {
+        val plan = RuntimePermissionGranter.accessPlan(
+            pkg,
+            "other.app/other.Service",
+            listOf("other.app/other.Listener", "$pkg/x; reboot", listener),
+            null,
+            false,
+        )
+        assertEquals(listOf(listOf("cmd", "notification", "allow_listener", listener)), plan)
+        assertTrue(RuntimePermissionGranter.accessPlan("evil pkg", a11y, listOf(listener), null, true).isEmpty())
+    }
 }
