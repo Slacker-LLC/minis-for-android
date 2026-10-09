@@ -1165,6 +1165,14 @@ internal fun ChatComposer(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.widthIn(max = 190.dp),
                                     )
+                                    // A dot when the active provider's balance / subscription is running low or out.
+                                    val composerEntryId by viewModel.activeEntryId.collectAsState()
+                                    val composerConfig by providerRepository.config.collectAsState()
+                                    com.openminis.app.ui.settings.QuotaDot(
+                                        instanceId = composerConfig.modelEntries.firstOrNull { it.id == composerEntryId }?.providerInstanceId,
+                                        providerRepository = providerRepository,
+                                        modifier = Modifier.padding(start = 6.dp),
+                                    )
                                     if (canThink && composerThinking.isEnabled) {
                                         Text(
                                             text = " · " + thinkingLevelLabel(composerThinking),

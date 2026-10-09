@@ -825,6 +825,7 @@ class MinisApp : Application(), ImageLoaderFactory {
             com.openminis.app.tools.runtime.AgentRalphHandler(),
             aliasNames = listOf("ralph"),
         )
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.runtime.ProviderQuotaHandler())
 
         // LinuxProvider gates linux.* on the Ubuntu runtime being available (file tools excepted,
         // execution tools try to revive it). Other prefixes have no provider semantics, so their

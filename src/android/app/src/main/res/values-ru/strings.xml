@@ -2426,9 +2426,11 @@
     <string name="quota_refresh">Обновить</string>
     <string name="quota_empty">Баланс или лимит исчерпан</string>
     <string name="quota_plan">Тариф: %1$s</string>
-    <string name="quota_available">Доступно %1$s %2$s</string>
+    <string name="quota_available">Осталось %1$s %2$s</string>
     <string name="quota_granted">Начислено %1$s</string>
     <string name="quota_topped_up">Пополнено %1$s</string>
-    <string name="quota_window_used">Окно %1$s: использовано %2$d%%</string>
     <string name="quota_resets_in">Сброс через %1$s</string>
+    <string name="quota_window_left">Окно %1$s: осталось %2$d%%</string>
+    <string name="quota_unlimited">Без ограничений</string>
+    <string name="quota_open_console">Посмотреть баланс на сайте сервиса</string>
 </resources>

@@ -4,6 +4,8 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+- What is left on each provider (balance, or the share of a subscription's windows left): on the provider page, as a pill in the model picker, as a dot beside the model name when it runs low, and through the agent's `provider_quota` tool. DeepSeek, Moonshot, SiliconFlow, OpenRouter, ChatGPT / Claude / Kimi Code sign-ins and Sub2API / New API relays; Xiaomi MiMo links to its console.
+
 ## 0.0.1 — 2026-10-09
 
 The release page was cleared and versioning restarted at 0.0.1 (`versionName` 0.0.1, `versionCode` 199). It is

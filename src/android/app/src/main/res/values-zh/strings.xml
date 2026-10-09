@@ -2447,9 +2447,11 @@
     <string name="quota_refresh">刷新</string>
     <string name="quota_empty">余额或用量已用完</string>
     <string name="quota_plan">套餐：%1$s</string>
-    <string name="quota_available">可用 %1$s %2$s</string>
+    <string name="quota_available">剩余 %1$s %2$s</string>
     <string name="quota_granted">赠送 %1$s</string>
     <string name="quota_topped_up">充值 %1$s</string>
-    <string name="quota_window_used">%1$s 窗口：已用 %2$d%%</string>
     <string name="quota_resets_in">%1$s 后重置</string>
+    <string name="quota_window_left">%1$s 窗口：剩余 %2$d%%</string>
+    <string name="quota_unlimited">额度不限</string>
+    <string name="quota_open_console">到服务商官网查看余额</string>
 </resources>

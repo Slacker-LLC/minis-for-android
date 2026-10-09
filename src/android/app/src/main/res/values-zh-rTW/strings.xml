@@ -2418,9 +2418,11 @@
     <string name="quota_refresh">重新整理</string>
     <string name="quota_empty">餘額或用量已用完</string>
     <string name="quota_plan">方案：%1$s</string>
-    <string name="quota_available">可用 %1$s %2$s</string>
+    <string name="quota_available">剩餘 %1$s %2$s</string>
     <string name="quota_granted">贈送 %1$s</string>
     <string name="quota_topped_up">儲值 %1$s</string>
-    <string name="quota_window_used">%1$s 視窗：已用 %2$d%%</string>
     <string name="quota_resets_in">%1$s 後重置</string>
+    <string name="quota_window_left">%1$s 視窗：剩餘 %2$d%%</string>
+    <string name="quota_unlimited">額度不限</string>
+    <string name="quota_open_console">到服務商官網查看餘額</string>
 </resources>

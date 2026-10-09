@@ -26,13 +26,21 @@ class ProviderQuotaApiTest {
         assertEquals(QuotaKind.SILICONFLOW, ProviderQuotaApi.detect(instance(base = "https://api.siliconflow.cn/v1")))
         assertEquals(QuotaKind.OPENROUTER, ProviderQuotaApi.detect(instance(type = ProviderType.openRouter)))
         assertEquals(QuotaKind.CHATGPT, ProviderQuotaApi.detect(instance(credential = ProviderCredential.oauth)))
-        // A look-alike host must never receive the key.
-        assertNull(ProviderQuotaApi.detect(instance(base = "https://api.deepseek.com.evil.example/v1")))
-        assertNull(ProviderQuotaApi.detect(instance(base = "https://evil.example/api.deepseek.com")))
-        assertNull(ProviderQuotaApi.detect(instance(base = "https://relay.example/v1")))
+        // A look-alike host is not DeepSeek: it is a relay, and only ever gets asked on its own origin.
+        assertEquals(QuotaKind.RELAY, ProviderQuotaApi.detect(instance(base = "https://api.deepseek.com.evil.example/v1")))
+        assertEquals("https://api.deepseek.com.evil.example", ProviderQuotaApi.relayOrigin(instance(base = "https://api.deepseek.com.evil.example/v1")))
+        assertEquals(QuotaKind.RELAY, ProviderQuotaApi.detect(instance(base = "https://evil.example/api.deepseek.com")))
+        assertEquals(QuotaKind.RELAY, ProviderQuotaApi.detect(instance(base = "https://relay.example/v1")))
+        assertNull("cleartext relays are never asked", ProviderQuotaApi.detect(instance(base = "http://relay.example/v1")))
+        assertNull("the official endpoints have nothing to ask", ProviderQuotaApi.detect(instance(base = "https://api.openai.com/v1")))
         assertNull(ProviderQuotaApi.detect(instance()))
-        // A pasted bearer is not a ChatGPT session.
+        // Sign-ins: each service's own endpoint; a pasted bearer is not a session.
+        assertEquals(QuotaKind.CLAUDE, ProviderQuotaApi.detect(instance(type = ProviderType.anthropic, credential = ProviderCredential.oauth)))
+        assertEquals(QuotaKind.KIMI_CODE, ProviderQuotaApi.detect(instance(type = ProviderType.kimiCode, credential = ProviderCredential.oauth)))
         assertNull(ProviderQuotaApi.detect(instance(credential = ProviderCredential.oauth), manualBearer = true))
+        // No balance API is documented for Xiaomi MiMo: the page links to its console.
+        assertEquals(QuotaKind.CONSOLE, ProviderQuotaApi.detect(instance(base = "https://token-plan-cn.xiaomimimo.com/v1")))
+        assertEquals("https://platform.xiaomimimo.com", ProviderQuotaApi.consoleUrl(instance(base = "https://api.xiaomimimo.com/v1")))
     }
 
     @Test
@@ -122,5 +130,91 @@ class ProviderQuotaApiTest {
         assertFalse(ProviderQuotaApi.windowLabel(0) == "5h")
         assertEquals("90m", ProviderQuotaApi.windowLabel(5400))
         assertTrue(ProviderQuotaApi.windowLabel(86_400) == "1d")
+    }
+
+    @Test
+    fun `claude subscription windows`() {
+        val quota = ProviderQuotaApi.parse(
+            QuotaKind.CLAUDE,
+            """{"five_hour":{"utilization":37.4,"resets_at":"2026-10-10T08:00:00.000000+00:00"},
+               "seven_day":{"utilization":81.0,"resets_at":"2026-10-14T00:00:00Z"},
+               "seven_day_sonnet":{"utilization":12.0,"resets_at":null},"seven_day_opus":null}""",
+            1L,
+        )!!
+        assertEquals(listOf("5h", "7d", "7d Sonnet"), quota.windows.map { it.label })
+        assertEquals(listOf(37, 81, 12), quota.windows.map { it.usedPercent })
+        assertEquals(1_791_619_200L, quota.windows[0].resetAtEpochSec)
+        assertNull(quota.windows[2].resetAtEpochSec)
+        val request = ProviderQuotaApi.request(QuotaKind.CLAUDE, instance(type = ProviderType.anthropic, credential = ProviderCredential.oauth), "tok")
+        assertEquals("https://api.anthropic.com/api/oauth/usage", request.url.toString())
+        assertEquals("oauth-2025-04-20", request.header("anthropic-beta"))
+        assertNull(ProviderQuotaApi.parse(QuotaKind.CLAUDE, "{}", 1L))
+    }
+
+    @Test
+    fun `kimi code weekly usage and limits`() {
+        val quota = ProviderQuotaApi.parse(
+            QuotaKind.KIMI_CODE,
+            """{"usage":{"limit":"100","remaining":"40","resetTime":"2026-10-14T00:00:00Z"},
+               "limits":[{"detail":{"limit":"200","used":"50","name":"5h rolling"},"window":{"duration":300,"timeUnit":"TIME_UNIT_MINUTE"}},
+                         {"detail":{"limit":10,"used":10},"window":{"duration":1,"timeUnit":"TIME_UNIT_DAY"}}]}""",
+            1L,
+        )!!
+        assertEquals(listOf("weekly", "5h rolling", "1d"), quota.windows.map { it.label })
+        assertEquals(listOf(60, 25, 100), quota.windows.map { it.usedPercent })
+        assertEquals(QuotaLevel.EMPTY, quota.level)
+        assertEquals("https://api.kimi.com/coding/v1/usages", ProviderQuotaApi.request(QuotaKind.KIMI_CODE, instance(type = ProviderType.kimiCode, credential = ProviderCredential.oauth), "t").url.toString())
+        assertNull(ProviderQuotaApi.parse(QuotaKind.KIMI_CODE, """{"usage":{}}""", 1L))
+    }
+
+    @Test
+    fun `sub2api key introspection`() {
+        val wallet = ProviderQuotaApi.parseSub2Api("""{"mode":"unrestricted","isValid":true,"planName":"wallet","remaining":12.5,"unit":"USD","balance":12.5}""", 1L)!!
+        assertEquals(12.5, wallet.balances.single().total, 0.0)
+        assertEquals("USD", wallet.balances.single().currency)
+        assertEquals(true, wallet.available)
+        val limited = ProviderQuotaApi.parseSub2Api(
+            """{"mode":"quota_limited","isValid":true,"quota":{"limit":10,"used":4,"remaining":6,"unit":"USD"},"remaining":6,"unit":"USD",
+               "rate_limits":[{"window":"5h","limit":2,"used":0.5,"remaining":1.5,"reset_at":"2026-10-10T08:00:00Z"}]}""", 1L,
+        )!!
+        assertEquals(6.0, limited.balances.single().total, 0.0)
+        assertEquals(75, 100 - limited.windows.single().usedPercent)
+        assertEquals(false, ProviderQuotaApi.parseSub2Api("""{"isValid":false,"remaining":3,"unit":"USD"}""", 1L)!!.available)
+        assertEquals(QuotaLevel.EMPTY, ProviderQuotaApi.parseSub2Api("""{"isValid":false,"remaining":3,"unit":"USD"}""", 1L)!!.level)
+        assertNull("not a sub2api answer", ProviderQuotaApi.parseSub2Api("""{"object":"list"}""", 1L))
+        assertEquals("https://relay.example/v1/usage", ProviderQuotaApi.relaySub2ApiRequest("https://relay.example", "k").url.toString())
+    }
+
+    @Test
+    fun `new api billing pair`() {
+        val quota = ProviderQuotaApi.parseNewApi(
+            """{"object":"billing_subscription","has_payment_method":true,"soft_limit_usd":50.0,"hard_limit_usd":50.0,"system_hard_limit_usd":50.0,"access_until":0}""",
+            """{"object":"list","total_usage":1250.0}""", 1L,
+        )!!
+        assertEquals(37.5, quota.balances.single().total, 1e-9)
+        assertEquals("the site's own credit unit is not named", "", quota.balances.single().currency)
+        assertEquals("no 'low' warning in an unknown unit", QuotaLevel.OK, ProviderQuota(balances = listOf(Balance("", 0.5))).level)
+        assertEquals(QuotaLevel.EMPTY, ProviderQuota(balances = listOf(Balance("", 0.0))).level)
+        assertTrue(ProviderQuotaApi.parseNewApi("""{"hard_limit_usd":100000000}""", """{"total_usage":5}""", 1L)!!.unlimited)
+        assertNull(ProviderQuotaApi.parseNewApi("""{"error":{"message":"x"}}""", "{}", 1L))
+        val (sub, usage) = ProviderQuotaApi.relayNewApiRequests("https://relay.example", "k")
+        assertEquals("https://relay.example/v1/dashboard/billing/subscription", sub.url.toString())
+        assertEquals("https://relay.example/v1/dashboard/billing/usage", usage.url.toString())
+    }
+
+    @Test
+    fun `the agent reads what is left, never what was spent, and never a key`() {
+        val ready = ProviderQuotaRepository.State.Ready(
+            ProviderQuota(
+                balances = listOf(Balance("CNY", 9.12, 0.0, 9.12)),
+                windows = listOf(UsageWindow("5h", 9, 1_800_000_000L + 12_000)),
+                plan = "plus",
+            ),
+        )
+        val text = ProviderQuotaText.describe("deepseek", ready, now = 1_800_000_000_000L)
+        assertTrue(text, text.startsWith("deepseek: plan plus; remaining 9.12 CNY (granted 0.00, topped up 9.12); 5h window: 91% left, resets in 3h 20m"))
+        assertTrue(ProviderQuotaText.describe("x", ProviderQuotaRepository.State.Console("https://c.example")).contains("https://c.example"))
+        assertTrue(ProviderQuotaText.describe("x", ProviderQuotaRepository.State.Unsupported).contains("no balance endpoint"))
+        assertTrue(ProviderQuotaText.describe("x", ProviderQuotaRepository.State.Failed("HTTP 500", null)).contains("could not read (HTTP 500)"))
     }
 }

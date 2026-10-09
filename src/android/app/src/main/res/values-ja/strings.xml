@@ -2206,9 +2206,11 @@
     <string name="quota_refresh">更新</string>
     <string name="quota_empty">残高または使用枠を使い切りました</string>
     <string name="quota_plan">プラン：%1$s</string>
-    <string name="quota_available">利用可能 %1$s %2$s</string>
+    <string name="quota_available">残り %1$s %2$s</string>
     <string name="quota_granted">付与 %1$s</string>
     <string name="quota_topped_up">チャージ %1$s</string>
-    <string name="quota_window_used">%1$s ウィンドウ：%2$d%% 使用</string>
     <string name="quota_resets_in">%1$s 後にリセット</string>
+    <string name="quota_window_left">%1$s ウィンドウ：残り %2$d%%</string>
+    <string name="quota_unlimited">無制限</string>
+    <string name="quota_open_console">プロバイダーのサイトで残高を確認</string>
 </resources>

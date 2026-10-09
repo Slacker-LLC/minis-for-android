@@ -2105,9 +2105,11 @@
     <string name="quota_refresh">Actualiser</string>
     <string name="quota_empty">Solde ou quota épuisé</string>
     <string name="quota_plan">Forfait : %1$s</string>
-    <string name="quota_available">Disponible %1$s %2$s</string>
+    <string name="quota_available">Restant %1$s %2$s</string>
     <string name="quota_granted">Offert %1$s</string>
     <string name="quota_topped_up">Rechargé %1$s</string>
-    <string name="quota_window_used">Fenêtre %1$s : %2$d%% utilisé</string>
     <string name="quota_resets_in">Réinitialisation dans %1$s</string>
+    <string name="quota_window_left">Fenêtre %1$s : %2$d%% restant</string>
+    <string name="quota_unlimited">Illimité</string>
+    <string name="quota_open_console">Voir le solde sur le site du fournisseur</string>
 </resources>

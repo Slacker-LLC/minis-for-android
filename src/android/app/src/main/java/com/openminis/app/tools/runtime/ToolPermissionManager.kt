@@ -140,6 +140,8 @@ object ToolPermissionManager {
         "android.diagnose" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.deploy" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "system.jobs" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        // How much money / quota the user has left is theirs: the local agent may read it, a remote caller may not.
+        "provider_quota" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         "android.diagnose.*" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.deploy.*" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.root.probe" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
