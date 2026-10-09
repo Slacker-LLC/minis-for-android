@@ -2203,4 +2203,15 @@
     <string name="compact_revert_failed">Rückgängig nicht möglich: Der Eintrag wurde nicht gefunden.</string>
     <string name="chat_model_gave_up_note">Keine Antwort vom Modell nach %1$d automatischen Wiederholungen. Erledigte Schritte bleiben erhalten.</string>
     <string name="chat_model_failed_note">Die Modellanfrage ist fehlgeschlagen. Erledigte Schritte bleiben erhalten.</string>
+    <string name="quota_header">Guthaben &amp; Nutzung</string>
+    <string name="quota_reading">Wird gelesen…</string>
+    <string name="quota_failed">Guthaben konnte nicht gelesen werden</string>
+    <string name="quota_refresh">Aktualisieren</string>
+    <string name="quota_empty">Guthaben oder Kontingent aufgebraucht</string>
+    <string name="quota_plan">Tarif: %1$s</string>
+    <string name="quota_available">Verfügbar %1$s %2$s</string>
+    <string name="quota_granted">Geschenkt %1$s</string>
+    <string name="quota_topped_up">Aufgeladen %1$s</string>
+    <string name="quota_window_used">Fenster %1$s: %2$d%% verbraucht</string>
+    <string name="quota_resets_in">Zurückgesetzt in %1$s</string>
 </resources>

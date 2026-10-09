@@ -2441,4 +2441,15 @@
     <string name="compact_revert_failed">无法撤销压缩：找不到它的记录。</string>
     <string name="chat_model_gave_up_note">模型没有响应，已自动重试 %1$d 次，已完成的步骤已保留。</string>
     <string name="chat_model_failed_note">模型请求失败，已完成的步骤已保留。</string>
+    <string name="quota_header">额度与用量</string>
+    <string name="quota_reading">正在读取…</string>
+    <string name="quota_failed">读取额度失败</string>
+    <string name="quota_refresh">刷新</string>
+    <string name="quota_empty">余额或用量已用完</string>
+    <string name="quota_plan">套餐：%1$s</string>
+    <string name="quota_available">可用 %1$s %2$s</string>
+    <string name="quota_granted">赠送 %1$s</string>
+    <string name="quota_topped_up">充值 %1$s</string>
+    <string name="quota_window_used">%1$s 窗口：已用 %2$d%%</string>
+    <string name="quota_resets_in">%1$s 后重置</string>
 </resources>

@@ -2200,4 +2200,15 @@
     <string name="compact_revert_failed">圧縮を元に戻せません：記録が見つかりません。</string>
     <string name="chat_model_gave_up_note">モデルから応答がなく、自動で%1$d回再試行しました。完了した手順は保持されています。</string>
     <string name="chat_model_failed_note">モデルへのリクエストが失敗しました。完了した手順は保持されています。</string>
+    <string name="quota_header">残高と使用量</string>
+    <string name="quota_reading">読み込み中…</string>
+    <string name="quota_failed">残高を読み取れませんでした</string>
+    <string name="quota_refresh">更新</string>
+    <string name="quota_empty">残高または使用枠を使い切りました</string>
+    <string name="quota_plan">プラン：%1$s</string>
+    <string name="quota_available">利用可能 %1$s %2$s</string>
+    <string name="quota_granted">付与 %1$s</string>
+    <string name="quota_topped_up">チャージ %1$s</string>
+    <string name="quota_window_used">%1$s ウィンドウ：%2$d%% 使用</string>
+    <string name="quota_resets_in">%1$s 後にリセット</string>
 </resources>

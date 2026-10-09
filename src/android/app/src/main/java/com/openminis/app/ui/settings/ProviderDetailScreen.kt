@@ -579,6 +579,9 @@ fun ProviderDetailScreen(
             }
         }
 
+        // ─── Balance / usage (where the service has an endpoint for it) ─
+        ProviderQuotaSection(instance = instance, providerRepository = providerRepository)
+
         // ─── Thinking Rules [T-android-thinking-rules-phase2 §3] ─────
         ThinkingRulesSection(instance = instance, providerRepository = providerRepository)
 

@@ -2192,4 +2192,15 @@
     <string name="compact_revert_failed">압축을 되돌릴 수 없습니다: 기록을 찾을 수 없습니다.</string>
     <string name="chat_model_gave_up_note">모델이 응답하지 않아 %1$d회 자동 재시도했습니다. 완료한 단계는 유지됩니다.</string>
     <string name="chat_model_failed_note">모델 요청에 실패했습니다. 완료한 단계는 유지됩니다.</string>
+    <string name="quota_header">잔액 및 사용량</string>
+    <string name="quota_reading">읽는 중…</string>
+    <string name="quota_failed">잔액을 읽지 못했습니다</string>
+    <string name="quota_refresh">새로고침</string>
+    <string name="quota_empty">잔액 또는 사용량을 모두 사용했습니다</string>
+    <string name="quota_plan">요금제: %1$s</string>
+    <string name="quota_available">사용 가능 %1$s %2$s</string>
+    <string name="quota_granted">지급 %1$s</string>
+    <string name="quota_topped_up">충전 %1$s</string>
+    <string name="quota_window_used">%1$s 구간: %2$d%% 사용</string>
+    <string name="quota_resets_in">%1$s 후 초기화</string>
 </resources>
