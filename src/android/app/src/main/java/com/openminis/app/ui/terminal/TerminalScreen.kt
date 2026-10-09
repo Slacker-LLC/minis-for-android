@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,6 +66,9 @@ import com.openminis.app.terminal.MinisOpenUrlBroker
 import com.openminis.app.ui.terminal.canvas.TerminalNativeViewCompose
 import com.openminis.app.ui.terminal.canvas.TerminalInputView
 import com.openminis.app.ui.terminal.canvas.rememberTerminalInputController
+import com.openminis.app.ui.terminal.emulator.ProgramState
+import com.openminis.app.ui.terminal.emulator.StatusRecord
+import com.openminis.app.ui.terminal.emulator.sanitizeStatusText
 import com.openminis.app.ui.terminal.emulator.TerminalEmulator
 import com.openminis.app.ui.terminal.emulator.TerminalPalette
 import com.openminis.app.ui.theme.ChatColors
@@ -142,6 +146,14 @@ fun TerminalScreen(
         emulator.onResponse = { data -> terminalSession.sendRawBytes(data) }
         onDispose { emulator.onResponse = null }
     }
+
+    // OSC 7501: working/blocked/idle records end with the process; done/error stay for the user to see.
+    val sessionState by terminalSession.state.collectAsStateEffect()
+    LaunchedEffect(sessionState) {
+        if (sessionState == com.openminis.app.sandbox.TerminalSession.State.STOPPED) emulator.onProcessExit()
+    }
+    val programStatus by emulator.programStatus
+    val statusLine = remember(programStatus) { programStatusLine(programStatus, emulator::effectiveApp) }
 
     var showClearSheet by remember { mutableStateOf(false) }
 
@@ -290,6 +302,7 @@ fun TerminalScreen(
                 .background(chrome.bg),
         ) {
             TerminalTopBar(
+                status = statusLine,
                 onClose = {
                     terminalSession.stop()
                     onBack()
@@ -374,11 +387,33 @@ private fun <T> kotlinx.coroutines.flow.StateFlow<T>.collectAsStateEffect(): and
     return state
 }
 
+/** What the top bar shows for the terminal's OSC 7501 records: a state dot and one line of text. */
+internal class ProgramStatusLine(val color: Color, val text: String)
+
+private val STATUS_PRIORITY = listOf(
+    ProgramState.BLOCKED, ProgramState.ERROR, ProgramState.WORKING, ProgramState.DONE, ProgramState.IDLE,
+)
+
+internal fun programStatusLine(records: List<StatusRecord>, effectiveApp: (StatusRecord) -> String?): ProgramStatusLine? {
+    // Most urgent state wins; among equals the most recently updated record (last in the list).
+    val record = records.reversed().minByOrNull { STATUS_PRIORITY.indexOf(it.state) } ?: return null
+    val color = when (record.state) {
+        ProgramState.BLOCKED -> Color(0xFFFF9F0A)
+        ProgramState.ERROR -> Color(0xFFFF453A)
+        ProgramState.WORKING -> Color(0xFF0A84FF)
+        ProgramState.DONE -> Color(0xFF34C759)
+        ProgramState.IDLE -> Color(0xFF8E8E93)
+    }
+    val text = sanitizeStatusText(record.msg ?: record.title ?: effectiveApp(record) ?: "").trim()
+    return ProgramStatusLine(color, text)
+}
+
 // ─── Top bar ──────────────────────────────────────────────────────────────────
 
 /** The board's bar: back chevron and label on the left, "Minis Shell" centered, Clear on the right. */
 @Composable
 private fun TerminalTopBar(
+    status: ProgramStatusLine?,
     onClose: () -> Unit,
     onClear: () -> Unit,
 ) {
@@ -406,13 +441,32 @@ private fun TerminalTopBar(
             )
             Text(stringResource(R.string.back), color = chrome.accent, fontSize = 17.sp, maxLines = 1)
         }
-        Text(
-            stringResource(R.string.terminal_title),
-            color = chrome.fg,
-            fontSize = 17.sp,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-            modifier = Modifier.align(Alignment.Center),
-        )
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier.align(Alignment.Center).padding(horizontal = 96.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                stringResource(R.string.terminal_title),
+                color = chrome.fg,
+                fontSize = 17.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            )
+            if (status != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(7.dp).clip(CircleShape).background(status.color))
+                    if (status.text.isNotEmpty()) {
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            status.text,
+                            color = chrome.fg.copy(alpha = 0.7f),
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
         Text(
             stringResource(R.string.terminal_clear),
             color = chrome.accent,

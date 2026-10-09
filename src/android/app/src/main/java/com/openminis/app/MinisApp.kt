@@ -833,7 +833,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.tools.runtime.ProviderRouter.register(
             com.openminis.app.tools.runtime.LinuxProvider(
                 available = { UbuntuRuntime.snapshot.value.available },
-                revive = { UbuntuRuntime.ensureReady().running },
+                revive = { UbuntuRuntime.ensureReady(force = true).running },
             ),
         )
         com.openminis.app.tools.BotDelegationCoordinator.current()?.recoverAfterProcessStart()

@@ -41,6 +41,21 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     var title: String = ""
         private set
 
+    private val statusStore = ProgramStatusStore()
+    private val _programStatus = mutableStateOf<List<StatusRecord>>(emptyList())
+
+    /** OSC 7501 records; they belong to the terminal, so alternate-screen switches leave them alone. */
+    val programStatus: State<List<StatusRecord>> = _programStatus
+
+    /** Process exit: working, blocked and idle records go, done and error stay (OSC 7501 lifetime). */
+    fun onProcessExit() = publishStatus(statusStore.dropTransient())
+
+    fun effectiveApp(record: StatusRecord): String? = statusStore.effectiveApp(record)
+
+    private fun publishStatus(changed: Boolean) {
+        if (changed) _programStatus.value = statusStore.snapshot
+    }
+
     /** Callback for terminal responses (DSR, DA). */
     var onResponse: ((ByteArray) -> Unit)? = null
 
@@ -378,9 +393,21 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     private fun handleOsc(command: Int, payload: String) {
         when (command) {
             0, 2 -> title = payload
+            133 -> if (payload == "A" || payload.startsWith("A;")) publishStatus(statusStore.dropTransient())
             1337 -> handleITermOsc(payload)
+            7501 -> handleProgramStatus(payload)
             else -> {}
         }
+    }
+
+    private fun handleProgramStatus(body: String) {
+        if (ProgramStatusParser.isQuery(body)) {
+            // The only bytes this protocol ever writes back: the fixed feature-detection reply.
+            onResponse?.invoke("\u001B]7501;?\u001B\\".toByteArray(Charsets.UTF_8))
+            return
+        }
+        val report = ProgramStatusParser.parse(body) ?: return
+        publishStatus(statusStore.apply(report))
     }
 
     private fun handleITermOsc(payload: String) {
@@ -424,5 +451,6 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
         alternateBuffer.moveCursorTo(0, 0)
         isAlternateActive = false
         scrollOffset = 0
+        publishStatus(statusStore.reset())
     }
 }

@@ -634,6 +634,9 @@ internal object UbuntuKernel {
             "GOMAXPROCS" to "2",
             "MINIS_DIRECT_ROOT_SHELL" to shellMarkerToken,
         )
+        // OSC 133;A at every prompt: the terminal learns a program has exited back to the shell, so it can
+        // drop OSC 7501 working/blocked records (Program Status Protocol). A user .bashrc may replace this.
+        if (interactive) env["PROMPT_COMMAND"] = GUEST_PROMPT_COMMAND
         env.putAll(RootNetworkProxy.proxyEnv())
         val envArgs = env.entries.joinToString(" ") {
             shellQuote("${it.key}=${it.value}")
@@ -663,6 +666,9 @@ internal object UbuntuKernel {
         val su = checkNotNull(findSu()) { "Root launcher is unavailable" }
         return Launch(listOf(su, "-c", outer), pidFile)
     }
+
+    /** Prints OSC 133;A (ESC ] 133 ; A ESC \\) before every interactive prompt. */
+    internal const val GUEST_PROMPT_COMMAND = "printf '\\033]133;A\\033\\\\'"
 
     internal fun buildRootShellOuterCommand(child: String, interactive: Boolean): String {
         val launcher = if (interactive) {

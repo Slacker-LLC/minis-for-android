@@ -33,6 +33,7 @@ class AnsiParser {
 
     private var oscCommand = 0
     private var oscPayload = StringBuilder()
+    private var oscOverflow = false
 
     private val utf8Buffer = ByteArray(4)
     private var utf8Len = 0
@@ -50,6 +51,7 @@ class AnsiParser {
         csiIntermediate = null
         oscCommand = 0
         oscPayload.setLength(0)
+        oscOverflow = false
         utf8Len = 0
         utf8Remaining = 0
     }
@@ -117,6 +119,7 @@ class AnsiParser {
                 state = State.OSC_PARAM
                 oscCommand = 0
                 oscPayload.setLength(0)
+                oscOverflow = false
             }
             in 0x20..0x2F -> {
                 state = State.ESCAPE_INTERMEDIATE
@@ -226,6 +229,11 @@ class AnsiParser {
         }
     }
 
+    private fun dispatchOsc(action: (ParsedAction) -> Unit) {
+        if (!oscOverflow) action(ParsedAction.OscDispatch(oscCommand, oscPayload.toString()))
+        oscOverflow = false
+    }
+
     private fun processOscParam(byte: Int, action: (ParsedAction) -> Unit) {
         when (byte) {
             in 0x30..0x39 -> {
@@ -233,11 +241,11 @@ class AnsiParser {
             }
             0x3B -> state = State.OSC_STRING
             0x07 -> {
-                action(ParsedAction.OscDispatch(oscCommand, oscPayload.toString()))
+                dispatchOsc(action)
                 state = State.GROUND
             }
             0x1B -> {
-                action(ParsedAction.OscDispatch(oscCommand, oscPayload.toString()))
+                dispatchOsc(action)
                 state = State.ESCAPE
             }
             else -> state = State.GROUND
@@ -247,15 +255,16 @@ class AnsiParser {
     private fun processOscString(byte: Int, action: (ParsedAction) -> Unit) {
         when (byte) {
             0x07 -> {
-                action(ParsedAction.OscDispatch(oscCommand, oscPayload.toString()))
+                dispatchOsc(action)
                 state = State.GROUND
             }
             0x1B -> {
-                action(ParsedAction.OscDispatch(oscCommand, oscPayload.toString()))
+                dispatchOsc(action)
                 state = State.ESCAPE
             }
             in 0x20..0x7E, in 0x80..0xFF -> {
-                oscPayload.append(byte.toChar())
+                // OSC text is untrusted and unbounded; an oversize string is dropped whole, never truncated.
+                if (oscPayload.length >= MAX_OSC_PAYLOAD) oscOverflow = true else oscPayload.append(byte.toChar())
             }
             else -> { /* ignore */ }
         }
@@ -279,5 +288,8 @@ class AnsiParser {
     companion object {
         internal const val MAX_CSI_PARAM = 65_535
         private const val REPLACEMENT = 0xFFFD
+
+        /** Longest OSC string kept; OSC 7501 allows 4096 bytes for the whole sequence. */
+        private const val MAX_OSC_PAYLOAD = 4096
     }
 }

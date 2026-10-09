@@ -136,6 +136,8 @@ object ExecutionCoordinator {
         } catch (error: Exception) {
             shells.remove(sessionId)?.stop()
             lastInjectedKeys.remove(sessionId)
+            // Whatever broke may be in the runtime itself: do not trust the "checked recently" window.
+            UbuntuRuntime.invalidateReadiness()
             failure(
                 error.message ?: error::class.java.simpleName,
                 startTime,

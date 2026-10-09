@@ -51,8 +51,27 @@ object UbuntuRuntime {
         Log.i(TAG, "initialized direct Ubuntu backend uid=${ctx.applicationInfo.uid}")
     }
 
-    suspend fun ensureReady(): Snapshot = lifecycleLock.withLock {
-        ensureReadyLocked()
+    /**
+     * Readiness is a full set of Root probes (a `su` process each), so it is not repeated for every command:
+     * after one succeeds the runtime counts as ready for [ReadinessLease.IDLE_MS], and every call inside that
+     * window pushes the end out again. Ten idle minutes, a stop, a maintenance run or a failed command end it,
+     * and the next call checks everything again. [force] always checks.
+     */
+    private val lease = ReadinessLease()
+
+    suspend fun ensureReady(force: Boolean = false): Snapshot = lifecycleLock.withLock {
+        val current = _snapshot.value
+        if (!force && current.running && lease.renewIfLive()) return@withLock current
+        checkLocked()
+    }
+
+    /** The runtime may have changed under the lease (a command failed, mounts moved): check again next time. */
+    fun invalidateReadiness() = lease.invalidate()
+
+    private suspend fun checkLocked(): Snapshot {
+        val next = ensureReadyLocked()
+        if (next.running) lease.renew() else lease.invalidate()
+        return next
     }
 
     /**
@@ -65,7 +84,7 @@ object UbuntuRuntime {
         interactive: Boolean,
     ): UbuntuKernel.Launch = RuntimePathRegistry.withMountMutationLock {
         lifecycleLock.withLock {
-            val ready = ensureReadyLocked()
+            val ready = checkLocked()
             check(ready.running && ready.lastError == null) {
                 ready.lastError ?: "Ubuntu runtime is not ready"
             }
@@ -132,11 +151,41 @@ object UbuntuRuntime {
     }
 
     private suspend fun stopOwnedProcessesLocked(): Snapshot {
+        lease.invalidate()
         TerminalSession.stopAllAndJoin()
         ExecutionCoordinator.stopCurrentCommand()
         RootNetworkProxy.stop()
         val next = _snapshot.value.copy(running = false, available = false, statusFresh = true)
         _snapshot.value = next
         return next
+    }
+}
+
+/** Sliding "checked recently" window for [UbuntuRuntime.ensureReady]; the clock is injectable for tests. */
+internal class ReadinessLease(
+    private val idleMs: Long = IDLE_MS,
+    private val now: () -> Long = { System.nanoTime() / 1_000_000 },
+) {
+    @Volatile
+    private var until = Long.MIN_VALUE
+
+    /** True and extended when the window is still open; false when it has run out or was invalidated. */
+    fun renewIfLive(): Boolean {
+        val t = now()
+        if (t >= until) return false
+        until = t + idleMs
+        return true
+    }
+
+    fun renew() {
+        until = now() + idleMs
+    }
+
+    fun invalidate() {
+        until = Long.MIN_VALUE
+    }
+
+    companion object {
+        const val IDLE_MS = 10L * 60 * 1000
     }
 }
