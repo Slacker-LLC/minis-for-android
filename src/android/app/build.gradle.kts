@@ -18,7 +18,7 @@ plugins {
 //   X.Y-dev  <  X.Y-beta.N  <  X.Y  <  X.Y.Z-beta.N  <  X.Y.Z
 // code = major * 1_000_000 + minor * 10_000 + patch * 100 + stage; stage is 0 for -dev, N (1..98) for -beta.N
 // and 99 for a stable release.
-val appVersionName = "1.0"
+val appVersionName = "0.0.1"
 val appVersionCode: Int = run {
     val match = Regex(
         """^(0|[1-9]\d{0,2})\.(0|[1-9]\d?)(?:\.(0|[1-9]\d?))?(?:-(dev|beta\.([1-9]\d?)))?$""",
