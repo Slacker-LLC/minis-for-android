@@ -11,6 +11,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -97,6 +98,7 @@ import kotlinx.coroutines.withContext
 
 // ─── Block renderers ────────────────────────────────────────────────────────
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun RenderBlock(block: MdBlock) {
     val colors = currentMdColors()
@@ -400,6 +402,7 @@ internal fun RenderBlock(block: MdBlock) {
             // the attachment chip in T179 — keeps the visual rhythm consistent.
             // shadow → clip → border so the elevation paints behind the rounded
             // edge and the border stays crisp on top.
+            QuoteFileHost(file, file?.name ?: block.alt.ifBlank { "image" }) { onLongClick ->
             val imageShape = RoundedCornerShape(8.dp)
             val imageBaseModifier = Modifier
                 .fillMaxWidth()
@@ -413,7 +416,7 @@ internal fun RenderBlock(block: MdBlock) {
                 )
                 .clip(imageShape)
                 .border(1.dp, ChatColors.thumbnailBorder, imageShape)
-                .let { m -> if (onTap != null) m.clickable { onTap() } else m }
+                .let { m -> if (onTap != null || onLongClick != null) m.combinedClickable(onClick = { onTap?.invoke() }, onLongClick = onLongClick) else m }
             // T148: SubcomposeAsyncImage so we can render a broken-image
             // placeholder when the underlying file is gone (deleted workspace
             // PNG, broken URL). Without this slot, Coil paints nothing and
@@ -451,11 +454,14 @@ internal fun RenderBlock(block: MdBlock) {
                 contentDescription = block.alt,
                 modifier = imageBaseModifier,
                 contentScale = ContentScale.FillWidth,
+                // A big picture drawn small: mip-mapped sampling keeps fine text and lines readable.
+                filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium,
             ) {
                 when (painter.state) {
                     is AsyncImagePainter.State.Error -> BrokenImagePlaceholder(alt = block.alt)
                     else -> SubcomposeAsyncImageContent()
                 }
+            }
             }
         }
 

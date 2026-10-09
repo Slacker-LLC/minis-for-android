@@ -26,7 +26,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.openminis.app.ui.DisplayBitmapLimits.limitDisplaySize
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
@@ -58,9 +61,15 @@ internal fun ZoomableImagePage(
 
     fun progress(): Float = (abs(dragY) / (screenHeightPx * 0.4f)).coerceIn(0f, 1f)
 
+    // Decode at the picture's own size (up to the display ceiling). Left to size itself from the layout, Coil
+    // decodes at screen size and the zoom below then stretches that small bitmap: a blur at any zoom level.
+    val context = LocalContext.current
+    val request = remember(model) {
+        if (model is ImageRequest) model else ImageRequest.Builder(context).data(model).limitDisplaySize().build()
+    }
     Box(modifier = modifier.fillMaxSize()) {
         AsyncImage(
-            model = model,
+            model = request,
             contentDescription = null,
             contentScale = ContentScale.Fit,
             modifier = Modifier

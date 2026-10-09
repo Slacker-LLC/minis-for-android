@@ -80,6 +80,8 @@ import kotlin.math.roundToInt
 fun InlineAudioPlayer(
     filePath: String,
     modifier: Modifier = Modifier,
+    /** The name to show; the file's own name on disk when null (a staged copy's name is not the user's). */
+    title: String? = null,
 ) {
     val context = LocalContext.current
     var isPlaying by remember { mutableStateOf(false) }
@@ -220,7 +222,7 @@ fun InlineAudioPlayer(
                 }
 
                 // File name
-                val fileName = filePath.substringAfterLast("/")
+                val fileName = title ?: filePath.substringAfterLast("/")
                 Text(
                     fileName,
                     fontSize = 11.sp,

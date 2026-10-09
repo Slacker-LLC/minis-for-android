@@ -4,6 +4,18 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+### Attachments and previews
+
+- An attached document, or a long paste that became one, is listed to the model by path, size and time and is not
+  inlined into the request; the model opens it when it needs the content (reverts the inlining of #163).
+- Quote: a sent message (long-press > Quote) and a file or image in the chat, the user's or the agent's (long-press >
+  Quote), go into the next message.
+- Every attachment preview shares one layout: back and file name on top, one action bar underneath. Images, HTML
+  pages and video now use it; Word, Excel and PowerPoint (docx, xlsx, pptx) open in the in-app reader instead of
+  handing off to another app.
+- A zoomed image is decoded at its own size, so it no longer blurs when zoomed.
+- File cards in a reply show the real file name with its extension, on a narrower, shorter card.
+
 ### Repository permissions — 2026-10-02
 
 - Only the owner/administrator can merge pull requests, create or update `main` and `release/**`, and create,
@@ -49,9 +61,6 @@ after the first 1.0 build (more than 130 merged pull requests, #36 to #165).
 - The delegating model can name a model from the Agent Models list for a sub agent (#140).
 
 **Fixes that matter**
-- A text file attached to a message, or a long paste that became a file, now reaches the model: its head is sent
-  inside `<user-attached-files>` (60,000 characters per file, 120,000 per message); binary and larger files stay
-  as a path (#163).
 - The file browser (chat files from the home menu, Settings > File management) no longer crashes when it opens (#165).
 - Browse chat files shows only the chat's own folders that hold something, and no longer lists the empty mount
   points (`attachments`, `offloads`, `browser`) that sit inside `workspace`.

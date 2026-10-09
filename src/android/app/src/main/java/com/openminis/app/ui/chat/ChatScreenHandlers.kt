@@ -59,11 +59,10 @@ internal fun rememberPerformSendOrEnqueue(viewModel: com.openminis.app.ui.chat.C
 }
 
 @Composable
-internal fun rememberUrlClickHandler(onPreviewAttachment: kotlin.Function1<com.openminis.app.ui.sandbox.FileItem, kotlin.Unit>, context: android.content.Context, viewModel: com.openminis.app.ui.chat.ChatViewModel, attachmentsState: androidx.compose.runtime.State<kotlin.collections.List<com.openminis.app.ui.chat.InputAttachment>>, coroutineScope: kotlinx.coroutines.CoroutineScope, previewUrlState: androidx.compose.runtime.MutableState<kotlin.String?>, openHtmlPreview: kotlin.Function2<java.io.File, kotlin.String, kotlin.Unit>, previewImageGalleryState: androidx.compose.runtime.MutableState<kotlin.Pair<kotlin.collections.List<com.openminis.app.ui.components.ImageGalleryItem>, kotlin.Int>?>, previewVideoFileState: androidx.compose.runtime.MutableState<java.io.File?>): kotlin.Function1<kotlin.String, kotlin.Unit> {
+internal fun rememberUrlClickHandler(onPreviewAttachment: kotlin.Function1<com.openminis.app.ui.sandbox.FileItem, kotlin.Unit>, context: android.content.Context, viewModel: com.openminis.app.ui.chat.ChatViewModel, attachmentsState: androidx.compose.runtime.State<kotlin.collections.List<com.openminis.app.ui.chat.InputAttachment>>, coroutineScope: kotlinx.coroutines.CoroutineScope, previewUrlState: androidx.compose.runtime.MutableState<kotlin.String?>, previewImageGalleryState: androidx.compose.runtime.MutableState<kotlin.Pair<kotlin.collections.List<com.openminis.app.ui.components.ImageGalleryItem>, kotlin.Int>?>): kotlin.Function1<kotlin.String, kotlin.Unit> {
     val attachments by attachmentsState
     var previewUrl by previewUrlState
     var previewImageGallery by previewImageGalleryState
-    var previewVideoFile by previewVideoFileState
     return remember<(String) -> Unit>(viewModel, coroutineScope) {
         { url ->
             coroutineScope.launch {
@@ -87,13 +86,6 @@ internal fun rememberUrlClickHandler(onPreviewAttachment: kotlin.Function1<com.o
                                     ),
                                 ) to 0
                             }
-                            action.item.isVideoFile -> previewVideoFile = action.item.file
-                            // T146: HTML files take the immersive web-preview path
-                            // (iOS-style 90% bottom sheet + fullscreen toggle)
-                            // instead of FilePreviewScreen's plain fullscreen
-                            // Scaffold. snake_game.html and similar generated
-                            // pages need browser controls to feel right.
-                            action.item.isHtmlFile -> openHtmlPreview(action.item.file, action.item.name)
                             // T279: route through the NavHost FILE_PREVIEW destination
                             // (same path as user-bubble attachments and "Browse Chat Files")
                             // so FilePreviewScreen inherits the Activity's edge-to-edge

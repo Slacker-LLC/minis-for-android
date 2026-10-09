@@ -1094,21 +1094,6 @@ fun ChatScreen(
     val htmlPreviewFullscreen_st = remember { mutableStateOf(false) }
     var htmlPreviewFullscreen by htmlPreviewFullscreen_st
     val appCtx = context.applicationContext
-    val openHtmlPreview = remember<(java.io.File, String) -> Unit>(appCtx) {
-        { file, title ->
-            // Reuse the same WebViewHolder as long as the file path doesn't
-            // change. Tapping the same html link twice should pick up wherever
-            // the user left off rather than reloading from scratch.
-            val url = "file://${file.absolutePath}"
-            val existing = htmlPreviewHolder
-            if (existing == null || existing.currentUrl != url) {
-                existing?.destroy()
-                htmlPreviewHolder = com.openminis.app.ui.preview.WebViewHolder(appCtx, url)
-            }
-            htmlPreviewFallbackTitle = title
-            htmlPreviewFullscreen = false
-        }
-    }
     // Pinned-shortcut deep link: minis://session/<id>/<resource-path>
     // consumes here on first composition iff this screen is showing the
     // matching session; opens fullscreen HTML preview backed by a fresh
@@ -1130,15 +1115,6 @@ fun ChatScreen(
         mutableStateOf<Pair<List<com.openminis.app.ui.components.ImageGalleryItem>, Int>?>(null)
     }
     var previewImageGallery by previewImageGallery_st
-    // Video links from chat go through MinisFullscreenVideoPlayer rather than
-    // FilePreviewScreen → InlineVideoPlayer. The inline player wraps a bare
-    // VideoView with an anchored MediaController and never starts playback,
-    // so a tap on an mp4 link rendered as a black surface until the user
-    // happened to tap again to surface the controller. The fullscreen player
-    // auto-starts on prepared, has a built-in scrubber + play/pause, and an
-    // onError listener so failures actually log instead of silently blanking.
-    val previewVideoFile_st = remember { mutableStateOf<java.io.File?>(null) }
-    var previewVideoFile by previewVideoFile_st
     // T-pwa-2: long-press on an HTML attachment chip opens the
     // "Add to Home Screen" sheet for that attachment.
     val webAppSheetTarget_st = remember { mutableStateOf<InputAttachment?>(null) }
@@ -1150,9 +1126,7 @@ fun ChatScreen(
         attachmentsState = attachments_st,
         coroutineScope = coroutineScope,
         previewUrlState = previewUrl_st,
-        openHtmlPreview = openHtmlPreview,
         previewImageGalleryState = previewImageGallery_st,
-        previewVideoFileState = previewVideoFile_st,
     )
 
     // Auto-present the in-app preview when a shell tool's stdout emits an
@@ -1205,6 +1179,12 @@ fun ChatScreen(
         // minis://attachments/* lookups don't rely on the global bindMounts
         // map (which is last-writer-wins across sessions).
         LocalMarkdownSessionId provides sessionId,
+        // Long-press a file or image in the chat to quote it into the next message.
+        LocalQuoteFile provides { file, name ->
+            viewModel.quoteAttachmentFile(file, name)
+            try { inputFocusRequester.requestFocus() } catch (_: IllegalStateException) {}
+            keyboardController?.show()
+        },
     ) {
     // The chat page is white (the redesign); only the drawer keeps the grey page.
     val pagePalette = LocalChatPalette.current
@@ -1555,17 +1535,6 @@ fun ChatScreen(
             items = items,
             startIndex = startIdx,
             onDismiss = { previewImageGallery = null },
-        )
-    }
-
-    // Fullscreen video player — tapped video link (mp4/mov/m4v/…) from chat
-    // markdown. Reuses the same dialog player as the markdown-rendered
-    // ![](minis://...) syntax so behaviour is consistent regardless of how
-    // the LLM emitted the reference.
-    previewVideoFile?.let { file ->
-        com.openminis.app.ui.media.MinisFullscreenVideoPlayer(
-            file = file,
-            onDismiss = { previewVideoFile = null },
         )
     }
 

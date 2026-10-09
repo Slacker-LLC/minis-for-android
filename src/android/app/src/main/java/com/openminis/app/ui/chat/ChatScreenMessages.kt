@@ -451,6 +451,11 @@ internal fun ChatMessageList(
                         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                         clipboard.setPrimaryClip(android.content.ClipData.newPlainText("message", item.message.content))
                     },
+                    onQuote = if (item.message.isQueued) null else ({
+                        viewModel.quoteMessage(item.message)
+                        try { inputFocusRequester.requestFocus() } catch (_: IllegalStateException) {}
+                        keyboardController?.show()
+                    }),
                     // T119: pass null while a turn is in flight so
                     // the long-press menu hides Retry; once the
                     // stream stops (cancel or natural end) the
