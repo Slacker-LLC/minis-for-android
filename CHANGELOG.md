@@ -16,6 +16,12 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 - A zoomed image is decoded at its own size, so it no longer blurs when zoomed.
 - File cards in a reply show the real file name with its extension, on a narrower, shorter card.
 
+### Permissions
+
+- One-tap authorize now also turns on the app's accessibility service, notification access and default-assistant
+  role, the module switches, and the virtual screen (when Shizuku is running), next to the Android permissions and
+  the Agent tool permissions. Shizuku's own service is not started from here.
+
 ### Repository permissions — 2026-10-02
 
 - Only the owner/administrator can merge pull requests, create or update `main` and `release/**`, and create,
