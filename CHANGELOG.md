@@ -4,6 +4,10 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+- Retry after a failed model call goes on in the same reply: the steps it had already finished stay on screen
+  (they used to disappear, although the model still had them). The note after repeated failures is a sentence in
+  your language, with the provider's own message behind the info button, instead of one clipped line.
+
 ### Attachments and previews
 
 - An attached document, or a long paste that became one, is listed to the model by path, size and time and is not

@@ -201,7 +201,15 @@ internal suspend fun ChatViewModel.runAgentLoop(
         } else {
             "assistant_${System.currentTimeMillis()}"
         }
-    val allToolBlocks = mutableListOf<AssistantBlock>()
+    // A retry goes on in the message that failed: the steps it already finished stay in it (and on screen). They are
+    // earlier turns for what follows, so `turnStartBlockIndex` below starts after them.
+    val allToolBlocks = (
+        if (reusingAssistantId != null) {
+            _messages.value.firstOrNull { it.id == reusingAssistantId }?.toolBlocks.orEmpty()
+        } else {
+            emptyList()
+        }
+        ).toMutableList()
     // Per-tool ring of the most recent `accumulated` JSON snapshots emitted
     // by `LLMStreamChunk.ToolInputDelta`. Capped at TOOL_INPUT_CHUNK_RING_MAX
     // entries per tool id so memory stays bounded even on long streams.
@@ -238,7 +246,7 @@ internal suspend fun ChatViewModel.runAgentLoop(
                 content = "",
                 isStreaming = true,
                 isAwaitingModelResponse = true,
-                toolBlocks = emptyList(),
+                toolBlocks = allToolBlocks.toList(),
                 error = null,
                 thinkingLevel = turnThinkingLevel,
             )
@@ -796,7 +804,14 @@ internal suspend fun ChatViewModel.runAgentLoop(
                     if (terminal != null) {
                         Log.w(TAG, "⛔ ${terminal.code} — terminal, no retry: ${terminal.message}")
                         if (classification.retryable || classification.overflow || blockedByEffects) {
-                            appendSystemInfo(text = terminal.message, iconKind = "compact")
+                            // The label is a sentence in the user's language; the classifier's own words (the
+                            // provider's error) wait behind the info button instead of being cut off on one line.
+                            val label = if (classification.retryable && !classification.overflow && !blockedByEffects) {
+                                context.getString(R.string.chat_model_gave_up_note, retryAttempt)
+                            } else {
+                                context.getString(R.string.chat_model_failed_note)
+                            }
+                            appendSystemInfo(text = label, iconKind = "info", payload = terminal.message)
                         }
                     }
                     // All fallbacks exhausted. Surface the trail of tried

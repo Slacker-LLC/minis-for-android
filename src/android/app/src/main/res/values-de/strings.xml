@@ -2201,4 +2201,6 @@
     <string name="compact_revert_busy">Die Komprimierung kann nicht rückgängig gemacht werden, solange eine Antwort oder Komprimierung läuft.</string>
     <string name="compact_revert_none">In dieser Unterhaltung gibt es nichts rückgängig zu machen.</string>
     <string name="compact_revert_failed">Rückgängig nicht möglich: Der Eintrag wurde nicht gefunden.</string>
+    <string name="chat_model_gave_up_note">Keine Antwort vom Modell nach %1$d automatischen Wiederholungen. Erledigte Schritte bleiben erhalten.</string>
+    <string name="chat_model_failed_note">Die Modellanfrage ist fehlgeschlagen. Erledigte Schritte bleiben erhalten.</string>
 </resources>

@@ -579,7 +579,8 @@ internal fun FallbackInfoBlock(block: AssistantBlock, onRevert: (() -> Unit)? = 
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Medium,
                     color = fg,
-                    maxLines = 1,
+                    // Two lines: a failure note is a sentence, not a label; the info button has the rest.
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     // weight(1f, fill=false) lets the text take just what it
                     // needs but lose space first when the row gets tight,
