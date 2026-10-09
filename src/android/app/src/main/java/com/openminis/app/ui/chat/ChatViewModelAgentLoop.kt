@@ -195,6 +195,7 @@ internal suspend fun ChatViewModel.runAgentLoop(
     // `accumulatedText` are also reset at that point so the new bubble
     // starts empty and `buildTurnParts(allToolBlocks, turnStartBlockIndex,
     // toolInputMap)` continues to slice only the current turn's blocks
+    giveUpNote = null
     var assistantId = reusingAssistantId
         ?: if (_messages.value.lastOrNull()?.let { it.role == "assistant" && it.content.isBlank() && it.toolBlocks.isEmpty() } == true) {
             _messages.value.last().id
@@ -811,7 +812,9 @@ internal suspend fun ChatViewModel.runAgentLoop(
                             } else {
                                 context.getString(R.string.chat_model_failed_note)
                             }
-                            appendSystemInfo(text = label, iconKind = "info", payload = terminal.message)
+                            // One note about the failure, in the error banner under the reply (setInlineError reads this),
+                            // not a second line saying the same thing.
+                            giveUpNote = label
                         }
                     }
                     // All fallbacks exhausted. Surface the trail of tried
