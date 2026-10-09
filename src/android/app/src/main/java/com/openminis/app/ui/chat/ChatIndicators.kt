@@ -197,7 +197,7 @@ internal fun CompactProgressIndicator(
 internal fun TurnClockLine(startedAtMs: Long, endedAtMs: Long?, live: Boolean) {
     var elapsedSec by androidx.compose.runtime.remember(startedAtMs, live) { androidx.compose.runtime.mutableStateOf(0L) }
     androidx.compose.runtime.LaunchedEffect(startedAtMs, live) {
-        if (live) {
+        if (live && startedAtMs > 0L) {
             while (true) {
                 elapsedSec = ((System.currentTimeMillis() - startedAtMs) / 1000L).coerceAtLeast(0L)
                 kotlinx.coroutines.delay(1_000L)
@@ -205,11 +205,12 @@ internal fun TurnClockLine(startedAtMs: Long, endedAtMs: Long?, live: Boolean) {
         }
     }
     val text = if (live) {
-        androidx.compose.ui.res.stringResource(com.openminis.app.R.string.work_status_running) +
-            " · " + formatStepDuration(elapsedSec, stillRunning = false)
+        val working = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.work_status_running)
+        // A turn whose send time is unknown shows no number rather than a wrong one.
+        if (startedAtMs <= 0L) working else working + " · " + formatStepDuration(elapsedSec, stillRunning = false)
     } else {
         val done = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.work_status_done)
-        val took = endedAtMs?.let { (it - startedAtMs) / 1000L }?.takeIf { it >= 0L }
+        val took = endedAtMs?.takeIf { startedAtMs > 0L }?.let { (it - startedAtMs) / 1000L }?.takeIf { it >= 0L }
         if (took == null) done else done + " · " + androidx.compose.ui.res.stringResource(
             com.openminis.app.R.string.work_process_duration, formatStepDuration(took, stillRunning = false),
         )

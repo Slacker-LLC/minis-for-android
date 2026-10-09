@@ -329,10 +329,11 @@ internal fun workStatusText(summary: WorkProcessSummary): String {
         return parts.joinToString(" · ")
     }
     parts.add(
-        if (summary.toolCount > 0) {
-            pluralStringResource(R.plurals.work_process_completed_steps, summary.toolCount, summary.toolCount)
-        } else {
-            stringResource(R.string.work_status_done)
+        when {
+            summary.toolCount > 0 -> pluralStringResource(R.plurals.work_process_completed_steps, summary.toolCount, summary.toolCount)
+            // A run of nothing but thinking: the turn's line above already says "completed".
+            summary.thinkingCount > 0 -> stringResource(R.string.token_usage_thinking_label)
+            else -> stringResource(R.string.work_status_done)
         },
     )
     val groups = tallyEntries(summary.tallies)
