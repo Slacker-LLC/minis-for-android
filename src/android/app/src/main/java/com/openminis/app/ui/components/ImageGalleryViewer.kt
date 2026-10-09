@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -101,43 +102,7 @@ fun ImageGalleryViewer(
     }
 
     val context = LocalContext.current
-    val view = LocalView.current
     val scope = rememberCoroutineScope()
-
-    // Hide system bars on entry, restore on exit. Same pattern as the
-    // single-image FullscreenImageViewer — see its comment block (T169)
-    // for why we don't touch decorFitsSystemWindows on the activity
-    // window.
-    DisposableEffect(Unit) {
-        val window = (view.context as? android.app.Activity)?.window
-        val controller = window?.let { WindowInsetsControllerCompat(it, view) }
-        val prevLightStatus = controller?.isAppearanceLightStatusBars
-        val prevLightNav = controller?.isAppearanceLightNavigationBars
-        @Suppress("DEPRECATION")
-        val prevStatusBarColor = window?.statusBarColor
-        @Suppress("DEPRECATION")
-        val prevNavBarColor = window?.navigationBarColor
-
-        controller?.isAppearanceLightStatusBars = false
-        controller?.isAppearanceLightNavigationBars = false
-        @Suppress("DEPRECATION")
-        window?.statusBarColor = android.graphics.Color.TRANSPARENT
-        @Suppress("DEPRECATION")
-        window?.navigationBarColor = android.graphics.Color.TRANSPARENT
-        controller?.hide(WindowInsetsCompat.Type.systemBars())
-        controller?.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-
-        onDispose {
-            controller?.show(WindowInsetsCompat.Type.systemBars())
-            prevLightStatus?.let { controller.isAppearanceLightStatusBars = it }
-            prevLightNav?.let { controller.isAppearanceLightNavigationBars = it }
-            @Suppress("DEPRECATION")
-            prevStatusBarColor?.let { window.statusBarColor = it }
-            @Suppress("DEPRECATION")
-            prevNavBarColor?.let { window.navigationBarColor = it }
-        }
-    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -148,23 +113,21 @@ fun ImageGalleryViewer(
             decorFitsSystemWindows = false,
         ),
     ) {
-        // Apply immersive flags to the dialog's own window too.
+        // The dialog is its own window: lay it out edge to edge with clear bars and dark status icons, so the
+        // page colour runs behind them like on the document previews.
         val dialogContainer = LocalView.current.parent as? android.view.ViewGroup
+        val lightIcons = !com.openminis.app.ui.theme.ChatColors.isDark
         DisposableEffect(dialogContainer) {
             val win = dialogContainer?.let { findDialogWindowForGallery(it) }
             win?.let { w ->
-                w.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
                 WindowCompat.setDecorFitsSystemWindows(w, false)
                 @Suppress("DEPRECATION")
                 w.statusBarColor = android.graphics.Color.TRANSPARENT
                 @Suppress("DEPRECATION")
                 w.navigationBarColor = android.graphics.Color.TRANSPARENT
                 val ctrl = WindowInsetsControllerCompat(w, w.decorView)
-                ctrl.isAppearanceLightStatusBars = false
-                ctrl.isAppearanceLightNavigationBars = false
-                ctrl.hide(WindowInsetsCompat.Type.systemBars())
-                ctrl.systemBarsBehavior =
-                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                ctrl.isAppearanceLightStatusBars = lightIcons
+                ctrl.isAppearanceLightNavigationBars = lightIcons
             }
             onDispose { }
         }
@@ -173,150 +136,80 @@ fun ImageGalleryViewer(
             initialPage = startIndex.coerceIn(0, items.size - 1),
             pageCount = { items.size },
         )
-        var showChrome by remember { mutableStateOf(true) }
-        // How far the picture has been dragged toward closing; the backdrop and the chrome fade with it.
+        // How far the picture has been dragged toward closing; the page colour fades with it.
         var dismissProgress by remember { mutableFloatStateOf(0f) }
+        val currentItem = items.getOrNull(pagerState.currentPage) ?: items[0]
+        val pageColor = com.openminis.app.ui.settings.settingsPageBackground()
 
-        Box(
+        androidx.compose.foundation.layout.Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 1f - 0.85f * dismissProgress)),
+                .background(pageColor.copy(alpha = 1f - 0.85f * dismissProgress)),
         ) {
-            // Pager is the bottom-most surface so per-page pointer input
-            // (pinch / pan / double-tap) wins over the dialog's outer
-            // click-to-dismiss when applicable.
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-                // Default behaviour: drag with at least 1 finger pages
-                // unless the page composable consumes the gesture first
-                // (we do that when zoomed, see below).
-            ) { page ->
-                GalleryPage(
-                    item = items[page],
-                    onTapChrome = { showChrome = !showChrome },
-                    onDismiss = onDismiss,
-                    onDismissProgress = { dismissProgress = it },
-                )
-            }
-
-            // ── Close button ────────────────────────────────────────
-            AnimatedVisibility(
-                visible = showChrome && dismissProgress == 0f,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier.align(Alignment.TopEnd),
-            ) {
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .statusBarsPadding()
-                        .padding(8.dp),
-                ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = stringResource(R.string.common_close),
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp),
+            // The same top bar as a document preview: back, the file's name, share.
+            com.openminis.app.ui.settings.MinisTopBar(
+                title = {
+                    Text(
+                        text = currentItem.caption.orEmpty(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                    )
+                },
+                onBack = onDismiss,
+                backLabel = stringResource(R.string.filebrowser_title),
+                background = pageColor,
+            )
+            // Clipped: a zoomed picture must not paint over the bars.
+            Box(modifier = Modifier.weight(1f).clipToBounds()) {
+                // Per-page pointer input (pinch / pan / double-tap) wins over the pager's swipe while zoomed.
+                HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                    GalleryPage(
+                        item = items[page],
+                        onTapChrome = {},
+                        onDismiss = onDismiss,
+                        onDismissProgress = { dismissProgress = it },
                     )
                 }
             }
-
-            // ── Bottom caption + actions ────────────────────────────
-            val currentItem = items.getOrNull(pagerState.currentPage) ?: items[0]
-            AnimatedVisibility(
-                visible = showChrome && dismissProgress == 0f,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier.align(Alignment.BottomCenter),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .navigationBarsPadding()
-                        .padding(bottom = 24.dp),
-                ) {
-                    androidx.compose.foundation.layout.Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
+            val savedToAlbumMsg = stringResource(R.string.image_saved_to_album_toast)
+            val saveFailedMsg = stringResource(R.string.image_save_failed_toast)
+            var sharing by remember { mutableStateOf(false) }
+            com.openminis.app.ui.sandbox.PreviewActionBar(
+                listOf(
+                    com.openminis.app.ui.sandbox.PreviewAction(
+                        Icons.Outlined.ContentCopy,
+                        stringResource(R.string.image_action_copy),
+                    ) { copyBitmapToClipboard(context, scope, currentItem.model) },
+                    com.openminis.app.ui.sandbox.PreviewAction(
+                        Icons.Outlined.Share,
+                        stringResource(R.string.image_action_share),
                     ) {
-                        // Caption capsule — matches iOS GalleryPage caption
-                        // (MessageImageGallery.swift L110-123). Hidden when
-                        // the item has no caption (e.g. raw markdown image
-                        // without alt text).
-                        if (!currentItem.caption.isNullOrBlank()) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(bottom = 12.dp)
-                                    .background(
-                                        color = Color.Black.copy(alpha = 0.55f),
-                                        shape = RoundedCornerShape(14.dp),
-                                    )
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                            ) {
-                                Text(
-                                    text = currentItem.caption,
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
+                        if (!sharing) {
+                            sharing = true
+                            scope.launch {
+                                try {
+                                    shareImage(context, currentItem.model)
+                                } finally {
+                                    sharing = false
+                                }
                             }
                         }
-
-                        val pillShape = RoundedCornerShape(32.dp)
-                        Row(
-                            modifier = Modifier
-                                .background(color = Color(0xFF3A3A3C), shape = pillShape)
-                                .border(
-                                    width = 1.dp,
-                                    color = Color.White.copy(alpha = 0.15f),
-                                    shape = pillShape,
-                                )
-                                .padding(horizontal = 20.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(32.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            ImageActionButton(
-                                icon = Icons.Outlined.ContentCopy,
-                                label = stringResource(R.string.image_action_copy),
-                                onClick = { copyBitmapToClipboard(context, scope, currentItem.model) },
-                            )
-                            var sharing by remember { mutableStateOf(false) }
-                            ImageActionButton(
-                                icon = Icons.Outlined.Share,
-                                label = stringResource(R.string.image_action_share),
-                                onClick = onClick@{
-                                    if (sharing) return@onClick
-                                    sharing = true
-                                    scope.launch {
-                                        try {
-                                            shareImage(context, currentItem.model)
-                                        } finally {
-                                            sharing = false
-                                        }
-                                    }
-                                },
-                            )
-                            val savedToAlbumMsg = stringResource(R.string.image_saved_to_album_toast)
-                            val saveFailedMsg = stringResource(R.string.image_save_failed_toast)
-                            ImageActionButton(
-                                icon = Icons.Outlined.Download,
-                                label = stringResource(R.string.image_action_save),
-                                onClick = {
-                                    scope.launch {
-                                        val bmp = loadBitmap(context, currentItem.model)
-                                        if (bmp != null) {
-                                            val saved = saveToGallery(context, bmp)
-                                            val msg = if (saved) savedToAlbumMsg else saveFailedMsg
-                                            com.openminis.app.ui.components.MinisToast.show(context, msg)
-                                        }
-                                    }
-                                },
-                            )
+                    },
+                    com.openminis.app.ui.sandbox.PreviewAction(
+                        Icons.Outlined.Download,
+                        stringResource(R.string.image_action_save),
+                    ) {
+                        scope.launch {
+                            val bmp = loadBitmap(context, currentItem.model)
+                            if (bmp != null) {
+                                val saved = saveToGallery(context, bmp)
+                                com.openminis.app.ui.components.MinisToast.show(context, if (saved) savedToAlbumMsg else saveFailedMsg)
+                            }
                         }
-                    }
-                }
-            }
+                    },
+                ),
+            )
         }
     }
 }

@@ -56,7 +56,7 @@ object ChatLinkResolver {
         if (context != null) {
             val staged = resolveDecodedPath(fileInput) { candidate ->
                 val guestPath = resolveGuestPath(candidate, scheme) ?: return@resolveDecodedPath null
-                stageGuestFile(context, guestPath, sessionId)?.let { FileItem.from(it) }
+                stageGuestFile(context, guestPath, sessionId)?.let { staged -> FileItem.from(staged)?.copy(name = guestPath.substringAfterLast('/')) }
             }
             if (staged != null) return ChatLinkAction.SandboxFile(staged)
         }

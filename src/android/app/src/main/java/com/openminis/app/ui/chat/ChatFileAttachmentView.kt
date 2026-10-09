@@ -4,7 +4,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -137,6 +139,7 @@ fun ChatFileAttachmentView(
             .padding(vertical = 4.dp)
             .animateContentSize(),
     ) {
+        QuoteFileHost(fileItem.file, fileItem.name) { onLongClick ->
         if (!isInlineMode || !isTextBased) {
             // ─── Compact File Card ──────────────────────────────────────
             CompactFileCard(
@@ -144,6 +147,7 @@ fun ChatFileAttachmentView(
                 canInlinePreview = isTextBased,
                 onToggleInline = { isInlineMode = true },
                 onOpenFull = { onOpenFullPreview(fileItem) },
+                onLongClick = onLongClick,
             )
         } else {
             // ─── Inline Preview ─────────────────────────────────────────
@@ -155,21 +159,35 @@ fun ChatFileAttachmentView(
                 onToggleHeight = { isInlineHeightExpanded = !isInlineHeightExpanded },
                 onCollapseToCard = { isInlineMode = false },
                 onOpenFull = { onOpenFullPreview(fileItem) },
+                onLongClick = onLongClick,
             )
         }
+        }
     }
+}
+
+/** [name] cut in the middle when it is long, so the extension at its end always shows. */
+internal fun shortFileName(name: String, maxChars: Int = 22): String {
+    if (name.length <= maxChars) return name
+    val ext = name.substringAfterLast('.', "").let { if (it.isNotEmpty() && it.length <= 8) ".$it" else "" }
+    val base = name.removeSuffix(ext)
+    val keepTail = 3
+    val head = (maxChars - ext.length - keepTail - 1).coerceAtLeast(4)
+    return base.take(head) + "…" + base.takeLast(keepTail) + ext
 }
 
 /**
  * Compact File Card showing file icon, file name, type, formatted size,
  * and entry points for preview or external open.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CompactFileCard(
     fileItem: FileItem,
     canInlinePreview: Boolean,
     onToggleInline: () -> Unit,
     onOpenFull: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val cardShape = RoundedCornerShape(10.dp)
 
@@ -178,21 +196,21 @@ private fun CompactFileCard(
         color = ChatColors.secondaryBg,
         tonalElevation = 1.dp,
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxWidth(0.67f)
             .clip(cardShape)
             .border(0.5.dp, ChatColors.thumbnailBorder, cardShape)
-            .clickable(onClick = onOpenFull),
+            .combinedClickable(onClick = onOpenFull, onLongClick = onLongClick),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // File type icon box
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(32.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
                 contentAlignment = Alignment.Center,
@@ -201,44 +219,23 @@ private fun CompactFileCard(
                     imageVector = fileItem.category.icon,
                     contentDescription = fileItem.category.displayName,
                     tint = ChatColors.link,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(20.dp),
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
-            // File name, type & size
-            Column(
+            // The file's own name, prefix and extension, on one line.
+            Text(
+                text = shortFileName(fileItem.name),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 13.sp,
+                ),
+                color = ChatColors.primaryText,
+                maxLines = 1,
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    text = fileItem.name,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp,
-                    ),
-                    color = ChatColors.primaryText,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                val sizeText = if (fileItem.size > 0L) fileItem.formattedSize else null
-                val subtitle = if (sizeText != null) {
-                    "${fileItem.category.displayName} • $sizeText"
-                } else {
-                    fileItem.category.displayName
-                }
-
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = ChatColors.secondaryText,
-                    maxLines = 1,
-                )
-            }
+            )
 
             Spacer(modifier = Modifier.width(8.dp))
 
@@ -282,6 +279,7 @@ private fun CompactFileCard(
 /**
  * Inline File Preview with capped height, expand/collapse toggle, and Full View option.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun InlineFilePreview(
     fileItem: FileItem,
@@ -291,6 +289,7 @@ private fun InlineFilePreview(
     onToggleHeight: () -> Unit,
     onCollapseToCard: () -> Unit,
     onOpenFull: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val cardShape = RoundedCornerShape(10.dp)
     val maxPreviewHeight = if (isHeightExpanded) null else 220.dp
@@ -310,6 +309,7 @@ private fun InlineFilePreview(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                    .combinedClickable(onClick = {}, onLongClick = onLongClick, enabled = onLongClick != null)
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -465,11 +465,14 @@ fun ChatFileAttachmentView(
     val sessionId = LocalMarkdownSessionId.current
     val urlHandler = LocalMarkdownUrlClickHandler.current
     val hostFile = rememberMdMediaFile(url, sessionId)
+    // The file's own name, with its extension, from the link; the link text only when the link has no file name.
     val fallbackName = remember(title, url) {
-        if (title.isNotBlank()) title
-        else {
-            val last = url.substringAfterLast('/').substringBefore('?')
-            runCatching { java.net.URLDecoder.decode(last, "UTF-8") }.getOrDefault(last).ifEmpty { "file" }
+        val last = url.substringAfterLast('/').substringBefore('?')
+        val fromUrl = runCatching { java.net.URLDecoder.decode(last.replace("+", "%2B"), "UTF-8") }.getOrDefault(last)
+        when {
+            fromUrl.contains('.') -> fromUrl
+            title.isNotBlank() -> title
+            else -> fromUrl.ifEmpty { "file" }
         }
     }
     val fileItem = remember(hostFile, fallbackName, url) {

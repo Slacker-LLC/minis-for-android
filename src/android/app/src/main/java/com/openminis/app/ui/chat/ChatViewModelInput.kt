@@ -107,6 +107,37 @@ fun ChatViewModel.quoteIntoInput(selection: String) {
     _quotedTexts.value = (_quotedTexts.value + text).takeLast(MAX_QUOTES)
 }
 
+/**
+ * Quotes a file the chat already holds (one the user sent, or one the agent produced) by attaching it to the next
+ * message. The same file is not attached twice.
+ */
+fun ChatViewModel.quoteAttachmentFile(file: java.io.File, name: String) {
+    if (!file.isFile) return
+    val uri = android.net.Uri.fromFile(file)
+    if (_attachments.value.any { it.uri == uri }) return
+    val mime = guessMimeType(name, fallback = "application/octet-stream")
+    addAttachment(
+        InputAttachment(
+            fileName = name,
+            uri = uri,
+            mimeType = mime,
+            kind = if (mime.startsWith("image/")) InputAttachment.Kind.IMAGE else InputAttachment.Kind.DOCUMENT,
+        ),
+    )
+}
+
+/** Quotes a sent message: its text (without the quotes it carried itself) as a card, its files as attachments. */
+fun ChatViewModel.quoteMessage(message: ChatMessage) {
+    quoteIntoInput(splitLeadingQuotes(message.content).second)
+    message.imageUris.forEachIndexed { i, uri ->
+        uri.path?.let { quoteAttachmentFile(java.io.File(it), message.attachmentNames.getOrNull(i) ?: java.io.File(it).name) }
+    }
+    val fileNames = message.attachmentNames.drop(message.imageUris.size)
+    message.attachmentUris.forEachIndexed { i, uri ->
+        uri.path?.let { quoteAttachmentFile(java.io.File(it), fileNames.getOrNull(i) ?: java.io.File(it).name) }
+    }
+}
+
 fun ChatViewModel.removeQuote(index: Int) {
     _quotedTexts.value = _quotedTexts.value.filterIndexed { i, _ -> i != index }
 }

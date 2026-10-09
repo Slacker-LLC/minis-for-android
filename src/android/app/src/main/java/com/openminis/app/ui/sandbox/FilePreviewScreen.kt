@@ -233,48 +233,33 @@ fun FilePreviewScreen(
         )
         },
         bottomBar = {
-            // Board: the actions live in a bar under the content; the rest go to an action sheet.
-            androidx.compose.foundation.layout.Column(
-                modifier = Modifier.background(com.openminis.app.ui.settings.settingsPageBackground()),
-            ) {
-                androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                androidx.compose.foundation.layout.Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(vertical = 6.dp),
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
-                ) {
-                    PreviewBarAction(Icons.Default.Share, stringResource(R.string.filepreview_share)) { shareFile(context, item) }
-                    if (item.isImageFile) {
-                        // T142 image → MediaStore Save to Gallery.
-                        PreviewBarAction(Icons.Default.Download, stringResource(R.string.filepreview_save_to_gallery)) {
-                            scope.launch {
-                                val ok = saveImageToGallery(context, item.file)
-                                Toast.makeText(
-                                    context,
-                                    context.getString(if (ok) R.string.image_saved_to_album_toast else R.string.image_save_failed_toast),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
+            // The same bar as every other attachment preview: the actions under the content, the rest in "More".
+            val actions = buildList {
+                add(PreviewAction(Icons.Default.Share, stringResource(R.string.filepreview_share)) { shareFile(context, item) })
+                if (item.isImageFile) {
+                    // T142 image → MediaStore Save to Gallery.
+                    add(PreviewAction(Icons.Default.Download, stringResource(R.string.filepreview_save_to_gallery)) {
+                        scope.launch {
+                            val ok = saveImageToGallery(context, item.file)
+                            Toast.makeText(
+                                context,
+                                context.getString(if (ok) R.string.image_saved_to_album_toast else R.string.image_save_failed_toast),
+                                Toast.LENGTH_SHORT,
+                            ).show()
                         }
-                    } else {
-                        // T144 non-image → SAF Save-As (user picks location).
-                        PreviewBarAction(Icons.Default.Download, stringResource(R.string.filepreview_save_as)) { saveAsLauncher.launch(item.name) }
-                    }
-                    // Print: HTML renders via WebView; markdown / plain text /
-                    // json / csv print their raw text wrapped in a WebView so we
-                    // reuse the single createPrintDocumentAdapter path (Android
-                    // has no UISimpleTextPrintFormatter equivalent). Image files
-                    // take the gallery route above and never reach this bar.
-                    if (item.isHtmlFile || item.isMarkdownFile || item.isTextFile ||
-                        item.isJsonFile || item.isCsvFile
-                    ) {
-                        PreviewBarAction(Icons.Default.Print, stringResource(R.string.action_print)) { printFile(context, item) }
-                    }
-                    PreviewBarAction(Icons.Default.MoreHoriz, stringResource(R.string.filebrowser_more_action)) { showPreviewSheet = true }
+                    })
+                } else {
+                    // T144 non-image → SAF Save-As (user picks location).
+                    add(PreviewAction(Icons.Default.Download, stringResource(R.string.filepreview_save_as)) { saveAsLauncher.launch(item.name) })
                 }
+                // Print: HTML renders via WebView; markdown / plain text / json / csv print their raw text
+                // wrapped in a WebView, so one createPrintDocumentAdapter path serves them all.
+                if (item.isHtmlFile || item.isMarkdownFile || item.isTextFile || item.isJsonFile || item.isCsvFile) {
+                    add(PreviewAction(Icons.Default.Print, stringResource(R.string.action_print)) { printFile(context, item) })
+                }
+                add(PreviewAction(Icons.Default.MoreHoriz, stringResource(R.string.filebrowser_more_action)) { showPreviewSheet = true })
             }
+            PreviewActionBar(actions)
         },
     ) { padding ->
         Box(
@@ -293,7 +278,7 @@ fun FilePreviewScreen(
                 FileCategory.JSON -> JsonPreview(item)
                 FileCategory.CODE, FileCategory.TEXT -> TextPreview(item)
                 FileCategory.ARCHIVE -> ArchivePreview(item)
-                FileCategory.OFFICE -> OfficeOpenExternal(item)
+                FileCategory.OFFICE -> OfficePreview(item)
                 FileCategory.UNKNOWN -> FileInfoView(item)
             }
         }
@@ -315,20 +300,6 @@ fun FilePreviewScreen(
                 },
             ),
         )
-    }
-}
-
-@Composable
-private fun PreviewBarAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    androidx.compose.foundation.layout.Column(
-        modifier = Modifier
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, maxLines = 1)
     }
 }
 
@@ -528,27 +499,18 @@ private fun MarkdownPreview(item: FileItem) {
 
 @Composable
 private fun HtmlPreview(item: FileItem) {
+    // The same page host as the chat's web preview, so scripts and the pages' own files behave as before; only
+    // the chrome around it is now the document preview's.
+    val holder = com.openminis.app.ui.preview.rememberWebViewHolder("file://${item.file.absolutePath}")
+    androidx.compose.runtime.DisposableEffect(holder) {
+        onDispose { holder.destroy() }
+    }
     AndroidView(
         modifier = Modifier.fillMaxSize(),
-        factory = { ctx ->
-            WebView(ctx).apply {
-                settings.javaScriptEnabled = false
-                settings.allowFileAccess = true
-                // T-webview-popup-d3c6e10f: mirror ffc85ad's WebPreviewBottomSheet
-                // fix. Pages using `height: 100vh` + `overflow: hidden` were
-                // collapsing to a 0-height clipped box (white screen) on first
-                // compose because Blink resolved CSS viewport units against a
-                // 0×0 measured container. useWideViewPort + loadWithOverviewMode
-                // decouple the CSS viewport from initial measured size, and
-                // deferring loadUrl via `post {}` guarantees the WebView has
-                // been laid out (positive width/height) before Blink resolves
-                // viewport units.
-                settings.useWideViewPort = true
-                settings.loadWithOverviewMode = true
-                webViewClient = WebViewClient()
-                val targetUrl = "file://${item.file.absolutePath}"
-                post { loadUrl(targetUrl) }
-            }
+        factory = {
+            holder.detach()
+            holder.startIfNeeded()
+            holder.webView
         },
     )
 }
@@ -563,7 +525,7 @@ private fun AudioPreview(item: FileItem) {
             .padding(16.dp),
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.Top,
     ) {
-        InlineAudioPlayer(filePath = item.file.absolutePath)
+        InlineAudioPlayer(filePath = item.file.absolutePath, title = item.name)
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = item.formattedSize,
@@ -869,7 +831,33 @@ private fun ArchivePreview(item: FileItem) {
     }
 }
 
-// ==================== Office (xlsx/docx/pptx → external) ====================
+// ==================== Office (docx / xlsx / pptx → the Markdown reader) ====================
+
+/**
+ * A Word, Excel or PowerPoint file read in the same reader as a Markdown file (see [OfficeToMarkdown]); the old
+ * binary formats and anything unreadable keep the "open in another app" page.
+ */
+@Composable
+private fun OfficePreview(item: FileItem) {
+    var state by remember(item.file) { mutableStateOf<String?>(null) }
+    var done by remember(item.file) { mutableStateOf(false) }
+    LaunchedEffect(item.file) {
+        state = withContext(Dispatchers.IO) { OfficeToMarkdown.convert(item.file) }
+        done = true
+    }
+    when {
+        !done -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(stringResource(R.string.common_loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        state == null -> OfficeOpenExternal(item)
+        else -> com.openminis.app.ui.chat.MarkdownDocument(
+            content = state!!,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        )
+    }
+}
+
 
 @Composable
 private fun OfficeOpenExternal(item: FileItem) {

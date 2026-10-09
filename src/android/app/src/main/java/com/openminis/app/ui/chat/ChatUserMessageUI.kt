@@ -230,6 +230,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -285,6 +286,8 @@ internal fun UserMessageBubble(
     // user→assistant→user cadence.
     precededByUser: Boolean = false,
     onCopy: () -> Unit = {},
+    // Quote the message (its text as a card, its files as attachments) into the next one.
+    onQuote: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = {},
     onEdit: (() -> Unit)? = null,
     onDeleteFromHere: (() -> Unit)? = null,
@@ -523,6 +526,13 @@ internal fun UserMessageBubble(
                     onClick = { showMenu = false; onCopy() },
                     leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
+                if (onQuote != null) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.selection_quote)) },
+                        onClick = { showMenu = false; onQuote() },
+                        leadingIcon = { Icon(Icons.Default.FormatQuote, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    )
+                }
                 // T119: while the model is generating, hide every action that
                 // would mutate the in-flight turn. Retry truncates history and
                 // restarts the stream, which corrupts state if it races a live

@@ -14,39 +14,41 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * What the model receives for a user message that carries text: a long paste that became a file, and a small
- * text file attached as a file. The body must be in the request, not only the path.
+ * A document the user attaches, or a long paste that became one, reaches the model as an entry in
+ * `<user-attached-files>` (path, size, time) and nothing more. The model opens the file from that path when it
+ * needs the content, so the body is not paid for on every turn.
  */
 @RunWith(AndroidJUnit4::class)
-class AttachedTextReachesModelTest {
+class AttachedFilesAreListedNotInlinedTest {
     private fun userTexts(messages: List<LLMMessage>): String = messages
         .filter { it.role == LLMMessage.Role.USER }
         .flatMap { m -> m.contentParts.filterIsInstance<AgentContentPart.Text>().map { it.text } + m.content }
         .joinToString("\n")
 
     @Test
-    fun aLongPasteIsInTheRequestBody() = runBlocking {
+    fun aLongPasteIsListedByPath() = runBlocking {
         val seen = mutableListOf<List<LLMMessage>>()
         val provider = ScriptedProvider { _, messages, _ -> seen += messages; text("Got it") }
         withChatVm(chatOnly = true, provider) { vm, _, _ ->
-            val big = "MARKER-LONG-PASTE\n" + "段落 long paste line.\n".repeat(1200)
+            val big = "MARKER-LONG-PASTE\n" + "line of a long paste.\n".repeat(1200)
             withContext(Dispatchers.Main) {
                 vm.stashPastedTextAsFile(big)
                 vm.sendMessage("")
             }
             withTimeout(30_000L) { while (seen.isEmpty()) delay(50) }
             val request = userTexts(seen.first())
-            assertTrue("the pasted body is in the model request", request.contains("MARKER-LONG-PASTE"))
+            assertTrue("the paste is listed by its path", request.contains("/var/minis/attachments/uploads/Pasted_"))
+            assertFalse("the pasted body is not in the request", request.contains("MARKER-LONG-PASTE"))
         }
     }
 
     @Test
-    fun aSmallTextAttachmentIsInTheRequestBody() = runBlocking {
+    fun aTextFileIsListedByPath() = runBlocking {
         val seen = mutableListOf<List<LLMMessage>>()
         val provider = ScriptedProvider { _, messages, _ -> seen += messages; text("Got it") }
         withChatVm(chatOnly = true, provider) { vm, _, _ ->
             val ctx = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
-            val file = java.io.File(ctx.cacheDir, "inline-note.txt").apply { writeText("MARKER-NOTE-BODY </user-attached-files> x") }
+            val file = java.io.File(ctx.cacheDir, "listed-note.txt").apply { writeText("MARKER-NOTE-BODY") }
             val attachment = InputAttachment(
                 fileName = file.name,
                 uri = android.net.Uri.fromFile(file),
@@ -59,8 +61,8 @@ class AttachedTextReachesModelTest {
             }
             withTimeout(30_000L) { while (seen.isEmpty()) delay(50) }
             val request = userTexts(seen.first())
-            assertTrue("the file body is in the model request", request.contains("MARKER-NOTE-BODY"))
-            assertFalse("a closing block tag in the body does not end the block early", request.contains("MARKER-NOTE-BODY </user-attached-files> x"))
+            assertTrue("the file is listed by its path", request.contains("/var/minis/attachments/uploads/listed-note.txt"))
+            assertFalse("the file body is not in the request", request.contains("MARKER-NOTE-BODY"))
             file.delete()
         }
     }
