@@ -23,6 +23,8 @@ object ProviderQuotaRepository {
     sealed interface State {
         data object Unsupported : State
         data object Loading : State
+        /** No balance API is documented for this service: the page links to its console instead. */
+        data class Console(val url: String) : State
         data class Ready(val quota: ProviderQuota) : State
         data class Failed(val message: String, val last: ProviderQuota?) : State
     }
@@ -52,6 +54,10 @@ object ProviderQuotaRepository {
             put(instance.id, State.Unsupported)
             return
         }
+        if (kind == QuotaKind.CONSOLE) {
+            put(instance.id, ProviderQuotaApi.consoleUrl(instance)?.let { State.Console(it) } ?: State.Unsupported)
+            return
+        }
         val previous = (states.value[instance.id] as? State.Ready)?.quota
         if (!force && previous != null && System.currentTimeMillis() - previous.fetchedAtMs < TTL_MS) return
         put(instance.id, State.Loading)
@@ -60,20 +66,32 @@ object ProviderQuotaRepository {
             instance.id,
             result.fold(
                 onSuccess = { State.Ready(it) },
-                onFailure = { State.Failed(it.message ?: it::class.java.simpleName, previous) },
+                onFailure = {
+                    // A relay that offers no balance endpoint is simply not one we can read: nothing to show, no error.
+                    if (it is NotOffered) State.Unsupported else State.Failed(it.message ?: it::class.java.simpleName, previous)
+                },
             ),
         )
     }
 
+    private class NotOffered : Exception("the service does not offer a balance endpoint")
+
+    /** The kinds whose credential is the service's own sign-in token, refreshed by the app's OAuth manager. */
+    private val SIGN_IN_KINDS = setOf(QuotaKind.CHATGPT, QuotaKind.CLAUDE, QuotaKind.KIMI_CODE)
+
+    /** Which of a relay's two layouts answered last time, so the next read is one request. */
+    private val relayLayout = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
     private suspend fun fetch(context: Context, providers: ProviderRepository, instance: ProviderInstance, kind: QuotaKind): Result<ProviderQuota> =
         runCatching {
             var key = providers.loadApiKey(instance.id)
-            if (kind == QuotaKind.CHATGPT) {
+            if (kind in SIGN_IN_KINDS) {
                 key = OAuthManager.forInstance(context, instance)?.validAccessToken() ?: key
             }
             if (key.isNullOrBlank()) error("no API key")
             val accountId = if (kind == QuotaKind.CHATGPT) OpenAIOAuthManager(context, instance.id).accountId else null
             val now = System.currentTimeMillis()
+            if (kind == QuotaKind.RELAY) return@runCatching fetchRelay(instance, key, now)
             var response = client.newCall(ProviderQuotaApi.request(kind, instance, key, accountId)).execute()
             var code = response.code
             var body = response.body?.string().orEmpty()
@@ -92,6 +110,29 @@ object ProviderQuotaRepository {
             if (code !in 200..299) error("HTTP $code")
             ProviderQuotaApi.parse(kind, body, now) ?: error("unexpected response")
         }
+
+    /** Sub2API's `/v1/usage`, else the OpenAI-style billing pair; both on the origin the chat requests already use. */
+    private fun fetchRelay(instance: ProviderInstance, key: String, now: Long): ProviderQuota {
+        val origin = ProviderQuotaApi.relayOrigin(instance) ?: throw NotOffered()
+        fun get(request: okhttp3.Request): Pair<Int, String> =
+            client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }
+        val preferNewApi = relayLayout[instance.id] == false
+        if (!preferNewApi) {
+            val (code, body) = get(ProviderQuotaApi.relaySub2ApiRequest(origin, key))
+            if (code in 200..299) ProviderQuotaApi.parseSub2Api(body, now)?.let { relayLayout[instance.id] = true; return it }
+            if (code == 401 || code == 403) error("the service refused the key (HTTP $code)")
+        }
+        val (subscription, usage) = ProviderQuotaApi.relayNewApiRequests(origin, key)
+        val (subCode, subBody) = get(subscription)
+        if (subCode in 200..299) {
+            val (usageCode, usageBody) = get(usage)
+            if (usageCode in 200..299) {
+                ProviderQuotaApi.parseNewApi(subBody, usageBody, now)?.let { relayLayout[instance.id] = false; return it }
+            }
+        }
+        if (subCode == 401 || subCode == 403) error("the service refused the key (HTTP $subCode)")
+        throw NotOffered()
+    }
 
     private fun put(id: String, state: State) {
         states.value = states.value + (id to state)

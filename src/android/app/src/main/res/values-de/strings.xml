@@ -2209,9 +2209,11 @@
     <string name="quota_refresh">Aktualisieren</string>
     <string name="quota_empty">Guthaben oder Kontingent aufgebraucht</string>
     <string name="quota_plan">Tarif: %1$s</string>
-    <string name="quota_available">Verfügbar %1$s %2$s</string>
+    <string name="quota_available">Verbleibend %1$s %2$s</string>
     <string name="quota_granted">Geschenkt %1$s</string>
     <string name="quota_topped_up">Aufgeladen %1$s</string>
-    <string name="quota_window_used">Fenster %1$s: %2$d%% verbraucht</string>
     <string name="quota_resets_in">Zurückgesetzt in %1$s</string>
+    <string name="quota_window_left">Fenster %1$s: %2$d%% übrig</string>
+    <string name="quota_unlimited">Unbegrenzt</string>
+    <string name="quota_open_console">Guthaben auf der Website des Anbieters ansehen</string>
 </resources>

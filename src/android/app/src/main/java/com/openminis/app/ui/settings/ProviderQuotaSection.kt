@@ -1,6 +1,13 @@
 package com.openminis.app.ui.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
@@ -41,6 +48,12 @@ fun ProviderQuotaSection(instance: ProviderInstance, providerRepository: Provide
             null, ProviderQuotaRepository.State.Loading ->
                 SettingsRow(title = stringResource(R.string.quota_reading), showDivider = false)
             ProviderQuotaRepository.State.Unsupported -> Unit
+            is ProviderQuotaRepository.State.Console -> SettingsRow(
+                title = stringResource(R.string.quota_open_console),
+                subtitle = state.url,
+                onClick = { runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(state.url)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } },
+                showDivider = false,
+            )
             is ProviderQuotaRepository.State.Failed -> {
                 state.last?.let { QuotaRows(it, refresh, showRefresh = false) }
                 SettingsRow(
@@ -70,6 +83,7 @@ private fun ColumnScope.QuotaRows(quota: ProviderQuota, refresh: () -> Unit, sho
         rows.add { last -> SettingsRow(title = stringResource(R.string.quota_empty), showDivider = !last, titleColor = MaterialTheme.colorScheme.error) }
     }
     quota.plan?.let { plan -> rows.add { last -> SettingsRow(title = stringResource(R.string.quota_plan, plan), showDivider = !last) } }
+    if (quota.unlimited) rows.add { last -> SettingsRow(title = stringResource(R.string.quota_unlimited), showDivider = !last) }
     quota.balances.forEach { balance -> rows.add { last -> BalanceRow(balance, last) } }
     quota.windows.forEach { window -> rows.add { last -> WindowRow(window, last) } }
     if (showRefresh) {
@@ -93,7 +107,7 @@ private fun BalanceRow(balance: Balance, last: Boolean) {
         balance.toppedUp?.let { stringResource(R.string.quota_topped_up, money(it)) },
     ).joinToString(" · ").ifEmpty { null }
     SettingsRow(
-        title = stringResource(R.string.quota_available, balance.currency, money(balance.total)),
+        title = stringResource(R.string.quota_available, balance.currency, money(balance.total)).replace("  ", " ").trim(),
         subtitle = detail,
         showDivider = !last,
     )
@@ -103,7 +117,7 @@ private fun BalanceRow(balance: Balance, last: Boolean) {
 private fun WindowRow(window: UsageWindow, last: Boolean) {
     val resets = window.resetAtEpochSec?.let { stringResource(R.string.quota_resets_in, duration(it * 1000L - System.currentTimeMillis())) }
     SettingsRow(
-        title = stringResource(R.string.quota_window_used, window.label, window.usedPercent),
+        title = stringResource(R.string.quota_window_left, window.label, (100 - window.usedPercent).coerceIn(0, 100)),
         subtitle = resets,
         showDivider = !last,
     )
@@ -111,15 +125,68 @@ private fun WindowRow(window: UsageWindow, last: Boolean) {
 
 private fun money(value: Double): String = String.format(Locale.US, "%.2f", value)
 
-/** "3h 12m", "2d 4h", "45m". */
-internal fun duration(ms: Long): String {
-    val minutes = (ms / 60_000L).coerceAtLeast(0L)
-    val days = minutes / 1_440L
-    val hours = (minutes % 1_440L) / 60L
-    val mins = minutes % 60L
-    return when {
-        days > 0 -> "${days}d ${hours}h"
-        hours > 0 -> "${hours}h ${mins}m"
-        else -> "${mins}m"
+internal fun duration(ms: Long): String = com.openminis.app.provider.quota.ProviderQuotaText.duration(ms)
+
+private val LowColor = Color(0xFFF5A623)
+private val EmptyColor = Color(0xFFE5484D)
+
+private fun levelColor(level: QuotaLevel, normal: Color): Color = when (level) {
+    QuotaLevel.OK -> normal
+    QuotaLevel.LOW -> LowColor
+    QuotaLevel.EMPTY -> EmptyColor
+}
+
+/** The one short "what is left" for a pill: the biggest balance, else the tightest window, else "no limit". */
+@Composable
+private fun quotaHeadline(quota: ProviderQuota): String? = when {
+    quota.balances.isNotEmpty() -> {
+        val b = quota.balances.maxBy { it.total }
+        stringResource(R.string.quota_available, b.currency, money(b.total)).replace("  ", " ").trim()
     }
+    quota.windows.isNotEmpty() -> {
+        val tightest = quota.windows.maxBy { it.usedPercent }
+        stringResource(R.string.quota_window_left, tightest.label, (100 - tightest.usedPercent).coerceIn(0, 100))
+    }
+    quota.unlimited -> stringResource(R.string.quota_unlimited)
+    else -> null
+}
+
+/**
+ * What is left on [instance], as a small pill (model picker, model groups). Reads when shown; the repository's short cache
+ * keeps this from asking again on every recomposition. Shows nothing where the service has no balance source.
+ */
+@Composable
+fun QuotaPill(instance: ProviderInstance, providerRepository: ProviderRepository, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    if (!ProviderQuotaRepository.supported(context, instance)) return
+    val states by ProviderQuotaRepository.all.collectAsState()
+    LaunchedEffect(instance.id) { ProviderQuotaRepository.refresh(context, providerRepository, instance) }
+    val quota = ((states[instance.id] as? ProviderQuotaRepository.State.Ready)?.quota
+        ?: (states[instance.id] as? ProviderQuotaRepository.State.Failed)?.last) ?: return
+    val text = quotaHeadline(quota) ?: return
+    androidx.compose.material3.Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = levelColor(quota.level, MaterialTheme.colorScheme.onSurfaceVariant),
+        maxLines = 1,
+        modifier = modifier
+            .background(levelColor(quota.level, MaterialTheme.colorScheme.onSurface).copy(alpha = 0.08f), CircleShape)
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    )
+}
+
+/** A small dot beside the model name when the active provider is running low (amber) or out (red); nothing while all is well. */
+@Composable
+fun QuotaDot(instanceId: String?, providerRepository: ProviderRepository, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val config by providerRepository.config.collectAsState()
+    val instance = config.instances.firstOrNull { it.id == instanceId } ?: return
+    if (!ProviderQuotaRepository.supported(context, instance)) return
+    val states by ProviderQuotaRepository.all.collectAsState()
+    LaunchedEffect(instance.id) { ProviderQuotaRepository.refresh(context, providerRepository, instance) }
+    val quota = (states[instance.id] as? ProviderQuotaRepository.State.Ready)?.quota ?: return
+    if (quota.level == QuotaLevel.OK) return
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier.size(7.dp).background(levelColor(quota.level, Color.Unspecified), CircleShape),
+    )
 }

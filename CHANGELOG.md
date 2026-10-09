@@ -6,6 +6,7 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 - The agent can open real terminals (`terminal` tool: open, send text and keys, read the rendered screen) to run interactive programs such as pi, Claude Code or Codex; plain commands stay on `shell_execute`.
 - One-tap authorize also shares the API-key providers added in the app with pi, Claude Code and Codex in the sandbox (environment variables, no second login); OAuth sign-ins are not shared.
+- What is left on each provider (balance, or the share of a subscription's windows left): on the provider page, as a pill in the model picker, as a dot beside the model name when it runs low, and through the agent's `provider_quota` tool. DeepSeek, Moonshot, SiliconFlow, OpenRouter, ChatGPT / Claude / Kimi Code sign-ins and Sub2API / New API relays; Xiaomi MiMo links to its console.
 
 ## 0.0.1 — 2026-10-09
 

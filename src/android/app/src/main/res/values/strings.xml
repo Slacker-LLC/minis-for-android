@@ -2537,9 +2537,11 @@
     <string name="quota_refresh">Refresh</string>
     <string name="quota_empty">Out of balance or usage</string>
     <string name="quota_plan">Plan: %1$s</string>
-    <string name="quota_available">Available %1$s %2$s</string>
+    <string name="quota_available">Remaining %1$s %2$s</string>
     <string name="quota_granted">Granted %1$s</string>
     <string name="quota_topped_up">Topped up %1$s</string>
-    <string name="quota_window_used">%1$s window: %2$d%% used</string>
     <string name="quota_resets_in">Resets in %1$s</string>
+    <string name="quota_window_left">%1$s window: %2$d%% left</string>
+    <string name="quota_unlimited">No limit</string>
+    <string name="quota_open_console">Check the balance on the provider website</string>
 </resources>
