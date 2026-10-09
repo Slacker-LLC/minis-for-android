@@ -545,6 +545,11 @@ internal fun OpenAIProvider.buildRequestBody(
                     val textParts = msg.contentParts.filterIsInstance<AgentContentPart.Text>()
                     val imageParts = msg.contentParts.filterIsInstance<AgentContentPart.ImageData>()
 
+                    // Every tool message of one assistant turn must follow that turn directly: a user
+                    // message between two of them makes strict servers (DeepSeek) answer 400 "No tool
+                    // output found for tool call <the later id>". So the pixels of read_image results are
+                    // collected and sent after the last tool message.
+                    val imageTurns = ArrayList<JSONObject>()
                     for (tr in toolResults) {
                         messagesArray.put(JSONObject().apply {
                             put("role", "tool")
@@ -563,7 +568,7 @@ internal fun OpenAIProvider.buildRequestBody(
                                 tr.imageMimeType ?: "image/jpeg"
                             } else "image/jpeg"
                             val b64 = Base64.encodeToString(safeBytes, Base64.NO_WRAP)
-                            messagesArray.put(JSONObject().apply {
+                            imageTurns.add(JSONObject().apply {
                                 put("role", "user")
                                 put("content", JSONArray().apply {
                                     put(JSONObject().apply {
@@ -580,6 +585,7 @@ internal fun OpenAIProvider.buildRequestBody(
                             })
                         }
                     }
+                    imageTurns.forEach { messagesArray.put(it) }
                     // T132: emit text + image_url parts as a structured user
                     // message. The previous structured-contentParts branch
                     // dropped AgentContentPart.ImageData entirely — only the
