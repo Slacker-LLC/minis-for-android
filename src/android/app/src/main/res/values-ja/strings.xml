@@ -2165,7 +2165,7 @@
     <string name="agent_models_cli_only">minis-model-use 専用（チャットモデルではありません）</string>
     <string name="oneclick_header">ワンタップ許可</string>
     <string name="oneclick_title">すべて許可</string>
-    <string name="oneclick_sub">root でアプリが宣言したすべての Android 権限を付与し、ユーザー補助・Shizuku・仮想画面を含むエージェントの全ツールを許可します。オフにするとエージェント側は既定に戻り、Android の権限は残ります。</string>
+    <string name="oneclick_sub">root でアプリが宣言したすべての Android 権限を付与し、ユーザー補助・Shizuku・仮想画面を含むエージェントの全ツールを許可します。オフにするとエージェント側は既定に戻り、Android の権限は残ります。API キー方式のプロバイダーをターミナル内の pi、Claude Code、Codex と共有します。</string>
     <string name="oneclick_working">許可しています…</string>
     <string name="module_settings_restart_title">Minis を再起動して接続</string>
     <string name="module_settings_restart_sub">Minis が起動中にモジュールを有効にした場合に使います。</string>

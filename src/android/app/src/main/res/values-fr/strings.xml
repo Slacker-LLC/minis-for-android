@@ -2064,7 +2064,7 @@
     <string name="agent_models_cli_only">minis-model-use uniquement (pas un modèle de chat)</string>
     <string name="oneclick_header">Autorisation en un geste</string>
     <string name="oneclick_title">Tout autoriser</string>
-    <string name="oneclick_sub">Accorde via root toutes les autorisations Android déclarées par l\'app et autorise tous les outils de l\'agent, y compris accessibilité, Shizuku et l\'écran virtuel. Désactiver remet les outils de l\'agent à leurs valeurs par défaut ; les autorisations Android restent.</string>
+    <string name="oneclick_sub">Accorde via root toutes les autorisations Android déclarées par l\'app et autorise tous les outils de l\'agent, y compris accessibilité, Shizuku et l\'écran virtuel. Désactiver remet les outils de l\'agent à leurs valeurs par défaut ; les autorisations Android restent. Partage aussi vos fournisseurs à clé API avec pi, Claude Code et Codex dans le terminal.</string>
     <string name="oneclick_working">Autorisation en cours…</string>
     <string name="module_settings_restart_title">Redémarrer Minis pour se connecter</string>
     <string name="module_settings_restart_sub">À utiliser après avoir activé le module alors que Minis tournait déjà.</string>

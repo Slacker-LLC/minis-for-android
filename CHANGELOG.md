@@ -4,6 +4,8 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+- One-tap authorize also shares the API-key providers added in the app with pi, Claude Code and Codex in the sandbox (environment variables, no second login); OAuth sign-ins are not shared.
+
 ## 0.0.1 — 2026-10-09
 
 The release page was cleared and versioning restarted at 0.0.1 (`versionName` 0.0.1, `versionCode` 199). It is

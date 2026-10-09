@@ -105,7 +105,8 @@ object ExecutionCoordinator {
                 // runtime-owned keys so a helper that dies before the first
                 // command cannot leave those values behind.
                 lastInjectedKeys.putIfAbsent(sessionId, RootNetworkProxy.PROXY_ENV_KEYS)
-                val userEnv = envVarRepository?.allAsDict().orEmpty()
+                // The provider keys shared with the coding agents come first: an env var the user set by hand wins.
+                val userEnv = com.openminis.app.provider.bridge.ProviderBridge.currentEnv() + envVarRepository?.allAsDict().orEmpty()
                 val runtimeProxy = RootNetworkProxy.proxyEnv()
                 // The helper is an optional compatibility overlay. Preserve
                 // explicit user proxy variables when it is absent, while the
@@ -165,7 +166,7 @@ object ExecutionCoordinator {
                 return ShellJobs.JobProcess.Result(failed.exitCode)
             }
             shell.ensureStarted()
-            val env = envVarRepository?.allAsDict().orEmpty().toMutableMap().apply {
+            val env = (com.openminis.app.provider.bridge.ProviderBridge.currentEnv() + envVarRepository?.allAsDict().orEmpty()).toMutableMap().apply {
                 putAll(RootNetworkProxy.proxyEnv())
             }
             if (env.isNotEmpty()) shell.applyEnvironment(env)

@@ -2168,7 +2168,7 @@
     <string name="agent_models_cli_only">Nur minis-model-use (kein Chatmodell)</string>
     <string name="oneclick_header">Ein-Tipp-Freigabe</string>
     <string name="oneclick_title">Alles freigeben</string>
-    <string name="oneclick_sub">Erteilt per Root alle vom App deklarierten Android-Berechtigungen und erlaubt alle Agent-Werkzeuge, auch Bedienungshilfen, Shizuku und den virtuellen Bildschirm. Beim Ausschalten kehren die Agent-Werkzeuge zu ihren Standardwerten zurück; die Android-Berechtigungen bleiben.</string>
+    <string name="oneclick_sub">Erteilt per Root alle vom App deklarierten Android-Berechtigungen und erlaubt alle Agent-Werkzeuge, auch Bedienungshilfen, Shizuku und den virtuellen Bildschirm. Beim Ausschalten kehren die Agent-Werkzeuge zu ihren Standardwerten zurück; die Android-Berechtigungen bleiben. Gibt außerdem deine API-Key-Anbieter an pi, Claude Code und Codex im Terminal weiter.</string>
     <string name="oneclick_working">Wird erteilt…</string>
     <string name="module_settings_restart_title">Minis neu starten, um zu verbinden</string>
     <string name="module_settings_restart_sub">Nutze das, wenn du das Modul aktiviert hast, während Minis schon lief.</string>

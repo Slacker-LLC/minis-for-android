@@ -16,6 +16,7 @@ import androidx.compose.ui.res.stringResource
 import com.openminis.app.R
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.permissions.RuntimePermissionGranter
+import com.openminis.app.provider.bridge.ProviderBridge
 import kotlinx.coroutines.launch
 
 /**
@@ -31,7 +32,8 @@ fun OneTapAuthorizeSection() {
     var epoch by remember { mutableIntStateOf(0) }
     var busy by remember { mutableStateOf(false) }
     val on = remember(epoch) {
-        RuntimePermissionGranter.allGranted(context) && OffloadPermissionManager.isEverythingAllowed()
+        RuntimePermissionGranter.allGranted(context) && OffloadPermissionManager.isEverythingAllowed() &&
+            ProviderBridge.isEnabled(context)
     }
     SettingsSection(header = stringResource(R.string.oneclick_header)) {
         SettingsSwitchRow(
@@ -45,6 +47,7 @@ fun OneTapAuthorizeSection() {
             onCheckedChange = { turnOn ->
                 if (!turnOn) {
                     OffloadPermissionManager.resetAll()
+                    ProviderBridge.disable(context)
                     epoch++
                     return@SettingsSwitchRow
                 }
@@ -54,6 +57,9 @@ fun OneTapAuthorizeSection() {
                     // The Agent side is opened whatever the Android side managed: a phone without root still
                     // gets its Agent tools allowed, and the message says which grants are missing.
                     OffloadPermissionManager.allowAll()
+                    // The provider keys for the coding agents in the sandbox (pi, Claude Code, Codex).
+                    (context.applicationContext as? com.openminis.app.MinisApp)?.providerRepositoryOrNull
+                        ?.let { ProviderBridge.enable(context, it) }
                     busy = false
                     epoch++
                     val message = when {

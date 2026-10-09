@@ -2157,7 +2157,7 @@
     <string name="agent_models_cli_only">minis-model-use 전용(채팅 모델 아님)</string>
     <string name="oneclick_header">원탭 권한 허용</string>
     <string name="oneclick_title">모두 허용</string>
-    <string name="oneclick_sub">root로 앱이 선언한 모든 Android 권한을 부여하고, 접근성·Shizuku·가상 화면을 포함한 에이전트의 모든 도구를 허용합니다. 끄면 에이전트 권한은 기본값으로 돌아가고 Android 권한은 그대로 남습니다.</string>
+    <string name="oneclick_sub">root로 앱이 선언한 모든 Android 권한을 부여하고, 접근성·Shizuku·가상 화면을 포함한 에이전트의 모든 도구를 허용합니다. 끄면 에이전트 권한은 기본값으로 돌아가고 Android 권한은 그대로 남습니다. API 키 방식 공급자를 터미널의 pi, Claude Code, Codex와도 공유합니다.</string>
     <string name="oneclick_working">권한 부여 중…</string>
     <string name="module_settings_restart_title">Minis를 재시작하여 연결</string>
     <string name="module_settings_restart_sub">Minis가 실행 중일 때 모듈을 활성화한 경우 사용하세요.</string>
