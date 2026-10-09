@@ -2407,7 +2407,7 @@
     <string name="agent_models_cli_only">仅限 minis-model-use（非对话模型）</string>
     <string name="oneclick_header">一键授权</string>
     <string name="oneclick_title">授权全部</string>
-    <string name="oneclick_sub">需要 root。授予本应用声明的全部 Android 权限，打开无障碍服务、通知读取权限和默认助手角色，启用模块开关和虚拟屏幕（需先运行 Shizuku），并允许 Agent 的全部工具。关闭只把 Agent 权限恢复默认，Android 系统授权保留。</string>
+    <string name="oneclick_sub">需要 root。授予本应用声明的全部 Android 权限，打开无障碍服务、通知读取权限和默认助手角色，启用模块开关和虚拟屏幕（需先运行 Shizuku），并允许 Agent 的全部工具。关闭只把 Agent 权限恢复默认，Android 系统授权保留。并把 API Key 类服务商共享给终端里的 pi、Claude Code 和 Codex。</string>
     <string name="oneclick_working">正在授权…</string>
     <string name="module_settings_restart_title">重启 Minis 以连接框架</string>
     <string name="module_settings_restart_sub">在 Minis 已经运行时才启用模块的话，点这里重启一次。</string>

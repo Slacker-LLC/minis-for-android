@@ -5,6 +5,7 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 ## Unreleased
 
 - The agent can open real terminals (`terminal` tool: open, send text and keys, read the rendered screen) to run interactive programs such as pi, Claude Code or Codex; plain commands stay on `shell_execute`.
+- One-tap authorize also shares the API-key providers added in the app with pi, Claude Code and Codex in the sandbox (environment variables, no second login); OAuth sign-ins are not shared.
 
 ## 0.0.1 — 2026-10-09
 

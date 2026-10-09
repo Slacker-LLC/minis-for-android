@@ -2378,7 +2378,7 @@
     <string name="agent_models_cli_only">僅限 minis-model-use（非對話模型）</string>
     <string name="oneclick_header">一鍵授權</string>
     <string name="oneclick_title">授權全部</string>
-    <string name="oneclick_sub">以 root 一次授予本應用宣告的全部 Android 權限，並開啟 Agent 的全部工具權限（含無障礙、Shizuku、虛擬螢幕）。關閉只會把 Agent 權限還原為預設，Android 系統授權保留。</string>
+    <string name="oneclick_sub">以 root 一次授予本應用宣告的全部 Android 權限，並開啟 Agent 的全部工具權限（含無障礙、Shizuku、虛擬螢幕）。關閉只會把 Agent 權限還原為預設，Android 系統授權保留。並把 API Key 類服務商共用給終端機裡的 pi、Claude Code 和 Codex。</string>
     <string name="oneclick_working">正在授權…</string>
     <string name="module_settings_restart_title">重新啟動 Minis 以連接框架</string>
     <string name="module_settings_restart_sub">在 Minis 已經執行時才啟用模組的話，點這裡重新啟動一次。</string>

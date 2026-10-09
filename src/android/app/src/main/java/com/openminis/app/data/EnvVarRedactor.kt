@@ -79,7 +79,7 @@ object EnvVarRedactor {
     fun redactIfEnabled(output: String): Pair<String, Int> {
         if (!EnvVarPrivacyStore.isEnabled) return output to 0
         val repo = envVarRepository ?: return output to 0
-        val values = repo.allAsDict().values.filter { it.isNotEmpty() }
+        val values = (repo.allAsDict().values + com.openminis.app.provider.bridge.ProviderBridge.secrets()).filter { it.isNotEmpty() }
         if (values.isEmpty()) return output to 0
         val (masked, hits) = redact(output, values)
         if (hits == 0) return masked to 0

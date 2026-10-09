@@ -2386,7 +2386,7 @@
     <string name="agent_models_cli_only">Только minis-model-use (не чат-модель)</string>
     <string name="oneclick_header">Разрешить одним нажатием</string>
     <string name="oneclick_title">Разрешить всё</string>
-    <string name="oneclick_sub">Через root выдаёт все разрешения Android, объявленные приложением, и разрешает все инструменты агента, включая спецвозможности, Shizuku и виртуальный экран. При выключении инструменты агента возвращаются к значениям по умолчанию; разрешения Android остаются.</string>
+    <string name="oneclick_sub">Через root выдаёт все разрешения Android, объявленные приложением, и разрешает все инструменты агента, включая спецвозможности, Shizuku и виртуальный экран. При выключении инструменты агента возвращаются к значениям по умолчанию; разрешения Android остаются. Также передаёт ключи API-провайдеров pi, Claude Code и Codex в терминале.</string>
     <string name="oneclick_working">Выдача разрешений…</string>
     <string name="module_settings_restart_title">Перезапустить Minis для подключения</string>
     <string name="module_settings_restart_sub">Используйте, если модуль включён, когда Minis уже работал.</string>
