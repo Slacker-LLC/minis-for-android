@@ -4,6 +4,13 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+## 0.0.1 — 2026-10-09
+
+The release page was cleared and versioning restarted at 0.0.1 (`versionName` 0.0.1, `versionCode` 100). It is
+built from the same source line as the earlier 1.0 and carries the changes below. An earlier 1.0 install cannot be
+updated in place (Android refuses a lower `versionCode`): back up in the old build (Settings > File management >
+Backup & Restore), uninstall, install this APK, then restore. Earlier entries in this file keep their old numbers.
+
 ### Attachments and previews
 
 - An attached document, or a long paste that became one, is listed to the model by path, size and time and is not
