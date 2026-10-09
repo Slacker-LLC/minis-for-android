@@ -2105,6 +2105,7 @@
     <string name="work_status_running">Arbeitet</string>
     <string name="work_status_step">Schritt %1$d</string>
     <string name="work_status_thinking">Denkt nach</string>
+    <string name="work_status_list_separator">", "</string>
     <string name="work_status_done">Fertig</string>
     <string name="assistant_menu_branch_here">Von hier verzweigen</string>
     <string name="chat_input_placeholder">Nachricht eingeben oder / für Skills</string>

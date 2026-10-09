@@ -2094,6 +2094,7 @@
     <string name="work_status_running">작업 중</string>
     <string name="work_status_step">%1$d단계</string>
     <string name="work_status_thinking">생각 중</string>
+    <string name="work_status_list_separator">", "</string>
     <string name="work_status_done">완료</string>
     <string name="assistant_menu_branch_here">여기서 분기</string>
     <string name="chat_input_placeholder">메시지를 입력하거나 /로 스킬 호출</string>

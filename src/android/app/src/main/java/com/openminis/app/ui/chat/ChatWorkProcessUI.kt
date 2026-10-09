@@ -357,7 +357,7 @@ internal fun workStatusText(summary: WorkProcessSummary, clockElapsedSec: Long? 
     if (groups.isNotEmpty()) {
         val labels = ArrayList<String>(groups.size)
         for (index in groups.indices) labels.add(workItemTallyLabel(groups[index].first, groups[index].second))
-        parts.add(labels.joinToString(", "))
+        parts.add(labels.joinToString(stringResource(R.string.work_status_list_separator)))
     }
     summary.durationMs?.let {
         parts.add(stringResource(R.string.work_process_duration, formatStepDuration(it / 1000L, stillRunning = false)))

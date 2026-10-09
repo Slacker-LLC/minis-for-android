@@ -2102,6 +2102,7 @@
     <string name="work_status_running">作業中</string>
     <string name="work_status_step">ステップ %1$d</string>
     <string name="work_status_thinking">考え中</string>
+    <string name="work_status_list_separator">、</string>
     <string name="work_status_done">完了</string>
     <string name="assistant_menu_branch_here">ここから分岐</string>
     <string name="chat_input_placeholder">メッセージを入力、または / でスキルを呼び出し</string>

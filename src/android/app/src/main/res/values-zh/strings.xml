@@ -2343,6 +2343,7 @@
     <string name="work_status_running">正在工作</string>
     <string name="work_status_step">第 %1$d 步</string>
     <string name="work_status_thinking">思考中</string>
+    <string name="work_status_list_separator">、</string>
     <string name="work_status_done">已完成</string>
     <string name="assistant_menu_branch_here">从这里分支</string>
     <string name="chat_input_placeholder">输入消息，或用 / 调用技能</string>

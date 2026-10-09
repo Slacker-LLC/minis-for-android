@@ -2322,6 +2322,7 @@
     <string name="work_status_running">Работаю</string>
     <string name="work_status_step">Шаг %1$d</string>
     <string name="work_status_thinking">Думает</string>
+    <string name="work_status_list_separator">", "</string>
     <string name="work_status_done">Готово</string>
     <string name="assistant_menu_branch_here">Ответвить отсюда</string>
     <string name="chat_input_placeholder">Сообщение или / для навыков</string>

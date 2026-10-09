@@ -2433,6 +2433,7 @@
     <string name="work_status_running">Working</string>
     <string name="work_status_step">Step %1$d</string>
     <string name="work_status_thinking">Thinking</string>
+    <string name="work_status_list_separator">", "</string>
     <string name="work_status_done">Done</string>
     <string name="assistant_menu_branch_here">Branch from here</string>
     <string name="chat_input_placeholder">Message, or type / for skills</string>

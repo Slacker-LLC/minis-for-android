@@ -2001,6 +2001,7 @@
     <string name="work_status_running">En cours</string>
     <string name="work_status_step">Étape %1$d</string>
     <string name="work_status_thinking">Réflexion</string>
+    <string name="work_status_list_separator">", "</string>
     <string name="work_status_done">Terminé</string>
     <string name="assistant_menu_branch_here">Brancher d’ici</string>
     <string name="chat_input_placeholder">Écrivez un message, ou / pour les compétences</string>
