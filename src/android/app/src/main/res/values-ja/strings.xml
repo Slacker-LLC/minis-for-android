@@ -2198,4 +2198,6 @@
     <string name="compact_revert_busy">返信または圧縮の実行中は、圧縮を元に戻せません。</string>
     <string name="compact_revert_none">この会話には元に戻せる圧縮がありません。</string>
     <string name="compact_revert_failed">圧縮を元に戻せません：記録が見つかりません。</string>
+    <string name="chat_model_gave_up_note">モデルから応答がなく、自動で%1$d回再試行しました。完了した手順は保持されています。</string>
+    <string name="chat_model_failed_note">モデルへのリクエストが失敗しました。完了した手順は保持されています。</string>
 </resources>

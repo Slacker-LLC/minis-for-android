@@ -2190,4 +2190,6 @@
     <string name="compact_revert_busy">답변이나 압축이 진행 중일 때는 압축을 되돌릴 수 없습니다.</string>
     <string name="compact_revert_none">이 대화에는 되돌릴 압축이 없습니다.</string>
     <string name="compact_revert_failed">압축을 되돌릴 수 없습니다: 기록을 찾을 수 없습니다.</string>
+    <string name="chat_model_gave_up_note">모델이 응답하지 않아 %1$d회 자동 재시도했습니다. 완료한 단계는 유지됩니다.</string>
+    <string name="chat_model_failed_note">모델 요청에 실패했습니다. 완료한 단계는 유지됩니다.</string>
 </resources>

@@ -2529,4 +2529,6 @@
     <string name="compact_revert_busy">Cannot undo the compaction while a reply or a compaction is in progress.</string>
     <string name="compact_revert_none">There is no compaction to undo in this conversation.</string>
     <string name="compact_revert_failed">Could not undo the compaction: its record was not found.</string>
+    <string name="chat_model_gave_up_note">No response from the model after %1$d automatic retries. Finished steps are kept.</string>
+    <string name="chat_model_failed_note">The model request failed. Finished steps are kept.</string>
 </resources>
