@@ -192,7 +192,10 @@ fun ChatViewModel.stashPastedTextAsFile(text: String): InputAttachment? {
     val dir = java.io.File(context.cacheDir, "pasted_text").apply { mkdirs() }
     val stamp = java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US)
         .format(java.util.Date())
-    val name = "Pasted_$stamp-${java.util.UUID.randomUUID().toString().take(8)}.txt"
+    // "Pasted_<time>.txt"; a second paste in the same second gets a counter.
+    var name = "Pasted_$stamp.txt"
+    var n = 2
+    while (java.io.File(dir, name).exists()) name = "Pasted_${stamp}_${n++}.txt"
     val file = java.io.File(dir, name)
     return try {
         file.writeText(text)
