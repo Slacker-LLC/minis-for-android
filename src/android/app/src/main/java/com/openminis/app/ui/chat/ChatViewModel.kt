@@ -1780,6 +1780,8 @@ class ChatViewModel(
      *     persisted row so a re-load doesn't resurrect the failed turn.
      */
     internal var lastRetryTimestamp = 0L
+    /** What the app did before giving up on a failed model request; the error banner shows it (see [setInlineError]). */
+    internal var giveUpNote: String? = null
 
 
 

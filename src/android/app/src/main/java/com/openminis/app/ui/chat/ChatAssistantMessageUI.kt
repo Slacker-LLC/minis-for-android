@@ -347,7 +347,7 @@ internal fun InlineErrorBanner(
             color = ChatColors.bad,
             fontSize = 12.sp,
             lineHeight = 16.sp,
-            maxLines = 3,
+            maxLines = 4,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )

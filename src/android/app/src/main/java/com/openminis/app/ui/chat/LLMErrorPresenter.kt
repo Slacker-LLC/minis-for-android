@@ -96,5 +96,19 @@ internal object LLMErrorPresenter {
 
 /** A failed model request, shown in the chat as [LLMErrorPresenter] words it. */
 internal fun ChatViewModel.setInlineError(e: Throwable) {
-    setInlineError(LLMErrorPresenter.present(context, e).ifBlank { e.message ?: "Unknown error" })
+    val text = LLMErrorPresenter.present(context, e).ifBlank { e.message ?: "Unknown error" }
+    val note = giveUpNote
+    giveUpNote = null
+    setInlineError(withGiveUpNote(text, note))
+}
+
+/**
+ * The error banner's text with what the app did about the failure ([note]) between the reason (its first line)
+ * and the provider's own words (the rest), so the banner is the one place that says it.
+ */
+internal fun withGiveUpNote(text: String, note: String?): String {
+    if (note.isNullOrBlank()) return text
+    val reason = text.substringBefore('\n')
+    val rest = text.substringAfter('\n', "")
+    return if (rest.isEmpty()) "$reason\n$note" else "$reason\n$note\n$rest"
 }

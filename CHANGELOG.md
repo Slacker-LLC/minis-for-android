@@ -13,7 +13,9 @@ Backup & Restore), uninstall, install this APK, then restore. Earlier entries in
 
 - Retry after a failed model call goes on in the same reply: the steps it had already finished stay on screen
   (they used to disappear, although the model still had them). The note after repeated failures is a sentence in
-  your language, with the provider's own message behind the info button, instead of one clipped line.
+  your language, with the provider's own message behind the info button, instead of one clipped line. The red error
+  banner is now the only note about a failed request: what was retried and that finished steps are kept are in the
+  banner, not in a second line below it.
 
 ### Attachments and previews
 
