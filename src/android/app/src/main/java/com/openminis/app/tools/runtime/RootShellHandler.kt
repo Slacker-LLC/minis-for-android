@@ -76,6 +76,7 @@ class RootShellHandler : ToolHandler {
             risk = PrivilegedCommandRisk.classify(tool, args),
             timeoutMs = timeout,
             rootOnly = true,
+            entryPoint = "root.shell",
         )
         if (!response.success) {
             val detail = response.unavailableReason ?: response.stderr.ifBlank { "Root execution failed" }

@@ -4,6 +4,7 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+- Device protection (Settings > Permissions, on by default): privileged commands from the agent, `android-root-cli` and the Android tools can no longer write partitions or the system partitions, remove `/data/system`, `/data/misc`, `/metadata` or `/data/adb`, uninstall or disable core system apps, factory-reset or remove user 0. Nothing is asked: the agent gets `DEVICE_PROTECTED: <category>: <target>` and tries another way. Everything else stays open. Refusals are listed under the switch. When `/data` is nearly full the app freezes its own terminals and refuses new bulk writes until space is freed. `android-root-cli partition read` exports a partition read-only.
 - Root only: Shizuku (and AXManager / Sui) support is removed; Root is the app's one privileged path. The code before this change is kept on the branch `archive/before-root-only`.
 - `android-shizuku-cli` is now `android-root-cli`: the same subcommands and JSON, run as root through `su`. Its Agent permission switch carries over.
 - The virtual screen runs in a root service (libsu) instead of a Shizuku UserService. Run its compatibility check once more to switch it back on.

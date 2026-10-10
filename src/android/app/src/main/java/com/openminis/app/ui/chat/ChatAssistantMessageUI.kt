@@ -318,6 +318,8 @@ internal fun InlineErrorBanner(
 ) {
     val clipboard = LocalClipboardManager.current
     var localRetrying by remember(error) { mutableStateOf(false) }
+    // The provider's own words can be long; four lines would cut them off with no way to read the rest.
+    var expanded by remember(error) { mutableStateOf(false) }
     val canRetry = onRetry != null && !isRetrying && !localRetrying
 
     Row(
@@ -327,7 +329,7 @@ internal fun InlineErrorBanner(
             .clip(RoundedCornerShape(12.dp))
             .background(ChatColors.bad.copy(alpha = 0.12f))
             .combinedClickable(
-                onClick = {},
+                onClick = { expanded = !expanded },
                 onLongClick = {
                     clipboard.setText(androidx.compose.ui.text.AnnotatedString(error))
                 },
@@ -347,7 +349,7 @@ internal fun InlineErrorBanner(
             color = ChatColors.bad,
             fontSize = 12.sp,
             lineHeight = 16.sp,
-            maxLines = 4,
+            maxLines = if (expanded) Int.MAX_VALUE else 4,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )

@@ -12,7 +12,12 @@ import com.openminis.app.data.model.LLMError
  */
 internal object LLMErrorPresenter {
 
-    enum class Kind { AUTH, RATE_LIMIT, NETWORK, SERVER, BAD_REQUEST, NOT_FOUND, TOO_LARGE, REJECTED, DECODING, OTHER }
+    enum class Kind {
+        AUTH, RATE_LIMIT, NETWORK, SERVER, BAD_REQUEST, NOT_FOUND, TOO_LARGE, REJECTED, DECODING, OTHER,
+
+        // A 400 whose body says what was wrong. Only these five are told apart; anything else stays BAD_REQUEST.
+        BAD_TOOL_PAIRING, BAD_CONTEXT, BAD_IMAGE, BAD_MODEL, BAD_THINKING,
+    }
 
     data class Reason(val kind: Kind, val status: Int?, val detail: String)
 
@@ -38,6 +43,38 @@ internal object LLMErrorPresenter {
         return type?.let { TYPE_STATUS[it] }
     }
 
+    private val TOOL_PAIRING = listOf(
+        "no tool output found", // OpenAI Responses: a function_call without its function_call_output
+        "tool_use ids were found without tool_result", // Anthropic
+        "responding to each", // Chat Completions: "...must be followed by tool messages responding to each tool_call_id"
+        "must be followed by tool messages",
+        "no tool call found", // the reverse: an output with no call
+        "function response parts", // Gemini: number of function response parts must equal function call parts
+    )
+    private val CONTEXT = listOf(
+        "context length", "context_length", "maximum context", "context window", "too many tokens",
+        "prompt is too long", "input is too long", "reduce the length", "max_tokens_to_sample",
+    )
+
+    /**
+     * What a 400 was about, read from the provider's own body. The providers word these differently, so this is a
+     * list of phrases that are specific enough not to mean something else; no match leaves the general 400 text.
+     * Pure, so the phrases are unit-tested.
+     */
+    internal fun refine400(detail: String): Kind {
+        // Providers quote identifiers differently (`tool_use`, 'tool_calls'); the phrases below carry no quotes.
+        val d = detail.lowercase().replace("`", "").replace("'", "").replace("\"", "")
+        return when {
+            TOOL_PAIRING.any { it in d } -> Kind.BAD_TOOL_PAIRING
+            CONTEXT.any { it in d } -> Kind.BAD_CONTEXT
+            "image" in d && listOf("not support", "unsupported", "invalid image", "does not accept", "cannot be", "vision", "multimodal").any { it in d } -> Kind.BAD_IMAGE
+            "model" in d && listOf("not found", "does not exist", "invalid model", "unknown model", "model_not_found", "not supported").any { it in d } -> Kind.BAD_MODEL
+            listOf("reasoning", "thinking", "budget_tokens", "effort").any { it in d } &&
+                listOf("invalid", "unsupported", "not support", "unknown", "must be", "not allowed").any { it in d } -> Kind.BAD_THINKING
+            else -> Kind.BAD_REQUEST
+        }
+    }
+
     internal fun classify(e: Throwable): Reason? {
         val llm = e as? LLMError ?: return null
         return when (llm) {
@@ -49,7 +86,7 @@ internal object LLMErrorPresenter {
             is LLMError.ProviderError -> {
                 val status = statusOf(llm.detail)
                 val kind = when (status) {
-                    400 -> Kind.BAD_REQUEST
+                    400 -> refine400(llm.detail)
                     401, 403 -> Kind.AUTH
                     404 -> Kind.NOT_FOUND
                     413 -> Kind.TOO_LARGE
@@ -74,6 +111,11 @@ internal object LLMErrorPresenter {
             Kind.NETWORK -> context.getString(R.string.llm_err_network)
             Kind.SERVER -> context.getString(R.string.llm_err_server, code.ifEmpty { "5xx" })
             Kind.BAD_REQUEST -> context.getString(R.string.llm_err_bad_request)
+            Kind.BAD_TOOL_PAIRING -> context.getString(R.string.llm_err_400_tool_pairing)
+            Kind.BAD_CONTEXT -> context.getString(R.string.llm_err_400_context)
+            Kind.BAD_IMAGE -> context.getString(R.string.llm_err_400_image)
+            Kind.BAD_MODEL -> context.getString(R.string.llm_err_400_model)
+            Kind.BAD_THINKING -> context.getString(R.string.llm_err_400_thinking)
             Kind.NOT_FOUND -> context.getString(R.string.llm_err_not_found)
             Kind.TOO_LARGE -> context.getString(R.string.llm_err_too_large)
             Kind.REJECTED -> context.getString(R.string.llm_err_rejected, code)

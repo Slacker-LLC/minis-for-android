@@ -40,6 +40,29 @@ The previous Anthropic helper parsed arbitrary numeric Claude versions and compa
 
 A refresh asks each provider for its live list first (OpenAI/Anthropic/xAI/Kimi/OpenRouter/custom endpoints via `/models`, Gemini via paged `models.list`, Codex OAuth via the ChatGPT backend), so new models appear without touching this file. The `staticModels` catalogs are what an instance shows before its first refresh and when a refresh fails, and `UsageStatsScreen` looks historical ids up in them — so add the current flagships on top and keep older ids. Check an id against the provider's own list (or the models.dev registry for that provider) before adding it, and drop an id only when the provider has retired it. Every non-`supportsReasoning: false` entry needs a thinking-ceiling rule; `ThinkingLevelCatalogSnapshotTest` pins that.
 
+### models.dev: the source to maintain from
+
+Look model metadata up in [models.dev](https://models.dev) (`https://models.dev/api.json`) before reading a vendor's own site. It is a community catalog covering most providers, and the app already consumes it (`ModelsDevApi`): a bundled snapshot in `assets/models-dev-api.json` (refresh it with `scripts/update_models_dev.sh`), a 48-hour disk cache refreshed in the background, and the snapshot as the offline fallback. Every refresh of a provider's live model list is enriched from it (`ModelsDevApi.enrichModels`), so a new model that models.dev already lists needs no change in this repository.
+
+What each side owns:
+
+| Property | Resolved from, first match wins |
+|---|---|
+| Context window | the model's own value (set by models.dev enrichment or the `staticModels` object) → a `contextWindow` rule → an id-based heuristic |
+| Max output tokens, reasoning flag, interleaved-reasoning field, input/output modalities | models.dev enrichment; a `staticModels` object supplies the value when models.dev has none |
+| Selectable thinking levels | the effort tiers models.dev declares (`reasoning_options` of type `effort`) → a `maxThinkingLevel` rule → `HIGH` |
+| Release order in pickers | models.dev `release_date`; for same-day releases the output price breaks the tie (`ModelReleaseIndex`) |
+| Request quirks no catalog describes (`rejectsTemperature`, `adaptiveThinking`, `requiresThoughtSignature`), picker filters, the `codexOAuth` call allow-list | `model-rules.json` only |
+
+So the work for a new model is: run the update script, look the id up under its provider on models.dev, and add a rule or a `staticModels` entry only for what the catalog lacks or gets wrong. Do not copy values models.dev already provides into the rules file; two copies drift.
+
+Limits to keep in mind:
+
+- models.dev is community-maintained, not authoritative. The same model id often appears under many providers with different capabilities (the code comments record `glm-5.2`: 17 of 19 entries declare effort tiers, 2 declare none), and the enrichment takes the provider's own entry first, then the entry with the richest reasoning data. When a value is wrong for a model, the vendor's documentation wins and the fix is a narrow rule in `model-rules.json`; put the evidence in the commit message.
+- models.dev says what a model *can* do, not what an account or a login may *call*. For ChatGPT-backend (Codex) and Antigravity logins the backend's own list stays authoritative.
+- The snapshot carries more than the app reads today. Per model it also has `cost` (`input`, `output`, `cache_read`, USD per million tokens), `tool_call`, `temperature`, `structured_output`, `knowledge` (training cutoff), `status` (`beta` / `deprecated`) and `open_weights`. Only the output price is parsed (as the ordering tie-break above). These are the fields to read next, for example for an estimated cost, a "no tool calling" label or hiding deprecated models; none of that is implemented yet.
+- models.dev prices are list prices per token. They say nothing about subscriptions or free tiers, so a cost derived from them must be labelled an estimate.
+
 ### Codex OAuth warning
 
 A refresh for a Codex OAuth instance first asks the ChatGPT backend for its own list (`GET chatgpt.com/backend-api/codex/models?client_version=…`, same client version and headers as chat requests) and shows the entries it marks `visibility: list` in its `priority` order. That list is authoritative for callable IDs, so a model OpenAI ships later appears without an app update. The `client_version` matters: the backend only lists models that version may call, and listing and inference must advertise the same number, so both read `CODEX_CLIENT_VERSION` in `OpenAIProvider`. It is `0.159.0`, the `client_version` that CLIProxyAPI, a widely used reference client, uses to fetch the Codex catalog and whose registry carries `gpt-6.1-sol` for team / plus / pro; the previous value, `0.155.0`, is what the upstream app validated on live accounts. It is deliberately a version a reference client already uses rather than the newest Codex CLI: raise it only on evidence (a model that is listed and then refused, or a wanted model the list leaves out) and verify against a live account. A refused login (401/403) from the list request is an error, not a silent fall-back to the bundled list.

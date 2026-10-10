@@ -400,6 +400,14 @@
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">配置工具</string>
     <string name="perm_section_autonomy">Agent 自主程度</string>
+    <string name="perm_section_device_protection">设备保护</string>
+    <string name="perm_device_protection_title">设备保护</string>
+    <string name="perm_device_protection_sub">只拦会让手机无法开机或无法使用的操作：写分区和系统文件、卸载或停用核心系统应用、恢复出厂。不弹窗，Agent 直接收到错误并换办法；其他操作不受限。</string>
+    <string name="perm_device_protection_blocked">最近被拦截</string>
+    <string name="perm_device_protection_none">还没有拦截记录</string>
+    <string name="device_protection_channel">设备保护</string>
+    <string name="device_storage_low_title">存储空间不足，Minis 已暂停写入</string>
+    <string name="device_storage_low_body">/data 只剩 %1$d MB。终端和后台任务已暂停，不会删除任何文件，释放空间后自动继续。</string>
     <string name="perm_autonomy_ask">询问</string>
     <string name="perm_autonomy_ask_sub">Agent 每次修改设置都要你确认。</string>
     <string name="perm_autonomy_smart">智能</string>
@@ -2375,11 +2383,16 @@
     <string name="llm_err_network">连不上服务商。请检查网络后重试。</string>
     <string name="llm_err_server">服务商的服务器暂时出了问题（%1$s）。请稍后重试。</string>
     <string name="llm_err_bad_request">服务商拒绝了这次请求（400）。通常是它不接受的内容：模型名、思考档位、某个附件，或对话太长。</string>
+    <string name="llm_err_400_tool_pairing">服务商拒绝了这次请求（400）：这个对话里有一次工具调用没有对应的结果。不是模型名、思考档位或附件的问题。新开一个对话可以继续；要反馈的话请带上下面服务商的原文。</string>
+    <string name="llm_err_400_context">对话超过了模型能处理的长度（400）。请压缩对话，或新开一个。</string>
+    <string name="llm_err_400_image">这个模型或服务商不接受图片（400）。请换一个支持图片的模型，或去掉图片。</string>
+    <string name="llm_err_400_model">服务商不认识这个模型名（400）。请到「设置 → 服务商」检查模型名。</string>
+    <string name="llm_err_400_thinking">服务商不接受当前的思考档位（400）。请调低或关闭思考后重试。</string>
     <string name="llm_err_not_found">找不到模型或地址（404）。请到「设置 → 服务商」检查模型名和接口地址。</string>
     <string name="llm_err_too_large">请求太大，服务商接收不了（413）。请缩短对话或去掉大附件。</string>
     <string name="llm_err_rejected">服务商拒绝了这次请求（%1$s）。</string>
     <string name="llm_err_decoding">无法读取服务商的回复，请重试。</string>
-    <string name="llm_err_detail">详情：%1$s</string>
+    <string name="llm_err_detail">服务商原文：%1$s</string>
     <string name="compact_failed">压缩对话失败：%1$s</string>
     <string name="chat_no_provider">还没有配置模型服务商。请到「设置 → 服务商」添加。</string>
     <string name="chat_provider_rejected">服务商配置被拒绝。</string>

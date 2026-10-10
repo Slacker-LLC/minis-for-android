@@ -306,6 +306,14 @@
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">設定ツール</string>
     <string name="perm_section_autonomy">エージェントの自律レベル</string>
+    <string name="perm_section_device_protection">デバイス保護</string>
+    <string name="perm_device_protection_title">デバイス保護</string>
+    <string name="perm_device_protection_sub">端末が起動できなくなる、または使えなくなる操作だけを止めます：パーティションやシステムファイルへの書き込み、コアシステムアプリの削除・無効化、初期化。確認は出さず、エージェントにはエラーが返り、別の方法を試します。それ以外は制限しません。</string>
+    <string name="perm_device_protection_blocked">最近ブロックされた操作</string>
+    <string name="perm_device_protection_none">ブロックされた操作はまだありません</string>
+    <string name="device_protection_channel">デバイス保護</string>
+    <string name="device_storage_low_title">空き容量が少ないため、Minisの書き込みを一時停止しました</string>
+    <string name="device_storage_low_body">/data の空きは %1$d MB のみです。ターミナルとバックグラウンドジョブを一時停止しました。ファイルは削除しません。空き容量が戻ると自動で再開します。</string>
     <string name="perm_autonomy_ask">確認する</string>
     <string name="perm_autonomy_ask_sub">エージェントによる設定変更をすべて確認します。</string>
     <string name="perm_autonomy_smart">スマート</string>
@@ -2180,11 +2188,16 @@
     <string name="llm_err_network">プロバイダーに接続できません。ネットワークを確認して再試行してください。</string>
     <string name="llm_err_server">プロバイダーのサーバーで一時的な問題が発生しました（%1$s）。しばらくしてから再試行してください。</string>
     <string name="llm_err_bad_request">プロバイダーがリクエストを拒否しました（400）。モデル名、思考レベル、添付ファイル、会話が長すぎることなどが原因のことが多いです。</string>
+    <string name="llm_err_400_tool_pairing">プロバイダーがリクエストを拒否しました（400）：このチャットに、結果のないツール呼び出しがあります。モデル名・思考レベル・添付の問題ではありません。新しいチャットで続けられます。報告する場合は、下のプロバイダーのメッセージを添えてください。</string>
+    <string name="llm_err_400_context">会話がモデルのコンテキスト長を超えています（400）。会話を圧縮するか、新しい会話を始めてください。</string>
+    <string name="llm_err_400_image">このモデルまたはプロバイダーは画像を受け付けません（400）。画像対応のモデルに切り替えるか、画像を外してください。</string>
+    <string name="llm_err_400_model">プロバイダーがこのモデル名を認識しません（400）。「設定 → プロバイダー」でモデル名を確認してください。</string>
+    <string name="llm_err_400_thinking">プロバイダーが現在の思考レベルを受け付けません（400）。下げるかオフにして再試行してください。</string>
     <string name="llm_err_not_found">モデルまたはアドレスが見つかりません（404）。「設定 → プロバイダー」でモデル名とエンドポイントを確認してください。</string>
     <string name="llm_err_too_large">リクエストがプロバイダーの上限を超えています（413）。会話を短くするか、大きな添付ファイルを外してください。</string>
     <string name="llm_err_rejected">プロバイダーがリクエストを拒否しました（%1$s）。</string>
     <string name="llm_err_decoding">プロバイダーの応答を読み取れませんでした。再試行してください。</string>
-    <string name="llm_err_detail">詳細：%1$s</string>
+    <string name="llm_err_detail">プロバイダーのメッセージ：%1$s</string>
     <string name="compact_failed">会話の圧縮に失敗しました：%1$s</string>
     <string name="chat_no_provider">モデルプロバイダーが未設定です。「設定 → プロバイダー」で追加してください。</string>
     <string name="chat_provider_rejected">プロバイダーの設定が拒否されました。</string>

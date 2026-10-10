@@ -42,6 +42,15 @@ import org.json.JSONObject
 class RootCliOffloadHandler(private val context: Context) : NativeOffloadHandler {
 
     override fun handle(request: NativeOffloadRequest): NativeOffloadResult {
+        RootProcess.callerSession.set(request.sessionId)
+        try {
+            return handleRequest(request)
+        } finally {
+            RootProcess.callerSession.remove()
+        }
+    }
+
+    private fun handleRequest(request: NativeOffloadRequest): NativeOffloadResult {
         val argv = request.argv.drop(1)
         // Top-level help / version short-circuits — no Root needed.
         if (argv.isEmpty() || argv[0] == "--help" || argv[0] == "-h" || argv[0] == "help") {
@@ -88,6 +97,7 @@ class RootCliOffloadHandler(private val context: Context) : NativeOffloadHandler
                 "notification" -> handleNotification(rest, args)
                 "file" -> handleFile(rest, args)
                 "device" -> handleDevice(rest, args)
+                "partition" -> handlePartition(rest, args)
                 "exec" -> handleExec(rest, args)
                 else -> NativeOffloadResult(
                     2,
@@ -112,12 +122,13 @@ class RootCliOffloadHandler(private val context: Context) : NativeOffloadHandler
                 val data = JSONObject()
                     .put("authorized", RootProcess.isGranted())
                     .put("available", reason == null)
+                    .put("deviceProtection", com.openminis.app.integrity.DeviceProtectionStore.isEnabled)
                 if (reason != null) data.put("reason", reason)
                 okEnvelope(data, args)
             }
             // Asks su now: the answer is the uid the command actually ran as.
             "ping" -> {
-                val r = RootProcess.run(arrayOf("id", "-u"))
+                val r = RootProcess.runRaw(arrayOf("id", "-u"))
                 if (r.exitCode == 0 && r.stdout.trim() == "0") {
                     ok("OK root (uid=0)\n")
                 } else {
@@ -930,6 +941,44 @@ class RootCliOffloadHandler(private val context: Context) : NativeOffloadHandler
         return ok(limited + "\n")
     }
 
+    // ─── Group: partition (read-only export) ───────────────────────────────
+    /**
+     * Partitions are write-protected for every other command (the protected view has no block nodes),
+     * so a read-only export lives here: the app builds `dd if=/dev/block/by-name/<name> of=<dest>`
+     * itself, the name is a plain identifier, and the destination goes through the same write check
+     * as any other command. This runs outside the protected view and only ever reads the block device.
+     */
+    private fun handlePartition(rest: List<String>, args: OffloadArgs): NativeOffloadResult {
+        val sub = rest.firstOrNull() ?: return ok(PARTITION_HELP)
+        return when (sub) {
+            "list" -> {
+                val r = RootProcess.runRaw(arrayOf("ls", "-1", "/dev/block/by-name"), timeoutMs = 5_000)
+                if (r.exitCode == 0) ok(r.stdout + "\n") else errEnvelope("OPERATION_FAILED", failMessage(r), args)
+            }
+            "read" -> partitionRead(args.positional.getOrNull(1), args.positional.getOrNull(2), args)
+            "help", "--help", "-h" -> ok(PARTITION_HELP)
+            else -> NativeOffloadResult(2, "partition: unknown subcommand '$sub'\n$PARTITION_HELP")
+        }
+    }
+
+    private fun partitionRead(name: String?, dest: String?, args: OffloadArgs): NativeOffloadResult {
+        if (name.isNullOrBlank() || dest.isNullOrBlank()) {
+            return errEnvelope("INVALID_ARGS", "partition read <name> <dest-file>", args)
+        }
+        if (!PARTITION_NAME.matches(name)) return errEnvelope("INVALID_ARGS", "invalid partition name: $name", args)
+        if (!dest.startsWith("/") || dest.contains('\u0000')) {
+            return errEnvelope("INVALID_ARGS", "dest must be an absolute path", args)
+        }
+        com.openminis.app.integrity.ProtectedRoot.checkWrite("android-root-cli", RootProcess.callerSession.get(), dest)
+            ?.let { return errEnvelope("DEVICE_PROTECTED", it.message, args) }
+        val r = RootProcess.runRaw(
+            arrayOf("dd", "if=/dev/block/by-name/$name", "of=$dest", "bs=1048576"),
+            timeoutMs = args.getInt("timeout-ms")?.toLong() ?: 600_000L,
+        )
+        return if (r.exitCode == 0) okEnvelope(JSONObject().put("partition", name).put("dest", dest), args)
+        else errEnvelope("OPERATION_FAILED", failMessage(r), args)
+    }
+
     // ─── Group: exec (raw shell passthrough) ───────────────────────────────
     /**
      * T341: wildcard fallback. Curated subcommands cover the well-known
@@ -1071,12 +1120,14 @@ class RootCliOffloadHandler(private val context: Context) : NativeOffloadHandler
         }
 
     private fun errEnvelope(code: String, message: String, args: OffloadArgs): NativeOffloadResult {
+        // A command refused by device protection carries its own fixed text; surface it as its own code.
+        val effectiveCode = if (message.startsWith("DEVICE_PROTECTED")) "DEVICE_PROTECTED" else code
         val obj = JSONObject().put("ok", false).put(
             "error",
-            JSONObject().put("code", code).put("message", message),
+            JSONObject().put("code", effectiveCode).put("message", message),
         )
         val body = OffloadOutput.formatBody(obj.toString(2), args)
-        AppLogger.warning(TAG, "$code: $message")
+        AppLogger.warning(TAG, "$effectiveCode: $message")
         return NativeOffloadResult(1, body + "\n")
     }
 
@@ -1130,7 +1181,15 @@ Groups:
   notification list / dismiss / channel
   file         ls / pull / push / rm
   device       info / battery / usage
+  partition    list / read   (read-only export of a partition to a file)
   service      status / ping
+
+Device protection (on by default): commands that could leave the phone
+unable to boot are refused with `DEVICE_PROTECTED: <category>: <target>`
+and exit code 77 — writing partitions or /system, /data/system|misc|vendor,
+/metadata, /data/adb (except /data/adb/minis), uninstalling or disabling core
+system apps, factory reset, removing user 0. Nothing is asked; use another
+approach. Everything else is open.
 
 Common flags:
   --format json|text|csv     output format (default text)
@@ -1159,6 +1218,8 @@ Examples:
   android-root-cli exec "logcat -d -t 200 | grep MyTag"
 
 Notes:
+  - Runs in the device-protection view: partitions, /system and /data system
+    state are read-only there; a blocked command reports DEVICE_PROTECTED.
   - Caller owns quoting/escaping. Metacharacters (; | > backticks) work.
   - Default timeout 30s; override via --timeout-ms.
   - Prefer curated subcommands when they exist — they emit structured JSON.
@@ -1269,6 +1330,18 @@ Usage:
   android-root-cli file pull <remote> <local>
   android-root-cli file push <local> <remote>
   android-root-cli file rm <path> [-r]
+"""
+
+        private val PARTITION_NAME = Regex("""[A-Za-z0-9_.-]{1,64}""")
+
+        private const val PARTITION_HELP = """partition — read-only partition export.
+
+Usage:
+  android-root-cli partition list
+  android-root-cli partition read <name> <dest-file> [--timeout-ms N]
+
+Copies /dev/block/by-name/<name> to <dest-file> (an absolute path). Partitions can
+be read, never written: every other command runs without block-device nodes.
 """
 
         private const val DEVICE_HELP = """device — device state.

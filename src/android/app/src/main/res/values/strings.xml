@@ -766,6 +766,14 @@
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">Configuration Tool</string>
     <string name="perm_section_autonomy">Agent autonomy</string>
+    <string name="perm_section_device_protection">Device protection</string>
+    <string name="perm_device_protection_title">Device protection</string>
+    <string name="perm_device_protection_sub">Blocks only what could leave the phone unable to boot or unusable: writes to partitions and system files, core system apps, factory reset. Nothing is asked: the agent gets an error and tries another way. Everything else stays open.</string>
+    <string name="perm_device_protection_blocked">Recently blocked</string>
+    <string name="perm_device_protection_none">Nothing blocked yet</string>
+    <string name="device_protection_channel">Device protection</string>
+    <string name="device_storage_low_title">Storage is low — Minis paused its writes</string>
+    <string name="device_storage_low_body">Only %1$d MB left on /data. Terminals and background jobs are paused and nothing is deleted. They resume automatically once space is freed.</string>
     <string name="perm_autonomy_ask">Ask</string>
     <string name="perm_autonomy_ask_sub">Confirm every change the agent makes to settings.</string>
     <string name="perm_autonomy_smart">Smart</string>
@@ -2465,11 +2473,16 @@
     <string name="llm_err_network">Could not reach the provider. Check your network and try again.</string>
     <string name="llm_err_server">The provider\'s server had a temporary problem (%1$s). Try again in a moment.</string>
     <string name="llm_err_bad_request">The provider refused the request (400). Usually something it does not accept: the model name, the thinking level, an attachment, or a conversation that is too long.</string>
+    <string name="llm_err_400_tool_pairing">The provider refused the request (400): a tool call in this chat has no matching result. This is not your model name, thinking level or attachment. Start a new chat to continue, and keep the provider\'s message below if you report it.</string>
+    <string name="llm_err_400_context">The conversation is longer than the model\'s context allows (400). Compact the conversation or start a new one.</string>
+    <string name="llm_err_400_image">This model or provider does not accept the image (400). Switch to a model that supports images, or remove the image.</string>
+    <string name="llm_err_400_model">The provider does not recognise this model name (400). Check the model name under Settings → Providers.</string>
+    <string name="llm_err_400_thinking">The provider does not accept the current thinking level (400). Lower it or turn thinking off, then retry.</string>
     <string name="llm_err_not_found">Model or address not found (404). Check the model name and endpoint under Settings → Providers.</string>
     <string name="llm_err_too_large">The request is too large for the provider (413). Shorten the conversation or remove large attachments.</string>
     <string name="llm_err_rejected">The provider rejected the request (%1$s).</string>
     <string name="llm_err_decoding">The provider\'s reply could not be read. Try again.</string>
-    <string name="llm_err_detail">Details: %1$s</string>
+    <string name="llm_err_detail">Provider\'s message: %1$s</string>
     <string name="compact_failed">Compaction failed: %1$s</string>
     <string name="chat_no_provider">No model provider is set up. Add one in Settings → Providers.</string>
     <string name="chat_provider_rejected">The provider configuration was rejected.</string>
