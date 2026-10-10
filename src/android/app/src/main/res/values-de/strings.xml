@@ -2228,4 +2228,29 @@
     <string name="quota_window_left">Fenster %1$s: %2$d%% übrig</string>
     <string name="quota_unlimited">Unbegrenzt</string>
     <string name="quota_open_console">Guthaben auf der Website des Anbieters ansehen</string>
+    <string name="terminal_tab_default">Terminal %1$d</string>
+    <string name="terminal_fgs_channel">Laufende Terminals</string>
+    <string name="terminal_fgs_stop_all">Alle beenden</string>
+    <string name="terminal_tab_new">Neues Terminal</string>
+    <string name="terminal_tab_close">Terminal schließen</string>
+    <string name="terminal_tab_limit">Höchstens %1$d Terminals. Schließe zuerst eines.</string>
+    <string name="terminal_close_busy_title">Ein Programm läuft noch</string>
+    <string name="terminal_close_busy_body">Wenn du dieses Terminal schließt, wird das darin laufende Programm beendet.</string>
+    <string name="terminal_close_busy_confirm">Terminal schließen</string>
+    <string name="terminal_rename_title">Terminal umbenennen</string>
+    <string name="terminal_rename_action">Umbenennen</string>
+    <string name="terminal_restart">Neu starten</string>
+    <string name="terminal_exited">Shell beendet</string>
+    <string name="terminal_agent_badge">Agent</string>
+    <string name="terminal_agent_readonly">Terminal des Agents, nur lesen</string>
+    <string name="terminal_agent_takeover">Übernehmen</string>
+    <string name="terminal_agent_release">Zurückgeben</string>
+    <string name="terminal_paste">Einfügen</string>
+    <string name="terminal_maintenance_title">Terminals wurden beendet</string>
+    <string name="terminal_maintenance_body">Ein Laufzeit-Update oder eine Reparatur hat die Terminals beendet. In %1$d lief noch ein Programm.</string>
+    <string name="terminal_maintenance_ok">Verstanden</string>
+    <plurals name="terminal_fgs_running">
+        <item quantity="one">%d Terminal läuft</item>
+        <item quantity="other">%d Terminals laufen</item>
+    </plurals>
 </resources>

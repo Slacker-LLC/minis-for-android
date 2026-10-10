@@ -76,7 +76,8 @@ import com.openminis.app.ui.settings.MemoryFileEditScreen
 import com.openminis.app.ui.settings.MemoryManagementScreen
 import com.openminis.app.ui.settings.OffloadPermissionScreen
 import com.openminis.app.ui.settings.RootAccessScreen
-import com.openminis.app.sandbox.TerminalSession
+import com.openminis.app.runtime.terminal.AgentTerminals
+import com.openminis.app.runtime.terminal.TerminalSessionManager
 import com.openminis.app.ui.terminal.TerminalScreen
 import com.openminis.app.ui.onboarding.OnboardingModelSelectionScreen
 
@@ -1160,9 +1161,10 @@ fun AppNavigation(
             val context = androidx.compose.ui.platform.LocalContext.current
             val initCommand = backStackEntry.arguments?.getString("initCommand")
             val sessionId = backStackEntry.arguments?.getString("sessionId")
-            val session = remember { TerminalSession(context.applicationContext) }
+            // The terminals belong to the app: this route only shows them, so leaving it stops nothing (Issue #183).
             TerminalScreen(
-                terminalSession = session,
+                manager = TerminalSessionManager.shared(context),
+                agentTerminals = AgentTerminals.shared(context),
                 onBack = { navController.safePopBackStack() },
                 initCommand = initCommand,
                 sessionId = sessionId,

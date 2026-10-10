@@ -2404,4 +2404,31 @@
     <string name="quota_window_left">Окно %1$s: осталось %2$d%%</string>
     <string name="quota_unlimited">Без ограничений</string>
     <string name="quota_open_console">Посмотреть баланс на сайте сервиса</string>
+    <string name="terminal_tab_default">Терминал %1$d</string>
+    <string name="terminal_fgs_channel">Работающие терминалы</string>
+    <string name="terminal_fgs_stop_all">Завершить все</string>
+    <string name="terminal_tab_new">Новый терминал</string>
+    <string name="terminal_tab_close">Закрыть терминал</string>
+    <string name="terminal_tab_limit">Не более %1$d терминалов. Сначала закройте один.</string>
+    <string name="terminal_close_busy_title">Программа ещё работает</string>
+    <string name="terminal_close_busy_body">При закрытии терминала запущенная в нём программа будет завершена.</string>
+    <string name="terminal_close_busy_confirm">Закрыть терминал</string>
+    <string name="terminal_rename_title">Переименовать терминал</string>
+    <string name="terminal_rename_action">Переименовать</string>
+    <string name="terminal_restart">Перезапустить</string>
+    <string name="terminal_exited">Оболочка завершена</string>
+    <string name="terminal_agent_badge">Agent</string>
+    <string name="terminal_agent_readonly">Терминал агента, только чтение</string>
+    <string name="terminal_agent_takeover">Перехватить</string>
+    <string name="terminal_agent_release">Вернуть</string>
+    <string name="terminal_paste">Вставить</string>
+    <string name="terminal_maintenance_title">Терминалы завершены</string>
+    <string name="terminal_maintenance_body">Обновление или восстановление среды завершило терминалы. В %1$d из них ещё работала программа.</string>
+    <string name="terminal_maintenance_ok">Понятно</string>
+    <plurals name="terminal_fgs_running">
+        <item quantity="one">Работает %d терминал</item>
+        <item quantity="few">Работают %d терминала</item>
+        <item quantity="many">Работают %d терминалов</item>
+        <item quantity="other">Работают %d терминала</item>
+    </plurals>
 </resources>

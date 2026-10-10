@@ -2396,4 +2396,28 @@
     <string name="quota_window_left">%1$s 視窗：剩餘 %2$d%%</string>
     <string name="quota_unlimited">額度不限</string>
     <string name="quota_open_console">到服務商官網查看餘額</string>
+    <string name="terminal_tab_default">終端機 %1$d</string>
+    <string name="terminal_fgs_channel">執行中的終端機</string>
+    <string name="terminal_fgs_stop_all">全部結束</string>
+    <string name="terminal_tab_new">新增終端機</string>
+    <string name="terminal_tab_close">關閉終端機</string>
+    <string name="terminal_tab_limit">最多同時開 %1$d 個終端機，請先關閉一個。</string>
+    <string name="terminal_close_busy_title">還有程式正在執行</string>
+    <string name="terminal_close_busy_body">關閉這個終端機會結束其中正在執行的程式。</string>
+    <string name="terminal_close_busy_confirm">關閉終端機</string>
+    <string name="terminal_rename_title">重新命名終端機</string>
+    <string name="terminal_rename_action">重新命名</string>
+    <string name="terminal_restart">重新啟動</string>
+    <string name="terminal_exited">Shell 已結束</string>
+    <string name="terminal_agent_badge">Agent</string>
+    <string name="terminal_agent_readonly">Agent 的終端機，唯讀</string>
+    <string name="terminal_agent_takeover">接管</string>
+    <string name="terminal_agent_release">交還</string>
+    <string name="terminal_paste">貼上</string>
+    <string name="terminal_maintenance_title">終端機已被結束</string>
+    <string name="terminal_maintenance_body">執行環境更新或修復結束了終端機，其中 %1$d 個還有程式在執行。</string>
+    <string name="terminal_maintenance_ok">知道了</string>
+    <plurals name="terminal_fgs_running">
+        <item quantity="other">%d 個終端機執行中</item>
+    </plurals>
 </resources>

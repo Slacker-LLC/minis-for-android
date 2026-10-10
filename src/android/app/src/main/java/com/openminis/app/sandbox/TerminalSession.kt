@@ -3,6 +3,7 @@ package com.openminis.app.sandbox
 import android.content.Context
 import android.util.Log
 import com.openminis.app.runtime.files.WorkspaceFileClient
+import com.openminis.app.runtime.terminal.PromptMarkerScanner
 import com.openminis.app.runtime.terminal.PtyBackend
 import com.openminis.app.runtime.ubuntu.DirectRootRunner
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
@@ -45,6 +46,7 @@ internal object PtyBridge {
     external fun setWindowSize(fd: Int, cols: Int, rows: Int): Int
     external fun closeFd(fd: Int): Int
     external fun terminateAndWait(pid: Int): Int
+    external fun foregroundPgid(fd: Int): Int
 }
 
 private object NativePtyBackend : PtyBackend {
@@ -57,6 +59,7 @@ private object NativePtyBackend : PtyBackend {
     override fun resize(fd: Int, cols: Int, rows: Int) { PtyBridge.setWindowSize(fd, cols, rows) }
     override fun close(fd: Int) { PtyBridge.closeFd(fd) }
     override fun terminateAndWait(pid: Int) { PtyBridge.terminateAndWait(pid) }
+    override fun foregroundPgid(fd: Int) = PtyBridge.foregroundPgid(fd)
 }
 
 /** A single IO coroutine owns each PTY, including all IO and final child reaping. */
@@ -64,6 +67,7 @@ class TerminalSession internal constructor(
     private val scope: CoroutineScope,
     private val prepare: suspend (String?) -> Launch,
     private val backend: PtyBackend,
+    private val nanoTime: () -> Long = System::nanoTime,
 ) {
     constructor(context: Context) : this(
         CoroutineScope(SupervisorJob() + Dispatchers.IO),
@@ -99,10 +103,24 @@ class TerminalSession internal constructor(
         const val DEFAULT_COLS = 80
         const val DEFAULT_ROWS = 24
         private const val RETRY_IO = -11 // EAGAIN on Android/Linux.
+        private const val SAMPLE_INTERVAL_NS = 400_000_000L
+        private const val QUIET_BASELINE_NS = 400_000_000L
 
         /** Weak registry for both booting and running terminals. */
         private val liveSessions = CopyOnWriteArrayList<WeakReference<TerminalSession>>()
         private val registryLock = Any()
+
+        /**
+         * Told, just before a runtime-wide stop, how many terminals had a program running (or could not be told).
+         * The terminal manager uses it to say so in the UI: maintenance must not end someone's work silently.
+         */
+        @Volatile
+        var maintenanceListener: ((busyTerminals: Int) -> Unit)? = null
+
+        private fun announceStop(sessions: List<TerminalSession>) {
+            val busy = sessions.count { it.isRunning && it.foregroundState() != ForegroundState.IDLE }
+            if (busy > 0) runCatching { maintenanceListener?.invoke(busy) }
+        }
 
         /** Stop every terminal before the rootfs, mounts, or proxy are changed. */
         fun stopAll() {
@@ -115,6 +133,7 @@ class TerminalSession internal constructor(
                     }
                 }
                 liveSessions.removeAll(dead.toSet())
+                announceStop(current)
                 // Stop while holding the same registry lock used by start.
                 // Taking a snapshot and stopping afterward lets a new run be
                 // registered on the same TerminalSession in between; the old
@@ -144,6 +163,7 @@ class TerminalSession internal constructor(
                     }
                 }
                 liveSessions.removeAll(dead.toSet())
+                announceStop(current)
                 current.mapNotNull { session ->
                     val job = session.activeJob()
                     if (job == null || job === callerJob) {
@@ -183,6 +203,58 @@ class TerminalSession internal constructor(
     private val lock = Any()
     private var activeRun: Run? = null
 
+    /** Whether a program other than the login shell holds the terminal's foreground. */
+    enum class ForegroundState { IDLE, BUSY, UNKNOWN }
+
+    // Sampled by the one coroutine that owns the PTY descriptor, so no other thread touches the fd.
+    @Volatile private var shellPgid = 0
+    @Volatile private var sampledPgid = 0
+    private var lastOutputNs = 0L
+    private var lastSampleNs = 0L
+
+    // The guest prints OSC 133;A at every prompt. That is a second, su-independent signal: once the prompt hook has
+    // been seen, a line sent with Enter means "running" until the next prompt comes back. It covers a `su` that
+    // relays through its own pty, where the foreground group of this pty never changes.
+    @Volatile private var promptHookSeen = false
+    @Volatile private var awaitingPrompt = false
+    private val promptScanner = PromptMarkerScanner()
+
+    /**
+     * IDLE: the shell is at its prompt. BUSY: a program is running in the foreground (the shell's own process
+     * group is not the PTY's foreground group). UNKNOWN: not measured yet, or the PTY cannot be asked.
+     * A session that is not running has nothing in it, so it is IDLE; callers that must not lose work
+     * treat UNKNOWN like BUSY.
+     */
+    fun foregroundState(): ForegroundState {
+        if (_state.value != State.RUNNING) return ForegroundState.IDLE
+        val shell = shellPgid
+        val sampled = sampledPgid
+        val byGroup = when {
+            shell <= 0 || sampled <= 0 -> ForegroundState.UNKNOWN
+            sampled == shell -> ForegroundState.IDLE
+            else -> ForegroundState.BUSY
+        }
+        if (byGroup == ForegroundState.BUSY) return ForegroundState.BUSY
+        if (promptHookSeen) {
+            // A line was sent and no prompt has come back: something is running, whatever the process group says.
+            if (awaitingPrompt) return ForegroundState.BUSY
+            // The pty cannot be asked, but the prompt is up and nothing was sent since.
+            if (byGroup == ForegroundState.UNKNOWN) return ForegroundState.IDLE
+        }
+        return byGroup
+    }
+
+    private fun sampleForeground(fd: Int) {
+        val now = nanoTime()
+        if (now - lastSampleNs < SAMPLE_INTERVAL_NS) return
+        lastSampleNs = now
+        val pgid = backend.foregroundPgid(fd)
+        if (pgid <= 0) return
+        sampledPgid = pgid
+        // The shell's own group is the foreground group the first time the output goes quiet: the prompt.
+        if (shellPgid == 0 && now - lastOutputNs >= QUIET_BASELINE_NS) shellPgid = pgid
+    }
+
     fun start(sessionId: String? = null, initialCols: Int = DEFAULT_COLS, initialRows: Int = DEFAULT_ROWS) {
         val run = synchronized(registryLock) {
             synchronized(lock) {
@@ -211,6 +283,13 @@ class TerminalSession internal constructor(
             currentCoroutineContext().ensureActive()
             fd = backend.open(launch, cols, rows, pid)
             check(fd >= 0 && pid[0] > 0) { "Failed to spawn PTY: $fd" }
+            shellPgid = 0
+            sampledPgid = 0
+            lastOutputNs = nanoTime()
+            lastSampleNs = 0L
+            promptHookSeen = false
+            awaitingPrompt = false
+            promptScanner.reset()
             currentCoroutineContext().ensureActive()
             synchronized(lock) {
                 if (activeRun === run) {
@@ -239,9 +318,15 @@ class TerminalSession internal constructor(
                 }
                 // Native read polls for at most 50 ms; writes are nonblocking.
                 val count = backend.read(fd, buffer)
-                if (count == RETRY_IO) continue
+                if (count == RETRY_IO) { sampleForeground(fd); continue }
                 if (count <= 0) break
+                lastOutputNs = nanoTime()
+                if (promptScanner.feed(buffer, count)) {
+                    promptHookSeen = true
+                    awaitingPrompt = false
+                }
                 synchronized(lock) { if (activeRun === run) _outputBytes.tryEmit(buffer.copyOf(count)) }
+                sampleForeground(fd)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -251,6 +336,10 @@ class TerminalSession internal constructor(
             }
         } finally {
             run.input.cancel()
+            sampledPgid = 0
+            shellPgid = 0
+            promptHookSeen = false
+            awaitingPrompt = false
             // Only this coroutine ever touches these descriptors and child pid.
             try {
                 DirectRootRunner.cleanupProcessGroup(rootPidFile)
@@ -277,6 +366,8 @@ class TerminalSession internal constructor(
 
     fun sendRawBytes(bytes: ByteArray) {
         if (bytes.isEmpty()) return
+        // Enter submits a line: until the prompt is printed again, something may be running.
+        if (bytes.any { it == '\r'.code.toByte() || it == '\n'.code.toByte() }) awaitingPrompt = true
         synchronized(lock) { activeRun?.input?.trySend(Input.Bytes(bytes.copyOf())) }
     }
 

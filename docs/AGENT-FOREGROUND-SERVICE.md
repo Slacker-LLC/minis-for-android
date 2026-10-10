@@ -63,6 +63,21 @@ Repository CI compiles the instrumentation APK with `:app:assembleDebugAndroidTe
 
 JVM tests cover the lifecycle policy: presence-only state, active execution, stop/resume transition, and `START_NOT_STICKY` process-death behavior.
 
+## Terminal sessions (Issue #183)
+
+A second, separate service, `TerminalForegroundService`, keeps Minis resident while a terminal has a live process. It is not the Agent service: an Agent turn and a terminal job are independent kinds of real work.
+
+- Type: `specialUse` with the subtype "Interactive terminal sessions with a live shell process started by the user or the agent". Never `mediaPlayback` or `dataSync`, for the same reasons as above.
+- Lifecycle: the count is the user's terminals (`TerminalSessionManager`) plus the agent's (`AgentTerminals`) whose shell is alive. `TerminalServicePolicy.shouldRun(count)` is `count > 0`. An ended shell, or a tab left open after `exit`, does not keep the app resident. The service stops after the last one ends.
+- Notification: "N terminals running"; tapping opens `minis://open_terminal`; the "End all" action closes both sets of terminals and stops the service.
+- `START_NOT_STICKY`: if the system kills the process, nothing is replayed.
+- Stopping right behind a pending `startForegroundService()` would kill the app (start deadline), so a stop request waits for the start to settle and re-checks the count.
+- Separate from this, `TerminalSession.stopAll*` (rootfs, mount or proxy changes) can still end terminals. The terminal manager is told how many had a program running and shows a dialog in the Terminal page and one notification.
+
+What this does not protect against: Android or the OEM killing the Minis process, and an app upgrade. The PTY master closes with the process and the shell gets SIGHUP. Surviving that needs the PTY holder to live outside the app process (for example tmux or dtach in the guest, re-attached after a restart); the design keeps `TerminalSessionManager` as the single owner so that can be added later, but it is not part of #183.
+
+Not verified on a device: background survival for 30 minutes or more on HyperOS (Xiaomi 24129PN74C), and how OEM background policies treat this service.
+
 ## Device and OEM limitations
 
 Foreground-service start restrictions still apply. `specialUse` is a type declaration, not an exemption from Android background-start rules. Exact-alarm/scheduled execution and OEM background policies may behave differently across devices.

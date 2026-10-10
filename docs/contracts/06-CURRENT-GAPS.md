@@ -222,6 +222,27 @@ config registry 暴露为 `prompt.custom`（带确认与审计回退）。内置
 
 - 远程 MCP 调用方可以经 `linux.shell` 在 guest 里调用 `android-root-cli exec`。维护者决定保留：每次调用都需要用户在手机上批准一次性 confirm（`MCPServer.handleToolCall` 的 MCP_CONFIRM 门，`AutonomyMode` 不参与，「全自动」不会跳过它），且 `root_cli` 开关默认关闭。这与 `root.shell`（本地专用、MCP 不可见）是两回事；改为拒绝远程调用需另开 PR。
 
+## 终端会话归 App 所有（#183，2026-10-10）
+
+已实现（宿主测试覆盖逻辑，未上真机）：`TerminalSessionManager`（App 级单例）持有用户终端及其 emulator，Terminal 页只附着/分离；`TerminalForegroundService`（`specialUse`）在有存活终端进程时常驻；标签页（上限 8）；鼠标上报 1000/1002/1003 + SGR 1006；全屏程序里滑动转方向键（遵守 DECCKM）；捏合缩放并重算行列；括号粘贴；`AgentTerminals` 空闲回收不再关闭前台有程序的终端。
+
+判断“终端里有程序在跑”靠两个信号：PTY 主端的 `tcgetpgrp()` 与 shell 自身进程组的比较；以及 guest 每个提示符输出的 `OSC 133;A`（回车后没看到新提示符 = 仍在运行）。无法判断时按“在运行”处理（关闭前确认、不回收）。
+
+**未验证（需要真机）：**
+
+- 小米 24129PN74C / HyperOS 切到后台 30 分钟以上，终端进程是否被系统或 OEM 杀掉；前台服务通知在该机型上的表现。
+- 原生 `tcgetpgrp` JNI：生产 C 代码已在 Linux 宿主用真实 JVM 和子进程验证（`scripts/test_pty_bridge.py`：空闲 shell 等于自身进程组、前台有程序时不等、坏 fd 返回 -1）；Android NDK / bionic 构建与真机结果未验证。
+- 当前 `su`（KernelSU / Magisk / APatch）是否把 PTY 直接交给 shell。如果某个 `su` 用自己的 pty 中继，PTY 主端看到的前台进程组不会变化，这时只剩 `OSC 133;A` 一个信号；用户在 `.bashrc` 里替换了 `PROMPT_COMMAND` 时两个信号都会失效，终端会被当成空闲（关闭标签不提示，Agent 空闲回收可能关掉它）。
+- vim（`:set mouse=a`）、htop、tmux（`set -g mouse on`）、less / man 中点击与滚动的实际手感；捏合后 `tput cols` 随之变化。
+- 往 bash 粘贴多行内容不逐行执行（括号粘贴在真实 bash/readline 上的表现）。
+
+**已知限制：**
+
+- 系统或 OEM 杀掉 Minis 进程、升级 App 时，PTY 主端随进程关闭，shell 收到 SIGHUP，任务照样断。这是第二阶段（PTY 持有者放到 App 进程之外，如 guest 里的 tmux / dtach，重启后重新附着），#183 不做；`TerminalSessionManager` 作为唯一持有者，不堵这条路。
+- 运行时维护（`TerminalSession.stopAll*`，由 rootfs 修复、挂载变更触发）调用方在非 UI 的运行时层，无法在那里弹出确认。实现为“停止前通知管理器”：Terminal 页弹一次对话框，页面不在前台时发一条通知。需要“先确认再维护”的流程要由发起维护的 UI 自己先检查 `TerminalSessionManager.busyCount()`，目前没有这样的入口。
+- Agent 终端的标签是文本快照（没有颜色、光标位置），不是第二个 emulator 视图；“接管”后输入直达该终端。
+- 剩余的后台 job（`cmd &`）不算前台程序：关闭标签不会提示，也会被当作空闲。
+
 ## 2026-10-08 之后新增的未验证项
 
 下列行为已有单元测试或模拟器测试，**没有**在真机上完整验证，不得据此声称设备结论：
