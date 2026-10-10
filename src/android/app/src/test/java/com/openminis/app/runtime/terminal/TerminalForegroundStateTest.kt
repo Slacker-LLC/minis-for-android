@@ -1,6 +1,5 @@
 package com.openminis.app.runtime.terminal
 
-import com.openminis.app.sandbox.PromptMarkerScanner
 import com.openminis.app.sandbox.TerminalSession
 import com.openminis.app.sandbox.TerminalSession.ForegroundState
 import kotlinx.coroutines.CoroutineScope
