@@ -216,8 +216,11 @@ config registry 暴露为 `prompt.custom`（带确认与审计回退）。内置
 
 已知缺口：
 
-- MCP 调用方可以经 `linux.shell`（需用户确认）在 guest 里调用 `android-root-cli exec`，等于远程拿到 root shell，与「禁止向远程调用方提供任意 Root shell」冲突。移除前的 `android-shizuku-cli` 有同样问题。应让 `RootCliOffloadHandler` 只接受本地 Agent 与终端 session 的请求。
 - 设备完整性保护（Issue #182）尚未实现：`exec`、`file rm -r`、`package uninstall` 等目前没有任何保护线。
+
+已接受的设计（不是缺口）：
+
+- 远程 MCP 调用方可以经 `linux.shell` 在 guest 里调用 `android-root-cli exec`。维护者决定保留：每次调用都需要用户在手机上批准一次性 confirm（`MCPServer.handleToolCall` 的 MCP_CONFIRM 门，`AutonomyMode` 不参与，「全自动」不会跳过它），且 `root_cli` 开关默认关闭。这与 `root.shell`（本地专用、MCP 不可见）是两回事；改为拒绝远程调用需另开 PR。
 
 ## 2026-10-08 之后新增的未验证项
 
