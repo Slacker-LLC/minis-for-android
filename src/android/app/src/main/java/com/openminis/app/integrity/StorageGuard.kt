@@ -1,12 +1,15 @@
 package com.openminis.app.integrity
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.StatFs
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.openminis.app.R
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.runtime.ubuntu.DirectRootRunner
@@ -113,6 +116,13 @@ object StorageGuard {
             .setContentText(context.getString(R.string.device_storage_low_body, freeBytes / (1024 * 1024)))
             .setOngoing(true)
             .build()
+        // POST_NOTIFICATIONS is a runtime permission on Android 13+; without it the freeze and the command
+        // refusals still apply, only the notice is skipped.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
         runCatching { NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification) }
     }
 }
