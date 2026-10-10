@@ -1417,6 +1417,14 @@
     <string name="perm_reset_confirm">重置</string>
     <string name="perm_section_config_tool">配置工具</string>
     <string name="perm_section_autonomy">Agent 自主程度</string>
+    <string name="perm_section_device_protection">裝置保護</string>
+    <string name="perm_device_protection_title">裝置保護</string>
+    <string name="perm_device_protection_sub">只攔會讓手機無法開機或無法使用的操作：寫入分割區和系統檔案、解除安裝或停用核心系統應用程式、恢復原廠設定。不彈窗，Agent 直接收到錯誤並換個辦法；其他操作不受限。</string>
+    <string name="perm_device_protection_blocked">最近攔截</string>
+    <string name="perm_device_protection_none">尚無攔截紀錄</string>
+    <string name="device_protection_channel">裝置保護</string>
+    <string name="device_storage_low_title">儲存空間不足，Minis 已暫停寫入</string>
+    <string name="device_storage_low_body">/data 只剩 %1$d MB。終端機和背景任務已暫停，不會刪除任何檔案，釋出空間後自動繼續。</string>
     <string name="perm_autonomy_ask">詢問</string>
     <string name="perm_autonomy_ask_sub">Agent 每次修改設定都要你確認。</string>
     <string name="perm_autonomy_smart">智慧</string>

@@ -306,6 +306,14 @@
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">設定ツール</string>
     <string name="perm_section_autonomy">エージェントの自律レベル</string>
+    <string name="perm_section_device_protection">デバイス保護</string>
+    <string name="perm_device_protection_title">デバイス保護</string>
+    <string name="perm_device_protection_sub">端末が起動できなくなる、または使えなくなる操作だけを止めます：パーティションやシステムファイルへの書き込み、コアシステムアプリの削除・無効化、初期化。確認は出さず、エージェントにはエラーが返り、別の方法を試します。それ以外は制限しません。</string>
+    <string name="perm_device_protection_blocked">最近ブロックされた操作</string>
+    <string name="perm_device_protection_none">ブロックされた操作はまだありません</string>
+    <string name="device_protection_channel">デバイス保護</string>
+    <string name="device_storage_low_title">空き容量が少ないため、Minisの書き込みを一時停止しました</string>
+    <string name="device_storage_low_body">/data の空きは %1$d MB のみです。ターミナルとバックグラウンドジョブを一時停止しました。ファイルは削除しません。空き容量が戻ると自動で再開します。</string>
     <string name="perm_autonomy_ask">確認する</string>
     <string name="perm_autonomy_ask_sub">エージェントによる設定変更をすべて確認します。</string>
     <string name="perm_autonomy_smart">スマート</string>

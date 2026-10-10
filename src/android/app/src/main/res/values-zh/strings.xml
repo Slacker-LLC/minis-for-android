@@ -400,6 +400,14 @@
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">配置工具</string>
     <string name="perm_section_autonomy">Agent 自主程度</string>
+    <string name="perm_section_device_protection">设备保护</string>
+    <string name="perm_device_protection_title">设备保护</string>
+    <string name="perm_device_protection_sub">只拦会让手机无法开机或无法使用的操作：写分区和系统文件、卸载或停用核心系统应用、恢复出厂。不弹窗，Agent 直接收到错误并换办法；其他操作不受限。</string>
+    <string name="perm_device_protection_blocked">最近被拦截</string>
+    <string name="perm_device_protection_none">还没有拦截记录</string>
+    <string name="device_protection_channel">设备保护</string>
+    <string name="device_storage_low_title">存储空间不足，Minis 已暂停写入</string>
+    <string name="device_storage_low_body">/data 只剩 %1$d MB。终端和后台任务已暂停，不会删除任何文件，释放空间后自动继续。</string>
     <string name="perm_autonomy_ask">询问</string>
     <string name="perm_autonomy_ask_sub">Agent 每次修改设置都要你确认。</string>
     <string name="perm_autonomy_smart">智能</string>

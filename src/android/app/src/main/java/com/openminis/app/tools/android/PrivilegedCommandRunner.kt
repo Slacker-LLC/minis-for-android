@@ -2,6 +2,7 @@ package com.openminis.app.tools.android
 
 import android.content.Context
 import android.util.Log
+import com.openminis.app.integrity.ProtectedRoot
 import com.openminis.app.runtime.ubuntu.DirectRootRunner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -419,6 +420,7 @@ object PrivilegedCommandRunner {
         risk: CommandRisk = CommandRisk.READ_ONLY,
         timeoutMs: Long = 30_000L,
         rootOnly: Boolean = false,
+        entryPoint: String = "android-tool",
     ): AndroidCommandResult {
         require(argv.isNotEmpty()) { "privileged command argv must not be empty" }
         val tool = argv.first()
@@ -447,7 +449,9 @@ object PrivilegedCommandRunner {
                 "tool=$tool session=$sessionId",
         )
         val result = try {
-            DirectRootRunner.runArgv(listOf(resolvedTool) + commandArgs, timeoutMs)
+            // Every agent-facing privileged command passes the device-integrity policy and runs in the
+            // protected view (Issue #182). Infrastructure the app builds itself uses DirectRootRunner.
+            ProtectedRoot.runArgv(entryPoint, sessionId, listOf(resolvedTool) + commandArgs, timeoutMs)
         } catch (cancelled: CancellationException) {
             throw cancelled
         }

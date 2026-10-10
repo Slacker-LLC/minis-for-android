@@ -531,6 +531,14 @@
     <string name="perm_reset_confirm">Сбросить</string>
     <string name="perm_section_config_tool">Инструмент настройки</string>
     <string name="perm_section_autonomy">Автономность агента</string>
+    <string name="perm_section_device_protection">Защита устройства</string>
+    <string name="perm_device_protection_title">Защита устройства</string>
+    <string name="perm_device_protection_sub">Блокирует только то, что может помешать загрузке телефона или сделать его непригодным: запись в разделы и системные файлы, основные системные приложения, сброс до заводских настроек. Запросов нет: агент получает ошибку и пробует иначе. Всё остальное остаётся открытым.</string>
+    <string name="perm_device_protection_blocked">Недавно заблокировано</string>
+    <string name="perm_device_protection_none">Пока ничего не блокировалось</string>
+    <string name="device_protection_channel">Защита устройства</string>
+    <string name="device_storage_low_title">Мало места — Minis приостановил запись</string>
+    <string name="device_storage_low_body">На /data осталось всего %1$d МБ. Терминалы и фоновые задачи приостановлены, ничего не удаляется. Они продолжатся автоматически, когда место освободится.</string>
     <string name="perm_autonomy_ask">Спрашивать</string>
     <string name="perm_autonomy_ask_sub">Подтверждать каждое изменение настроек агентом.</string>
     <string name="perm_autonomy_smart">Умный режим</string>

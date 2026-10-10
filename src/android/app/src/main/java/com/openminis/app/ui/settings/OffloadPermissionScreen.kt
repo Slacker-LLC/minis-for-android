@@ -95,6 +95,32 @@ fun OffloadPermissionScreen(
             )
         }
 
+        // Device protection (Issue #182): only the user switches this, from here.
+        val protectionOn by com.openminis.app.integrity.DeviceProtectionStore.enabled.collectAsState()
+        val blocked by com.openminis.app.integrity.IntegrityAudit.entries.collectAsState()
+        SettingsSection(header = stringResource(R.string.perm_section_device_protection)) {
+            SettingsSwitchRow(
+                title = stringResource(R.string.perm_device_protection_title),
+                subtitle = stringResource(R.string.perm_device_protection_sub),
+                checked = protectionOn,
+                onCheckedChange = { com.openminis.app.integrity.DeviceProtectionStore.setEnabled(it) },
+                showDivider = protectionOn,
+            )
+            if (protectionOn) {
+                val recent = blocked.take(5)
+                SettingsRow(
+                    title = stringResource(R.string.perm_device_protection_blocked),
+                    subtitle = if (recent.isEmpty()) {
+                        stringResource(R.string.perm_device_protection_none)
+                    } else {
+                        recent.joinToString("\n") { "${it.category}: ${it.target} (${it.entryPoint})" }
+                    },
+                    showChevron = false,
+                    showDivider = false,
+                )
+            }
+        }
+
         SettingsSection(
             header = stringResource(R.string.perm_section_config_tool),
         ) {
