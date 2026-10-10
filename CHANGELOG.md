@@ -10,6 +10,7 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 - `android-shizuku-cli` is now `android-root-cli`: the same subcommands and JSON, run as root through `su`. Its Agent permission switch carries over.
 - The virtual screen runs in a root service (libsu) instead of a Shizuku UserService. Run its compatibility check once more to switch it back on.
 - Accessibility repair, clearing restricted settings and one-tap authorize use Root; Settings > System has a Root page in place of "Root & Shizuku", and the readiness checklist no longer lists Shizuku.
+- Fast Mode works for GPT models again on the Responses path (Codex login and Responses relays): with the toggle on, requests carry `service_tier: "priority"`, as OpenMinis 1.14 does. A change that kept only the xAI case had turned the toggle into a no-op for GPT.
 
 ## 0.0.2 — 2026-10-10
 

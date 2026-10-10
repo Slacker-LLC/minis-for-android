@@ -209,7 +209,19 @@ internal fun OpenAIProvider.buildResponsesAPIBody(
     // through, so no isOAuth narrowing. Ineligible upstreams ignore the
     // field or silently downgrade (receipt visible via the
     // response.completed service_tier log).
+    //
+    // [T-android-xai-priority] The per-instance (xAI) tier is resolved first and the
+    // gpt-family rule only fills a missing key, so neither clobbers the other. The two
+    // gates are disjoint today: that toggle is xAI-only and xAI never reaches this builder.
+    // The gpt-family rule had been replaced by the xAI call alone, which made Fast Mode a
+    // silent no-op for every GPT model (OpenMinis 1.14 keeps both).
     resolvedServiceTier()?.let { body.put("service_tier", it) }
+    if (!body.has("service_tier") &&
+        com.openminis.app.data.FastModePrefs.isEnabled() &&
+        model.id.contains("gpt", ignoreCase = true)
+    ) {
+        body.put("service_tier", "priority")
+    }
 
     if (systemPrompt != null) {
         body.put("instructions", systemPrompt)
