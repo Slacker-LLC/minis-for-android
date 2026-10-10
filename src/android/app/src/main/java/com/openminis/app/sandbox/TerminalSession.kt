@@ -211,6 +211,13 @@ class TerminalSession internal constructor(
     private var lastOutputNs = 0L
     private var lastSampleNs = 0L
 
+    // The guest prints OSC 133;A at every prompt. That is a second, su-independent signal: once the prompt hook has
+    // been seen, a line sent with Enter means "running" until the next prompt comes back. It covers a `su` that
+    // relays through its own pty, where the foreground group of this pty never changes.
+    @Volatile private var promptHookSeen = false
+    @Volatile private var awaitingPrompt = false
+    private val promptScanner = PromptMarkerScanner()
+
     /**
      * IDLE: the shell is at its prompt. BUSY: a program is running in the foreground (the shell's own process
      * group is not the PTY's foreground group). UNKNOWN: not measured yet, or the PTY cannot be asked.
@@ -221,11 +228,19 @@ class TerminalSession internal constructor(
         if (_state.value != State.RUNNING) return ForegroundState.IDLE
         val shell = shellPgid
         val sampled = sampledPgid
-        return when {
+        val byGroup = when {
             shell <= 0 || sampled <= 0 -> ForegroundState.UNKNOWN
             sampled == shell -> ForegroundState.IDLE
             else -> ForegroundState.BUSY
         }
+        if (byGroup == ForegroundState.BUSY) return ForegroundState.BUSY
+        if (promptHookSeen) {
+            // A line was sent and no prompt has come back: something is running, whatever the process group says.
+            if (awaitingPrompt) return ForegroundState.BUSY
+            // The pty cannot be asked, but the prompt is up and nothing was sent since.
+            if (byGroup == ForegroundState.UNKNOWN) return ForegroundState.IDLE
+        }
+        return byGroup
     }
 
     private fun sampleForeground(fd: Int) {
@@ -271,6 +286,9 @@ class TerminalSession internal constructor(
             sampledPgid = 0
             lastOutputNs = nanoTime()
             lastSampleNs = 0L
+            promptHookSeen = false
+            awaitingPrompt = false
+            promptScanner.reset()
             currentCoroutineContext().ensureActive()
             synchronized(lock) {
                 if (activeRun === run) {
@@ -302,6 +320,10 @@ class TerminalSession internal constructor(
                 if (count == RETRY_IO) { sampleForeground(fd); continue }
                 if (count <= 0) break
                 lastOutputNs = nanoTime()
+                if (promptScanner.feed(buffer, count)) {
+                    promptHookSeen = true
+                    awaitingPrompt = false
+                }
                 synchronized(lock) { if (activeRun === run) _outputBytes.tryEmit(buffer.copyOf(count)) }
                 sampleForeground(fd)
             }
@@ -315,6 +337,8 @@ class TerminalSession internal constructor(
             run.input.cancel()
             sampledPgid = 0
             shellPgid = 0
+            promptHookSeen = false
+            awaitingPrompt = false
             // Only this coroutine ever touches these descriptors and child pid.
             try {
                 DirectRootRunner.cleanupProcessGroup(rootPidFile)
@@ -341,6 +365,8 @@ class TerminalSession internal constructor(
 
     fun sendRawBytes(bytes: ByteArray) {
         if (bytes.isEmpty()) return
+        // Enter submits a line: until the prompt is printed again, something may be running.
+        if (bytes.any { it == '\r'.code.toByte() || it == '\n'.code.toByte() }) awaitingPrompt = true
         synchronized(lock) { activeRun?.input?.trySend(Input.Bytes(bytes.copyOf())) }
     }
 
@@ -397,4 +423,36 @@ class TerminalSession internal constructor(
     }
 
     fun clearOutput() { _clearVersion.value += 1 }
+}
+
+/**
+ * Finds the guest's prompt marker (OSC 133;A, `ESC ] 133 ; A`) in the output stream, including when it is cut
+ * between two reads. Pure apart from the few bytes it remembers, so it is unit-tested.
+ */
+internal class PromptMarkerScanner {
+    private var tail = ByteArray(0)
+
+    fun reset() { tail = ByteArray(0) }
+
+    /** Whether [length] bytes of [chunk], together with what came before, contain the marker. */
+    fun feed(chunk: ByteArray, length: Int): Boolean {
+        val window = ByteArray(tail.size + length)
+        tail.copyInto(window)
+        chunk.copyInto(window, tail.size, 0, length)
+        val found = indexOf(window) >= 0
+        tail = window.copyOfRange(maxOf(0, window.size - (MARKER.size - 1)), window.size)
+        return found
+    }
+
+    private fun indexOf(window: ByteArray): Int {
+        outer@ for (i in 0..window.size - MARKER.size) {
+            for (j in MARKER.indices) if (window[i + j] != MARKER[j]) continue@outer
+            return i
+        }
+        return -1
+    }
+
+    companion object {
+        val MARKER = byteArrayOf(0x1B, ']'.code.toByte(), '1'.code.toByte(), '3'.code.toByte(), '3'.code.toByte(), ';'.code.toByte(), 'A'.code.toByte())
+    }
 }

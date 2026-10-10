@@ -69,6 +69,8 @@ class TerminalSessionManager(
     private val now: () -> Long = System::currentTimeMillis,
     private val maxTabs: Int = MAX_TABS,
     private val titleFor: (Int) -> String = { "Terminal $it" },
+    /** Told when the runtime ended terminals that had a program running, for a notification while the page is closed. */
+    private val onMaintenance: (MaintenanceNotice) -> Unit = {},
 ) {
     class LimitExceeded(message: String) : Exception(message)
 
@@ -90,7 +92,11 @@ class TerminalSessionManager(
     private val attached = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
     init {
-        TerminalSession.maintenanceListener = { busy -> _maintenance.value = MaintenanceNotice(busy, now()) }
+        TerminalSession.maintenanceListener = { busy ->
+            val notice = MaintenanceNotice(busy, now())
+            _maintenance.value = notice
+            runCatching { onMaintenance(notice) }
+        }
     }
 
     fun get(id: String): UserTerminal? = _tabs.value.firstOrNull { it.id == id }
@@ -116,6 +122,26 @@ class TerminalSessionManager(
         start(terminal, initCommand, cols, rows)
         publishRunning()
         return terminal
+    }
+
+    /**
+     * What opening the Terminal page asks for. With neither [sessionId] nor [initCommand] it shows what is there and
+     * only opens a shell when nothing is. A chat's "Open Terminal" (a [sessionId]) selects that chat's live shell if it
+     * has one; a command always gets a fresh tab, so it never lands in a shell that is busy with something else.
+     */
+    fun openOrSelect(sessionId: String? = null, initCommand: String? = null): UserTerminal {
+        if (initCommand.isNullOrBlank()) {
+            val existing = if (sessionId == null) {
+                selected() ?: _tabs.value.lastOrNull()
+            } else {
+                _tabs.value.lastOrNull { it.sessionId == sessionId && it.session.isRunning }
+            }
+            if (existing != null) {
+                select(existing.id)
+                return existing
+            }
+        }
+        return open(sessionId, initCommand)
     }
 
     private fun wire(terminal: UserTerminal) {
@@ -245,6 +271,7 @@ class TerminalSessionManager(
                         scope = CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate),
                         keepAlive = TerminalForegroundService.keepAlive(app),
                         titleFor = { app.getString(com.openminis.app.R.string.terminal_tab_default, it) },
+                        onMaintenance = { TerminalForegroundService.notifyMaintenance(app, it.busy) },
                     )
                 }.also { shared = it }
             }

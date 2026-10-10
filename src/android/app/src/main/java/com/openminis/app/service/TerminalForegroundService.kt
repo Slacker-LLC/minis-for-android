@@ -113,6 +113,7 @@ class TerminalForegroundService : Service() {
         private const val TAG = "TerminalFgs"
         private const val CHANNEL_ID = "terminal_sessions"
         private const val NOTIFICATION_ID = 0x1830
+        private const val MAINTENANCE_NOTIFICATION_ID = 0x1831
         private const val EXTRA_COUNT = "count"
         internal const val ACTION_STOP_ALL = "com.openminis.app.STOP_ALL_TERMINALS"
         private const val MIN_LIFETIME_BEFORE_STOP_MS = 1_500L
@@ -145,6 +146,42 @@ class TerminalForegroundService : Service() {
                 }
             }
             if (wait <= 0L) stopNow() else Handler(Looper.getMainLooper()).postDelayed({ stopNow() }, wait)
+        }
+
+        /**
+         * One notice that the runtime ended terminals with a program running (rootfs repair, mount change). The page
+         * shows the same fact as a dialog; this is for when the page is not open. Skipped without the permission.
+         */
+        fun notifyMaintenance(app: Context, busy: Int) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                androidx.core.content.ContextCompat.checkSelfPermission(app, android.Manifest.permission.POST_NOTIFICATIONS) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
+            val manager = app.getSystemService(NotificationManager::class.java) ?: return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                manager.createNotificationChannel(
+                    NotificationChannel(CHANNEL_ID, app.getString(R.string.terminal_fgs_channel), NotificationManager.IMPORTANCE_LOW),
+                )
+            }
+            val open = PendingIntent.getActivity(
+                app,
+                2,
+                Intent(Intent.ACTION_VIEW, Uri.parse("minis://open_terminal"))
+                    .setClassName(app, "com.openminis.app.MainActivity")
+                    .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val notification = NotificationCompat.Builder(app, CHANNEL_ID)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(app.getString(R.string.terminal_maintenance_title))
+                .setContentText(app.getString(R.string.terminal_maintenance_body, busy))
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .build()
+            runCatching { manager.notify(MAINTENANCE_NOTIFICATION_ID, notification) }
         }
 
         private fun currentCount(): Int {

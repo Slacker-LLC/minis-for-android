@@ -8,8 +8,11 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 /** The user's terminals belong to the app: detaching from a tab never ends it, and the ways a shell does end are explicit. */
@@ -201,5 +204,52 @@ class TerminalSessionManagerTest {
         assertEquals(1, notice!!.busy)
         m2.dismissMaintenanceNotice()
         assertNull(m2.maintenanceNotice.value)
+    }
+
+    @Test fun `opening the page with nothing asked shows what is there and opens a shell only when there is none`() {
+        val m = manager()
+        val first = m.openOrSelect()
+        assertEquals(1, m.tabs.value.size)
+        val second = m.open()
+        m.select(first.id)
+        assertSame("the selected tab stays", first, m.openOrSelect())
+        assertEquals(2, m.tabs.value.size)
+        assertEquals(first.id, m.selectedId.value)
+        assertNotNull(second)
+    }
+
+    @Test fun `a chat's terminal reuses its live shell, a command always gets a new tab`() {
+        val m = manager()
+        val chat = m.openOrSelect(sessionId = "chat-1")
+        assertTrue(running(chat))
+        val other = m.openOrSelect(sessionId = "chat-2")
+        assertNotSame(chat, other)
+        assertSame("same chat, same shell", chat, m.openOrSelect(sessionId = "chat-1"))
+        assertEquals(chat.id, m.selectedId.value)
+        val withCommand = m.openOrSelect(sessionId = "chat-1", initCommand = "ls")
+        assertNotSame(chat, withCommand)
+        assertEquals("chat-1", withCommand.sessionId)
+        assertEquals(3, m.tabs.value.size)
+    }
+
+    @Test fun `the tab limit applies to opening from a link too`() {
+        val m = manager(maxTabs = 1)
+        m.open(sessionId = "chat-1")
+        try {
+            m.openOrSelect(sessionId = "chat-2")
+            fail("over the limit")
+        } catch (_: TerminalSessionManager.LimitExceeded) {
+        }
+        assertEquals(1, m.tabs.value.size)
+    }
+
+    @Test fun `an agent tab can be selected and a made-up id cannot`() {
+        val m = manager()
+        val a = m.open()
+        m.select(TerminalSessionManager.agentTabId("t1"))
+        assertEquals("agent:t1", m.selectedId.value)
+        m.select("bogus")
+        assertEquals("agent:t1", m.selectedId.value)
+        assertNotNull(m.get(a.id))
     }
 }

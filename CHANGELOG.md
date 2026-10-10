@@ -8,6 +8,11 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 - `android-shizuku-cli` is now `android-root-cli`: the same subcommands and JSON, run as root through `su`. Its Agent permission switch carries over.
 - The virtual screen runs in a root service (libsu) instead of a Shizuku UserService. Run its compatibility check once more to switch it back on.
 - Accessibility repair, clearing restricted settings and one-tap authorize use Root; Settings > System has a Root page in place of "Root & Shizuku", and the readiness checklist no longer lists Shizuku.
+- Terminals belong to the app, not to the Terminal page: leaving the page, going to another app or locking the screen no longer ends the shell or the program in it, and the screen and scrollback are as you left them. A shell ends when you close its tab, when it exits, from "End all" on the notification, or when the runtime is stopped for maintenance (you are told).
+- While any terminal (yours or the agent's) has a live process, a foreground service keeps Minis running and shows "N terminals running" with an "End all" button.
+- Tabs in the Terminal page: new, switch, close, long-press to rename, a status dot from OSC 7501, up to 8. Closing a tab with a program running asks once. The agent's terminals appear as read-only "Agent" tabs; "Take over" lets you type into one.
+- Touch: mouse reporting (DECSET 1000 / 1002 / 1003, SGR 1006) so vim, htop, tmux and TUIs can be clicked and scrolled; a swipe on a full-screen program that did not ask for the mouse sends arrow keys (application cursor mode respected); pinch changes the text size and the terminal is resized; Paste in the selection menu and on a long press on empty space, wrapped in bracketed paste when the program asked for it.
+- The agent's terminal idle clean-up no longer closes a terminal that has a program running in the foreground.
 
 ## 0.0.2 — 2026-10-10
 
