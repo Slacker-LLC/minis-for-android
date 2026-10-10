@@ -216,7 +216,7 @@ config registry 暴露为 `prompt.custom`（带确认与审计回退）。内置
 
 已知缺口：
 
-- 设备完整性保护（Issue #182）尚未实现：`exec`、`file rm -r`、`package uninstall` 等目前没有任何保护线。
+- 设备完整性保护（Issue #182）已实现（见 04 安全合同），但见下一节：全部未在真机验证。
 
 已接受的设计（不是缺口）：
 
@@ -236,3 +236,22 @@ config registry 暴露为 `prompt.custom`（带确认与审计回退）。内置
 ## PR4 — 下个版本移除旧模型组 Room 表（暂缓）
 
 PR2/PR3 只把运行配置迁移到固定 Model Slots，并保留旧表作为迁移/回滚兼容边界；本阶段不删 `provider_model_groups` 表、不升级 Room schema。后续 PR4 才能在数据升级路径和真机备份恢复验收完成后删除该表并将 Room schema 从当前 v4 升至 v5。
+
+## 设备完整性保护（Issue #182，2026-10-10）
+
+只有 JVM 单测、编译和 lint 的证据；`ProtectedView` 生成的脚本、mount namespace、能力裁剪、存储水位冻结都**没有在真机上跑过**，不得据此声称设备结论。需要在小米 24129PN74C / HyperOS（KernelSU）上确认：
+
+- `unshare -m` 在 `su` 起的进程里可用，`mount -o rprivate,bind / /`、`/dev/block` 换 tmpfs、对 `/data/adb`、`/apex` 等目录的只读 bind 与 `remount,bind,ro` 都能成功；任何一步失败会让特权命令返回 `DEVICE_PROTECTION_UNAVAILABLE`（失败关闭）；
+- rootfs 里的 `setpriv` 经 `ld-linux-aarch64.so.1 --library-path` 在 chroot 之外能运行，`--bounding-set` 去掉 `CAP_SYS_ADMIN` 后 `pm`/`cmd`/`settings`/`am`/`dumpsys`/`input`/`wm`/`appops` 与现有 `android-root-cli` 子命令没有回归；
+- 视图里 `mount -o remount,rw /system`、`dd of=/dev/block/…`、`rm -rf /data/system` 确实失败，`su` 桩生效；
+- KernelSU 的 `/data/adb/ksu/bin/su` 被桩覆盖后，视图外的 App 自身 `su` 不受影响；
+- 存储水位：guest 写大文件逼近阈值时自动冻结、发通知，清理后恢复；冻结只作用于 `shells/shell-*.pid` 记录的进程组；
+- 小米补充名单（`com.miui.securitycenter`、`com.lbe.security.miui`、`com.miui.home`、`com.xiaomi.xmsf`、`com.miui.system`）需真机核对，其余 OEM 没有补充名单。
+
+已知残余：
+
+- 原始 `service call` 直接发 binder 事务，不经 `pm`/`cmd`/`settings`/`am` 前端，绕过核心包和设备状态检查。本保护防的是 Agent 手滑，不防刻意绕过。
+- 命令词判定看不穿变量、`$(…)`、脚本文件；这类只靠视图兜底，且视图只管路径类（分区、系统分区、`/data` 系统数据），管不到 binder 类（核心包、恢复出厂、用户 0）。
+- `/data/adb/minis` 因例外保持可写，`rm -rf` 它会毁掉 rootfs（可重装），不会让手机变砖。
+- `/apex`、`/system` 等目录在系统挂载为只读的设备上，视图的只读 bind 是第二道保险，不是第一道。
+- 分区读取（`partition read`）在视图之外以 root 执行，只读块设备，目标文件走与其它命令相同的写路径检查。

@@ -538,6 +538,8 @@ class MinisApp : Application(), ImageLoaderFactory {
         // the process. Mirrors iOS ConfigRegistry.shared.registerBuiltinsIfNeeded().
         com.openminis.app.config.MinisConfigPermissionStore.init(this)
         com.openminis.app.config.AutonomyStore.init(this)
+        com.openminis.app.integrity.DeviceProtectionStore.init(this)
+        com.openminis.app.integrity.StorageGuard.start(this)
         com.openminis.app.config.audit.ConfigAuditLog.init(this)
         com.openminis.app.config.ConfigRegistry.init(
             this, providerRepository, envVarRepository, chatRepository,

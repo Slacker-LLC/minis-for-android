@@ -1,5 +1,6 @@
 package com.openminis.app.offload
 
+import com.openminis.app.integrity.ProtectedRoot
 import com.openminis.app.runtime.ubuntu.DirectRootRunner
 import com.openminis.app.runtime.ubuntu.RootAccess
 import com.openminis.app.runtime.ubuntu.RootAccessStatus
@@ -9,10 +10,14 @@ import kotlinx.coroutines.runBlocking
 /**
  * Run one argv as root and collect its output.
  *
- * Used by `android-root-cli` (its handler runs synchronously on the offload IPC worker thread) and
- * by the accessibility repairs. Every call goes through [DirectRootRunner], the same `su` launcher
- * the Ubuntu runtime and `root.shell` use, so the app has one Root path. Arguments are quoted word
- * by word; nothing is parsed by a shell unless the caller explicitly runs `sh -c`.
+ * Two doors, one `su` launcher ([DirectRootRunner]):
+ *  - [run] is for `android-root-cli`, whose handler runs synchronously on the offload IPC worker
+ *    thread and takes commands from the agent. It goes through [ProtectedRoot], so the device-integrity
+ *    policy and the protected view apply (Issue #182).
+ *  - [exec] and [runRaw] are for commands the app builds itself (accessibility repair, restricted
+ *    settings, the su liveness check); they are not subject to the policy.
+ * Arguments are quoted word by word; nothing is parsed by a shell unless the caller explicitly runs
+ * `sh -c`.
  */
 object RootProcess {
     const val DEFAULT_TIMEOUT_MS = 5_000L
@@ -45,8 +50,19 @@ object RootProcess {
 
     fun unavailableReason(): String? = unavailable()?.message
 
-    /** Blocking form for synchronous callers; never call it on the main thread. */
+    /** Session of the guest request being served on this thread, for the integrity audit. */
+    val callerSession = ThreadLocal<String?>()
+
+    /** Agent-originated command, subject to device protection. Never call it on the main thread. */
     fun run(argv: Array<String>, timeoutMs: Long = DEFAULT_TIMEOUT_MS): Result =
+        runBlocking(Dispatchers.IO) {
+            require(argv.isNotEmpty()) { "argv must not be empty" }
+            val r = ProtectedRoot.runArgv("android-root-cli", callerSession.get(), argv.toList(), timeoutMs)
+            toResult(r.exitCode, r.stdout, r.stderr, r.error)
+        }
+
+    /** App-built command that must run outside the protected view (a liveness check, say). */
+    fun runRaw(argv: Array<String>, timeoutMs: Long = DEFAULT_TIMEOUT_MS): Result =
         runBlocking(Dispatchers.IO) { exec(argv.toList(), timeoutMs) }
 
     suspend fun exec(argv: List<String>, timeoutMs: Long = DEFAULT_TIMEOUT_MS): Result {

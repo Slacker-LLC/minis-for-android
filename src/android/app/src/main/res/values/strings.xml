@@ -766,6 +766,14 @@
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">Configuration Tool</string>
     <string name="perm_section_autonomy">Agent autonomy</string>
+    <string name="perm_section_device_protection">Device protection</string>
+    <string name="perm_device_protection_title">Device protection</string>
+    <string name="perm_device_protection_sub">Blocks only what could leave the phone unable to boot or unusable: writes to partitions and system files, core system apps, factory reset. Nothing is asked: the agent gets an error and tries another way. Everything else stays open.</string>
+    <string name="perm_device_protection_blocked">Recently blocked</string>
+    <string name="perm_device_protection_none">Nothing blocked yet</string>
+    <string name="device_protection_channel">Device protection</string>
+    <string name="device_storage_low_title">Storage is low — Minis paused its writes</string>
+    <string name="device_storage_low_body">Only %1$d MB left on /data. Terminals and background jobs are paused and nothing is deleted. They resume automatically once space is freed.</string>
     <string name="perm_autonomy_ask">Ask</string>
     <string name="perm_autonomy_ask_sub">Confirm every change the agent makes to settings.</string>
     <string name="perm_autonomy_smart">Smart</string>

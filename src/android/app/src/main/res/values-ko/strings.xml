@@ -306,6 +306,14 @@
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">설정 도구</string>
     <string name="perm_section_autonomy">에이전트 자율 수준</string>
+    <string name="perm_section_device_protection">기기 보호</string>
+    <string name="perm_device_protection_title">기기 보호</string>
+    <string name="perm_device_protection_sub">기기가 부팅되지 않거나 사용할 수 없게 되는 작업만 막습니다: 파티션·시스템 파일 쓰기, 핵심 시스템 앱 삭제·비활성화, 초기화. 확인 창 없이 에이전트에 오류가 전달되고 다른 방법을 시도합니다. 그 밖의 작업은 제한하지 않습니다.</string>
+    <string name="perm_device_protection_blocked">최근 차단된 작업</string>
+    <string name="perm_device_protection_none">차단 기록이 없습니다</string>
+    <string name="device_protection_channel">기기 보호</string>
+    <string name="device_storage_low_title">저장 공간이 부족하여 Minis의 쓰기를 일시 중지했습니다</string>
+    <string name="device_storage_low_body">/data에 %1$d MB만 남았습니다. 터미널과 백그라운드 작업을 일시 중지했으며 파일은 삭제하지 않습니다. 공간이 확보되면 자동으로 재개됩니다.</string>
     <string name="perm_autonomy_ask">묻기</string>
     <string name="perm_autonomy_ask_sub">에이전트가 설정을 바꿀 때마다 확인합니다.</string>
     <string name="perm_autonomy_smart">스마트</string>

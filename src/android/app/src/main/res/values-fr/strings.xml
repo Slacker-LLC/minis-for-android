@@ -306,6 +306,14 @@
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">Outil de configuration</string>
     <string name="perm_section_autonomy">Autonomie de l\'agent</string>
+    <string name="perm_section_device_protection">Protection de l\'appareil</string>
+    <string name="perm_device_protection_title">Protection de l\'appareil</string>
+    <string name="perm_device_protection_sub">Bloque uniquement ce qui pourrait empêcher le téléphone de démarrer ou le rendre inutilisable : écriture sur les partitions et les fichiers système, applications système essentielles, réinitialisation d\'usine. Aucune confirmation : l\'agent reçoit une erreur et essaie autrement. Tout le reste reste ouvert.</string>
+    <string name="perm_device_protection_blocked">Bloqués récemment</string>
+    <string name="perm_device_protection_none">Rien n\'a été bloqué</string>
+    <string name="device_protection_channel">Protection de l\'appareil</string>
+    <string name="device_storage_low_title">Stockage presque plein : Minis a suspendu ses écritures</string>
+    <string name="device_storage_low_body">Il ne reste que %1$d Mo sur /data. Les terminaux et les tâches en arrière-plan sont suspendus, rien n\'est supprimé. Ils reprennent automatiquement dès que de l\'espace est libéré.</string>
     <string name="perm_autonomy_ask">Demander</string>
     <string name="perm_autonomy_ask_sub">Confirmer chaque modification des réglages par l\'agent.</string>
     <string name="perm_autonomy_smart">Intelligent</string>
