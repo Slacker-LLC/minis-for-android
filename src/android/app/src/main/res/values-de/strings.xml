@@ -2216,9 +2216,4 @@
     <string name="quota_window_left">Fenster %1$s: %2$d%% übrig</string>
     <string name="quota_unlimited">Unbegrenzt</string>
     <string name="quota_open_console">Guthaben auf der Website des Anbieters ansehen</string>
-    <string name="add_provider_group_china">Festlandchina</string>
-    <string name="add_provider_group_coding">Coding-Pläne</string>
-    <string name="add_provider_group_global">International</string>
-    <string name="add_provider_group_gateway">Gateways &amp; Aggregatoren</string>
-    <string name="add_provider_group_local">Dieses Telefon / lokales Netz</string>
 </resources>

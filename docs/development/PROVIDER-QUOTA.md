@@ -41,7 +41,7 @@ credits) is only ever empty, never low. A currency with nothing left does not hi
 
 ## Command Code
 
-An API-key provider on `api.commandcode.ai` (Add provider > Coding plans > Command Code) is read with `GET https://api.commandcode.ai/alpha/billing/credits`
+An API-key provider on `api.commandcode.ai` (an OpenAI-compatible provider with that base URL) is read with `GET https://api.commandcode.ai/alpha/billing/credits`
 and `Authorization: Bearer <key>`: the call behind the CLI's `/usage` (found in `command-code` 1.79.2, `dist/cli.mjs`: `fetchUsageCredits`,
 `projectUsageView`). The docs name no such endpoint, so this follows that source and has not been run against a real account.
 `credits.monthlyCredits + purchasedCredits + freeCredits` is what is left, in dollars; `credits.windowLimits.{fiveHour,weekly}` = `{used, cap, resetAt in ms}`

@@ -2454,9 +2454,4 @@
     <string name="quota_window_left">%1$s 窗口：剩余 %2$d%%</string>
     <string name="quota_unlimited">额度不限</string>
     <string name="quota_open_console">到服务商官网查看余额</string>
-    <string name="add_provider_group_china">国内服务商</string>
-    <string name="add_provider_group_coding">编程订阅（Coding Plan）</string>
-    <string name="add_provider_group_global">海外服务商</string>
-    <string name="add_provider_group_gateway">网关与聚合平台</string>
-    <string name="add_provider_group_local">本机 / 局域网</string>
 </resources>

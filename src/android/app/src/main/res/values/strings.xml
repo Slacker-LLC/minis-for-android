@@ -2544,9 +2544,4 @@
     <string name="quota_window_left">%1$s window: %2$d%% left</string>
     <string name="quota_unlimited">No limit</string>
     <string name="quota_open_console">Check the balance on the provider website</string>
-    <string name="add_provider_group_china">Mainland China</string>
-    <string name="add_provider_group_coding">Coding plans</string>
-    <string name="add_provider_group_global">Global</string>
-    <string name="add_provider_group_gateway">Gateways &amp; aggregators</string>
-    <string name="add_provider_group_local">On this phone / this network</string>
 </resources>

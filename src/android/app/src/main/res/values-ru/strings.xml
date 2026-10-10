@@ -2433,9 +2433,4 @@
     <string name="quota_window_left">Окно %1$s: осталось %2$d%%</string>
     <string name="quota_unlimited">Без ограничений</string>
     <string name="quota_open_console">Посмотреть баланс на сайте сервиса</string>
-    <string name="add_provider_group_china">Материковый Китай</string>
-    <string name="add_provider_group_coding">Планы для кода</string>
-    <string name="add_provider_group_global">Международные</string>
-    <string name="add_provider_group_gateway">Шлюзы и агрегаторы</string>
-    <string name="add_provider_group_local">Этот телефон / локальная сеть</string>
 </resources>
