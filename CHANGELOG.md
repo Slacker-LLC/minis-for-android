@@ -12,6 +12,7 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 - One-tap authorize shares more: known services under the variable their tools read, and relays / added services as custom endpoints for pi, Command Code and OpenCode (no key is written to any config file).
 - One-tap authorize also turns on "run in the background" and, on Xiaomi / HyperOS, Autostart.
 - A provider on Command Code's API (`api.commandcode.ai`, added as an OpenAI-compatible provider) shows its remaining credits and 5-hour / weekly windows show like any other provider's, and the same key logs the Command Code CLI in.
+- Remaining balance now also for Vercel AI Gateway, Poe, Novita AI, StepFun and Command Code (matched on the API host of an ordinary compatible provider); about thirty more services link to their console page instead of showing nothing.
 - `provider_quota` answers for the model of the chat by default (`provider=all` for every provider). The terminal and provider-quota tools have their own switches under Settings > System prompt (modules `tools.terminal`, `tools.providerQuota`).
 
 ## 0.0.1 — 2026-10-09

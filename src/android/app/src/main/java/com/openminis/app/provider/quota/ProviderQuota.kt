@@ -65,6 +65,14 @@ enum class QuotaKind {
     KIMI_CODE,
     /** Command Code (API key): `GET https://api.commandcode.ai/alpha/billing/credits`, the call its CLI's `/usage` makes. */
     COMMAND_CODE,
+    /** Vercel AI Gateway: `GET /v1/credits` -> `{balance, total_used}` in USD (docs: AI Gateway REST API, "Check credit balance"). */
+    VERCEL,
+    /** Poe: `GET /usage/current_balance` -> `{current_point_balance}` (docs: Poe Usage API). */
+    POE,
+    /** Novita AI: `GET /openapi/v1/billing/balance/detail` -> `availableBalance` in 1/10000 USD (docs: Get User Balance). */
+    NOVITA,
+    /** StepFun: `GET https://api.stepfun.com/v1/accounts` -> `{balance, total_cash_balance, total_voucher_balance}` (docs: Get account information). */
+    STEPFUN,
     /** A relay on a custom https base (Sub2API / New API style); asks the same origin the chat requests already go to. */
     RELAY,
     /** No documented balance API: the page only links to the service's own console. */
@@ -94,6 +102,10 @@ object ProviderQuotaApi {
             host("api.siliconflow.cn", "api.siliconflow.com") -> QuotaKind.SILICONFLOW
             host("openrouter.ai") -> QuotaKind.OPENROUTER
             host("api.commandcode.ai") -> QuotaKind.COMMAND_CODE
+            host("ai-gateway.vercel.sh") -> QuotaKind.VERCEL
+            host("api.poe.com") -> QuotaKind.POE
+            host("api.novita.ai") -> QuotaKind.NOVITA
+            host("api.stepfun.com") -> QuotaKind.STEPFUN
             host in CONSOLES -> QuotaKind.CONSOLE
             // The official endpoints of the big three have nothing to ask with an API key.
             host("api.openai.com", "api.anthropic.com", "generativelanguage.googleapis.com", "api.x.ai") -> null
@@ -106,9 +118,44 @@ object ProviderQuotaApi {
         "api.xiaomimimo.com", "token-plan-cn.xiaomimimo.com", "token-plan-sgp.xiaomimimo.com", "token-plan-ams.xiaomimimo.com",
     )
 
-    /** Services whose docs name no balance API: the host and the page where the user reads usage and credits. */
-    private val CONSOLES: Map<String, String> =
-        XIAOMI_HOSTS.associateWith { "https://platform.xiaomimimo.com" }
+    /**
+     * Services with no balance call a normal API key can make (some need a separate management key, some only an
+     * account login, some publish nothing): the host and the page where the user reads the balance. Pages that could not be
+     * confirmed individually link to the service's console home.
+     */
+    private val CONSOLES: Map<String, String> = XIAOMI_HOSTS.associateWith { "https://platform.xiaomimimo.com" } + mapOf(
+        "api.groq.com" to "https://console.groq.com/settings/billing",
+        "api.mistral.ai" to "https://console.mistral.ai/billing",
+        "api.together.xyz" to "https://api.together.ai/settings/billing",
+        "api.fireworks.ai" to "https://fireworks.ai/account/billing",
+        "api.cerebras.ai" to "https://cloud.cerebras.ai",
+        "api.perplexity.ai" to "https://www.perplexity.ai/settings/api",
+        "api.cohere.ai" to "https://dashboard.cohere.com/billing",
+        "api.deepinfra.com" to "https://deepinfra.com/dash/billing",
+        "router.huggingface.co" to "https://huggingface.co/settings/billing",
+        "integrate.api.nvidia.com" to "https://build.nvidia.com",
+        "api.stepfun.ai" to "https://platform.stepfun.ai",
+        "api.minimax.io" to "https://platform.minimax.io",
+        "api.minimax.cn" to "https://platform.minimaxi.com",
+        "open.bigmodel.cn" to "https://open.bigmodel.cn",
+        "api.z.ai" to "https://z.ai",
+        "dashscope.aliyuncs.com" to "https://bailian.console.aliyun.com",
+        "dashscope-intl.aliyuncs.com" to "https://bailian.console.aliyun.com",
+        "coding.dashscope.aliyuncs.com" to "https://bailian.console.aliyun.com",
+        "ark.cn-beijing.volces.com" to "https://console.volcengine.com/ark",
+        "api.longcat.chat" to "https://longcat.chat/platform",
+        "zenmux.ai" to "https://zenmux.ai",
+        "aihubmix.com" to "https://aihubmix.com",
+        "api.302.ai" to "https://302.ai",
+        "router.requesty.ai" to "https://app.requesty.ai",
+        "api.kilo.ai" to "https://app.kilo.ai",
+        "ai-gateway.helicone.ai" to "https://us.helicone.ai",
+        "ollama.com" to "https://ollama.com/settings",
+        "opencode.ai" to "https://opencode.ai/auth",
+        "api.llama.com" to "https://llama.developer.meta.com",
+        "api.tokenfactory.nebius.com" to "https://tokenfactory.nebius.com",
+    )
+
     private val RELAY_TYPES = setOf(ProviderType.openAI, ProviderType.openAIResponses, ProviderType.anthropic)
 
     /** The console page to open for a [QuotaKind.CONSOLE] provider (no balance API is documented for it). */
@@ -133,6 +180,10 @@ object ProviderQuotaApi {
                 .header("anthropic-beta", "oauth-2025-04-20")
             QuotaKind.KIMI_CODE -> builder.url("https://api.kimi.com/coding/v1/usages")
             QuotaKind.COMMAND_CODE -> builder.url("https://api.commandcode.ai/alpha/billing/credits")
+            QuotaKind.VERCEL -> builder.url("https://ai-gateway.vercel.sh/v1/credits")
+            QuotaKind.POE -> builder.url("https://api.poe.com/usage/current_balance")
+            QuotaKind.STEPFUN -> builder.url("https://api.stepfun.com/v1/accounts")
+            QuotaKind.NOVITA -> builder.url("https://api.novita.ai/openapi/v1/billing/balance/detail")
             QuotaKind.RELAY, QuotaKind.CONSOLE -> throw IllegalArgumentException("$kind has no single request")
         }.header("Authorization", "Bearer $key").build()
     }
@@ -217,6 +268,26 @@ object ProviderQuotaApi {
                 if (windows.isEmpty()) return@runCatching null
                 // The same label twice (7d and the overage window) would be two identical rows.
                 ProviderQuota(windows = windows.distinctBy { it.label }, fetchedAtMs = now)
+            }
+            QuotaKind.VERCEL -> {
+                // Both are decimal strings in USD.
+                val balance = json.getString("balance").toDouble()
+                ProviderQuota(balances = listOf(Balance("USD", balance)), fetchedAtMs = now)
+            }
+            QuotaKind.POE -> ProviderQuota(
+                balances = listOf(Balance("points", json.getLong("current_point_balance").toDouble())), fetchedAtMs = now,
+            )
+            QuotaKind.STEPFUN -> {
+                // The docs give no currency for these floats, so none is named.
+                ProviderQuota(
+                    balances = listOf(Balance("", json.getDouble("balance"), json.optDouble("total_voucher_balance").takeIf { it.isFinite() }, json.optDouble("total_cash_balance").takeIf { it.isFinite() })),
+                    fetchedAtMs = now,
+                )
+            }
+            QuotaKind.NOVITA -> {
+                // Integer strings in 1/10000 USD; availableBalance already includes the credit line.
+                val units = json.getString("availableBalance").toLong()
+                ProviderQuota(balances = listOf(Balance("USD", units / 10_000.0, toppedUp = json.optString("cashBalance").toLongOrNull()?.div(10_000.0))), fetchedAtMs = now)
             }
             QuotaKind.COMMAND_CODE -> {
                 // `command-code` 1.79.2 `dist/cli.mjs`, projectUsageView: credits.{monthly,purchased,free}Credits are what is LEFT, in

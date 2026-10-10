@@ -47,3 +47,26 @@ and `Authorization: Bearer <key>`: the call behind the CLI's `/usage` (found in 
 `credits.monthlyCredits + purchasedCredits + freeCredits` is what is left, in dollars; `credits.windowLimits.{fiveHour,weekly}` = `{used, cap, resetAt in ms}`
 is shown while `limited` is true. Organisation accounts pass an `orgId` (from `/alpha/whoami`); this app asks without one, i.e. the personal account.
 The same key is exported to the sandbox as `COMMAND_CODE_API_KEY`, the variable the CLI reads.
+
+## Services added with an official balance call (0.0.2)
+
+Each of these is matched on the exact API host of an ordinary OpenAI-compatible provider, so adding the service through "OpenAI / Compatible API" is enough.
+
+| Service | Call | Result | Source |
+|---|---|---|---|
+| Vercel AI Gateway | `GET https://ai-gateway.vercel.sh/v1/credits` | `balance`, `total_used` (USD strings) | docs: AI Gateway REST API, "Check credit balance" |
+| Poe | `GET https://api.poe.com/usage/current_balance` | `current_point_balance` (points) | docs: Poe Usage API |
+| Novita AI | `GET https://api.novita.ai/openapi/v1/billing/balance/detail` | `availableBalance` (integer string, 1/10000 USD) | docs: Get User Balance |
+| StepFun | `GET https://api.stepfun.com/v1/accounts` | `balance`, `total_cash_balance`, `total_voucher_balance` (currency not stated, shown without one) | docs: Get account information |
+| Command Code | see above | | CLI source |
+
+None of these were run against a real account here; the field names and units are the documented ones.
+
+## Looked for, not usable with a normal API key
+
+These get a link to their console instead of a number:
+
+- Fireworks (billing summary needs an account id and returns spend line items, no balance), Together (monthly usage line items), Perplexity (organisation analytics).
+- ZenMux (balance call needs a separate management key), AIHubMix (needs its Manage Key), DeepInfra (`/payment/checklist` `stripe_balance` has no stated unit).
+- MiniMax (`/v1/token_plan/remains` is named in the docs without a response description), Z.ai / Zhipu (the quota call is not in the official docs).
+- Groq, Mistral, Cerebras, Cohere, Hugging Face, NVIDIA, Qwen / DashScope, Volcengine (account-level calls only with cloud access keys), Xiaomi MiMo.

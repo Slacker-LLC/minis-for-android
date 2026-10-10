@@ -250,4 +250,51 @@ class ProviderQuotaApiTest {
         assertEquals(QuotaLevel.EMPTY, q.level)
         assertNull(ProviderQuotaApi.parse(QuotaKind.COMMAND_CODE, """{"error":"nope"}""", 1L))
     }
+
+    @Test
+    fun `vercel poe and novita read the balance call their docs name`() {
+        val vercel = instance(base = "https://ai-gateway.vercel.sh/v1")
+        assertEquals(QuotaKind.VERCEL, ProviderQuotaApi.detect(vercel))
+        assertEquals("https://ai-gateway.vercel.sh/v1/credits", ProviderQuotaApi.request(QuotaKind.VERCEL, vercel, "k").url.toString())
+        assertEquals(95.5, ProviderQuotaApi.parse(QuotaKind.VERCEL, """{"balance":"95.50","total_used":"4.50"}""", 1L)!!.balances.single().total, 0.0001)
+
+        val poe = instance(base = "https://api.poe.com/v1")
+        assertEquals(QuotaKind.POE, ProviderQuotaApi.detect(poe))
+        assertEquals("https://api.poe.com/usage/current_balance", ProviderQuotaApi.request(QuotaKind.POE, poe, "k").url.toString())
+        val points = ProviderQuotaApi.parse(QuotaKind.POE, """{"current_point_balance":1500}""", 1L)!!.balances.single()
+        assertEquals(1500.0, points.total, 0.0001)
+        assertEquals("points", points.currency)
+
+        val novita = instance(base = "https://api.novita.ai/openai")
+        assertEquals(QuotaKind.NOVITA, ProviderQuotaApi.detect(novita))
+        assertEquals("https://api.novita.ai/openapi/v1/billing/balance/detail", ProviderQuotaApi.request(QuotaKind.NOVITA, novita, "k").url.toString())
+        val usd = ProviderQuotaApi.parse(
+            QuotaKind.NOVITA,
+            """{"availableBalance":"1000000","cashBalance":"800000","creditLimit":"200000","pendingCharges":"0","outstandingInvoices":"0"}""", 1L,
+        )!!.balances.single()
+        assertEquals(100.0, usd.total, 0.0001)
+    }
+
+    @Test
+    fun `these hosts match exactly, a look-alike never gets a key or a link`() {
+        assertNull(ProviderQuotaApi.detect(instance(base = "https://api.poe.com.evil.example/v1")).takeIf { it != QuotaKind.RELAY })
+        assertEquals(QuotaKind.CONSOLE, ProviderQuotaApi.detect(instance(base = "https://api.groq.com/openai/v1")))
+        assertEquals("https://console.groq.com/settings/billing", ProviderQuotaApi.consoleUrl(instance(base = "https://api.groq.com/openai/v1")))
+        assertNull(ProviderQuotaApi.consoleUrl(instance(base = "https://api.groq.com.evil.example/v1")))
+        assertNull(ProviderQuotaApi.parse(QuotaKind.NOVITA, """{"error":"x"}""", 1L))
+    }
+
+    @Test
+    fun `stepfun reads its accounts call`() {
+        val step = instance(base = "https://api.stepfun.com/v1")
+        assertEquals(QuotaKind.STEPFUN, ProviderQuotaApi.detect(step))
+        assertEquals("https://api.stepfun.com/v1/accounts", ProviderQuotaApi.request(QuotaKind.STEPFUN, step, "k").url.toString())
+        val b = ProviderQuotaApi.parse(
+            QuotaKind.STEPFUN,
+            """{"object":"account","type":"prepaid","balance":12.5,"total_cash_balance":10.0,"total_voucher_balance":26.0}""", 1L,
+        )!!.balances.single()
+        assertEquals(12.5, b.total, 0.0001)
+        assertEquals("", b.currency)
+        assertNull(ProviderQuotaApi.parse(QuotaKind.STEPFUN, """{"error":{"message":"x"}}""", 1L))
+    }
 }
