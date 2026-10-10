@@ -6,6 +6,10 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## 0.0.2 — 2026-10-10
 
+- The terminal understands OSC 7501 (program status): a program reports working / done / blocked / error and the top bar shows it; the feature probe `OSC 7501;?` is answered.
+- The Linux sandbox is probed once and then stays ready for 10 minutes after the last command (the window slides with every command), instead of being probed for every command.
+- One clock line under your message for the whole turn, with no per-step times and no red failure line; richer work-status text.
+- Fixed: a request with several tool results that carry images failed with HTTP 400 on DeepSeek (the image turns now follow all tool messages).
 - The agent can open real terminals (`terminal` tool: open, send text and keys, read the rendered screen) to run interactive programs such as pi, Claude Code or Codex; plain commands stay on `shell_execute`.
 - One-tap authorize also shares the API-key providers added in the app with pi, Claude Code and Codex in the sandbox (environment variables, no second login); OAuth sign-ins are not shared.
 - What is left on each provider (balance, or the share of a subscription's windows left): on the provider page, as a pill in the model picker, as a dot beside the model name when it runs low, and through the agent's `provider_quota` tool. DeepSeek, Moonshot, SiliconFlow, OpenRouter, ChatGPT / Claude / Kimi Code sign-ins and Sub2API / New API relays; Xiaomi MiMo links to its console.
@@ -14,6 +18,8 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 - A provider on Command Code's API (`api.commandcode.ai`, added as an OpenAI-compatible provider) shows its remaining credits and 5-hour / weekly windows show like any other provider's, and the same key logs the Command Code CLI in.
 - Remaining balance now also for Vercel AI Gateway, Poe, Novita AI, StepFun and Command Code (matched on the API host of an ordinary compatible provider); about thirty more services link to their console page instead of showing nothing.
 - `provider_quota` answers for the model of the chat by default (`provider=all` for every provider). The terminal and provider-quota tools have their own switches under Settings > System prompt (modules `tools.terminal`, `tools.providerQuota`).
+
+Rebuilt on 2026-10-10: the same source as the first 0.0.2 build plus this changelog (which had left out the four items at the top of the list). `versionName` and `versionCode` (299) are unchanged, so an installed 0.0.2 is not offered the update; installing the new APK over it works and keeps the data.
 
 ## 0.0.1 — 2026-10-09
 
