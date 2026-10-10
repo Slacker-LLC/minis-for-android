@@ -75,7 +75,7 @@ class VirtualScreenHomeActivity : ComponentActivity() {
     }
 
     /**
-     * Started through the Shizuku service, like every other launch on the virtual display: an app starting
+     * Started through the root virtual-screen service, like every other launch on the virtual display: an app starting
      * another app from its own process is stopped by MIUI's "associated start" prompt, which would pop up
      * on the virtual screen for every icon.
      */

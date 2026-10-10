@@ -153,7 +153,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 
 | Component | Source | License | Current use |
 |---|---|---|---|
-| Adapted VScreen support code | [android-notes/ShadowAuto](https://github.com/android-notes/ShadowAuto) @ `611e5eb0e1c94befda3c17c97438912dfd30e8a8` | Apache-2.0 | Shizuku shell UserService, virtual-display session, display-targeted UI/input, IME policy, clipboard bridge and bounded screenshots |
+| Adapted VScreen support code | [android-notes/ShadowAuto](https://github.com/android-notes/ShadowAuto) @ `611e5eb0e1c94befda3c17c97438912dfd30e8a8` | Apache-2.0 | Privileged-process context bootstrap (now hosted in a libsu root service; originally a Shizuku shell UserService), virtual-display session, display-targeted UI/input, IME policy, clipboard bridge and bounded screenshots |
 
 License text: [third_party/shadowauto/LICENSE](third_party/shadowauto/LICENSE), copied from the pinned source commit. The pinned tree has no separate `NOTICE`, and the migrated source files carry no file-level copyright headers. Each adapted file therefore records its exact upstream path and commit plus an Apache-2.0 notice and modification statement; no copyright owner is inferred from the commit author.
 
@@ -202,7 +202,7 @@ Source for those packages is published by the Ubuntu project for 24.04 (noble), 
 | multiplatform-markdown-renderer | Apache-2.0 |
 | Reorderable | Apache-2.0 |
 | ACRA | Apache-2.0 |
-| Shizuku API/provider | MIT |
+| libsu core/service (topjohnwu) | Apache-2.0 |
 | RealTimeCutVADLibraryForAndroid | MIT |
 | JUnit 4 | EPL-1.0 |
 | org.json test dependency | Public Domain / JSON License |

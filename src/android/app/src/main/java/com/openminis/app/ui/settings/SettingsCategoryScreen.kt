@@ -37,7 +37,6 @@ import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
@@ -150,7 +149,7 @@ fun SettingsCategoryScreen(
     onSystemEnhanceClick: () -> Unit = {},
     onPermissionsClick: () -> Unit = {},
     onToolPermissionsClick: () -> Unit = {},
-    onShizukuClick: () -> Unit = {},
+    onRootClick: () -> Unit = {},
     onVirtualScreenClick: () -> Unit = {},
     onBackgroundClick: () -> Unit = {},
     onLogsClick: () -> Unit = {},
@@ -346,11 +345,11 @@ fun SettingsCategoryScreen(
                     header = stringResource(R.string.settings_manage_header),
                 ) {
                     SettingsRow(
-                        icon = Icons.Outlined.Terminal,
-                        iconColor = Color(0xFF5856D6),
-                        title = stringResource(R.string.shizuku_title),
-                        subtitle = stringResource(R.string.settings_shizuku_sub),
-                        onClick = onShizukuClick,
+                        icon = Icons.Outlined.Key,
+                        iconColor = Color(0xFFFF9500),
+                        title = stringResource(R.string.system_enhance_root),
+                        subtitle = stringResource(R.string.settings_root_sub),
+                        onClick = onRootClick,
                     )
                     SettingsRow(
                         icon = Icons.Outlined.Dashboard,

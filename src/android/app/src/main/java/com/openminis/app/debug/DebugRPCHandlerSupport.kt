@@ -508,15 +508,15 @@ internal fun DebugRPCHandler.handlePermissionsList(): JSONObject {
 }
 
 /**
- * T344: Direct invocation of [com.openminis.app.runtime.guest.ShizukuOffloadHandler]
- * for e2e harnesses. Bypasses the agent loop so debug clients can verify Shizuku
+ * T344: Direct invocation of [com.openminis.app.runtime.guest.RootCliOffloadHandler]
+ * for e2e harnesses. Bypasses the agent loop so debug clients can verify Root
  * CLI behavior without driving a chat. DEBUG-build only — gated in [dispatch].
  *
  * Params (one of):
- *   - {"args": ["exec", "id"]}            — argv past `android-shizuku-cli`
+ *   - {"args": ["exec", "id"]}            — argv past `android-root-cli`
  *   - {"command": "exec id"}              — single string, whitespace-split
  */
-internal fun DebugRPCHandler.handleShizukuExec(params: JSONObject): JSONObject {
+internal fun DebugRPCHandler.handleRootCliExec(params: JSONObject): JSONObject {
     val argvTail: List<String> = when {
         params.has("args") -> {
             val arr = params.optJSONArray("args")
@@ -528,13 +528,13 @@ internal fun DebugRPCHandler.handleShizukuExec(params: JSONObject): JSONObject {
         }
         else -> throw RPCException(-32602, "Missing 'args' (array) or 'command' (string)")
     }
-    AppLogger.info("DebugRPC", "debug.shizuku.exec argv=${argvTail.joinToString(" ")}")
-    val handler = com.openminis.app.runtime.guest.ShizukuOffloadHandler(context)
-    // ShizukuOffloadHandler.handle() drops argv[0]; prepend the CLI name so the
-    // tail aligns with what `android-shizuku-cli` would receive in-shell.
+    AppLogger.info("DebugRPC", "debug.rootCli.exec argv=${argvTail.joinToString(" ")}")
+    val handler = com.openminis.app.runtime.guest.RootCliOffloadHandler(context)
+    // RootCliOffloadHandler.handle() drops argv[0]; prepend the CLI name so the
+    // tail aligns with what `android-root-cli` would receive in-shell.
     val request = com.openminis.app.runtime.guest.NativeOffloadRequest(
         pid = -1,
-        argv = listOf("android-shizuku-cli") + argvTail,
+        argv = listOf("android-root-cli") + argvTail,
         env = emptyMap(),
         cwd = "/",
         sessionId = null,
@@ -549,7 +549,7 @@ internal fun DebugRPCHandler.handleShizukuExec(params: JSONObject): JSONObject {
 
 /**
  * Direct invocation of [com.openminis.app.runtime.guest.ModelUseOffloadHandler]
- * for e2e harnesses. Mirrors [handleShizukuExec]; lets callers exercise the
+ * for e2e harnesses. Mirrors [handleRootCliExec]; lets callers exercise the
  * `minis-model-use` CLI without going through a real Ubuntu shell prompt.
  * DEBUG-only.
  */

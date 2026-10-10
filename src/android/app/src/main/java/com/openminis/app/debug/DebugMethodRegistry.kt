@@ -45,10 +45,10 @@ object DebugMethodRegistry {
 
     private val DEBUG_ONLY_METHODS: List<MethodSpec> = listOf(
         MethodSpec(
-            name = "debug.shizuku.exec",
-            description = "DEBUG-only: invoke ShizukuOffloadHandler directly with the given argv (T344). Bypasses the agent loop for e2e harness verification of android-shizuku-cli.",
+            name = "debug.rootCli.exec",
+            description = "DEBUG-only: invoke RootCliOffloadHandler directly with the given argv (T344). Bypasses the agent loop for e2e harness verification of android-root-cli.",
             params = listOf(
-                ParamSpec("args", "[string]", required = false, description = "argv past `android-shizuku-cli` (e.g. [\"exec\", \"id\"]). Either this or 'command' is required."),
+                ParamSpec("args", "[string]", required = false, description = "argv past `android-root-cli` (e.g. [\"exec\", \"id\"]). Either this or 'command' is required."),
                 ParamSpec("command", "string", required = false, description = "Whitespace-separated alternative to args, e.g. \"exec id\"."),
             ),
             returns = "{exitCode, output, argv}",
@@ -56,7 +56,7 @@ object DebugMethodRegistry {
         ),
         MethodSpec(
             name = "debug.modelUse.exec",
-            description = "DEBUG-only: invoke ModelUseOffloadHandler directly with the given argv. Parallels debug.shizuku.exec — lets harnesses trigger `minis-model-use run/list/search` without an in-shell prompt.",
+            description = "DEBUG-only: invoke ModelUseOffloadHandler directly with the given argv. Parallels debug.rootCli.exec — lets harnesses trigger `minis-model-use run/list/search` without an in-shell prompt.",
             params = listOf(
                 ParamSpec("args", "[string]", required = false, description = "argv past `minis-model-use` (e.g. [\"run\", \"--model\", \"gpt-5.3-codex\"])."),
                 ParamSpec("command", "string", required = false, description = "Whitespace-separated alternative to args."),

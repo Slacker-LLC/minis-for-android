@@ -46,8 +46,7 @@ object OffloadPermissionManager {
         PRIVACY("Privacy"),
         MEDIA("Media"),
         SYSTEM("System"),
-        // T330: privileged automation CLIs (Shizuku binder / Accessibility
-        // service). These run via the offload bridge as shell tools, not as
+        // T330: privileged automation CLIs (Root / Accessibility service). These run via the offload bridge as shell tools, not as
         // named LLM tool calls, so the gate happens inside the
         // NativeOffloadHandler entry point rather than ChatViewModel.
         INTEGRATIONS("Integrations"),
@@ -95,10 +94,10 @@ object OffloadPermissionManager {
         // T330: integrations — opt-in by default. These tools can drive
         // other apps and read on-screen content, so the safer posture is
         // NOT_ALLOWED until the user picks otherwise even when the
-        // underlying system layer (Shizuku binder / Accessibility service)
-        // is already authorized.
+        // underlying system layer (Root / Accessibility service) is already
+        // authorized.
         ToolPermissionInfo("a11y_cli", "android-a11y-cli", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
-        ToolPermissionInfo("shizuku_cli", "android-shizuku-cli", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
+        ToolPermissionInfo("root_cli", "android-root-cli", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
         // minis-apt: the guest cannot run apt itself, so the App does it as Root for the agent. Allowed by
         // default (a package install changes only the Ubuntu environment); the user can switch it off.
         ToolPermissionInfo("apt_cli", "minis-apt", PermissionCategory.INTEGRATIONS, PermissionLevel.BYPASS),
@@ -455,7 +454,27 @@ object OffloadPermissionManager {
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences("offload_permissions", Context.MODE_PRIVATE)
+        migrateRenamedTools()
         migrateLegacyAskOnce()
+    }
+
+    /** Tools that were renamed: the old stored choice carries over once, then the old key is gone. */
+    internal val renamedTools: Map<String, String> = mapOf(
+        // 2026-10: android-shizuku-cli became android-root-cli when Shizuku was removed.
+        "shizuku_cli" to "root_cli",
+    )
+
+    private fun migrateRenamedTools() {
+        val editor = prefs.edit()
+        var changed = false
+        for ((old, new) in renamedTools) {
+            val oldKey = "level_$old"
+            val stored = prefs.getString(oldKey, null) ?: continue
+            if (prefs.getString("level_$new", null) == null) editor.putString("level_$new", stored)
+            editor.remove(oldKey)
+            changed = true
+        }
+        if (changed) editor.apply()
     }
 
     /**
@@ -528,7 +547,7 @@ object OffloadPermissionManager {
 
     /**
      * Allow every Agent tool in one go (the one-tap authorize in Settings → System & permissions): the
-     * integrations that default to off (accessibility, Shizuku, the virtual screen) are switched on too, so
+     * integrations that default to off (accessibility, the Root CLI, the virtual screen) are switched on too, so
      * granting the Android side does not leave the Agent side shut.
      */
     fun allowAll() {

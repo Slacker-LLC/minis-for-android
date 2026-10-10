@@ -89,11 +89,19 @@ internal class VirtualScreenPreferences(context: Context) {
         private const val KEY_HEIGHT = "display_height"
         private const val KEY_DPI = "display_dpi"
 
+        /**
+         * Which privileged host ran the probe. A probe passed under an earlier host (the Shizuku
+         * UserService, before 2026-10) says nothing about the current one, so a new host makes every
+         * saved probe stale and the feature waits for a fresh pass.
+         */
+        internal const val SERVICE_HOST = "libsu-root-1"
+
         fun currentDeviceFingerprint(): String = listOf(
             Build.FINGERPRINT.orEmpty(),
             Build.VERSION.SDK_INT.toString(),
             Build.MANUFACTURER.orEmpty(),
             Build.DEVICE.orEmpty(),
+            SERVICE_HOST,
         ).joinToString("|")
     }
 }

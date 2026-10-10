@@ -5,7 +5,7 @@ import android.content.pm.PackageManager
 import android.content.pm.PermissionInfo
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.offload.MinisNotificationListenerService
-import com.openminis.app.offload.ShizukuManager
+import com.openminis.app.offload.RootProcess
 import com.openminis.app.tools.android.CommandRisk
 import com.openminis.app.tools.android.PrivilegedCommandRunner
 import com.openminis.app.tools.android.vscreen.VirtualScreenClientProvider
@@ -20,7 +20,7 @@ import kotlinx.coroutines.withContext
  * One-tap "grant every permission the app declares", for a rooted phone: instead of the system asking
  * once per permission as the agent first needs it, the user grants them all from Settings. Besides the
  * permissions it opens this app's own accesses: the accessibility service, notification access, the default
- * assistant role, the module switches, Shizuku's permission and the virtual screen.
+ * assistant role, the module switches and the virtual screen.
  *
  * It only issues fixed `pm grant` / `cmd appops set` argv for THIS package's own declared permissions;
  * nothing the agent or a model supplies reaches it, and it goes through the structured privileged runner
@@ -159,9 +159,8 @@ object RuntimePermissionGranter {
         val role = context.assistantRoleManagerOrNull()
         if (role != null && role.assistantRoleAvailable() && !role.assistantRoleHeld()) return false
         if (!ModuleSettingsStore.SWITCHES.all { ModuleSettingsStore.isEnabled(context, it) }) return false
-        // Shizuku and the virtual screen only count when Shizuku is there to be used.
-        if (ShizukuManager.isInstalled() && !ShizukuManager.isReady()) return false
-        if (ShizukuManager.isReady() && !VirtualScreenClientProvider.get(context).isEnabled()) return false
+        // The virtual screen runs as root, so it only counts once root is granted.
+        if (RootProcess.isGranted() && !VirtualScreenClientProvider.get(context).isEnabled()) return false
         return true
     }
 
@@ -234,24 +233,18 @@ object RuntimePermissionGranter {
             if (runCatching { ModuleSettingsStore.setEnabled(context, key, true) }.getOrDefault(false)) succeeded++ else failed += "module:$key"
         }
 
-        // The virtual screen needs Shizuku up and a passing device probe. Shizuku's own service is not started
-        // from here: that would run a script from shared storage as root.
-        ShizukuManager.refresh()
-        if (ShizukuManager.isReady()) {
-            attempted++
-            val ok = withContext(Dispatchers.IO) {
-                runCatching {
-                    val client = VirtualScreenClientProvider.get(context)
-                    client.runProbe()
-                    client.setEnabled(true)
-                    client.isEnabled()
-                }.getOrDefault(false)
-            }
-            if (ok) succeeded++ else failed += "virtual-screen"
-        } else if (ShizukuManager.isInstalled()) {
-            failed += "shizuku-not-running"
-            attempted++
+        // The virtual screen needs a passing device probe. Root already answered every command above, so the
+        // root service it runs in can start.
+        attempted++
+        val ok = withContext(Dispatchers.IO) {
+            runCatching {
+                val client = VirtualScreenClientProvider.get(context)
+                client.runProbe()
+                client.setEnabled(true)
+                client.isEnabled()
+            }.getOrDefault(false)
         }
+        if (ok) succeeded++ else failed += "virtual-screen"
         return Result(attempted, succeeded, failed)
     }
 

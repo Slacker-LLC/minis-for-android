@@ -72,19 +72,17 @@
     <string name="overlay_completion_cancelled">已取消</string>
     <string name="overlay_completion_timeout">已超时</string>
     <string name="a11y_repair_dialog_title">无障碍服务已关闭</string>
-    <string name="a11y_repair_dialog_message_shizuku">Minis 的无障碍权限已丢失——强行停止应用后会出现这种情况。检测到 Shizuku 可用，可以立即恢复，无需前往系统设置。</string>
+    <string name="a11y_repair_dialog_message_root">Minis 的无障碍权限已丢失——强行停止应用后会出现这种情况。已获得 Root，可以立即恢复，无需前往系统设置。</string>
     <string name="a11y_repair_dialog_message_manual">Minis 的无障碍权限已丢失——强行停止应用后会出现这种情况。请在「设置 → 无障碍」中重新开启 Minis。</string>
     <string name="a11y_repair_action_repair">立即恢复</string>
     <string name="a11y_repair_action_open_settings">打开设置</string>
     <string name="a11y_repair_cancel">暂不</string>
     <string name="a11y_repair_section_header">需要处理</string>
-    <string name="a11y_repair_row_shizuku">恢复无障碍权限</string>
+    <string name="a11y_repair_row_root">恢复无障碍权限</string>
     <string name="a11y_repair_row_manual">重新开启无障碍</string>
     <string name="a11y_repair_row_sub">权限已被撤销，可能是强行停止导致的</string>
     <string name="a11y_repair_in_progress">正在恢复…</string>
     <string name="a11y_repair_failed">恢复失败——请到系统设置中开启</string>
-    <string name="a11y_repair_footer_shizuku">每次应用被强行停止，Android 都会移除无障碍授权，且不会自动恢复。Shizuku 可以直接写回该授权。</string>
-    <string name="a11y_repair_footer_manual">每次应用被强行停止，Android 都会移除无障碍授权，且不会自动恢复。安装并授权 Shizuku 后，今后可一键恢复。</string>
     <string name="bg_service_notification_title">Minis Agent 运行中</string>
     <string name="bg_service_notification_text">%1$s | %2$s | %3$s</string>
     <string name="bg_service_notification_title_completed">任务已完成</string>
@@ -413,14 +411,14 @@
     <string name="perm_grant_all_no_root">没有可用的 root，无法自动授予权限。</string>
     <!-- T336: 每个集成 CLI 一个独立 SectionCard,展示 CLI 描述 / Agent 权限 / 系统授权状态 / 跳转入口 -->
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
-    <string name="perm_tool_shizuku_cli">android-shizuku-cli</string>
+    <string name="perm_tool_root_cli">android-root-cli</string>
     <string name="perm_tool_apt_cli">minis-apt</string>
     <string name="perm_section_a11y">无障碍</string>
     <string name="perm_a11y_section_footer">android-a11y-cli 让 Agent 读取屏幕 UI、模拟点击与输入、监听系统事件。下方两项都需配置:选择 Agent 权限,并在系统设置启用无障碍服务。</string>
-    <string name="perm_shizuku_section_footer">android-shizuku-cli 通过 Shizuku 服务调用 Android 高权限 API(安装应用、settings put、强制停止等)。Shizuku 由无线 ADB 或 root 启动。下方两项都需配置。</string>
     <string name="perm_a11y_cli_description">让 Agent 读取屏幕、点击、输入、监听事件</string>
     <string name="perm_a11y_open_settings">前往无障碍设置</string>
     <string name="perm_system_authorization">系统授权</string>
+    <string name="perm_root_not_granted">未授权</string>
     <string name="perm_agent_policy">Agent 权限</string>
     <string name="perm_a11y_system_ready">已启用</string>
     <string name="perm_a11y_system_disabled">未启用</string>
@@ -435,57 +433,21 @@
     <string name="perm_tool_contacts">通讯录</string>
     <string name="perm_tool_photos">照片</string>
 
-    <!-- T322: Shizuku 权限引导 -->
-    <string name="shizuku_title">Root 与 Shizuku</string>
-    <string name="shizuku_status_header">状态</string>
-    <string name="shizuku_status_footer">Shizuku 通过无线 ADB 或 root 启动一个本地服务，让用户应用无需 root 即可调用 Android 系统隐藏 API。支持两款兼容的管理器：Shizuku（RikkaApps）和 AXManager（Axeron），任意安装一个即可。授权后，Minis 可使用 android-shizuku-cli 命令管理包、权限、设置、输入、Activity 等。</string>
-    <string name="shizuku_actions_header">下一步</string>
-    <string name="shizuku_capabilities_header">可用能力</string>
-    <string name="shizuku_capabilities_footer">在终端执行 `android-shizuku-cli --help` 查看完整用法。无论 binder 来自 Shizuku、AXManager 还是 Sui，命令集完全一致。</string>
-    <string name="shizuku_cap_package_desc">安装、卸载、列出和查询应用</string>
-    <string name="shizuku_cap_permission_desc">授予或撤销运行时权限</string>
-    <string name="shizuku_cap_activity_desc">启动 Activity、发送广播</string>
-    <string name="shizuku_cap_display_desc">查询和调整显示设置</string>
-    <string name="shizuku_cap_settings_desc">读写 system / secure / global 设置</string>
-    <string name="shizuku_cap_user_desc">列出和管理设备用户</string>
-    <string name="shizuku_cap_network_desc">查看和切换网络状态</string>
-    <string name="shizuku_cap_input_desc">注入点击、滑动、按键和文本</string>
-    <string name="shizuku_cap_notification_desc">发布和管理通知</string>
-    <string name="shizuku_cap_file_desc">读写受保护的文件路径</string>
-    <string name="shizuku_cap_device_desc">查询设备属性和硬件状态</string>
-    <string name="shizuku_cap_service_desc">调用和查看系统服务</string>
-    <string name="shizuku_install_footer">安装 Shizuku(RikkaApps)、AXManager(Axeron)或 Sui(RikkaApps)其中任意一个 —— 三者实现同一套协议,可以互换。Shizuku 和 AXManager 是普通 App,通过无线 ADB 激活。Sui 面向已经 root 的设备:它以 Magisk/KernelSU 模块的形式安装,无需 App,且重启后依然保持生效。在 KernelSU 或 APatch 上,Sui 还需要额外的 Zygisk 实现(Zygisk Next / ReZygisk / NeoZygisk)—— 没有它 Sui 不会加载。安装其中一个后返回此页。</string>
-    <string name="shizuku_start_footer">打开管理器应用，通过无线 ADB（无需电脑）或 root 启动服务，状态变为运行后返回此页面。\n\n使用 AXManager 时，还需在 AXManager 的"设置 → AX-Permission Intercept"中打开开关，AXManager 才会向 Minis 推送 Shizuku 兼容 binder。</string>
-    <string name="shizuku_grant_footer">服务已运行。点击「授权 Minis」会弹出管理器的系统授权对话框。</string>
+    <string name="root_cli_cap_package_desc">安装、卸载、列出和查询应用</string>
+    <string name="root_cli_cap_permission_desc">授予或撤销运行时权限</string>
+    <string name="root_cli_cap_activity_desc">启动 Activity、发送广播</string>
+    <string name="root_cli_cap_display_desc">查询和调整显示设置</string>
+    <string name="root_cli_cap_settings_desc">读写 system / secure / global 设置</string>
+    <string name="root_cli_cap_user_desc">列出和管理设备用户</string>
+    <string name="root_cli_cap_network_desc">查看和切换网络状态</string>
+    <string name="root_cli_cap_input_desc">注入点击、滑动、按键和文本</string>
+    <string name="root_cli_cap_notification_desc">发布和管理通知</string>
+    <string name="root_cli_cap_file_desc">读写受保护的文件路径</string>
+    <string name="root_cli_cap_device_desc">查询设备属性和硬件状态</string>
+    <string name="root_cli_cap_service_desc">检查 Root 是否可用</string>
 
-    <string name="shizuku_state_not_installed">未安装管理器</string>
-    <string name="shizuku_state_not_installed_subtitle">安装 Shizuku、AXManager 或 Sui —— 任意一个即可。</string>
-    <string name="shizuku_state_not_running">服务未运行</string>
-    <string name="shizuku_state_not_running_subtitle">请打开管理器应用并启动服务。</string>
-    <string name="shizuku_state_need_permission">需要授权</string>
-    <string name="shizuku_state_need_permission_subtitle">服务已运行，但 Minis 尚未获得授权。</string>
-    <string name="shizuku_state_ready">已就绪</string>
-    <string name="shizuku_ready_subtitle">版本=%1$d，uid=%2$d</string>
-
-    <string name="shizuku_badge_not_installed">未安装</string>
-    <string name="shizuku_badge_not_running">未启动</string>
-    <string name="shizuku_badge_need_permission">待授权</string>
-    <string name="shizuku_badge_ready">就绪</string>
-
-    <string name="shizuku_install_btn">安装 Shizuku</string>
-    <string name="shizuku_install_btn_subtitle">RikkaApps · 打开 GitHub Releases 页面</string>
-    <string name="shizuku_install_btn_axmanager">安装 AXManager</string>
-    <string name="shizuku_install_btn_axmanager_subtitle">Axeron · 打开 GitHub Releases 页面</string>
-    <string name="shizuku_open_btn">打开管理器应用</string>
-    <string name="shizuku_open_btn_subtitle">启动已安装的管理器以启动或管理服务</string>
-    <string name="shizuku_recheck_btn">重新检测</string>
-    <string name="shizuku_recheck_subtitle">启动服务后重新检查状态</string>
-    <string name="shizuku_grant_btn">授权 Minis</string>
-    <string name="shizuku_grant_subtitle">弹出授权对话框</string>
-
-    <!-- [T-android-privileged-backend] 特权后端（Shizuku / AXManager） -->
     <string name="perm_section_privileged_backend">特权后端</string>
-    <string name="perm_privileged_cli_description">允许 Agent 通过特权后端（Shizuku 或 AXManager）执行 ADB 级系统命令</string>
+    <string name="perm_privileged_cli_description">允许 Agent 以 root 身份执行 ADB 级系统命令（pm、am、settings、input…）</string>
 
     <string name="skill_title">技能</string>
     <string name="skill_add">添加 Skill</string>
@@ -1423,10 +1385,6 @@
     <string name="browser_downloads_cancel">取消下载</string>
     <string name="browser_downloads_failed">失败</string>
     <string name="browser_downloads_open">打开</string>
-    <string name="shizuku_install_btn_sui">安装 Sui</string>
-    <string name="shizuku_install_btn_sui_subtitle">RikkaApps · 适用于已 root 设备(Magisk/KernelSU)· 无需 App,重启后依然生效</string>
-    <string name="shizuku_ready_subtitle_sui">Sui(root)· 版本=%1$d, uid=%2$d</string>
-    <string name="shizuku_grant_footer_sui">Sui 正在运行。点击「授权 Minis」以授予访问权限 —— 确认对话框由 Sui 自己弹出,没有单独的管理器 App 需要打开。</string>
     <string name="group_move_to">移入分组</string>
     <string name="group_change">更换分组</string>
     <string name="group_picker_title_move">移入分组</string>
@@ -1573,7 +1531,6 @@
     <string name="system_permissions_module_a11y_header">模块保护</string>
     <string name="system_permissions_module_a11y_toggle">保持无障碍服务开启</string>
     <string name="system_permissions_module_a11y_unavailable">Minis 模块未安装或未启用</string>
-    <string name="system_permissions_module_a11y_footer">仅在已安装 LSPosed 模块并作用于 Minis 时可用；模块会在系统内保持无障碍服务开启，无需 Shizuku。</string>
 
     <string name="module_settings_title">模块设置</string>
     <string name="module_settings_row_subtitle">LSPosed 模块读取的开关</string>
@@ -1673,7 +1630,7 @@
     <string name="settings_cat_chat_sub">回车键、回复后聚焦、思考展开、自动归类</string>
     <string name="settings_cat_appearance_sub2">主题、字体、语言、应用图标、桌宠</string>
     <string name="settings_cat_runtime_sub2">Rootfs、环境变量</string>
-    <string name="settings_cat_system_sub2">Root、Shizuku、Agent 权限、后台与通知</string>
+    <string name="settings_cat_system_sub2">Root、Agent 权限、后台与通知</string>
     <string name="settings_cat_data_sub">日志、更新、隐私</string>
     <string name="settings_root_footer">终端在会话抽屉里；团队和定时任务在 Agent 里。</string>
     <string name="settings_attention_count">%1$d 项需要处理</string>
@@ -1716,7 +1673,7 @@
     <string name="module_settings_assistant_role_hint">要让 Minis 接管电源键，先在「权限」里把它设为系统默认助手。</string>
     <string name="settings_tool_permissions">Agent 权限</string>
     <string name="settings_tool_permissions_sub">Agent 可以自己做哪些事</string>
-    <string name="settings_shizuku_sub">Root 状态、Shizuku 安装与授权</string>
+    <string name="settings_root_sub">Root 状态与可用功能</string>
     <string name="system_permissions_overlay_section">悬浮窗权限</string>
     <string name="system_permissions_overlay_row">显示在其他应用上层</string>
     <string name="system_permissions_overlay_granted">已授权</string>
@@ -2149,7 +2106,7 @@
     <string name="scheduled_vscreen_unattended_hint">无人值守运行中的界面操作只使用虚拟屏。</string>
     <string name="scheduled_vscreen_unavailable_warning">虚拟屏尚未通过当前设备自检并启用。仍可保存例程，但界面操作可能失败。</string>
     <string name="settings_vscreen_entry">虚拟屏幕（实验性）</string>
-    <string name="settings_vscreen_subtitle">Shizuku 虚拟屏幕与设备兼容性自检</string>
+    <string name="settings_vscreen_subtitle">Root 虚拟屏幕与设备兼容性自检</string>
     <string name="vscreen_allow_physical_unattended">允许无人值守操作物理屏</string>
     <string name="vscreen_allow_physical_unattended_risk">风险：后台例程可能控制你正在使用的屏幕。默认关闭；仅使用虚拟屏更安全。</string>
     <string name="vscreen_check_compatibility">检测设备兼容性</string>
@@ -2157,11 +2114,10 @@
     <string name="vscreen_enabled_label">启用虚拟屏幕</string>
     <string name="vscreen_enabled_summary">启用前会先运行一次当前设备自检。</string>
     <string name="vscreen_height">高度（px）</string>
-    <string name="vscreen_intro">实验性功能，默认关闭。需要一个以 Root 或 ADB 身份运行的 Shizuku 服务（有 Root 时用 Root 启动 Shizuku 即可）。它只创建一个隔离的虚拟显示屏，绝不会回退到物理屏幕。</string>
     <string name="vscreen_no_display">当前没有虚拟屏。</string>
     <string name="vscreen_reason_service_timeout">服务进程没有及时启动。请更新应用后重试；仍然出现请反馈此代码。</string>
     <string name="vscreen_fail_dialog_title">这些检测没有通过</string>
-    <string name="vscreen_fail_action_shizuku">去 Shizuku</string>
+    <string name="vscreen_fail_action_root">去 Root 设置</string>
     <string name="vscreen_fail_action_devopts">开发者选项</string>
     <string name="vscreen_view_failures">查看未通过的项目</string>
     <string name="vscreen_viewer_title">虚拟屏幕</string>
@@ -2178,13 +2134,13 @@
     <string name="vscreen_reason_app_moved">应用已离开虚拟屏。请停止操作；Minis 不会回退到物理屏。</string>
     <string name="vscreen_reason_cleanup_ready">临时自检虚拟屏已释放。</string>
     <string name="vscreen_reason_cleanup_skipped">未创建临时显示屏，因此无需释放。</string>
-    <string name="vscreen_reason_context_failed">无法建立系统上下文。请重启 Shizuku 和 Minis 后重试。</string>
+    <string name="vscreen_reason_context_failed">无法建立系统上下文。请重启 Minis 后重试。</string>
     <string name="vscreen_reason_context_ready">隔离的系统上下文已就绪。</string>
     <string name="vscreen_reason_display_busy">请先关闭当前虚拟屏，再重新检测兼容性。</string>
     <string name="vscreen_reason_display_failed">无法创建虚拟显示屏。请关闭当前虚拟屏后重试；如果仍失败，设备 ROM 可能不支持所需 API。</string>
     <string name="vscreen_reason_display_ready">已成功创建临时虚拟显示屏。</string>
-    <string name="vscreen_reason_generic_failure">此项检测失败。请查看设备详情、确认 Shizuku 已授权后重试。</string>
-    <string name="vscreen_reason_hidden_api">Shizuku UserService 无法使用所需隐藏 API。此设备不能启用 VScreen。</string>
+    <string name="vscreen_reason_generic_failure">此项检测失败。请查看设备详情、确认 Minis 已获得 Root 后重试。</string>
+    <string name="vscreen_reason_hidden_api">Root 服务无法使用所需隐藏 API。此设备不能启用 VScreen。</string>
     <string name="vscreen_reason_ime_ready">键盘已路由到虚拟屏。</string>
     <string name="vscreen_reason_ime_unavailable">当前 ROM 无法隔离键盘路由，文本输入可能不稳定，请谨慎测试。</string>
     <string name="vscreen_reason_input_failed">输入注入被拒绝。小米/HyperOS 设备请在开发者选项中开启“USB 调试（安全设置）”。</string>
@@ -2195,13 +2151,13 @@
     <string name="vscreen_reason_screenshot_blocked">画面为黑屏；FLAG_SECURE 或系统不支持的截取策略可能阻止像素采集。请改用 UI 节点树，或请用户接手。不要尝试 OCR 或其他截屏路径。</string>
     <string name="vscreen_reason_screenshot_failed">没有可安全显示的图像。受保护或黑屏画面会被主动拦截。</string>
     <string name="vscreen_reason_screenshot_ready">已截取到非黑屏的虚拟屏画面。</string>
-    <string name="vscreen_reason_shizuku_missing">请启动 Shizuku 并授权 Minis，然后重新检测兼容性。</string>
-    <string name="vscreen_reason_shizuku_ready">Shizuku 已授权，shell UserService 正在运行。</string>
-    <string name="vscreen_reason_timeout">设备检测超时。请保持 Shizuku 运行后重试。</string>
-    <string name="vscreen_reason_uiautomation_failed">界面观察被系统阻止。请检查 Shizuku 授权与设备兼容性。</string>
-    <string name="vscreen_reason_uiautomation_ready">Shizuku 服务中的界面观察已可用。</string>
+    <string name="vscreen_reason_root_missing">请为 Minis 授予 Root，然后重新检测兼容性。</string>
+    <string name="vscreen_reason_root_ready">已获得 Root，虚拟屏幕服务正以 root 身份运行。</string>
+    <string name="vscreen_reason_timeout">设备检测超时。请确认已授予 Root 后重试。</string>
+    <string name="vscreen_reason_uiautomation_failed">界面观察被系统阻止。请检查 Root 授权与设备兼容性。</string>
+    <string name="vscreen_reason_uiautomation_ready">Root 服务中的界面观察已可用。</string>
     <string name="vscreen_reason_unknown">无法识别此检测结果。请保持 VScreen 关闭并反馈此代码。</string>
-    <string name="vscreen_reason_wrong_identity">服务没有以已授权的 shell（2000）或 Root（0）身份运行。请重启 Shizuku 后重试。</string>
+    <string name="vscreen_reason_wrong_identity">服务没有以 Root（0）身份运行。请为 Minis 授予 Root 后重试。</string>
     <string name="vscreen_release">释放虚拟屏</string>
     <string name="vscreen_released">虚拟屏已释放。</string>
     <string name="vscreen_resolution">分辨率和密度</string>
@@ -2219,7 +2175,7 @@
     <string name="vscreen_step_input">显示屏内输入</string>
     <string name="vscreen_step_launch">在虚拟屏启动应用</string>
     <string name="vscreen_step_screenshot">非黑屏截图</string>
-    <string name="vscreen_step_shizuku">Shizuku 授权与服务身份</string>
+    <string name="vscreen_step_root">Root 授权与服务身份</string>
     <string name="vscreen_step_uiautomation">界面观察</string>
     <string name="vscreen_step_unknown">兼容性检测</string>
     <string name="vscreen_title">虚拟屏幕</string>
@@ -2295,9 +2251,6 @@
     <string name="perm_tool_vscreen_ui">操作虚拟屏幕</string>
     <string name="perm_vscreen_master_title">允许 Agent 使用虚拟屏幕</string>
     <string name="perm_vscreen_master_sub">总开关，下面是各项权限</string>
-    <string name="settings_ready_shizuku_title">Shizuku</string>
-    <string name="settings_ready_shizuku_ok">已连接 · 供虚拟屏幕与 Agent 工具使用</string>
-    <string name="settings_ready_shizuku_bad">未就绪 · 需要安装、启动或授权 Shizuku</string>
     <string name="settings_ready_overlay_title">显示在其他应用上层</string>
     <string name="settings_ready_overlay_ok">已允许</string>
     <string name="settings_ready_overlay_bad">未允许 · 桌宠和悬浮控件需要它</string>
@@ -2407,7 +2360,7 @@
     <string name="agent_models_cli_only">仅限 minis-model-use（非对话模型）</string>
     <string name="oneclick_header">一键授权</string>
     <string name="oneclick_title">授权全部</string>
-    <string name="oneclick_sub">需要 root。授予本应用声明的全部 Android 权限，打开无障碍服务、通知读取权限和默认助手角色，启用模块开关和虚拟屏幕（需先运行 Shizuku），并允许 Agent 的全部工具。关闭只把 Agent 权限恢复默认，Android 系统授权保留。并把 API Key 类服务商共享给终端里的 pi、Claude Code 和 Codex。</string>
+    <string name="oneclick_sub">需要 root。授予本应用声明的全部 Android 权限，打开无障碍服务、通知读取权限和默认助手角色，启用模块开关和虚拟屏幕，并允许 Agent 的全部工具。关闭只把 Agent 权限恢复默认，Android 系统授权保留。并把 API Key 类服务商共享给终端里的 pi、Claude Code 和 Codex。</string>
     <string name="oneclick_working">正在授权…</string>
     <string name="module_settings_restart_title">重启 Minis 以连接框架</string>
     <string name="module_settings_restart_sub">在 Minis 已经运行时才启用模块的话，点这里重启一次。</string>

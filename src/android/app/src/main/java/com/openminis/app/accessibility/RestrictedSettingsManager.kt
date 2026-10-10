@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.pm.PackageInstaller
 import android.os.Build
 import com.openminis.app.logging.AppLogger
-import com.openminis.app.offload.ShizukuManager
+import com.openminis.app.offload.RootProcess
 
 object RestrictedSettingsManager {
     private const val TAG = "RestrictedSettings"
@@ -34,13 +34,13 @@ object RestrictedSettingsManager {
         packageSource == PackageInstaller.PACKAGE_SOURCE_LOCAL_FILE ||
             packageSource == PackageInstaller.PACKAGE_SOURCE_DOWNLOADED_FILE
 
-    suspend fun clearWithShizuku(context: Context): Boolean {
-        if (!ShizukuManager.isReady()) {
-            AppLogger.info(TAG, "clear skipped: Shizuku not ready")
+    suspend fun clearWithRoot(context: Context): Boolean {
+        if (!RootProcess.isGranted()) {
+            AppLogger.info(TAG, "clear skipped: Root not granted")
             return false
         }
-        val set = ShizukuManager.runProcess(
-            arrayOf(
+        val set = RootProcess.exec(
+            listOf(
                 "appops", "set", context.packageName,
                 "ACCESS_RESTRICTED_SETTINGS", "allow",
             ),
@@ -49,12 +49,12 @@ object RestrictedSettingsManager {
             AppLogger.warning(TAG, "appops set failed: exit=${set.exitCode} ${set.combined}")
             return false
         }
-        val get = ShizukuManager.runProcess(
-            arrayOf("appops", "get", context.packageName, "ACCESS_RESTRICTED_SETTINGS"),
+        val get = RootProcess.exec(
+            listOf("appops", "get", context.packageName, "ACCESS_RESTRICTED_SETTINGS"),
         )
         val ok = get.exitCode == 0 && get.combined.contains("allow")
         if (ok) cleared = true
-        AppLogger.info(TAG, "cleared restricted settings via Shizuku; ok=$ok (${get.combined.trim()})")
+        AppLogger.info(TAG, "cleared restricted settings via Root; ok=$ok (${get.combined.trim()})")
         return ok
     }
 }

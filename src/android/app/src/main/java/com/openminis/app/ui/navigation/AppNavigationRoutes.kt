@@ -107,12 +107,8 @@ object Routes {
     const val SYSTEM_PROMPT_MODULES = "system_prompt_modules"
     const val MEMORY_FILE_EDIT = "memory_file/{fileName}/{isGlobal}"
     const val PERMISSIONS = "permissions"
-    /**
-     * T322 / [T-android-privileged-backend]: Shizuku-protocol manager
-     * walkthrough — handles both Shizuku and AXManager (they share the same
-     * binder protocol + client SDK).
-     */
-    const val SHIZUKU = "shizuku"
+    /** Root status, what Root is used for, and the android-root-cli surface. */
+    const val ROOT = "root"
     const val VIRTUAL_SCREEN_SETTINGS = "virtual_screen_settings"
     /** T323: System Permissions (Accessibility service status, etc.). */
     const val SYSTEM_PERMISSIONS = "system_permissions"

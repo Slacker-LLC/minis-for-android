@@ -75,7 +75,7 @@ import com.openminis.app.ui.settings.LogManagementScreen
 import com.openminis.app.ui.settings.MemoryFileEditScreen
 import com.openminis.app.ui.settings.MemoryManagementScreen
 import com.openminis.app.ui.settings.OffloadPermissionScreen
-import com.openminis.app.ui.settings.ShizukuPermissionScreen
+import com.openminis.app.ui.settings.RootAccessScreen
 import com.openminis.app.sandbox.TerminalSession
 import com.openminis.app.ui.terminal.TerminalScreen
 import com.openminis.app.ui.onboarding.OnboardingModelSelectionScreen
@@ -529,10 +529,10 @@ fun AppNavigation(
                     onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
                     onSystemEnhanceClick = { navController.safeNavigate(Routes.SYSTEM_ENHANCE) },
                     onPermissionsClick = { navController.safeNavigate(Routes.SYSTEM_PERMISSIONS) },
-                    // [T-android-settings-hierarchy] The tool-permission and Shizuku screens
-                    // were reachable only through each other; they belong to the same category.
+                    // [T-android-settings-hierarchy] The tool-permission and Root screens
+                    // belong to the same category.
                     onToolPermissionsClick = { navController.safeNavigate(Routes.PERMISSIONS) },
-                    onShizukuClick = { navController.safeNavigate(Routes.SHIZUKU) },
+                    onRootClick = { navController.safeNavigate(Routes.ROOT) },
                     onVirtualScreenClick = { navController.safeNavigate(Routes.VIRTUAL_SCREEN_SETTINGS) },
                     onBackgroundClick = { navController.safeNavigate(Routes.BACKGROUND) },
                     onLogsClick = { navController.safeNavigate(Routes.LOGS) },
@@ -1236,18 +1236,13 @@ fun AppNavigation(
         composable(Routes.PERMISSIONS) {
             OffloadPermissionScreen(
                 onBack = { navController.safePopBackStack() },
-                // [T-android-privileged-backend] Single Shizuku-protocol screen
-                // handles both Shizuku and AXManager managers; the old
-                // multi-backend screen was retired in favour of a single
-                // surface (the two managers share one binder slot, so a
-                // multi-backend abstraction was misleading).
-                onOpenPrivilegedBackend = { navController.safeNavigate(Routes.SHIZUKU) },
+                onOpenRoot = { navController.safeNavigate(Routes.ROOT) },
                 onOpenSystemPermissions = { navController.safeNavigate(Routes.SYSTEM_PERMISSIONS) },
             )
         }
 
-        composable(Routes.SHIZUKU) {
-            ShizukuPermissionScreen(
+        composable(Routes.ROOT) {
+            RootAccessScreen(
                 onBack = { navController.safePopBackStack() },
             )
         }
@@ -1255,7 +1250,7 @@ fun AppNavigation(
         composable(Routes.VIRTUAL_SCREEN_SETTINGS) {
             VirtualScreenSettingsScreen(
                 onBack = { navController.safePopBackStack() },
-                onOpenShizuku = { navController.safeNavigate(Routes.SHIZUKU) },
+                onOpenRoot = { navController.safeNavigate(Routes.ROOT) },
             )
         }
 

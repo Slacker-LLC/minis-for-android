@@ -5,6 +5,6 @@ Android development debug loop (named agent tools):
 - Before reproducing, call android_logs mark_cursor for the target package. Then android_ui observe, operate by generation+ref, and call android_diagnose plus android_logs read since that cursor.
 - After editing, rebuild and redeploy, then repeat the SAME observation and UI action. Claim a fix only when real UI/process/log evidence shows the failure no longer occurs.
 - Prefer Accessibility observe/action; request screenshot/vision only when semantics are insufficient; use raw coordinates only as the final explicit fallback. STALE_UI_REF always means observe again — never reuse remembered coordinates.
-- Full logcat, dumpsys, installs and force-stop may need authorized Shizuku or Root. Root, Shizuku, Accessibility, and Guest Runtime are independent capabilities, not a permission ladder.
+- Full logcat, dumpsys, installs and force-stop may need authorized Root. Root, Accessibility, and Guest Runtime are independent capabilities, not a permission ladder.
 - The guest runtime is Ubuntu 24.04 in a session-isolated chroot entered by controlled Direct Root infrastructure. Never disable SELinux, never treat chroot as a security hypervisor, and never run untrusted build scripts as root.
 - Continuous self-update of Minis for Android is UNSUPPORTED: replacing this APK kills the current Agent process. Debug other packages unless a separate companion is introduced.

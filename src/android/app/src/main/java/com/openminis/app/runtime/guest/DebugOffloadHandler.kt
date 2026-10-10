@@ -150,7 +150,7 @@ class DebugOffloadHandler(private val context: Context) : NativeOffloadHandler {
             // in DEBUG_ONLY_METHODS of DebugMethodRegistry and are useful
             // from a shell context. Both take an `args` JSON array; we
             // accept either a positional command line or `--args '["a","b"]'`.
-            "shizuku" -> RpcCall("debug.shizuku.exec", buildExecForwarder(rest, args))
+            "root-cli", "rootCli" -> RpcCall("debug.rootCli.exec", buildExecForwarder(rest, args))
             "model-use", "modelUse" -> RpcCall("debug.modelUse.exec", buildExecForwarder(rest, args))
 
             // Generic escape hatch — call any registered method directly.
@@ -172,7 +172,7 @@ class DebugOffloadHandler(private val context: Context) : NativeOffloadHandler {
     }
 
     /**
-     * Build the `{args: [...]}` envelope expected by `debug.shizuku.exec` /
+     * Build the `{args: [...]}` envelope expected by `debug.rootCli.exec` /
      * `debug.modelUse.exec`. If the user passes `--args '["foo","bar"]'`
      * we take that verbatim; otherwise we use the remaining positional
      * arguments as the argv slice.
@@ -330,7 +330,7 @@ SUBCOMMANDS:
   exec <command...>                  Run a shell command via debug.shellExecute
 
 Android-only (DEBUG_ONLY_METHODS in DebugMethodRegistry):
-  shizuku <argv...>                  Invoke android-shizuku-cli (debug.shizuku.exec)
+  root-cli <argv...>                 Invoke android-root-cli (debug.rootCli.exec)
   model-use <argv...>                Invoke minis-model-use (debug.modelUse.exec)
 
 Escape hatch (for any method not listed above):

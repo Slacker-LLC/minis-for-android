@@ -39,7 +39,7 @@ object AndroidAgentTools {
         ),
         AgentToolDefinition(
             name = APP,
-            description = "Inspect and control an Android package with PackageManager/ActivityManager first and authorized Root or Shizuku only where shell privilege is required. " +
+            description = "Inspect and control an Android package with PackageManager/ActivityManager first and authorized Root only where shell privilege is required. " +
                 "Actions: search, info, launch, stop, restart, freeze, unfreeze, install, uninstall. search resolves a display name to a real package among the launcher apps this app can see. freeze/unfreeze are pm disable-user/pm enable: the package keeps its data but cannot run until it is enabled again, and an unlucky target can be a system app, so they require one-time approval. Android 11 package visibility is reported honestly. Install/uninstall require one-time approval and never assume QUERY_ALL_PACKAGES.",
             parameters = commonParams() + packageParams() + artifactParams() + mapOf(
                 "action" to AgentToolParam(
@@ -61,7 +61,7 @@ object AndroidAgentTools {
         ),
         AgentToolDefinition(
             name = UI,
-            description = "Observe and operate Android UI through the existing MinisAccessibilityService on displayId=0, or the Shizuku VScreen UiAutomation backend on the exact active non-zero displayId; unknown ids fail closed and never fall back to the physical screen. No second Accessibility implementation is installed in the app process. " +
+            description = "Observe and operate Android UI through the existing MinisAccessibilityService on displayId=0, or the root VScreen UiAutomation backend on the exact active non-zero displayId; unknown ids fail closed and never fall back to the physical screen. No second Accessibility implementation is installed in the app process. " +
                 "Prefer observe (compact interactive nodes) then actions by generation+ref. Refs are bound to a UI fingerprint and return STALE_UI_REF after a screen change; the tool never guesses old coordinates. " +
                 "Every action reports evidence plus its evidenceSource instead of a bare boolean: accepted-with-effect, accepted-without-evidence, direction-mismatch, timed-out and rejected are different outcomes, and a truncated snapshot refuses ref actions. " +
                 "Coordinates are screenshot-space by default on the physical screen: x/y read off the returned screenshot image are converted through that capture's scale, and an action in that space is refused rather than misclicked when there is no capture or the screen changed; send coordinateSpace=screen for real device pixels. On a virtual display (displayId != 0) the default is display pixels (coordinateSpace=screen) and its size comes with open, observe and screenshot, so no screenshot is needed before a coordinate click. " +
@@ -148,7 +148,7 @@ object AndroidAgentTools {
         AgentToolDefinition(
             name = LOGS,
             description = "Cursor-based, token-bounded Android logcat. Mark a cursor immediately before a UI action, then read since that cursor so logs are attributed to the real action rather than a guessed time window. " +
-                "Actions: mark_cursor, snapshot, watch, read, stop, clear. watch reuses JobRegistry; large raw output reuses SpillPolicy and returns a /var/minis/offloads pointer instead of flooding context. Full-device logs require authorized Root/Shizuku; ordinary mode is explicitly PARTIAL.",
+                "Actions: mark_cursor, snapshot, watch, read, stop, clear. watch reuses JobRegistry; large raw output reuses SpillPolicy and returns a /var/minis/offloads pointer instead of flooding context. Full-device logs require authorized Root; ordinary mode is explicitly PARTIAL.",
             parameters = commonParams() + packageParams() + mapOf(
                 "action" to AgentToolParam("string", "Log action", listOf("mark_cursor", "snapshot", "watch", "read", "stop", "clear")),
                 "cursor" to AgentToolParam("string", "Cursor id from mark_cursor"),

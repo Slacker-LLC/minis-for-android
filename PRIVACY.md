@@ -65,7 +65,7 @@ The app declares many permissions because its tools are optional abilities: loca
 SMS and call log, camera, microphone, photos and media, all-files access, Bluetooth and nearby Wi-Fi, usage
 statistics, notifications (including full-screen notifications), drawing over other apps, accessibility
 control, package installation, exact alarms, changing system settings, battery-optimisation and Data Saver
-exemptions, and Root or Shizuku access. Android asks you before a permission is used, and you can withdraw it in system
+exemptions, and Root access. Android asks you before a permission is used, and you can withdraw it in system
 settings at any time.
 
 A permission is used on the device to carry out the action you or the agent asked for. What a tool returns

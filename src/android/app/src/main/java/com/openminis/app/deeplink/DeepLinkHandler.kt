@@ -202,7 +202,7 @@ object DeepLinkHandler {
             "background" -> DeepLinkAction.OpenSettingsScreen(Routes.BACKGROUND)
             "about" -> DeepLinkAction.OpenSettingsScreen(Routes.ABOUT)
             "permissions" -> DeepLinkAction.OpenPermissionSettings
-            // The one place every grant lives (readiness check, Root, Shizuku, accessibility, files...).
+            // The one place every grant lives (readiness check, Root, accessibility, files...).
             "system", "system-permissions" -> DeepLinkAction.OpenSettingsScreen(Routes.settingsCategory("system"))
             // mirrors live as a section inside Rootfs management — no
             // standalone destination, so route both /mirrors and /rootfs

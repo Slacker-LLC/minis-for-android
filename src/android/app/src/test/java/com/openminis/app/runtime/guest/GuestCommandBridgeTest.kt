@@ -31,6 +31,22 @@ class GuestCommandBridgeTest {
     }
 
     @Test
+    fun `install script removes a retired wrapper but never a symlink or a command still provided`() {
+        val wrapper = GuestCommandBridge.wrapperScriptForTest()
+        val retired = "/rootfs/usr/local/bin/android-shizuku-cli"
+
+        val script = GuestCommandBridge.installScript("/rootfs", 10450, 10450, "cfg", wrapper, wrapper, setOf("android-root-cli"))
+
+        assertTrue(script.contains("if [ -f '$retired' ] && [ ! -L '$retired' ]; then rm -f -- '$retired'; fi"))
+        assertFalse(Regex("""(?m)^rm -f -- '$retired'""").containsMatchIn(script))
+
+        val stillProvided = GuestCommandBridge.installScript(
+            "/rootfs", 10450, 10450, "cfg", wrapper, wrapper, setOf("android-shizuku-cli"),
+        )
+        assertFalse(stillProvided.contains("rm -f -- '$retired'"))
+    }
+
+    @Test
     fun `managed guest CLI set includes registered Android handlers and preview aliases`() {
         val names = GuestCommandBridge.managedCommandNames(
             setOf("android-device", "minis-scheduled", "unsafe/name"),

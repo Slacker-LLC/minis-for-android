@@ -84,6 +84,6 @@ Ubuntu 24.04 userspace 运行在 Android 内核上。chroot 不是 VM，也不�
 - 不恢复旧 broker 或 PRoot/Alpine 双运行时；
 - 不把 guest 宣传成 VM/强沙箱；
 - 不把网络代理写成 Root/chroot 的天然组成部分；
-- 不把 Root、Accessibility、Shizuku、普通 Android API 合并成一条权限阶梯；
+- 不把 Root、Accessibility、普通 Android API 合并成一条权限阶梯；
 - 不通过伪装 FGS 类型维持无限后台寿命；
 - 不为了 namespace 整洁顺手重命名全库 Kotlin/Java package。

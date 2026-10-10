@@ -48,7 +48,6 @@ import com.openminis.app.R
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.permissions.SpecialAccess
-import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.power.PowerOptimizationManager
 import com.openminis.app.runtime.ubuntu.RootAccess
 import com.openminis.app.ui.components.MinisAlertDialog
@@ -61,7 +60,7 @@ import com.openminis.app.ui.theme.ChatColors
  * the assistant role, a tool the Agent is allowed to use).
  */
 enum class ReadinessId {
-    ROOT, SHIZUKU, ALL_FILES, ACCESSIBILITY, OVERLAY, ASSISTANT_ROLE, BACKGROUND, NOTIFICATIONS,
+    ROOT, ALL_FILES, ACCESSIBILITY, OVERLAY, ASSISTANT_ROLE, BACKGROUND, NOTIFICATIONS,
     CALENDAR, LOCATION, CONTACTS, PHOTOS,
     // The "special access" switches of Android's system settings (see SpecialAccess); all optional.
     INSTALL_APPS, EXACT_ALARM, USAGE_STATS, FULL_SCREEN, WRITE_SETTINGS, DATA_SAVER,
@@ -132,7 +131,6 @@ object SettingsReadiness {
     internal fun probe(context: Context, rootGranted: Boolean): List<ReadinessItem> {
         val results = linkedMapOf(
             ReadinessId.ROOT to rootGranted,
-            ReadinessId.SHIZUKU to ShizukuManager.isReady(),
             ReadinessId.ALL_FILES to hasAllFilesAccess(),
             ReadinessId.ACCESSIBILITY to MinisAccessibilityService.isEnabled(context),
             ReadinessId.OVERLAY to Settings.canDrawOverlays(context),
@@ -188,7 +186,6 @@ private fun ReadinessId.title(): String = stringResource(titleRes())
 private fun ReadinessItem.subtitle(): String = stringResource(
     when (id) {
         ReadinessId.ROOT -> if (ok) R.string.settings_ready_root_ok else R.string.settings_ready_root_bad
-        ReadinessId.SHIZUKU -> if (ok) R.string.settings_ready_shizuku_ok else R.string.settings_ready_shizuku_bad
         ReadinessId.ALL_FILES -> if (ok) R.string.settings_ready_files_ok else R.string.settings_ready_files_bad
         ReadinessId.ACCESSIBILITY -> if (ok) R.string.settings_ready_a11y_ok else R.string.settings_ready_a11y_bad
         ReadinessId.OVERLAY -> if (ok) R.string.settings_ready_overlay_ok else R.string.settings_ready_overlay_bad
@@ -225,7 +222,6 @@ fun ReadinessBanner(items: List<ReadinessItem>, onClick: () -> Unit) {
 
 private fun ReadinessId.titleRes(): Int = when (this) {
     ReadinessId.ROOT -> R.string.settings_ready_root_title
-    ReadinessId.SHIZUKU -> R.string.settings_ready_shizuku_title
     ReadinessId.ALL_FILES -> R.string.settings_ready_files_title
     ReadinessId.ACCESSIBILITY -> R.string.settings_ready_a11y_title
     ReadinessId.OVERLAY -> R.string.settings_ready_overlay_title
@@ -256,12 +252,6 @@ private val GRANT_LABEL = setOf(
 private fun fixReadiness(context: Context, item: ReadinessItem, onOpenBackground: () -> Unit) {
     when (item.id) {
         ReadinessId.ROOT -> RootAccess.request(context)
-        ReadinessId.SHIZUKU -> when (ShizukuManager.snapshot.value.state) {
-            ShizukuManager.State.NOT_INSTALLED -> ShizukuManager.openInstallPage(context)
-            ShizukuManager.State.NOT_RUNNING -> ShizukuManager.openShizukuApp(context)
-            ShizukuManager.State.NEED_PERMISSION -> ShizukuManager.requestPermission()
-            ShizukuManager.State.READY -> Unit
-        }
         ReadinessId.ALL_FILES -> openAllFilesAccess(context)
         ReadinessId.ACCESSIBILITY -> startSettings(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         ReadinessId.OVERLAY -> startSettings(

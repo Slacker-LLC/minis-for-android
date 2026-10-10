@@ -26,9 +26,16 @@ class VirtualScreenCopyPolicyTest {
 }
 
 class VirtualScreenFailActionTest {
-    @Test fun shizukuProblemsPointToShizuku() {
-        for (code in listOf("shizuku_not_ready", "shizuku_unavailable", "permission_denied", "unexpected_user_service_uid")) {
-            assertEquals(code, VirtualScreenCopyPolicy.FailAction.SHIZUKU, VirtualScreenCopyPolicy.actionFor(code, xiaomi = false))
+    @Test fun rootProblemsPointToTheRootPage() {
+        for (code in listOf("root_not_ready", "permission_denied", "unexpected_user_service_uid")) {
+            assertEquals(code, VirtualScreenCopyPolicy.FailAction.ROOT, VirtualScreenCopyPolicy.actionFor(code, xiaomi = false))
+        }
+    }
+
+    @Test fun retiredShizukuCodesNoLongerSendAnywhere() {
+        // Reports saved before the switch to Root still carry these; they must not offer a dead destination.
+        for (code in listOf("shizuku_not_ready", "shizuku_unavailable", "shizuku_shell_user_service")) {
+            assertEquals(code, VirtualScreenCopyPolicy.FailAction.NONE, VirtualScreenCopyPolicy.actionFor(code, xiaomi = false))
         }
     }
 

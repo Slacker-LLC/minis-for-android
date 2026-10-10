@@ -20,7 +20,7 @@ Android app（:app）
 ├─ Agent 循环 / 工具 / 子代理 / 会话（Room）/ 计划与检查点
 ├─ Provider（Chat Completions / Responses / Anthropic / Gemini / 各家兼容）
 ├─ MCP 客户端 + 设备内 MCP 服务、Skills、长期记忆、定时任务
-├─ 无障碍 GUI 控制、Shizuku offload、结构化 root.shell、内置浏览器
+├─ 无障碍 GUI 控制、android-root-cli、结构化 root.shell、内置浏览器
 ├─ 语音（VoiceInteractionService / 识别与合成 / 通话）、角色扮演、桌面宠物
 ├─ Xposed / LSPosed 系统增强（无障碍保活、电源键接管、厂商记忆等）
 └─ ExecutionCoordinator → UbuntuKernel / DirectRootRunner
@@ -102,7 +102,7 @@ bash scripts/verify-android-16k.sh      src/android/app/build/outputs/apk/debug/
 
 界面文案全部走资源，共 **8 个语言目录**：`values`（英文默认）、`values-zh`、`values-zh-rTW`、`values-ja`、
 `values-ko`、`values-de`、`values-fr`、`values-ru`，当前条目 2297。新增文案必须 8 语言同步；品牌与协议名
-（Minis、Shizuku、MCP、HTTP、JSON、Token 等）与 slash 命令 token 不翻译。规则、审计工具与覆盖情况见
+（Minis、MCP、HTTP、JSON、Token 等）与 slash 命令 token 不翻译。规则、审计工具与覆盖情况见
 `docs/I18N.md`（`python3 scripts/audit_strings.py`）。
 
 ## 文档地图

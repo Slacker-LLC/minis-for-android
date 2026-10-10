@@ -36,7 +36,7 @@ Android App → ExecutionCoordinator / App-owned shell
 → Ubuntu 24.04 bash
 ```
 
-普通 guest/Agent 命令不是 Root 命令。MCP 必须进入同一工具注册与权限边界。普通 Android API、Accessibility、Shizuku 与 Root 是不同能力。
+普通 guest/Agent 命令不是 Root 命令。MCP 必须进入同一工具注册与权限边界。普通 Android API、Accessibility 与 Root 是不同能力。
 
 ## 文档与历史记录
 

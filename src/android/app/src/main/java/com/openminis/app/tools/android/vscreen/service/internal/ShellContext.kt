@@ -50,7 +50,7 @@ internal class ShellContext private constructor(base: Context) : ContextWrapper(
         fun identityPackage(uid: Int = Process.myUid()): String = if (uid == 0) ROOT_PACKAGE_NAME else SHELL_PACKAGE_NAME
         @Volatile private var instance: ShellContext? = null
 
-        /** Runs only inside Shizuku's separate shell UserService process, which its API docs say has no non-SDK restrictions. */
+        /** Runs only inside the separate root process libsu starts with app_process, where non-SDK restrictions do not apply. */
         @SuppressLint("SoonBlockedPrivateApi")
         @Synchronized
         fun initialize(): String? = runCatching {

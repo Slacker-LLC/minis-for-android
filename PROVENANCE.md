@@ -45,7 +45,8 @@ Minis for Android 含有从开源项目 **OpenMinis** 衍生的代码：
     file and the migrated source files have no file-level copyright headers; each adapted file records its
     original path, pinned commit, Apache-2.0 notice, and the fact that it was modified. No copyright owner
     has been inferred from the Git commit author.
-  - The port is limited to Shizuku shell UserService support for a virtual display, display-targeted UI/input,
+  - The port is limited to the privileged-process support for a virtual display (first hosted in a Shizuku shell
+    UserService, since 2026-10 in a libsu root service), display-targeted UI/input,
     IME policy, clipboard bridge, and bounded screenshots; upstream Main/automation/socket/video/OCR/root paths
     are not imported.
 

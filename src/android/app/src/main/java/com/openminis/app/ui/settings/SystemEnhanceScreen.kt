@@ -279,7 +279,7 @@ internal fun rootStateSubtitle(state: RootAccessState): String = when {
     else -> stringResource(R.string.system_enhance_root_unknown)
 }
 
-/** The Root row: whether su works for this app, and a button to ask again. Shown on the Root & Shizuku page. */
+/** The Root row: whether su works for this app, and a button to ask again. Shown on the Root page. */
 @Composable
 internal fun RootStatusSection() {
     val context = LocalContext.current

@@ -8,7 +8,6 @@ import android.os.Build
 import android.os.StatFs
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.offload.OffloadPermissionManager
-import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import org.json.JSONArray
 import org.json.JSONObject
@@ -37,7 +36,6 @@ object AndroidCapabilityResolver {
         val root = rootSnapshot.probe
         val suPath = rootSnapshot.suPath
         val rootState = rootSnapshot.state
-        val shizuku = ShizukuManager.snapshot.value
         val service = MinisAccessibilityService.getInstance()
         val serviceInfo = service?.serviceInfo
         val rootStatus = when (rootState) {
@@ -48,13 +46,7 @@ object AndroidCapabilityResolver {
             RootAccessState.AUTHORIZATION_FAILED
             -> CapabilityStatus.REQUIRES_USER_GRANT
         }
-        val shizukuStatus = when (shizuku.state) {
-            ShizukuManager.State.READY -> CapabilityStatus.AVAILABLE
-            ShizukuManager.State.NEED_PERMISSION -> CapabilityStatus.REQUIRES_USER_GRANT
-            ShizukuManager.State.NOT_RUNNING -> CapabilityStatus.REQUIRES_USER_GRANT
-            ShizukuManager.State.NOT_INSTALLED -> CapabilityStatus.UNAVAILABLE
-        }
-        val privilegedAvailable = root?.authorized == true || shizuku.state == ShizukuManager.State.READY
+        val privilegedAvailable = root?.authorized == true
 
         return JSONObject().apply {
             put("root", JSONObject().apply {
@@ -95,11 +87,6 @@ object AndroidCapabilityResolver {
                         "active su probe failed: ${root?.error ?: "authorization was not established"}"
                     RootAccessState.SU_NOT_FOUND -> "no executable su was passively detected"
                 }, "root").toJson())
-                put("shizuku", CapabilityFact(
-                    shizukuStatus,
-                    "state=${shizuku.state}, uid=${shizuku.uid}, provider=${if (shizuku.isSui) "sui" else "shizuku-protocol"}",
-                    "shizuku",
-                ).toJson())
             })
             put("ui", JSONObject().apply {
                 put("accessibilityConnected", fact(
@@ -132,7 +119,7 @@ object AndroidCapabilityResolver {
                 put("logcat", CapabilityFact(
                     if (privilegedAvailable) CapabilityStatus.AVAILABLE else CapabilityStatus.PARTIAL,
                     if (privilegedAvailable) "full-device logcat through a privileged shell" else "normal app can only read its own log stream",
-                    if (root?.authorized == true) "root" else if (shizuku.state == ShizukuManager.State.READY) "shizuku" else "app",
+                    if (privilegedAvailable) "root" else "app",
                 ).toJson())
                 put("dumpsys", CapabilityFact(
                     if (privilegedAvailable) CapabilityStatus.AVAILABLE else CapabilityStatus.PARTIAL,

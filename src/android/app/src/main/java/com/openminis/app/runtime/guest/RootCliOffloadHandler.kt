@@ -2,7 +2,7 @@ package com.openminis.app.runtime.guest
 
 import android.content.Context
 import com.openminis.app.logging.AppLogger
-import com.openminis.app.offload.ShizukuManager
+import com.openminis.app.offload.RootProcess
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
@@ -12,15 +12,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * T322: `android-shizuku-cli` — full CLI surface from the design doc.
+ * `android-root-cli` — privileged Android control from the guest shell.
  *
- * Routes argv through [ShizukuManager.runProcess], which executes
- * privileged shell tools (`pm`, `am`, `cmd`, `settings`, `dumpsys`,
- * `input`, `wm`, `appops`) inside the Shizuku service's process (uid
- * 2000 with adb-startup, uid 0 with root-startup). This is exactly the
- * same surface area `adb shell` provides — so any subcommand a developer
- * could run from a USB-tethered laptop is now reachable from inside the
- * agent's sandboxed shell, without launching the device's settings UI.
+ * Routes argv through [RootProcess.run], which runs the Android shell tools
+ * (`pm`, `am`, `cmd`, `settings`, `dumpsys`, `input`, `wm`, `appops`) as
+ * root through the app's one `su` launcher. Everything `adb shell` can do is
+ * reachable from inside the agent's guest shell, plus whatever root adds.
+ * Until 2026-10 the same surface was `android-shizuku-cli` over a Shizuku
+ * binder; the subcommands and their JSON are unchanged.
  *
  * Subcommand groups (12, per design doc):
  *   package      list / info / install / uninstall / enable / disable / clear / path
@@ -40,15 +39,15 @@ import org.json.JSONObject
  * flags via [OffloadOutput.formatBody], and `--format json|text|csv`
  * (text is the default; csv is wired only on `package list`).
  */
-class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler {
+class RootCliOffloadHandler(private val context: Context) : NativeOffloadHandler {
 
     override fun handle(request: NativeOffloadRequest): NativeOffloadResult {
         val argv = request.argv.drop(1)
-        // Top-level help / version short-circuits — no Shizuku dependency.
+        // Top-level help / version short-circuits — no Root needed.
         if (argv.isEmpty() || argv[0] == "--help" || argv[0] == "-h" || argv[0] == "help") {
             return ok(HELP)
         }
-        if (argv[0] == "--version") return ok("android-shizuku-cli 1.0 (T322)")
+        if (argv[0] == "--version") return ok("android-root-cli 1.0")
 
         val group = argv[0]
         val rest = argv.drop(1)
@@ -62,24 +61,18 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         // Allow" upgrades the stored level to BYPASS for next time. See
         // OffloadGate for the sync→suspend rationale (handler interface
         // is sync, manager API is suspend).
-        if (!OffloadGate.allow("shizuku_cli", "android-shizuku-cli", request)) {
+        if (!OffloadGate.allow(TOOL_NAME, "android-root-cli", request)) {
             return errEnvelope(
                 "PERMISSION_DENIED",
-                "Agent is not allowed to use android-shizuku-cli. Open Settings → Permissions → Integrations to change.",
+                "Agent is not allowed to use android-root-cli. Open Settings → Permissions → Integrations to change.",
                 args,
             )
         }
 
-        // Every other group needs binder + permission.
-        ShizukuManager.refresh()
-        when (val st = ShizukuManager.snapshot.value.state) {
-            ShizukuManager.State.NOT_INSTALLED ->
-                return errEnvelope("SERVICE_NOT_RUNNING", "Shizuku is not installed. Open Settings → Permissions → Shizuku.", args)
-            ShizukuManager.State.NOT_RUNNING ->
-                return errEnvelope("SERVICE_NOT_RUNNING", "Shizuku service is not running. Start it via adb or root, then retry.", args)
-            ShizukuManager.State.NEED_PERMISSION ->
-                return errEnvelope("PERMISSION_DENIED", "Minis is not authorized for Shizuku. Grant permission in Settings → Permissions → Shizuku.", args)
-            ShizukuManager.State.READY -> { /* fall through */ }
+        // Every other group needs Root. Only a definite "no su" or "denied" stops here; anything
+        // else is tried and su itself answers.
+        RootProcess.unavailable()?.let { root ->
+            return errEnvelope(root.code, "${root.message}. Open Settings → System → Root.", args)
         }
 
         return try {
@@ -98,9 +91,9 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
                 "exec" -> handleExec(rest, args)
                 else -> NativeOffloadResult(
                     2,
-                    "android-shizuku-cli: unknown subcommand '$group'.\n" +
-                        "  - Try `android-shizuku-cli exec $group ${rest.joinToString(" ")}`".trimEnd() + " to run as a raw shell command.\n" +
-                        "  - Run `android-shizuku-cli` with no args to see available subcommands.\n",
+                    "android-root-cli: unknown subcommand '$group'.\n" +
+                        "  - Try `android-root-cli exec $group ${rest.joinToString(" ")}`".trimEnd() + " to run as a raw shell command.\n" +
+                        "  - Run `android-root-cli` with no args to see available subcommands.\n",
                 )
             }
         } catch (t: Throwable) {
@@ -112,24 +105,23 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     // ─── Group: service ────────────────────────────────────────────────────
     private fun handleService(rest: List<String>, args: OffloadArgs): NativeOffloadResult {
         val sub = rest.firstOrNull() ?: "status"
-        val snap = ShizukuManager.snapshot.value
         return when (sub) {
+            // What the app last learned about su, without asking su again.
             "status" -> {
+                val reason = RootProcess.unavailableReason()
                 val data = JSONObject()
-                    .put("state", snap.state.name)
-                    .put("running", snap.state == ShizukuManager.State.READY ||
-                        snap.state == ShizukuManager.State.NEED_PERMISSION)
-                    .put("authorized", snap.state == ShizukuManager.State.READY)
-                    .put("version", snap.version)
-                    .put("uid", snap.uid)
-                    .put("startup_type", when (snap.uid) { 0 -> "root"; 2000 -> "adb"; else -> "unknown" })
+                    .put("authorized", RootProcess.isGranted())
+                    .put("available", reason == null)
+                if (reason != null) data.put("reason", reason)
                 okEnvelope(data, args)
             }
+            // Asks su now: the answer is the uid the command actually ran as.
             "ping" -> {
-                if (snap.state == ShizukuManager.State.READY) {
-                    ok("OK Shizuku service is running (uid=${snap.uid}, version=${snap.version})\n")
+                val r = RootProcess.run(arrayOf("id", "-u"))
+                if (r.exitCode == 0 && r.stdout.trim() == "0") {
+                    ok("OK root (uid=0)\n")
                 } else {
-                    NativeOffloadResult(1, "FAIL Shizuku service is not READY (state=${snap.state})\n")
+                    NativeOffloadResult(1, "FAIL root is not available: ${failMessage(r)}\n")
                 }
             }
             "help", "--help", "-h" -> ok(SERVICE_HELP)
@@ -161,7 +153,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         if (args.hasFlag("disabled")) cmd.add("-d")
         args.get("user")?.let { cmd.addAll(listOf("--user", it)) }
         args.get("filter")?.let { cmd.add(it) }
-        val r = ShizukuManager.runProcess(cmd.toTypedArray())
+        val r = RootProcess.run(cmd.toTypedArray())
         if (r.exitCode != 0) return errEnvelope("OPERATION_FAILED", failMessage(r), args)
         val pkgs = r.stdout.lineSequence()
             .map { it.removePrefix("package:") }
@@ -182,7 +174,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     private fun packageInfo(pkg: String?, args: OffloadArgs): NativeOffloadResult {
         if (pkg.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "package info <packageName>", args)
         val cmd = mutableListOf("dumpsys", "package", pkg)
-        val r = ShizukuManager.runProcess(cmd.toTypedArray(), timeoutMs = 10_000)
+        val r = RootProcess.run(cmd.toTypedArray(), timeoutMs = 10_000)
         if (r.exitCode != 0) return errEnvelope("PACKAGE_NOT_FOUND", r.combined, args)
         val d = parseDumpsysPackage(r.stdout, pkg)
         return okEnvelope(d, args)
@@ -196,7 +188,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         if (args.hasFlag("grant-permissions")) cmd.add("-g")
         args.get("user")?.let { cmd.addAll(listOf("--user", it)) }
         cmd.add(apk)
-        val r = ShizukuManager.runProcess(cmd.toTypedArray(), timeoutMs = 60_000)
+        val r = RootProcess.run(cmd.toTypedArray(), timeoutMs = 60_000)
         return if (r.exitCode == 0 && r.stdout.contains("Success")) {
             okEnvelope(JSONObject().put("installed", apk), args)
         } else {
@@ -210,7 +202,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         if (args.hasFlag("keep-data", "k")) cmd.add("-k")
         args.get("user")?.let { cmd.addAll(listOf("--user", it)) }
         cmd.add(pkg)
-        val r = ShizukuManager.runProcess(cmd.toTypedArray(), timeoutMs = 30_000)
+        val r = RootProcess.run(cmd.toTypedArray(), timeoutMs = 30_000)
         return if (r.exitCode == 0 && r.stdout.contains("Success")) {
             okEnvelope(JSONObject().put("uninstalled", pkg), args)
         } else {
@@ -226,7 +218,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         val cmd = mutableListOf("pm", verb)
         args.get("user")?.let { cmd.addAll(listOf("--user", it)) }
         cmd.add(pkg)
-        val r = ShizukuManager.runProcess(cmd.toTypedArray())
+        val r = RootProcess.run(cmd.toTypedArray())
         return if (r.exitCode == 0) {
             okEnvelope(JSONObject().put("package", pkg).put("state", if (enable) "enabled" else "disabled"), args)
         } else {
@@ -243,14 +235,14 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
             if (args.hasFlag("cache-only")) add("--cache-only")
             add(pkg)
         }
-        val r = ShizukuManager.runProcess(cmd.toTypedArray(), timeoutMs = 15_000)
+        val r = RootProcess.run(cmd.toTypedArray(), timeoutMs = 15_000)
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("cleared", pkg), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
 
     private fun packagePath(pkg: String?, args: OffloadArgs): NativeOffloadResult {
         if (pkg.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "package path <packageName>", args)
-        val r = ShizukuManager.runProcess(arrayOf("pm", "path", pkg))
+        val r = RootProcess.run(arrayOf("pm", "path", pkg))
         if (r.exitCode != 0) return errEnvelope("PACKAGE_NOT_FOUND", r.combined, args)
         val paths = r.stdout.lineSequence()
             .map { it.removePrefix("package:") }
@@ -276,7 +268,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     private fun permissionList(pkg: String?, args: OffloadArgs): NativeOffloadResult {
         if (pkg.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "permission list <packageName>", args)
         val cmd = mutableListOf("dumpsys", "package", pkg)
-        val r = ShizukuManager.runProcess(cmd.toTypedArray(), timeoutMs = 10_000)
+        val r = RootProcess.run(cmd.toTypedArray(), timeoutMs = 10_000)
         if (r.exitCode != 0) return errEnvelope("PACKAGE_NOT_FOUND", r.combined, args)
         val perms = parseDumpsysPermissions(r.stdout)
         val onlyGranted = args.hasFlag("granted")
@@ -308,7 +300,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         val cmd = mutableListOf("pm", if (grant) "grant" else "revoke")
         args.get("user")?.let { cmd.addAll(listOf("--user", it)) }
         cmd.add(pkg); cmd.add(perm)
-        val r = ShizukuManager.runProcess(cmd.toTypedArray())
+        val r = RootProcess.run(cmd.toTypedArray())
         return if (r.exitCode == 0) {
             okEnvelope(JSONObject().put("package", pkg).put("permission", perm).put("granted", grant), args)
         } else {
@@ -319,7 +311,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     private fun permissionAppops(pos: List<String>, args: OffloadArgs): NativeOffloadResult {
         if (pos.size < 3) return errEnvelope("INVALID_ARGS", "permission appops <pkg> <op> <mode>", args)
         val (pkg, op, mode) = Triple(pos[0], pos[1], pos[2])
-        val r = ShizukuManager.runProcess(arrayOf("appops", "set", pkg, op, mode))
+        val r = RootProcess.run(arrayOf("appops", "set", pkg, op, mode))
         return if (r.exitCode == 0) {
             okEnvelope(JSONObject().put("package", pkg).put("op", op).put("mode", mode), args)
         } else {
@@ -358,7 +350,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         for ((k, v) in extras(args, "extra-bool")) {
             cmd.addAll(listOf("--ez", k, v))
         }
-        val r = ShizukuManager.runProcess(cmd.toTypedArray(), timeoutMs = 15_000)
+        val r = RootProcess.run(cmd.toTypedArray(), timeoutMs = 15_000)
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("status", "started").put("output", r.stdout), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
@@ -368,14 +360,14 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         val cmd = mutableListOf("am", "force-stop")
         args.get("user")?.let { cmd.addAll(listOf("--user", it)) }
         cmd.add(pkg)
-        val r = ShizukuManager.runProcess(cmd.toTypedArray())
+        val r = RootProcess.run(cmd.toTypedArray())
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("stopped", pkg), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
 
     private fun activityKill(pkg: String?, args: OffloadArgs): NativeOffloadResult {
         if (pkg.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "activity kill <pkg>", args)
-        val r = ShizukuManager.runProcess(arrayOf("am", "kill", pkg))
+        val r = RootProcess.run(arrayOf("am", "kill", pkg))
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("killed", pkg), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
@@ -388,13 +380,13 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         args.get("user")?.let { cmd.addAll(listOf("--user", it)) }
         for ((k, v) in extras(args, "extra-string")) cmd.addAll(listOf("--es", k, v))
         for ((k, v) in extras(args, "extra-int")) cmd.addAll(listOf("--ei", k, v))
-        val r = ShizukuManager.runProcess(cmd.toTypedArray())
+        val r = RootProcess.run(cmd.toTypedArray())
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("broadcast", action).put("output", r.stdout), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
 
     private fun activityTop(args: OffloadArgs): NativeOffloadResult {
-        val r = ShizukuManager.runProcess(arrayOf("dumpsys", "activity", "activities"), timeoutMs = 6_000)
+        val r = RootProcess.run(arrayOf("dumpsys", "activity", "activities"), timeoutMs = 6_000)
         if (r.exitCode != 0) return errEnvelope("OPERATION_FAILED", failMessage(r), args)
         // Look for "topResumedActivity=ActivityRecord{... pkg/cls ...}"
         val regex = Regex("""topResumedActivity=ActivityRecord\{[^ ]+ \d+ ([^/]+)/([^ ]+)""")
@@ -409,7 +401,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         // No resumed record in the activity dump: the focused window is the surface
         // that receives input. It is read exactly instead of treating a substring
         // match as the same app (FocusedWindowParser @ c15de97).
-        val w = ShizukuManager.runProcess(arrayOf("dumpsys", "window"), timeoutMs = 6_000)
+        val w = RootProcess.run(arrayOf("dumpsys", "window"), timeoutMs = 6_000)
         val focused = if (w.exitCode == 0) FocusedWindowParser.parse(w.stdout) else null
         val obj = if (focused != null) {
             JSONObject()
@@ -437,7 +429,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     }
 
     private fun displayList(args: OffloadArgs): NativeOffloadResult {
-        val r = ShizukuManager.runProcess(arrayOf("dumpsys", "display"), timeoutMs = 6_000)
+        val r = RootProcess.run(arrayOf("dumpsys", "display"), timeoutMs = 6_000)
         if (r.exitCode != 0) return errEnvelope("OPERATION_FAILED", failMessage(r), args)
         // Parse "DisplayDeviceInfo" blocks; each contains "<id>" + width/height/density/refresh.
         val displays = JSONArray()
@@ -458,7 +450,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         }
         // The `wm size` override is the logical coordinate space that input and
         // screencap use; the physical displays alone do not describe it.
-        val size = ShizukuManager.runProcess(arrayOf("wm", "size"), timeoutMs = 4_000)
+        val size = RootProcess.run(arrayOf("wm", "size"), timeoutMs = 4_000)
         val override = if (size.exitCode == 0) AndroidDisplaySizeParser.parseOverride(size.stdout) else null
         val logical = override ?: if (size.exitCode == 0) AndroidDisplaySizeParser.parse(size.stdout) else null
         return okEnvelope(JSONObject()
@@ -472,13 +464,13 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         var ok = true
         val results = JSONObject()
         args.getInt("density")?.let {
-            val r = ShizukuManager.runProcess(arrayOf("wm", "density", it.toString()))
+            val r = RootProcess.run(arrayOf("wm", "density", it.toString()))
             results.put("density", r.exitCode == 0)
             ok = ok && r.exitCode == 0
         }
         val w = args.getInt("width"); val h = args.getInt("height")
         if (w != null && h != null) {
-            val r = ShizukuManager.runProcess(arrayOf("wm", "size", "${w}x${h}"))
+            val r = RootProcess.run(arrayOf("wm", "size", "${w}x${h}"))
             results.put("size", r.exitCode == 0)
             ok = ok && r.exitCode == 0
         }
@@ -487,8 +479,8 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     }
 
     private fun displayReset(args: OffloadArgs): NativeOffloadResult {
-        val r1 = ShizukuManager.runProcess(arrayOf("wm", "size", "reset"))
-        val r2 = ShizukuManager.runProcess(arrayOf("wm", "density", "reset"))
+        val r1 = RootProcess.run(arrayOf("wm", "size", "reset"))
+        val r2 = RootProcess.run(arrayOf("wm", "density", "reset"))
         return if (r1.exitCode == 0 && r2.exitCode == 0) okEnvelope(JSONObject().put("reset", true), args)
         else errEnvelope("OPERATION_FAILED", "size:${r1.combined} density:${r2.combined}", args)
     }
@@ -511,7 +503,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
 
     private fun settingsGet(ns: String?, key: String?, args: OffloadArgs): NativeOffloadResult {
         if (!validNs(ns) || key.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "settings get <global|secure|system> <key>", args)
-        val r = ShizukuManager.runProcess(arrayOf("settings", "get", ns!!, key))
+        val r = RootProcess.run(arrayOf("settings", "get", ns!!, key))
         // T339: `settings get` returns exitCode=1 with empty stdout/stderr when the key
         // is missing from the namespace database. Don't pass an empty message through —
         // synthesize a useful one so callers see what went wrong.
@@ -523,8 +515,8 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         val hint = r.combined.ifBlank {
             when (r.exitCode) {
                 1 -> "settings $ns key='$key' does not exist or is not readable (exitCode=1). " +
-                    "Try `android-shizuku-cli settings list $ns` to see available keys."
-                124 -> "settings get $ns $key timed out (exitCode=124); raise --timeout-ms or check Shizuku service health."
+                    "Try `android-root-cli settings list $ns` to see available keys."
+                124 -> "settings get $ns $key timed out (exitCode=124); raise --timeout-ms or check that Root is still granted."
                 143 -> "settings get $ns $key was killed mid-flight (SIGTERM/exitCode=143); " +
                     "the privileged process was destroyed before it could finish."
                 else -> "settings get $ns $key failed (exitCode=${r.exitCode})"
@@ -537,7 +529,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         if (!validNs(ns) || key.isNullOrBlank() || value == null) {
             return errEnvelope("INVALID_ARGS", "settings set <ns> <key> <value>", args)
         }
-        val r = ShizukuManager.runProcess(arrayOf("settings", "put", ns!!, key, value))
+        val r = RootProcess.run(arrayOf("settings", "put", ns!!, key, value))
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("key", key).put("value", value), args)
         else errEnvelope(
             "OPERATION_FAILED",
@@ -548,14 +540,14 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
 
     private fun settingsDelete(ns: String?, key: String?, args: OffloadArgs): NativeOffloadResult {
         if (!validNs(ns) || key.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "settings delete <ns> <key>", args)
-        val r = ShizukuManager.runProcess(arrayOf("settings", "delete", ns!!, key))
+        val r = RootProcess.run(arrayOf("settings", "delete", ns!!, key))
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("deleted", key), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r, "settings delete $ns $key"), args)
     }
 
     private fun settingsList(ns: String?, args: OffloadArgs): NativeOffloadResult {
         if (!validNs(ns)) return errEnvelope("INVALID_ARGS", "settings list <global|secure|system>", args)
-        val r = ShizukuManager.runProcess(arrayOf("settings", "list", ns!!), timeoutMs = 8_000)
+        val r = RootProcess.run(arrayOf("settings", "list", ns!!), timeoutMs = 8_000)
         if (r.exitCode != 0) return errEnvelope("OPERATION_FAILED", failMessage(r, "settings list $ns"), args)
         val filter = args.get("filter")
         val obj = JSONObject()
@@ -585,7 +577,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     }
 
     private fun userList(args: OffloadArgs): NativeOffloadResult {
-        val r = ShizukuManager.runProcess(arrayOf("pm", "list", "users"))
+        val r = RootProcess.run(arrayOf("pm", "list", "users"))
         if (r.exitCode != 0) return errEnvelope("OPERATION_FAILED", failMessage(r), args)
         val users = JSONArray()
         // Format: "UserInfo{<id>:<name>:<flags>} running"
@@ -606,28 +598,28 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         if (args.hasFlag("managed-profile")) cmd.add("--profileOf")
         if (args.hasFlag("guest")) cmd.add("--guest")
         cmd.add(name)
-        val r = ShizukuManager.runProcess(cmd.toTypedArray())
+        val r = RootProcess.run(cmd.toTypedArray())
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("created", r.stdout.trim()), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
 
     private fun userRemove(id: String?, args: OffloadArgs): NativeOffloadResult {
         if (id.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "user remove <userId>", args)
-        val r = ShizukuManager.runProcess(arrayOf("pm", "remove-user", id))
+        val r = RootProcess.run(arrayOf("pm", "remove-user", id))
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("removed", id), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
 
     private fun userSwitch(id: String?, args: OffloadArgs): NativeOffloadResult {
         if (id.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "user switch <userId>", args)
-        val r = ShizukuManager.runProcess(arrayOf("am", "switch-user", id))
+        val r = RootProcess.run(arrayOf("am", "switch-user", id))
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("switched", id), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
 
     private fun userStartStop(id: String?, args: OffloadArgs, start: Boolean): NativeOffloadResult {
         if (id.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "user ${if (start) "start" else "stop"} <userId>", args)
-        val r = ShizukuManager.runProcess(arrayOf("am", if (start) "start-user" else "stop-user", id))
+        val r = RootProcess.run(arrayOf("am", if (start) "start-user" else "stop-user", id))
         return if (r.exitCode == 0) okEnvelope(JSONObject().put(if (start) "started" else "stopped", id), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
@@ -668,14 +660,14 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         if (wantBackground) {
             // RUN_ANY_IN_BACKGROUND appop
             val mode = if (restrict) "ignore" else "allow"
-            val r = ShizukuManager.runProcess(arrayOf("appops", "set", pkg, "RUN_ANY_IN_BACKGROUND", mode))
+            val r = RootProcess.run(arrayOf("appops", "set", pkg, "RUN_ANY_IN_BACKGROUND", mode))
             results.put("background", r.exitCode == 0)
             if (r.exitCode != 0) failed = true
         }
         if (wantData) {
             val uid = pkgUid(pkg)
                 ?: return errEnvelope("NOT_FOUND", "cannot determine the UID of '$pkg'; nothing was changed for --data", args)
-            val r = ShizukuManager.runProcess(arrayOf("cmd", "netpolicy",
+            val r = RootProcess.run(arrayOf("cmd", "netpolicy",
                 if (restrict) "add" else "remove", "restrict-background-blacklist", uid))
             results.put("data", r.exitCode == 0)
             if (r.exitCode != 0) failed = true
@@ -687,7 +679,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     private fun networkStats(pkg: String?, args: OffloadArgs): NativeOffloadResult {
         if (pkg.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "network stats <pkg>", args)
         // dumpsys netstats detail; surface the per-uid block.
-        val r = ShizukuManager.runProcess(arrayOf("dumpsys", "netstats", "detail"), timeoutMs = 10_000)
+        val r = RootProcess.run(arrayOf("dumpsys", "netstats", "detail"), timeoutMs = 10_000)
         if (r.exitCode != 0) return errEnvelope("OPERATION_FAILED", failMessage(r), args)
         val uid = pkgUid(pkg)?.toIntOrNull()
             ?: return errEnvelope("NOT_FOUND", "cannot determine the UID of '$pkg'", args)
@@ -698,7 +690,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
 
     /** The package's UID, or null when it cannot be established (never a guessed 0). */
     private fun pkgUid(pkg: String): String? {
-        val r = ShizukuManager.runProcess(arrayOf("dumpsys", "package", pkg), timeoutMs = 6_000)
+        val r = RootProcess.run(arrayOf("dumpsys", "package", pkg), timeoutMs = 6_000)
         return parsePackageUid(r.stdout, r.exitCode)
     }
 
@@ -717,7 +709,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
 
     private fun inputTap(x: String?, y: String?, args: OffloadArgs): NativeOffloadResult {
         if (x.isNullOrBlank() || y.isNullOrBlank()) return errEnvelope("INVALID_ARGS", "input tap <x> <y>", args)
-        val r = ShizukuManager.runProcess(arrayOf("input", "tap", x, y))
+        val r = RootProcess.run(arrayOf("input", "tap", x, y))
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("tap", "$x,$y"), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
@@ -726,7 +718,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         if (coords.size < 4) return errEnvelope("INVALID_ARGS", "input swipe <x1> <y1> <x2> <y2>", args)
         val cmd = mutableListOf("input", "swipe", coords[0], coords[1], coords[2], coords[3])
         args.get("duration")?.let { cmd.add(it) }
-        val r = ShizukuManager.runProcess(cmd.toTypedArray())
+        val r = RootProcess.run(cmd.toTypedArray())
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("swipe", coords.take(4)), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
@@ -736,14 +728,14 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         val cmd = mutableListOf("input", "keyevent")
         if (args.hasFlag("long-press")) cmd.add("--longpress")
         cmd.add(key)
-        val r = ShizukuManager.runProcess(cmd.toTypedArray())
+        val r = RootProcess.run(cmd.toTypedArray())
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("key", key), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
 
     private fun inputText(text: String, args: OffloadArgs): NativeOffloadResult {
         if (text.isBlank()) return errEnvelope("INVALID_ARGS", "input text <text>", args)
-        val r = ShizukuManager.runProcess(arrayOf("input", "text", encodeInputText(text)))
+        val r = RootProcess.run(arrayOf("input", "text", encodeInputText(text)))
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("text", text), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
@@ -761,7 +753,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     }
 
     private fun notificationList(args: OffloadArgs): NativeOffloadResult {
-        val r = ShizukuManager.runProcess(arrayOf("dumpsys", "notification", "--noredact"), timeoutMs = 8_000)
+        val r = RootProcess.run(arrayOf("dumpsys", "notification", "--noredact"), timeoutMs = 8_000)
         if (r.exitCode != 0) return errEnvelope("OPERATION_FAILED", failMessage(r), args)
         val arr = JSONArray()
         val pkgFilter = args.get("package")
@@ -780,7 +772,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
 
     private fun notificationDismiss(args: OffloadArgs): NativeOffloadResult {
         if (args.hasFlag("all")) {
-            val r = ShizukuManager.runProcess(arrayOf("cmd", "notification", "cancel_all"))
+            val r = RootProcess.run(arrayOf("cmd", "notification", "cancel_all"))
             return if (r.exitCode == 0) okEnvelope(JSONObject().put("cancelled", "all"), args)
             else errEnvelope("OPERATION_FAILED", failMessage(r), args)
         }
@@ -788,12 +780,12 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         val id = args.get("id")
         return when {
             pkg != null -> {
-                val r = ShizukuManager.runProcess(arrayOf("cmd", "notification", "cancel", pkg))
+                val r = RootProcess.run(arrayOf("cmd", "notification", "cancel", pkg))
                 if (r.exitCode == 0) okEnvelope(JSONObject().put("cancelled", pkg), args)
                 else errEnvelope("OPERATION_FAILED", failMessage(r), args)
             }
             id != null -> {
-                val r = ShizukuManager.runProcess(arrayOf("cmd", "notification", "cancel", id))
+                val r = RootProcess.run(arrayOf("cmd", "notification", "cancel", id))
                 if (r.exitCode == 0) okEnvelope(JSONObject().put("cancelled_id", id), args)
                 else errEnvelope("OPERATION_FAILED", failMessage(r), args)
             }
@@ -806,7 +798,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         return when (sub) {
             "list" -> {
                 val pkg = rest.getOrNull(1) ?: return errEnvelope("INVALID_ARGS", "notification channel list <pkg>", args)
-                val r = ShizukuManager.runProcess(arrayOf("dumpsys", "notification"), timeoutMs = 8_000)
+                val r = RootProcess.run(arrayOf("dumpsys", "notification"), timeoutMs = 8_000)
                 if (r.exitCode != 0) return errEnvelope("OPERATION_FAILED", failMessage(r), args)
                 val arr = JSONArray()
                 val regex = Regex("""NotificationChannel\{.*?id=([^,]+).*?name=([^,]+).*?importance=(\d+)""")
@@ -831,7 +823,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
                         cmd.addAll(listOf("set_channel_importance", pkg, ch, imp))
                     }
                 }
-                val r = ShizukuManager.runProcess(cmd.toTypedArray())
+                val r = RootProcess.run(cmd.toTypedArray())
                 if (r.exitCode == 0) okEnvelope(JSONObject().put("channel", ch).put("package", pkg), args)
                 else errEnvelope("OPERATION_FAILED", failMessage(r), args)
             }
@@ -858,7 +850,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         if (args.hasFlag("long", "l")) cmd.add("-la") else cmd.add("-1")
         if (args.hasFlag("recursive", "r")) cmd.add("-R")
         cmd.add(path)
-        val r = ShizukuManager.runProcess(cmd.toTypedArray(), timeoutMs = 8_000)
+        val r = RootProcess.run(cmd.toTypedArray(), timeoutMs = 8_000)
         return if (r.exitCode == 0) ok(r.stdout + "\n")
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
@@ -867,10 +859,9 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         if (src.isNullOrBlank() || dst.isNullOrBlank()) {
             return errEnvelope("INVALID_ARGS", "file ${if (pull) "pull" else "push"} <src> <dst>", args)
         }
-        // Use cp via Shizuku — works for both directions because the
-        // Shizuku service has full FS access, while our own uid usually
-        // does not for /Android/data/* paths.
-        val r = ShizukuManager.runProcess(arrayOf("cp", "-r", src, dst), timeoutMs = 30_000)
+        // cp as root works in both directions, including /Android/data/*
+        // paths the app uid cannot reach.
+        val r = RootProcess.run(arrayOf("cp", "-r", src, dst), timeoutMs = 30_000)
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("src", src).put("dst", dst), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
@@ -880,7 +871,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         val cmd = mutableListOf("rm")
         if (args.hasFlag("recursive", "r")) cmd.add("-rf") else cmd.add("-f")
         cmd.add(path)
-        val r = ShizukuManager.runProcess(cmd.toTypedArray())
+        val r = RootProcess.run(cmd.toTypedArray())
         return if (r.exitCode == 0) okEnvelope(JSONObject().put("removed", path), args)
         else errEnvelope("OPERATION_FAILED", failMessage(r), args)
     }
@@ -909,7 +900,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     }
 
     private fun deviceBattery(args: OffloadArgs): NativeOffloadResult {
-        val r = ShizukuManager.runProcess(arrayOf("dumpsys", "battery"), timeoutMs = 5_000)
+        val r = RootProcess.run(arrayOf("dumpsys", "battery"), timeoutMs = 5_000)
         if (r.exitCode != 0) return errEnvelope("OPERATION_FAILED", failMessage(r), args)
         val obj = JSONObject()
         for (line in r.stdout.lineSequence()) {
@@ -926,7 +917,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     private fun deviceUsage(args: OffloadArgs): NativeOffloadResult {
         val pkg = args.get("package")
         val cmd = mutableListOf("dumpsys", "usagestats")
-        val r = ShizukuManager.runProcess(cmd.toTypedArray(), timeoutMs = 10_000)
+        val r = RootProcess.run(cmd.toTypedArray(), timeoutMs = 10_000)
         if (r.exitCode != 0) return errEnvelope("OPERATION_FAILED", failMessage(r), args)
         // Surface raw usagestats text — full structured parsing would dwarf this handler.
         val filtered = if (pkg != null) {
@@ -945,7 +936,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
      * surface, but LLM priors include a long tail of intuitive shell calls
      * (`pm list packages -f`, `cmd statusbar expand-notifications`, …) that
      * don't fit any group. `exec` joins remaining argv into a single shell
-     * command string and runs it under Shizuku via `sh -c` so metacharacters
+     * command string and runs it as root via `sh -c` so metacharacters
      * (`;`, `|`, `>`, backticks) keep their shell meaning. Caller is
      * responsible for quoting.
      */
@@ -953,7 +944,7 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
         if (rest.isEmpty() || rest.firstOrNull() in listOf("help", "--help", "-h")) return ok(EXEC_HELP)
         val cmd = rest.joinToString(" ")
         val timeout = args.getInt("timeout-ms")?.toLong() ?: 30_000L
-        val r = ShizukuManager.runProcess(arrayOf("sh", "-c", cmd), timeoutMs = timeout)
+        val r = RootProcess.run(arrayOf("sh", "-c", cmd), timeoutMs = timeout)
         val data = JSONObject()
             .put("command", cmd)
             .put("exitCode", r.exitCode)
@@ -1056,12 +1047,12 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
     }
 
     /**
-     * T339: many shell commands invoked via Shizuku exit non-zero with empty
+     * T339: many privileged shell commands exit non-zero with empty
      * stdout/stderr (e.g. `settings get` for an unknown key, `pm clear` on a
      * non-existent package). Wrap [r] so callers never surface a blank message
      * — the synthesized fallback keeps the original command context in view.
      */
-    private fun failMessage(r: ShizukuManager.ProcessResult, context: String): String =
+    private fun failMessage(r: RootProcess.Result, context: String): String =
         r.combined.ifBlank { "$context failed (exitCode=${r.exitCode})" }
 
     /**
@@ -1070,10 +1061,10 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
      * empty `OPERATION_FAILED` envelopes (the SIGTERM-143 + empty-output
      * combo was the surface symptom of the runProcess reflection bug).
      */
-    private fun failMessage(r: ShizukuManager.ProcessResult): String =
+    private fun failMessage(r: RootProcess.Result): String =
         r.combined.ifBlank {
             when (r.exitCode) {
-                124 -> "command timed out (exitCode=124); raise --timeout-ms or check Shizuku service health."
+                124 -> "command timed out (exitCode=124); raise --timeout-ms or check that Root is still granted."
                 143 -> "command was killed (SIGTERM/exitCode=143); privileged process destroyed mid-flight."
                 else -> "command failed (exitCode=${r.exitCode})"
             }
@@ -1107,16 +1098,19 @@ class ShizukuOffloadHandler(private val context: Context) : NativeOffloadHandler
          */
         internal fun encodeInputText(text: String): String = text.replace(" ", "%s")
 
-        private const val TAG = "ShizukuOffload"
+        private const val TAG = "RootCliOffload"
 
-        private const val HELP = """android-shizuku-cli — privileged Android system control via Shizuku.
+        /** Permission key in [com.openminis.app.offload.OffloadPermissionManager]. */
+        const val TOOL_NAME = "root_cli"
+
+        private const val HELP = """android-root-cli — privileged Android system control as root.
 
 Usage:
-  android-shizuku-cli <group> <subcommand> [flags]
-  android-shizuku-cli exec <any shell command>      ← fallback passthrough
+  android-root-cli <group> <subcommand> [flags]
+  android-root-cli exec <any shell command>      ← fallback passthrough
 
 Fallback:
-  exec         Run an arbitrary shell command with Shizuku privilege.
+  exec         Run an arbitrary shell command as root.
                Use this when no curated subcommand fits — `exec` accepts
                any `adb shell`-style invocation (pm, am, cmd, dumpsys,
                settings, wm, ime, appops, input, …) and returns
@@ -1145,24 +1139,24 @@ Common flags:
   --user <id>                target user ID
   --help                     group / subcommand help
 
-Run `android-shizuku-cli <group> --help` for group-specific flags.
+Run `android-root-cli <group> --help` for group-specific flags.
 """
 
         private const val EXEC_HELP = """exec — raw shell passthrough (T341).
 
 Usage:
-  android-shizuku-cli exec <shell command...>     [--timeout-ms N]
+  android-root-cli exec <shell command...>     [--timeout-ms N]
 
-Runs the joined argv via `sh -c` under the Shizuku service uid (same
-privilege as `adb shell`). Returns {ok, data:{command, exitCode, stdout,
+Runs the joined argv via `sh -c` as root (uid 0; everything `adb shell`
+can do, and more). Returns {ok, data:{command, exitCode, stdout,
 stderr, combined}}. On non-zero exit the stdout/stderr are still
 included in `data` so callers can diagnose without re-running.
 
 Examples:
-  android-shizuku-cli exec pm list packages -f
-  android-shizuku-cli exec dumpsys battery
-  android-shizuku-cli exec "settings get global airplane_mode_on"
-  android-shizuku-cli exec "logcat -d -t 200 | grep MyTag"
+  android-root-cli exec pm list packages -f
+  android-root-cli exec dumpsys battery
+  android-root-cli exec "settings get global airplane_mode_on"
+  android-root-cli exec "logcat -d -t 200 | grep MyTag"
 
 Notes:
   - Caller owns quoting/escaping. Metacharacters (; | > backticks) work.
@@ -1170,52 +1164,52 @@ Notes:
   - Prefer curated subcommands when they exist — they emit structured JSON.
 """
 
-        private const val SERVICE_HELP = """service — Shizuku runtime status.
+        private const val SERVICE_HELP = """service — Root status.
 
 Usage:
-  android-shizuku-cli service status        State + version + uid
-  android-shizuku-cli service ping          Quick connection check
+  android-root-cli service status          What the app last learned about su
+  android-root-cli service ping            Ask su now; OK when it runs as uid 0
 """
 
         private const val PACKAGE_HELP = """package — installed-app management.
 
 Usage:
-  android-shizuku-cli package list [--system|-3|--disabled] [--filter X]
-  android-shizuku-cli package info <pkg>
-  android-shizuku-cli package install <apkPath> [--grant-permissions] [--downgrade]
-  android-shizuku-cli package uninstall <pkg> [--keep-data]
-  android-shizuku-cli package enable <pkg>
-  android-shizuku-cli package disable <pkg>
-  android-shizuku-cli package clear <pkg> [--cache-only]
-  android-shizuku-cli package path <pkg>
+  android-root-cli package list [--system|-3|--disabled] [--filter X]
+  android-root-cli package info <pkg>
+  android-root-cli package install <apkPath> [--grant-permissions] [--downgrade]
+  android-root-cli package uninstall <pkg> [--keep-data]
+  android-root-cli package enable <pkg>
+  android-root-cli package disable <pkg>
+  android-root-cli package clear <pkg> [--cache-only]
+  android-root-cli package path <pkg>
 """
 
         private const val PERMISSION_HELP = """permission — runtime + AppOps permissions.
 
 Usage:
-  android-shizuku-cli permission list <pkg> [--granted|--denied|--dangerous]
-  android-shizuku-cli permission grant <pkg> <permission>
-  android-shizuku-cli permission revoke <pkg> <permission>
-  android-shizuku-cli permission appops <pkg> <op> <allow|deny|ignore|default>
+  android-root-cli permission list <pkg> [--granted|--denied|--dangerous]
+  android-root-cli permission grant <pkg> <permission>
+  android-root-cli permission revoke <pkg> <permission>
+  android-root-cli permission appops <pkg> <op> <allow|deny|ignore|default>
 """
 
         private const val ACTIVITY_HELP = """activity — Activity / process management.
 
 Usage:
-  android-shizuku-cli activity start [-p pkg] [-c component] [-a action] [-d uri]
+  android-root-cli activity start [-p pkg] [-c component] [-a action] [-d uri]
                                [--extra-string k=v;k=v] [--extra-int k=v]
-  android-shizuku-cli activity force-stop <pkg>
-  android-shizuku-cli activity kill <pkg>
-  android-shizuku-cli activity broadcast <action> [--package pkg]
-  android-shizuku-cli activity top
+  android-root-cli activity force-stop <pkg>
+  android-root-cli activity kill <pkg>
+  android-root-cli activity broadcast <action> [--package pkg]
+  android-root-cli activity top
 """
 
         private const val DISPLAY_HELP = """display — display & resolution.
 
 Usage:
-  android-shizuku-cli display list
-  android-shizuku-cli display set [--width N] [--height N] [--density DPI]
-  android-shizuku-cli display reset
+  android-root-cli display list
+  android-root-cli display set [--width N] [--height N] [--density DPI]
+  android-root-cli display reset
 
 display list reports the physical displays plus the logical (`wm size`) resolution
 that input and screencap use; logicalWidth/logicalHeight are -1 when unreadable.
@@ -1224,65 +1218,65 @@ that input and screencap use; logicalWidth/logicalHeight are -1 when unreadable.
         private const val SETTINGS_HELP = """settings — system Settings DB.
 
 Usage:
-  android-shizuku-cli settings get <global|secure|system> <key>
-  android-shizuku-cli settings set <ns> <key> <value>
-  android-shizuku-cli settings delete <ns> <key>
-  android-shizuku-cli settings list <ns> [--filter X]
+  android-root-cli settings get <global|secure|system> <key>
+  android-root-cli settings set <ns> <key> <value>
+  android-root-cli settings delete <ns> <key>
+  android-root-cli settings list <ns> [--filter X]
 """
 
         private const val USER_HELP = """user — multi-user management.
 
 Usage:
-  android-shizuku-cli user list
-  android-shizuku-cli user create <name> [--managed-profile|--guest]
-  android-shizuku-cli user remove <userId>
-  android-shizuku-cli user switch <userId>
-  android-shizuku-cli user start <userId>
-  android-shizuku-cli user stop <userId>
+  android-root-cli user list
+  android-root-cli user create <name> [--managed-profile|--guest]
+  android-root-cli user remove <userId>
+  android-root-cli user switch <userId>
+  android-root-cli user start <userId>
+  android-root-cli user stop <userId>
 """
 
         private const val NETWORK_HELP = """network — net policy & stats.
 
 Usage:
-  android-shizuku-cli network restrict <pkg> [--background|--data|--all]
-  android-shizuku-cli network allow <pkg> [--background|--data|--all]
-  android-shizuku-cli network stats <pkg>
+  android-root-cli network restrict <pkg> [--background|--data|--all]
+  android-root-cli network allow <pkg> [--background|--data|--all]
+  android-root-cli network stats <pkg>
 """
 
         private const val INPUT_HELP = """input — input simulation.
 
 Usage:
-  android-shizuku-cli input tap <x> <y>
-  android-shizuku-cli input swipe <x1> <y1> <x2> <y2> [--duration MS]
-  android-shizuku-cli input key <KEYCODE> [--long-press]
-  android-shizuku-cli input text <text>
+  android-root-cli input tap <x> <y>
+  android-root-cli input swipe <x1> <y1> <x2> <y2> [--duration MS]
+  android-root-cli input key <KEYCODE> [--long-press]
+  android-root-cli input text <text>
 """
 
         private const val NOTIFICATION_HELP = """notification — system notifications.
 
 Usage:
-  android-shizuku-cli notification list [--package pkg]
-  android-shizuku-cli notification dismiss [--all|--package pkg|--id N]
-  android-shizuku-cli notification channel list <pkg>
-  android-shizuku-cli notification channel set <pkg> <channelId>
+  android-root-cli notification list [--package pkg]
+  android-root-cli notification dismiss [--all|--package pkg|--id N]
+  android-root-cli notification channel list <pkg>
+  android-root-cli notification channel set <pkg> <channelId>
                                          [--block|--unblock|--importance N]
 """
 
         private const val FILE_HELP = """file — privileged file access.
 
 Usage:
-  android-shizuku-cli file ls <path> [-l] [-r]
-  android-shizuku-cli file pull <remote> <local>
-  android-shizuku-cli file push <local> <remote>
-  android-shizuku-cli file rm <path> [-r]
+  android-root-cli file ls <path> [-l] [-r]
+  android-root-cli file pull <remote> <local>
+  android-root-cli file push <local> <remote>
+  android-root-cli file rm <path> [-r]
 """
 
         private const val DEVICE_HELP = """device — device state.
 
 Usage:
-  android-shizuku-cli device info
-  android-shizuku-cli device battery
-  android-shizuku-cli device usage [--package pkg] [--top N]
+  android-root-cli device info
+  android-root-cli device battery
+  android-root-cli device usage [--package pkg] [--top N]
 """
     }
 }
