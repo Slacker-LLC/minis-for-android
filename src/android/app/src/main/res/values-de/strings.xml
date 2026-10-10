@@ -2183,11 +2183,16 @@
     <string name="llm_err_network">Der Anbieter ist nicht erreichbar. Prüfe das Netzwerk und versuche es erneut.</string>
     <string name="llm_err_server">Der Server des Anbieters hat ein vorübergehendes Problem (%1$s). Versuche es gleich noch einmal.</string>
     <string name="llm_err_bad_request">Der Anbieter hat die Anfrage abgelehnt (400). Meist liegt es an Modellname, Denkstufe, einem Anhang oder einer zu langen Unterhaltung.</string>
+    <string name="llm_err_400_tool_pairing">Der Anbieter hat die Anfrage abgelehnt (400): Für einen Tool-Aufruf in diesem Chat fehlt das Ergebnis. Das liegt nicht an Modellname, Denkstufe oder Anhang. Mit einem neuen Chat geht es weiter; bei einer Meldung bitte die Anbieternachricht unten mitschicken.</string>
+    <string name="llm_err_400_context">Die Unterhaltung ist länger, als der Kontext des Modells erlaubt (400). Komprimiere sie oder starte eine neue.</string>
+    <string name="llm_err_400_image">Dieses Modell oder dieser Anbieter nimmt das Bild nicht an (400). Wechsle zu einem Modell mit Bildunterstützung oder entferne das Bild.</string>
+    <string name="llm_err_400_model">Der Anbieter kennt diesen Modellnamen nicht (400). Prüfe den Modellnamen unter Einstellungen → Anbieter.</string>
+    <string name="llm_err_400_thinking">Der Anbieter akzeptiert die aktuelle Denkstufe nicht (400). Senke sie oder schalte das Denken aus und versuche es erneut.</string>
     <string name="llm_err_not_found">Modell oder Adresse nicht gefunden (404). Prüfe Modellname und Endpunkt unter Einstellungen → Anbieter.</string>
     <string name="llm_err_too_large">Die Anfrage ist für den Anbieter zu groß (413). Kürze die Unterhaltung oder entferne große Anhänge.</string>
     <string name="llm_err_rejected">Der Anbieter hat die Anfrage abgelehnt (%1$s).</string>
     <string name="llm_err_decoding">Die Antwort des Anbieters konnte nicht gelesen werden. Versuche es erneut.</string>
-    <string name="llm_err_detail">Details: %1$s</string>
+    <string name="llm_err_detail">Nachricht des Anbieters: %1$s</string>
     <string name="compact_failed">Komprimierung fehlgeschlagen: %1$s</string>
     <string name="chat_no_provider">Kein Modellanbieter eingerichtet. Füge unter Einstellungen → Anbieter einen hinzu.</string>
     <string name="chat_provider_rejected">Die Anbieterkonfiguration wurde abgelehnt.</string>

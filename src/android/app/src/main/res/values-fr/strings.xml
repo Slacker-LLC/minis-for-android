@@ -2079,11 +2079,16 @@
     <string name="llm_err_network">Impossible de joindre le fournisseur. Vérifiez le réseau et réessayez.</string>
     <string name="llm_err_server">Le serveur du fournisseur rencontre un problème temporaire (%1$s). Réessayez dans un instant.</string>
     <string name="llm_err_bad_request">Le fournisseur a refusé la requête (400). Souvent à cause du nom du modèle, du niveau de réflexion, d\'une pièce jointe ou d\'une conversation trop longue.</string>
+    <string name="llm_err_400_tool_pairing">Le fournisseur a refusé la requête (400) : un appel d\'outil de cette conversation n\'a pas de résultat. Ce n\'est pas le nom du modèle, le niveau de réflexion ni une pièce jointe. Une nouvelle conversation permet de continuer ; joignez le message du fournisseur ci-dessous si vous le signalez.</string>
+    <string name="llm_err_400_context">La conversation dépasse le contexte du modèle (400). Compressez-la ou commencez-en une nouvelle.</string>
+    <string name="llm_err_400_image">Ce modèle ou ce fournisseur n\'accepte pas l\'image (400). Passez à un modèle qui gère les images, ou retirez l\'image.</string>
+    <string name="llm_err_400_model">Le fournisseur ne reconnaît pas ce nom de modèle (400). Vérifiez le nom du modèle dans Réglages → Fournisseurs.</string>
+    <string name="llm_err_400_thinking">Le fournisseur n\'accepte pas le niveau de réflexion actuel (400). Baissez-le ou désactivez la réflexion, puis réessayez.</string>
     <string name="llm_err_not_found">Modèle ou adresse introuvable (404). Vérifiez le nom du modèle et le point d\'accès dans Réglages → Fournisseurs.</string>
     <string name="llm_err_too_large">La requête est trop volumineuse pour le fournisseur (413). Raccourcissez la conversation ou retirez les grosses pièces jointes.</string>
     <string name="llm_err_rejected">Le fournisseur a rejeté la requête (%1$s).</string>
     <string name="llm_err_decoding">La réponse du fournisseur est illisible. Réessayez.</string>
-    <string name="llm_err_detail">Détails : %1$s</string>
+    <string name="llm_err_detail">Message du fournisseur : %1$s</string>
     <string name="compact_failed">Échec de la compaction : %1$s</string>
     <string name="chat_no_provider">Aucun fournisseur de modèle configuré. Ajoutez-en un dans Réglages → Fournisseurs.</string>
     <string name="chat_provider_rejected">La configuration du fournisseur a été refusée.</string>
