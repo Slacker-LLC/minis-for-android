@@ -462,6 +462,8 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.ui.chat.SessionEventHub.installDurableStore(database.chatDao())
         providerRepository = ProviderRepository(this)
         envVarRepository = EnvVarRepository(this)
+        // Provider keys for the coding agents in the sandbox, when one-tap authorize has switched that on.
+        com.openminis.app.provider.bridge.ProviderBridge.attach(this, providerRepository)
         // [T-android-safemode-lateinit-crash-147] SkillRepository parses
         // third-party content (skills imported from external hubs), which
         // makes it the realistic source of a throw in this block. Its own
@@ -825,6 +827,10 @@ class MinisApp : Application(), ImageLoaderFactory {
             com.openminis.app.tools.runtime.AgentRalphHandler(),
             aliasNames = listOf("ralph"),
         )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.SystemTerminalHandler(),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.runtime.ProviderQuotaHandler())
 
         // LinuxProvider gates linux.* on the Ubuntu runtime being available (file tools excepted,
         // execution tools try to revive it). Other prefixes have no provider semantics, so their
@@ -833,7 +839,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.tools.runtime.ProviderRouter.register(
             com.openminis.app.tools.runtime.LinuxProvider(
                 available = { UbuntuRuntime.snapshot.value.available },
-                revive = { UbuntuRuntime.ensureReady().running },
+                revive = { UbuntuRuntime.ensureReady(force = true).running },
             ),
         )
         com.openminis.app.tools.BotDelegationCoordinator.current()?.recoverAfterProcessStart()

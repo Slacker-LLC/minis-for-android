@@ -27,6 +27,11 @@ internal object UbuntuMountPolicy {
         // Python, debuggers, child PTYs, and Android tooling. The enclosing
         // mount namespace is private; these mounts are not host-global.
         "/system/bin/mount -o bind /dev \"\$ROOTFS/dev\"",
+        // A non-recursive bind of /dev leaves /dev/pts an empty directory, so the guest's own pty
+        // slaves (tty, ttyname, script, tmux, a program opening a pty) could not be resolved. Mount the
+        // host's devpts at the same place. Best effort: a device without it keeps the old behaviour.
+        "if [ -d /dev/pts ] && [ -d \"\$ROOTFS/dev/pts\" ] && [ ! -L \"\$ROOTFS/dev/pts\" ]; then " +
+            "/system/bin/mount -o bind /dev/pts \"\$ROOTFS/dev/pts\" || true; fi",
         "/system/bin/mount -o bind /proc \"\$ROOTFS/proc\"",
         "/system/bin/mount -o bind /sys \"\$ROOTFS/sys\"",
     )

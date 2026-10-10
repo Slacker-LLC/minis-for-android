@@ -63,6 +63,25 @@ object RuntimePermissionGranter {
         )
     }
 
+    /**
+     * "Keep running in the background" and "start by itself": the standard background app-ops everywhere, and on Xiaomi / HyperOS
+     * the two vendor app-ops behind its Autostart (10008) and "start in the background" (10021) switches. Other vendors keep these
+     * in their own manager apps with no command; the Background page still links to them.
+     */
+    internal fun backgroundPlan(packageName: String, manufacturer: String): List<List<String>> {
+        if (!NAME.matches(packageName)) return emptyList()
+        val out = mutableListOf<List<String>>(
+            listOf("cmd", "appops", "set", packageName, "RUN_IN_BACKGROUND", "allow"),
+            listOf("cmd", "appops", "set", packageName, "RUN_ANY_IN_BACKGROUND", "allow"),
+        )
+        if (manufacturer.equals("xiaomi", ignoreCase = true) || manufacturer.equals("redmi", ignoreCase = true) ||
+            manufacturer.equals("poco", ignoreCase = true)) {
+            out += listOf("cmd", "appops", "set", packageName, "10008", "allow")
+            out += listOf("cmd", "appops", "set", packageName, "10021", "allow")
+        }
+        return out
+    }
+
     private val COMPONENT = Regex("[A-Za-z0-9_.]{1,200}/[A-Za-z0-9_.$]{1,200}")
     private const val ASSISTANT_ROLE = "android.app.role.ASSISTANT"
 
@@ -164,7 +183,12 @@ object RuntimePermissionGranter {
         }
     }.getOrDefault(false)
 
+    /** Whether the vendor autostart switch was turned on by [grantAll]; the system gives apps no way to read it back. */
+    fun autostartGrantedByApp(context: Context): Boolean =
+        context.getSharedPreferences("minis_oem_autostart", Context.MODE_PRIVATE).getBoolean("granted", false)
+
     suspend fun grantAll(context: Context): Result {
+        var autostartGranted = false
         val role = context.assistantRoleManagerOrNull()
         val listeners = listOf(
             android.content.ComponentName(context, MinisNotificationListenerService::class.java).flattenToString(),
@@ -172,6 +196,7 @@ object RuntimePermissionGranter {
         )
         val commands = plan(context.packageName, declaredPermissions(context)) +
             exemptionPlan(context.packageName, android.os.Process.myUid()) +
+            backgroundPlan(context.packageName, android.os.Build.MANUFACTURER.orEmpty()) +
             accessPlan(
                 packageName = context.packageName,
                 accessibilityComponent = android.content.ComponentName(context, MinisAccessibilityService::class.java).flattenToString(),
@@ -195,9 +220,13 @@ object RuntimePermissionGranter {
                 rootOnly = true,
             )
             result.unavailableReason?.let { return Result(commands.size, succeeded, failed, unavailable = it) }
-            if (result.success) succeeded++ else failed += label(argv)
+            if (result.success) {
+                succeeded++
+                if (argv.getOrNull(4) == "10008") autostartGranted = true
+            } else failed += label(argv)
         }
         var attempted = commands.size
+        if (autostartGranted) context.getSharedPreferences("minis_oem_autostart", Context.MODE_PRIVATE).edit().putBoolean("granted", true).apply()
 
         // The module's switches live in the app, not in the system.
         for (key in ModuleSettingsStore.SWITCHES) {

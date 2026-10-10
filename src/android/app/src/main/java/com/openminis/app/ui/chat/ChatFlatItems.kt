@@ -457,7 +457,6 @@ internal sealed class FlatChatItem {
             if (messageId != other.messageId) return false
             if (process.id != other.process.id) return false
             if (process.turnLive != other.process.turnLive) return false
-            if (process.messageUpdatedAtMs != other.process.messageUpdatedAtMs) return false
             val mine = process.blocks
             val theirs = other.process.blocks
             if (mine.size != theirs.size) return false
@@ -507,6 +506,21 @@ internal sealed class FlatChatItem {
     data class TimeDivider(val messageId: String, val epochMs: Long) : FlatChatItem() {
         override val key = "time:$messageId"
         override val contentType = "time"
+    }
+
+    /**
+     * The turn's one clock, the first line under the user's message: counts from the send while the reply is
+     * being produced, then shows the total once the whole reply is done. [endedAtMs] is null while [live] or
+     * when the end is not known.
+     */
+    data class TurnClock(
+        val messageId: String,
+        val startedAtMs: Long,
+        val endedAtMs: Long?,
+        val live: Boolean,
+    ) : FlatChatItem() {
+        override val key = "clock:$messageId"
+        override val contentType = "clock"
     }
 
     data class AssistantTyping(val messageId: String) : FlatChatItem() {
@@ -648,6 +662,7 @@ internal fun buildFlatChatItems(
             is FlatChatItem.AssistantMedia -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantInfo -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantTyping -> item.copy(messageId = "${item.messageId}#$n")
+            is FlatChatItem.TurnClock -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.TimeDivider -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantError -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantLegacyContent -> FlatChatItem.AssistantLegacyContent(
@@ -659,9 +674,6 @@ internal fun buildFlatChatItems(
             is FlatChatItem.AssistantActions -> item.copy(messageId = "${item.messageId}#$n")
         }
     }
-    // [T-android-turn-work] Where the current turn began: the user message that opened it. The
-    // turn's duration is measured from here, not from the assistant row's own timestamps.
-    var turnStartedAtMs = 0L
     for (idx in fromIndex until messages.size) {
         val message = messages[idx]
         // [T-android-perf-logging] Per-100-message progress breadcrumb.
@@ -749,8 +761,6 @@ internal fun buildFlatChatItems(
             blocks = blocks,
             presentation = stepsPresentation,
             thinkingVisible = thinkingVisible,
-            messageCreatedAtMs = turnStartedAtMs.takeIf { it > 0L } ?: message.createdAtMs,
-            messageUpdatedAtMs = message.updatedAtMs,
             turnLive = message.isStreaming,
         )
 
@@ -865,6 +875,26 @@ internal fun buildFlatChatItems(
             }
         }
 
+        // The turn's one clock, directly under the user's message: on the first reply after it, counting
+        // while any reply of the turn (a resumed reply is another message) is still being produced.
+        val previousSpeaker = (idx - 1 downTo 0).asSequence().map { messages[it] }.firstOrNull { it.role != "system" }
+        if (previousSpeaker?.role == "user") {
+            val turnReplies = ArrayList<ChatMessage>()
+            var next = idx
+            while (next < messages.size && messages[next].role != "user") {
+                if (messages[next].role == "assistant") turnReplies.add(messages[next])
+                next++
+            }
+            val live = turnReplies.any { it.isStreaming }
+            val started = previousSpeaker.createdAtMs.takeIf { it > 0L } ?: message.createdAtMs
+            out.add(dedupe(FlatChatItem.TurnClock(
+                messageId = message.id,
+                startedAtMs = started,
+                endedAtMs = if (live) null else turnReplies.mapNotNull { it.updatedAtMs }.maxOrNull()?.takeIf { it > started },
+                live = live,
+            )))
+        }
+
         turnEntries.forEach { entry ->
             when (entry) {
                 is AssistantTurnEntry.Single -> emitBlock(entry.blockIndex, entry.block)
@@ -901,7 +931,10 @@ internal fun buildFlatChatItems(
                 else -> true // tool_use pills render immediately
             }
         }
-        if (message.isStreaming && (!hasVisibleContent || message.isAwaitingModelResponse)) {
+        // The turn's clock line above already says "working" (with its dots), so this row is only a placeholder
+        // that keeps the list following the reply while nothing visible has arrived yet.
+        val hasWorkRow = turnEntries.any { it is AssistantTurnEntry.Process }
+        if (message.isStreaming && (!hasVisibleContent || message.isAwaitingModelResponse) && !hasWorkRow) {
             out.add(dedupe(FlatChatItem.AssistantTyping(message.id)))
         }
 

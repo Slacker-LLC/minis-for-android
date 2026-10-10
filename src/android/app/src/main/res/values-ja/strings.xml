@@ -1344,7 +1344,6 @@
     <!-- T-android-work-process / T-android-assistant-home / lint MissingTranslation -->
     <string name="work_process_running_step">ステップ %1$d を実行中 · %2$s</string>
     <string name="work_process_running_thinking">考えています…</string>
-    <string name="work_process_failed_step">ステップ %1$d が失敗 · %2$s</string>
     <plurals name="work_process_completed_steps">
         <item quantity="other">%d ステップ完了</item>
     </plurals>
@@ -1565,7 +1564,6 @@
         <item quantity="other">%1$d 回の委任</item>
     </plurals>
     <string name="work_process_duration">所要時間 %1$s</string>
-    <string name="work_process_duration_failed">所要時間 %1$s · ステップ %2$d 失敗</string>
     <string name="work_process_elapsed">%1$s 処理中</string>
     <string name="appearance_tool_status_bar_title">ツール ステータス バー</string>
     <string name="appearance_tool_status_bar_sub">入力欄の上に実行中のツールと結果を表示する帯です。</string>
@@ -2102,6 +2100,9 @@
     <string name="vscreen_viewer_open_failed">仮想スクリーンを開けませんでした：%1$s</string>
     <string name="vscreen_viewer_fps">%1$d fps</string>
     <string name="work_status_running">作業中</string>
+    <string name="work_status_step">ステップ %1$d</string>
+    <string name="work_status_thinking">考え中</string>
+    <string name="work_status_list_separator">、</string>
     <string name="work_status_done">完了</string>
     <string name="assistant_menu_branch_here">ここから分岐</string>
     <string name="chat_input_placeholder">メッセージを入力、または / でスキルを呼び出し</string>
@@ -2165,11 +2166,10 @@
     <string name="agent_models_cli_only">minis-model-use 専用（チャットモデルではありません）</string>
     <string name="oneclick_header">ワンタップ許可</string>
     <string name="oneclick_title">すべて許可</string>
-    <string name="oneclick_sub">root でアプリが宣言したすべての Android 権限を付与し、ユーザー補助・Shizuku・仮想画面を含むエージェントの全ツールを許可します。オフにするとエージェント側は既定に戻り、Android の権限は残ります。</string>
+    <string name="oneclick_sub">root でアプリが宣言したすべての Android 権限を付与し、ユーザー補助・Shizuku・仮想画面を含むエージェントの全ツールを許可します。オフにするとエージェント側は既定に戻り、Android の権限は残ります。API キー方式のプロバイダーをターミナル内の pi、Claude Code、Codex と共有します。</string>
     <string name="oneclick_working">許可しています…</string>
     <string name="module_settings_restart_title">Minis を再起動して接続</string>
     <string name="module_settings_restart_sub">Minis が起動中にモジュールを有効にした場合に使います。</string>
-    <string name="work_process_failed_only">ステップ %1$d が失敗</string>
     <string name="model_slot_image">画像</string>
     <string name="chat_interrupted_short">中断されました</string>
     <string name="queued_delivery_steer">次のステップでタスクを誘導します</string>
@@ -2200,4 +2200,17 @@
     <string name="compact_revert_failed">圧縮を元に戻せません：記録が見つかりません。</string>
     <string name="chat_model_gave_up_note">モデルから応答がなく、自動で%1$d回再試行しました。完了した手順は保持されています。</string>
     <string name="chat_model_failed_note">モデルへのリクエストが失敗しました。完了した手順は保持されています。</string>
+    <string name="quota_header">残高と使用量</string>
+    <string name="quota_reading">読み込み中…</string>
+    <string name="quota_failed">残高を読み取れませんでした</string>
+    <string name="quota_refresh">更新</string>
+    <string name="quota_empty">残高または使用枠を使い切りました</string>
+    <string name="quota_plan">プラン：%1$s</string>
+    <string name="quota_available">残り %1$s %2$s</string>
+    <string name="quota_granted">付与 %1$s</string>
+    <string name="quota_topped_up">チャージ %1$s</string>
+    <string name="quota_resets_in">%1$s 後にリセット</string>
+    <string name="quota_window_left">%1$s ウィンドウ：残り %2$d%%</string>
+    <string name="quota_unlimited">無制限</string>
+    <string name="quota_open_console">プロバイダーのサイトで残高を確認</string>
 </resources>

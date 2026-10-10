@@ -30,7 +30,7 @@ object ScheduledReadOnlyPolicy {
     private val readOnlyGitBranchOptions = setOf(
         "-a", "-r", "-v", "-vv", "--all", "--remotes", "--verbose", "--list", "--no-color", "--color",
     )
-    private val deniedCodeExecutionTools = setOf("linux.python.run", "linux.pip.install")
+    private val deniedCodeExecutionTools = setOf("linux.python.run", "linux.pip.install", "terminal")
     private val fileReadTools = setOf(
         "linux.file.read", "linux.file.image.read", "linux.file.list", "linux.file.search",
         "linux.file.grep", "linux.file.head_tail", "linux.file.info",

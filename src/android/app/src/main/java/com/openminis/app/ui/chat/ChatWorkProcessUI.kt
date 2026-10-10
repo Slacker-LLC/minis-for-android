@@ -33,7 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,21 +87,8 @@ internal fun WorkProcessRowView(
 ) {
     // Everything the summary reads: the blocks, whether the turn is still live, and the turn's end time (the
     // duration). Keyed on the blocks alone it kept saying "working" after the turn had ended.
-    val summary = remember(process.blocks, process.turnLive, process.messageUpdatedAtMs, process.messageCreatedAtMs) {
+    val summary = remember(process.blocks, process.turnLive) {
         process.summary()
-    }
-    // [T-android-turn-work] Wall-clock label while the turn runs; one tick a second is enough.
-    val startedAt = process.startedAtMs
-    var elapsedSec by remember(process.id, summary.isRunning, startedAt) { mutableStateOf(0L) }
-    LaunchedEffect(process.id, summary.isRunning, startedAt) {
-        if (!summary.isRunning || startedAt == null) {
-            elapsedSec = 0L
-        } else {
-            while (true) {
-                elapsedSec = ((System.currentTimeMillis() - startedAt) / 1000L).coerceAtLeast(0L)
-                delay(1_000L)
-            }
-        }
     }
     var expanded by rememberSaveable(process.id) { mutableStateOf(summary.isRunning) }
     var userToggled by rememberSaveable(process.id) { mutableStateOf(false) }
@@ -113,8 +99,7 @@ internal fun WorkProcessRowView(
         if (!userToggled) expanded = summary.isRunning
     }
 
-    val failed = summary.failureReason != null && !summary.isRunning
-    val statusText = workStatusText(summary, elapsedSec.takeIf { summary.isRunning })
+    val statusText = workStatusText(summary)
 
     // The redesign's status line: one small grey line above the reply, "已完成 · 用时 12s" with a chevron
     // (right when folded, down when open), or "正在工作 ..." while the turn runs. No bar, no rule under it.
@@ -134,7 +119,7 @@ internal fun WorkProcessRowView(
                 text = statusText,
                 fontSize = 13.sp,
                 lineHeight = 20.sp,
-                color = if (failed) ToolErrorColor else ChatColors.secondaryText,
+                color = ChatColors.secondaryText,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
@@ -153,24 +138,6 @@ internal fun WorkProcessRowView(
                 )
             }
         }
-        // An unrecovered failure is a second, red line: the first line keeps the step count and the time the
-        // turn took, which a failure used to replace.
-        if (failed) {
-            Text(
-                text = stringResource(
-                    R.string.work_process_failed_step,
-                    summary.failedStepNumber ?: 0,
-                    summary.failureReason.orEmpty(),
-                ),
-                fontSize = 12.sp,
-                lineHeight = 18.sp,
-                color = ToolErrorColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(end = 8.dp, bottom = 6.dp),
-            )
-        }
-
         AnimatedVisibility(
             visible = expanded,
             enter = fadeIn() + expandVertically(
@@ -195,26 +162,6 @@ internal fun WorkProcessRowView(
                     .heightIn(max = WORK_PANEL_MAX_HEIGHT)
                     .verticalScroll(panelScroll),
               ) {
-                // [T-android-work-items] What the run consisted of, by type - the same idea as
-                // Codex's grouped work items, in one line above the individual steps. The labels
-                // are resolved with a plain loop: a composable call inside joinToString's lambda
-                // is not a composable context.
-                val tallyGroups = tallyEntries(summary.tallies)
-                if (tallyGroups.isNotEmpty()) {
-                    val parts = ArrayList<String>(tallyGroups.size)
-                    for (index in tallyGroups.indices) {
-                        val (kind, count) = tallyGroups[index]
-                        parts.add(workItemTallyLabel(kind, count))
-                    }
-                    Text(
-                        text = parts.joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ChatColors.secondaryText,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                    )
-                }
                 val trailingBlockId = process.blocks.lastOrNull()?.id
                 process.blocks.forEach { block ->
                     when (block.kind) {
@@ -365,41 +312,37 @@ internal fun notePreview(content: String, latest: Boolean, maxChars: Int = 200):
 }
 
 /**
- * The status line's words: how the turn ended ("已完成 · 用时 12s", "已完成 5 个步骤 · 用时 38s"), where it
- * failed, or that it is still working. The wording rules live here so they stay in one place.
+ * The status line's words, without any time (the turn's time is its own line above the reply). Running: "Step 3 ·
+ * <what the step does>" or "Thinking", "Working" when nothing is known yet. Finished: "Completed 5 steps · read 3 files,
+ * ran 2 commands". The wording rules live here so they stay in one place.
  */
 @Composable
-internal fun workStatusText(summary: WorkProcessSummary, runningElapsedSec: Long? = null): String = when {
-    summary.isRunning -> {
-        val running = stringResource(R.string.work_status_running)
-        if (runningElapsedSec != null && runningElapsedSec > 0L) {
-            "$running · ${formatStepDuration(runningElapsedSec, stillRunning = true)}"
-        } else {
-            running
+internal fun workStatusText(summary: WorkProcessSummary): String {
+    val parts = ArrayList<String>(3)
+    if (summary.isRunning) {
+        summary.runningStepNumber?.let { parts.add(stringResource(R.string.work_status_step, it)) }
+        when {
+            summary.runningToolName != null -> parts.add(summary.runningToolName)
+            summary.thinking -> parts.add(stringResource(R.string.work_status_thinking))
         }
+        if (parts.isEmpty()) parts.add(stringResource(R.string.work_status_running))
+        return parts.joinToString(" · ")
     }
-    else -> {
-        val done = if (summary.toolCount > 0) {
-            pluralStringResource(R.plurals.work_process_completed_steps, summary.toolCount, summary.toolCount)
-        } else {
-            stringResource(R.string.work_status_done)
-        }
-        // The first line always says how long the turn took, failed or not; the failure itself is the
-        // red line under it (and the step number rides along here so a folded row still shows it).
-        val seconds = summary.durationMs?.let { it / 1000L }
-        val failedStep = summary.failedStepNumber?.takeIf { summary.failureReason != null }
-        val took = when {
-            seconds != null && failedStep != null -> stringResource(
-                R.string.work_process_duration_failed, formatStepDuration(seconds, stillRunning = false), failedStep,
-            )
-            seconds != null -> stringResource(
-                R.string.work_process_duration, formatStepDuration(seconds, stillRunning = false),
-            )
-            failedStep != null -> stringResource(R.string.work_process_failed_only, failedStep)
-            else -> null
-        }
-        if (took != null) "$done · $took" else done
+    parts.add(
+        when {
+            summary.toolCount > 0 -> pluralStringResource(R.plurals.work_process_completed_steps, summary.toolCount, summary.toolCount)
+            // A run of nothing but thinking: the turn's line above already says "completed".
+            summary.thinkingCount > 0 -> stringResource(R.string.token_usage_thinking_label)
+            else -> stringResource(R.string.work_status_done)
+        },
+    )
+    val groups = tallyEntries(summary.tallies)
+    if (groups.isNotEmpty()) {
+        val labels = ArrayList<String>(groups.size)
+        for (index in groups.indices) labels.add(workItemTallyLabel(groups[index].first, groups[index].second))
+        parts.add(labels.joinToString(stringResource(R.string.work_status_list_separator)))
     }
+    return parts.joinToString(" · ")
 }
 
 /**

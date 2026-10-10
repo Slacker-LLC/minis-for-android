@@ -105,7 +105,8 @@ object ExecutionCoordinator {
                 // runtime-owned keys so a helper that dies before the first
                 // command cannot leave those values behind.
                 lastInjectedKeys.putIfAbsent(sessionId, RootNetworkProxy.PROXY_ENV_KEYS)
-                val userEnv = envVarRepository?.allAsDict().orEmpty()
+                // The provider keys shared with the coding agents come first: an env var the user set by hand wins.
+                val userEnv = com.openminis.app.provider.bridge.ProviderBridge.currentEnv() + envVarRepository?.allAsDict().orEmpty()
                 val runtimeProxy = RootNetworkProxy.proxyEnv()
                 // The helper is an optional compatibility overlay. Preserve
                 // explicit user proxy variables when it is absent, while the
@@ -136,6 +137,8 @@ object ExecutionCoordinator {
         } catch (error: Exception) {
             shells.remove(sessionId)?.stop()
             lastInjectedKeys.remove(sessionId)
+            // Whatever broke may be in the runtime itself: do not trust the "checked recently" window.
+            UbuntuRuntime.invalidateReadiness()
             failure(
                 error.message ?: error::class.java.simpleName,
                 startTime,
@@ -165,7 +168,7 @@ object ExecutionCoordinator {
                 return ShellJobs.JobProcess.Result(failed.exitCode)
             }
             shell.ensureStarted()
-            val env = envVarRepository?.allAsDict().orEmpty().toMutableMap().apply {
+            val env = (com.openminis.app.provider.bridge.ProviderBridge.currentEnv() + envVarRepository?.allAsDict().orEmpty()).toMutableMap().apply {
                 putAll(RootNetworkProxy.proxyEnv())
             }
             if (env.isNotEmpty()) shell.applyEnvironment(env)
@@ -292,6 +295,8 @@ object ExecutionCoordinator {
         lastInjectedKeys.remove(sessionId)
         // A background job belongs to its session and ends with it.
         ShellJobs.killSession(sessionId)
+        // So do its terminals.
+        com.openminis.app.runtime.terminal.AgentTerminals.existing()?.closeSession(sessionId)
     }
 
     /** User-facing Stop. Kill the session shell; next command recreates it. Background jobs are left running on purpose. */

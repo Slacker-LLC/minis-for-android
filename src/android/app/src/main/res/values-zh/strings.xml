@@ -1526,7 +1526,6 @@
     <!-- [T-android-work-process] 工作过程收束行（思考 + 工具步骤）。 -->
     <string name="work_process_running_step">正在执行第 %1$d 步 · %2$s</string>
     <string name="work_process_running_thinking">正在思考…</string>
-    <string name="work_process_failed_step">第 %1$d 步失败 · %2$s</string>
     <plurals name="work_process_completed_steps">
         <item quantity="other">已完成 %d 个步骤</item>
     </plurals>
@@ -1748,7 +1747,6 @@
         <item quantity="other">%1$d 次委派</item>
     </plurals>
     <string name="work_process_duration">用时 %1$s</string>
-    <string name="work_process_duration_failed">用时 %1$s · 第 %2$d 步失败</string>
     <string name="work_process_elapsed">已处理 %1$s</string>
     <string name="appearance_tool_status_bar_title">工具状态栏</string>
     <string name="appearance_tool_status_bar_sub">输入框上方那条显示正在运行的工具与结果的横条。</string>
@@ -2343,6 +2341,9 @@
     <string name="vscreen_viewer_open_failed">无法开启虚拟屏幕：%1$s</string>
     <string name="vscreen_viewer_fps">%1$d 帧/秒</string>
     <string name="work_status_running">正在工作</string>
+    <string name="work_status_step">第 %1$d 步</string>
+    <string name="work_status_thinking">思考中</string>
+    <string name="work_status_list_separator">、</string>
     <string name="work_status_done">已完成</string>
     <string name="assistant_menu_branch_here">从这里分支</string>
     <string name="chat_input_placeholder">输入消息，或用 / 调用技能</string>
@@ -2406,11 +2407,10 @@
     <string name="agent_models_cli_only">仅限 minis-model-use（非对话模型）</string>
     <string name="oneclick_header">一键授权</string>
     <string name="oneclick_title">授权全部</string>
-    <string name="oneclick_sub">需要 root。授予本应用声明的全部 Android 权限，打开无障碍服务、通知读取权限和默认助手角色，启用模块开关和虚拟屏幕（需先运行 Shizuku），并允许 Agent 的全部工具。关闭只把 Agent 权限恢复默认，Android 系统授权保留。</string>
+    <string name="oneclick_sub">需要 root。授予本应用声明的全部 Android 权限，打开无障碍服务、通知读取权限和默认助手角色，启用模块开关和虚拟屏幕（需先运行 Shizuku），并允许 Agent 的全部工具。关闭只把 Agent 权限恢复默认，Android 系统授权保留。并把 API Key 类服务商共享给终端里的 pi、Claude Code 和 Codex。</string>
     <string name="oneclick_working">正在授权…</string>
     <string name="module_settings_restart_title">重启 Minis 以连接框架</string>
     <string name="module_settings_restart_sub">在 Minis 已经运行时才启用模块的话，点这里重启一次。</string>
-    <string name="work_process_failed_only">第 %1$d 步失败</string>
     <string name="model_slot_image">图像</string>
     <string name="chat_interrupted_short">已中断</string>
     <string name="queued_delivery_steer">将在下一步引导任务</string>
@@ -2441,4 +2441,17 @@
     <string name="compact_revert_failed">无法撤销压缩：找不到它的记录。</string>
     <string name="chat_model_gave_up_note">模型没有响应，已自动重试 %1$d 次，已完成的步骤已保留。</string>
     <string name="chat_model_failed_note">模型请求失败，已完成的步骤已保留。</string>
+    <string name="quota_header">额度与用量</string>
+    <string name="quota_reading">正在读取…</string>
+    <string name="quota_failed">读取额度失败</string>
+    <string name="quota_refresh">刷新</string>
+    <string name="quota_empty">余额或用量已用完</string>
+    <string name="quota_plan">套餐：%1$s</string>
+    <string name="quota_available">剩余 %1$s %2$s</string>
+    <string name="quota_granted">赠送 %1$s</string>
+    <string name="quota_topped_up">充值 %1$s</string>
+    <string name="quota_resets_in">%1$s 后重置</string>
+    <string name="quota_window_left">%1$s 窗口：剩余 %2$d%%</string>
+    <string name="quota_unlimited">额度不限</string>
+    <string name="quota_open_console">到服务商官网查看余额</string>
 </resources>

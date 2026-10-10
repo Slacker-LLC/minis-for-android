@@ -191,6 +191,8 @@ internal fun ChatViewModel.updateAssistantMessage(
         isStreaming = false,
         toolBlocks = toolBlocks.toList(),
         isAwaitingModelResponse = isAwaitingModelResponse,
+        // The turn's clock stops here: the status line shows send-to-now until this is set.
+        updatedAtMs = if (isAwaitingModelResponse) current[idx].updatedAtMs else System.currentTimeMillis(),
     )
     _messages.value = updated
     if (_streamingById.value.containsKey(id)) {
@@ -236,6 +238,7 @@ internal fun ChatViewModel.flushStreamingDelta(id: String) {
             isStreaming = false,
             toolBlocks = delta.toolBlocks,
             isAwaitingModelResponse = delta.isAwaitingModelResponse,
+            updatedAtMs = System.currentTimeMillis(),
         )
         _messages.value = updated
     }
@@ -263,6 +266,7 @@ internal fun ChatViewModel.flushAllStreamingDeltas() {
             isStreaming = false,
             toolBlocks = delta.toolBlocks,
             isAwaitingModelResponse = delta.isAwaitingModelResponse,
+            updatedAtMs = System.currentTimeMillis(),
         )
         changed = true
     }

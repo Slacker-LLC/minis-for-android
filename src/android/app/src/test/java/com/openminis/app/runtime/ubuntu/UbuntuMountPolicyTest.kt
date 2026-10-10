@@ -24,4 +24,16 @@ class UbuntuMountPolicyTest {
         assertFalse(commands.any { it.contains("rm -f") && it.contains("\$ROOTFS/dev") })
         assertFalse(commands.any { it.contains("ln -s") && it.contains("\$ROOTFS/dev") })
     }
+
+    @Test
+    fun `the host pty directory is mounted after the device bind, and only into a real directory`() {
+        val commands = UbuntuMountPolicy.setupCommands()
+        val dev = commands.indexOfFirst { it.contains("/system/bin/mount -o bind /dev \"") }
+        val pts = commands.indexOfFirst { it.contains("mount -o bind /dev/pts") }
+        assertTrue("devpts must come after /dev or the bind would hide it", pts > dev && dev >= 0)
+        val command = commands[pts]
+        assertTrue("never follows a link planted at the target", command.contains("! -L \"\$ROOTFS/dev/pts\""))
+        assertTrue("a device without devpts keeps working", command.contains("|| true"))
+        assertFalse(command.contains("--rbind"))
+    }
 }

@@ -559,8 +559,12 @@ internal fun ModelPickerSheet(
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.weight(1f, fill = false),
                                     )
+                                    // What is left on the account, where the service can say (balance / subscription windows).
+                                    androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+                                    com.openminis.app.ui.settings.QuotaPill(instance, providerRepository)
+                                    androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
                                     // [T-android-model-picker-polish] Same
                                     // neutral treatment as the group chevron
                                     // above — see that comment for why the

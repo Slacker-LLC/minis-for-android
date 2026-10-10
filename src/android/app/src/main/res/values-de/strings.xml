@@ -1338,7 +1338,6 @@
     <!-- T-android-work-process / T-android-assistant-home / lint MissingTranslation -->
     <string name="work_process_running_step">Schritt %1$d läuft · %2$s</string>
     <string name="work_process_running_thinking">Denkt nach…</string>
-    <string name="work_process_failed_step">Schritt %1$d fehlgeschlagen · %2$s</string>
     <plurals name="work_process_completed_steps">
         <item quantity="one">%d Schritt abgeschlossen</item>
         <item quantity="other">%d Schritte abgeschlossen</item>
@@ -1568,7 +1567,6 @@
         <item quantity="other">%1$d Delegationen</item>
     </plurals>
     <string name="work_process_duration">Dauer %1$s</string>
-    <string name="work_process_duration_failed">Dauer %1$s · Schritt %2$d fehlgeschlagen</string>
     <string name="work_process_elapsed">Läuft seit %1$s</string>
     <string name="appearance_tool_status_bar_title">Werkzeug-Statusleiste</string>
     <string name="appearance_tool_status_bar_sub">Der Streifen über dem Eingabefeld, der das laufende Werkzeug und sein Ergebnis zeigt.</string>
@@ -2105,6 +2103,9 @@
     <string name="vscreen_viewer_open_failed">Virtueller Bildschirm konnte nicht geöffnet werden: %1$s</string>
     <string name="vscreen_viewer_fps">%1$d fps</string>
     <string name="work_status_running">Arbeitet</string>
+    <string name="work_status_step">Schritt %1$d</string>
+    <string name="work_status_thinking">Denkt nach</string>
+    <string name="work_status_list_separator">", "</string>
     <string name="work_status_done">Fertig</string>
     <string name="assistant_menu_branch_here">Von hier verzweigen</string>
     <string name="chat_input_placeholder">Nachricht eingeben oder / für Skills</string>
@@ -2168,11 +2169,10 @@
     <string name="agent_models_cli_only">Nur minis-model-use (kein Chatmodell)</string>
     <string name="oneclick_header">Ein-Tipp-Freigabe</string>
     <string name="oneclick_title">Alles freigeben</string>
-    <string name="oneclick_sub">Erteilt per Root alle vom App deklarierten Android-Berechtigungen und erlaubt alle Agent-Werkzeuge, auch Bedienungshilfen, Shizuku und den virtuellen Bildschirm. Beim Ausschalten kehren die Agent-Werkzeuge zu ihren Standardwerten zurück; die Android-Berechtigungen bleiben.</string>
+    <string name="oneclick_sub">Erteilt per Root alle vom App deklarierten Android-Berechtigungen und erlaubt alle Agent-Werkzeuge, auch Bedienungshilfen, Shizuku und den virtuellen Bildschirm. Beim Ausschalten kehren die Agent-Werkzeuge zu ihren Standardwerten zurück; die Android-Berechtigungen bleiben. Gibt außerdem deine API-Key-Anbieter an pi, Claude Code und Codex im Terminal weiter.</string>
     <string name="oneclick_working">Wird erteilt…</string>
     <string name="module_settings_restart_title">Minis neu starten, um zu verbinden</string>
     <string name="module_settings_restart_sub">Nutze das, wenn du das Modul aktiviert hast, während Minis schon lief.</string>
-    <string name="work_process_failed_only">Schritt %1$d fehlgeschlagen</string>
     <string name="model_slot_image">Bild</string>
     <string name="chat_interrupted_short">Unterbrochen</string>
     <string name="queued_delivery_steer">Lenkt die Aufgabe im nächsten Schritt</string>
@@ -2203,4 +2203,17 @@
     <string name="compact_revert_failed">Rückgängig nicht möglich: Der Eintrag wurde nicht gefunden.</string>
     <string name="chat_model_gave_up_note">Keine Antwort vom Modell nach %1$d automatischen Wiederholungen. Erledigte Schritte bleiben erhalten.</string>
     <string name="chat_model_failed_note">Die Modellanfrage ist fehlgeschlagen. Erledigte Schritte bleiben erhalten.</string>
+    <string name="quota_header">Guthaben &amp; Nutzung</string>
+    <string name="quota_reading">Wird gelesen…</string>
+    <string name="quota_failed">Guthaben konnte nicht gelesen werden</string>
+    <string name="quota_refresh">Aktualisieren</string>
+    <string name="quota_empty">Guthaben oder Kontingent aufgebraucht</string>
+    <string name="quota_plan">Tarif: %1$s</string>
+    <string name="quota_available">Verbleibend %1$s %2$s</string>
+    <string name="quota_granted">Geschenkt %1$s</string>
+    <string name="quota_topped_up">Aufgeladen %1$s</string>
+    <string name="quota_resets_in">Zurückgesetzt in %1$s</string>
+    <string name="quota_window_left">Fenster %1$s: %2$d%% übrig</string>
+    <string name="quota_unlimited">Unbegrenzt</string>
+    <string name="quota_open_console">Guthaben auf der Website des Anbieters ansehen</string>
 </resources>

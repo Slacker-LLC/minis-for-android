@@ -95,6 +95,7 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
 
     val vendor = remember { PowerOptimizationManager.Vendor.current() }
     val needsOemGuidance = remember { PowerOptimizationManager.needsOemAutostartGuidance() }
+    val autostartByApp = remember { com.openminis.app.permissions.RuntimePermissionGranter.autostartGrantedByApp(context) }
 
     // [T-android-settings-metrics] The shared scaffold, like every other settings page. The old
     // 16dp horizontal padding it carried is dropped with it: every section already insets its card
@@ -190,9 +191,13 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
             SettingsSection(header = stringResource(R.string.rom_autostart_section_title)) {
                 SettingsRow(
                     icon = Icons.Outlined.PhoneAndroid,
-                    iconColor = ChatColors.warn,
+                    iconColor = if (autostartByApp) ChatColors.ok else ChatColors.warn,
                     title = stringResource(R.string.rom_autostart_row_title),
-                    subtitle = stringResource(R.string.rom_autostart_row_subtitle, vendor.displayName),
+                    subtitle = if (autostartByApp) {
+                        stringResource(R.string.battery_opt_already_exempt)
+                    } else {
+                        stringResource(R.string.rom_autostart_row_subtitle, vendor.displayName)
+                    },
                     onClick = {
                         if (activity != null) {
                             val ok = PowerOptimizationManager.openOemAutostartSettings(activity)

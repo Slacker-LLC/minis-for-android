@@ -1,7 +1,6 @@
 package com.openminis.app.ui.chat
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -52,34 +51,20 @@ class WorkProcessSummaryTest {
     }
 
     @Test
-    fun `duration runs from the first step's start to the last step's end`() {
-        val process = WorkProcess(
-            id = "p1",
-            blocks = listOf(
-                tool("a", "shell_execute", startTimeMs = 1_000L, durationMs = 2_000L),
-                tool("b", "file_read", startTimeMs = 4_000L, durationMs = 1_000L),
-            ),
-        )
-        assertEquals(4_000L, process.durationMs)
-        assertEquals(4_000L, process.summary().durationMs)
-    }
-
-    @Test
-    fun `a running step has no duration, and steps without timings report none`() {
+    fun `the running line names the step in flight and a thinking run says so`() {
         val running = WorkProcess(
             id = "p1",
             blocks = listOf(
-                tool("a", "shell_execute", startTimeMs = 1_000L, durationMs = 2_000L),
-                tool("b", "shell_execute", status = ToolBlockStatus.RUNNING, startTimeMs = 5_000L),
+                tool("a", "shell_execute"),
+                tool("b", "file_read", status = ToolBlockStatus.RUNNING).copy(toolTitle = "Read ChatScreen.kt"),
             ),
-        )
-        assertNull(running.durationMs)
+        ).summary()
+        assertEquals(2, running.runningStepNumber)
+        assertEquals("Read ChatScreen.kt", running.runningToolName)
 
-        val untimed = WorkProcess(id = "p2", blocks = listOf(tool("c", "shell_execute")))
-        assertNull(
-            "a row restored from older data has no timings and must keep its step wording",
-            untimed.durationMs,
-        )
+        val thinkingRun = WorkProcess(id = "p2", blocks = listOf(tool("a", "shell_execute"), thinking("t")), turnLive = true).summary()
+        assertEquals(true, thinkingRun.thinking)
+        assertEquals(null, thinkingRun.runningToolName)
     }
 
     @Test

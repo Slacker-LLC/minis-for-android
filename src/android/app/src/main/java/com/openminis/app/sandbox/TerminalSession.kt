@@ -120,7 +120,7 @@ class TerminalSession internal constructor(
                 // registered on the same TerminalSession in between; the old
                 // snapshot would then stop the replacement PTY as well.
                 current.forEach(TerminalSession::stopActiveRun)
-                liveSessions.removeAll { ref -> ref.get() == null || ref.get() in current }
+                liveSessions.removeIf { ref -> ref.get() == null || ref.get() in current }
             }
         }
 
@@ -154,7 +154,7 @@ class TerminalSession internal constructor(
                         job
                     }
                 }.also {
-                    liveSessions.removeAll { ref -> ref.get() == null || ref.get() in stopped }
+                    liveSessions.removeIf { ref -> ref.get() == null || ref.get() in stopped }
                 }
             }
             withContext(NonCancellable) {
@@ -193,7 +193,7 @@ class TerminalSession internal constructor(
                     it.job = scope.launch(start = CoroutineStart.LAZY) { runTerminal(it, sessionId, initialCols, initialRows) }
                 }
             }.also {
-                liveSessions.removeAll { ref -> ref.get() === this || ref.get() == null }
+                liveSessions.removeIf { ref -> ref.get() === this || ref.get() == null }
                 liveSessions.add(WeakReference(this))
             }
         }
@@ -270,7 +270,7 @@ class TerminalSession internal constructor(
                         false
                     }
                 }
-                if (removeLiveSession) liveSessions.removeAll { it.get() === this || it.get() == null }
+                if (removeLiveSession) liveSessions.removeIf { it.get() === this || it.get() == null }
             }
         }
     }
@@ -317,7 +317,7 @@ class TerminalSession internal constructor(
 
     fun stop() {
         stopActiveRun()
-        liveSessions.removeAll { it.get() === this || it.get() == null }
+        liveSessions.removeIf { it.get() === this || it.get() == null }
     }
 
     private fun activeJob(): Job? = synchronized(lock) { activeRun?.job }

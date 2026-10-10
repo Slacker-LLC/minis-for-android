@@ -59,23 +59,16 @@ class TurnWorkRowTest {
     }
 
     @Test
-    fun `only the last work row carries the turn's clock and stays open while the turn is live`() {
+    fun `only the last work row follows the live turn`() {
         val entries = buildAssistantTurnEntries(
             messageId = "m1",
             blocks = listOf(tool("c1", startTimeMs = 1_000L), text("t2", "再确认一下"), tool("c2", startTimeMs = 2_000L), text("t3", "结论")),
             presentation = StepsPresentation.GROUPED,
             thinkingVisible = true,
-            messageCreatedAtMs = 500L,
-            messageUpdatedAtMs = 9_500L,
             turnLive = true,
         )
         val processes = entries.filterIsInstance<AssistantTurnEntry.Process>().map { it.process }
-        assertEquals(2, processes.size)
-        assertEquals("an earlier run is finished: the model went on to write after it", false, processes[0].turnLive)
-        assertEquals("the run next to the answer follows the turn", true, processes[1].turnLive)
-        assertEquals(0L, processes[0].messageCreatedAtMs)
-        assertEquals(500L, processes[1].messageCreatedAtMs)
-        assertEquals("an earlier run reports its own steps' time", 500L, processes[0].copy(turnLive = false).durationMs)
+        assertEquals("an earlier run is finished: the model went on to write after it", listOf(false, true), processes.map { it.turnLive })
     }
 
     @Test

@@ -41,6 +41,21 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     var title: String = ""
         private set
 
+    private val statusStore = ProgramStatusStore()
+    private val _programStatus = mutableStateOf<List<StatusRecord>>(emptyList())
+
+    /** OSC 7501 records; they belong to the terminal, so alternate-screen switches leave them alone. */
+    val programStatus: State<List<StatusRecord>> = _programStatus
+
+    /** Process exit: working, blocked and idle records go, done and error stay (OSC 7501 lifetime). */
+    fun onProcessExit() = publishStatus(statusStore.dropTransient())
+
+    fun effectiveApp(record: StatusRecord): String? = statusStore.effectiveApp(record)
+
+    private fun publishStatus(changed: Boolean) {
+        if (changed) _programStatus.value = statusStore.snapshot
+    }
+
     /** Callback for terminal responses (DSR, DA). */
     var onResponse: ((ByteArray) -> Unit)? = null
 
@@ -104,6 +119,30 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
         primaryBuffer.resize(newCols, newRows)
         alternateBuffer.resize(newCols, newRows)
         _version.value = _version.value + 1
+    }
+
+    /**
+     * The visible screen as plain text for a reader that is not looking at the canvas: one line per row, trailing
+     * blanks removed, blank rows at the bottom dropped. [scrollbackLines] more lines from above the screen come first.
+     */
+    fun screenText(scrollbackLines: Int = 0): String {
+        val buf = activeBuffer
+        fun rowText(row: Array<TerminalCell>): String {
+            val sb = StringBuilder(row.size)
+            for (cell in row) {
+                if (cell.isWideTrailer) continue
+                sb.appendCodePoint(if (cell.char <= 0) ' '.code else cell.char)
+            }
+            return sb.toString().trimEnd()
+        }
+        val lines = ArrayList<String>()
+        if (scrollbackLines > 0 && !isAlternateActive) {
+            val history = buf.scrollback
+            for (i in maxOf(0, history.size - scrollbackLines) until history.size) lines.add(rowText(history.elementAt(i)))
+        }
+        for (row in buf.grid) lines.add(rowText(row))
+        while (lines.isNotEmpty() && lines.last().isEmpty()) lines.removeAt(lines.lastIndex)
+        return lines.joinToString("\n")
     }
 
     /** Current cursor position (in active buffer). */
@@ -378,9 +417,21 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     private fun handleOsc(command: Int, payload: String) {
         when (command) {
             0, 2 -> title = payload
+            133 -> if (payload == "A" || payload.startsWith("A;")) publishStatus(statusStore.dropTransient())
             1337 -> handleITermOsc(payload)
+            7501 -> handleProgramStatus(payload)
             else -> {}
         }
+    }
+
+    private fun handleProgramStatus(body: String) {
+        if (ProgramStatusParser.isQuery(body)) {
+            // The only bytes this protocol ever writes back: the fixed feature-detection reply.
+            onResponse?.invoke("\u001B]7501;?\u001B\\".toByteArray(Charsets.UTF_8))
+            return
+        }
+        val report = ProgramStatusParser.parse(body) ?: return
+        publishStatus(statusStore.apply(report))
     }
 
     private fun handleITermOsc(payload: String) {
@@ -424,5 +475,6 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
         alternateBuffer.moveCursorTo(0, 0)
         isAlternateActive = false
         scrollOffset = 0
+        publishStatus(statusStore.reset())
     }
 }

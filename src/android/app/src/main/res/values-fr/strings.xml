@@ -1205,7 +1205,6 @@
     <!-- T-android-work-process / T-android-assistant-home / lint MissingTranslation -->
     <string name="work_process_running_step">Étape %1$d en cours · %2$s</string>
     <string name="work_process_running_thinking">Réflexion…</string>
-    <string name="work_process_failed_step">Échec de l’étape %1$d · %2$s</string>
     <plurals name="work_process_completed_steps">
         <item quantity="one">%d étape terminée</item>
         <item quantity="many">%d étapes terminées</item>
@@ -1464,7 +1463,6 @@
         <item quantity="other">%1$d délégations</item>
     </plurals>
     <string name="work_process_duration">Durée %1$s</string>
-    <string name="work_process_duration_failed">Durée %1$s · étape %2$d en échec</string>
     <string name="work_process_elapsed">En cours depuis %1$s</string>
     <string name="appearance_tool_status_bar_title">Barre d\'état des outils</string>
     <string name="appearance_tool_status_bar_sub">La bande au-dessus du champ de saisie qui indique l\'outil en cours et son résultat.</string>
@@ -2001,6 +1999,9 @@
     <string name="vscreen_viewer_open_failed">Impossible d’ouvrir l’écran virtuel : %1$s</string>
     <string name="vscreen_viewer_fps">%1$d i/s</string>
     <string name="work_status_running">En cours</string>
+    <string name="work_status_step">Étape %1$d</string>
+    <string name="work_status_thinking">Réflexion</string>
+    <string name="work_status_list_separator">", "</string>
     <string name="work_status_done">Terminé</string>
     <string name="assistant_menu_branch_here">Brancher d’ici</string>
     <string name="chat_input_placeholder">Écrivez un message, ou / pour les compétences</string>
@@ -2064,11 +2065,10 @@
     <string name="agent_models_cli_only">minis-model-use uniquement (pas un modèle de chat)</string>
     <string name="oneclick_header">Autorisation en un geste</string>
     <string name="oneclick_title">Tout autoriser</string>
-    <string name="oneclick_sub">Accorde via root toutes les autorisations Android déclarées par l\'app et autorise tous les outils de l\'agent, y compris accessibilité, Shizuku et l\'écran virtuel. Désactiver remet les outils de l\'agent à leurs valeurs par défaut ; les autorisations Android restent.</string>
+    <string name="oneclick_sub">Accorde via root toutes les autorisations Android déclarées par l\'app et autorise tous les outils de l\'agent, y compris accessibilité, Shizuku et l\'écran virtuel. Désactiver remet les outils de l\'agent à leurs valeurs par défaut ; les autorisations Android restent. Partage aussi vos fournisseurs à clé API avec pi, Claude Code et Codex dans le terminal.</string>
     <string name="oneclick_working">Autorisation en cours…</string>
     <string name="module_settings_restart_title">Redémarrer Minis pour se connecter</string>
     <string name="module_settings_restart_sub">À utiliser après avoir activé le module alors que Minis tournait déjà.</string>
-    <string name="work_process_failed_only">Étape %1$d échouée</string>
     <string name="model_slot_image">Image</string>
     <string name="chat_interrupted_short">Interrompu</string>
     <string name="queued_delivery_steer">Guidera la tâche à la prochaine étape</string>
@@ -2099,4 +2099,17 @@
     <string name="compact_revert_failed">Annulation impossible : enregistrement introuvable.</string>
     <string name="chat_model_gave_up_note">Pas de réponse du modèle après %1$d nouvelles tentatives automatiques. Les étapes terminées sont conservées.</string>
     <string name="chat_model_failed_note">La requête au modèle a échoué. Les étapes terminées sont conservées.</string>
+    <string name="quota_header">Solde et utilisation</string>
+    <string name="quota_reading">Lecture…</string>
+    <string name="quota_failed">Impossible de lire le solde</string>
+    <string name="quota_refresh">Actualiser</string>
+    <string name="quota_empty">Solde ou quota épuisé</string>
+    <string name="quota_plan">Forfait : %1$s</string>
+    <string name="quota_available">Restant %1$s %2$s</string>
+    <string name="quota_granted">Offert %1$s</string>
+    <string name="quota_topped_up">Rechargé %1$s</string>
+    <string name="quota_resets_in">Réinitialisation dans %1$s</string>
+    <string name="quota_window_left">Fenêtre %1$s : %2$d%% restant</string>
+    <string name="quota_unlimited">Illimité</string>
+    <string name="quota_open_console">Voir le solde sur le site du fournisseur</string>
 </resources>

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
@@ -713,7 +714,8 @@ internal fun ChatMessageList(
                         { viewModel.revertCompact() }
                     } else null,
                 )
-                is FlatChatItem.AssistantTyping -> WorkingStatusLine()
+                is FlatChatItem.AssistantTyping -> Spacer(Modifier.height(4.dp))
+                is FlatChatItem.TurnClock -> TurnClockLine(item.startedAtMs, item.endedAtMs, item.live)
                 is FlatChatItem.TimeDivider -> TimeDividerLine(item.epochMs)
                 is FlatChatItem.AssistantError -> InlineErrorBanner(
                     error = item.error,
@@ -945,6 +947,7 @@ internal fun FlatChatItem.isCompacted(grayedMap: Map<String, Boolean>): Boolean 
     is FlatChatItem.AssistantMedia -> grayedMap[originalMessageId(messageId)] == true
     is FlatChatItem.AssistantInfo -> false  // system rows never grayed
     is FlatChatItem.AssistantTyping -> false
+    is FlatChatItem.TurnClock -> false
     is FlatChatItem.TimeDivider -> false
     is FlatChatItem.AssistantError -> grayedMap[originalMessageId(messageId)] == true
     is FlatChatItem.AssistantLegacyContent -> grayedMap[originalMessageId(messageId)] == true

@@ -55,6 +55,7 @@ fun ChatViewModel.enqueuePrompt(text: String, delivery: PendingDelivery = Pendin
     val chatMsg = ChatMessage(
         id = "queued_msg_${prompt.id}",
         role = "user",
+        createdAtMs = System.currentTimeMillis(),
         content = trimmed,
         imageUris = imageUris,
         attachmentNames = attachmentNames,
@@ -215,6 +216,7 @@ internal suspend fun ChatViewModel.injectQueuedPromptsAsNewTurn(
         val queuedUserMsg = ChatMessage(
             id = userEntity.id,
             role = "user",
+            createdAtMs = userEntity.createdAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
             content = userText,
             imageUris = prepared.imageUris,
             attachmentNames = prepared.attachmentNames,
@@ -223,6 +225,7 @@ internal suspend fun ChatViewModel.injectQueuedPromptsAsNewTurn(
         val nextAssistantMsg = ChatMessage(
             id = newAssistantId,
             role = "assistant",
+            createdAtMs = System.currentTimeMillis(),
             content = "",
             isStreaming = true,
             isAwaitingModelResponse = true,
@@ -525,6 +528,7 @@ internal fun ChatViewModel.sendMessage(
         val userMsg = ChatMessage(
             id = persistedUser.id,
             role = "user",
+            createdAtMs = persistedUser.createdAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
             content = trimmed,
             imageUris = prepared.imageUris,
             imageRefs = prepared.imageRefs,
@@ -561,6 +565,12 @@ internal fun ChatViewModel.sendMessage(
            contentParts = userContentParts,
            dbMessageId = persistedUser.id,
        ))
+
+        // The provider this chat talks to, for the agent's provider_quota tool.
+        com.openminis.app.provider.quota.ActiveChatProvider.set(
+            sessionId,
+            _activeEntryId.value?.let { id -> providerRepository.config.value.modelEntries.find { it.id == id }?.providerInstanceId },
+        )
 
         // Refresh OAuth token if needed before sending (mirrors iOS validAccessToken)
         if ((provider as? com.openminis.app.provider.anthropic.AnthropicProvider)?.isOAuth == true) {
@@ -726,6 +736,7 @@ internal fun ChatViewModel.setInlineError(errorText: String) {
             error = safeError,
             isStreaming = false,
             isAwaitingModelResponse = false,
+            updatedAtMs = System.currentTimeMillis(),
         )
         _messages.value = msgs
         // [T-error-persist-android] Persist the terminal error onto the
