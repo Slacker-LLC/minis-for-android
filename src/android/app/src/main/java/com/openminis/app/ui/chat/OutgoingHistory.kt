@@ -6,6 +6,7 @@ import com.openminis.app.data.db.CompactMarkerEntity
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.provider.ToolPairing
 
 /**
  * What is actually sent to the model from the conversation history: the compaction summary spliced
@@ -244,13 +245,16 @@ internal object OutgoingHistory {
      * invalid on several providers.
      */
     fun dropOrphanedToolParts(history: List<LLMMessage>): List<LLMMessage> {
+        // [T-android-responses-tool-id-normalize] Paired on ToolPairing.key, not the raw id:
+        // the Responses path stores "call|fc" ids and a history can hold both forms for
+        // one call, which raw ids called orphans (ported from OpenMinis 1.14).
         val toolUseIds = HashSet<String>()
         val toolResultIds = HashSet<String>()
         for (msg in history) {
             for (part in msg.contentParts) {
                 when (part) {
-                    is AgentContentPart.ToolUse -> toolUseIds.add(part.id)
-                    is AgentContentPart.ToolResult -> toolResultIds.add(part.id)
+                    is AgentContentPart.ToolUse -> toolUseIds.add(ToolPairing.key(part.id))
+                    is AgentContentPart.ToolResult -> toolResultIds.add(ToolPairing.key(part.id))
                     else -> {}
                 }
             }
@@ -271,7 +275,7 @@ internal object OutgoingHistory {
         val last = history.lastOrNull()
         if (last != null && last.role == LLMMessage.Role.ASSISTANT) {
             for (part in last.contentParts) {
-                if (part is AgentContentPart.ToolUse) orphanedUses.remove(part.id)
+                if (part is AgentContentPart.ToolUse) orphanedUses.remove(ToolPairing.key(part.id))
             }
         }
 
@@ -288,7 +292,7 @@ internal object OutgoingHistory {
         val cleaned = ArrayList<LLMMessage>(history.size)
         for (msg in history) {
             val kept = msg.contentParts.filter { part ->
-                if (part is AgentContentPart.ToolResult) !orphanedResults.contains(part.id) else true
+                if (part is AgentContentPart.ToolResult) !orphanedResults.contains(ToolPairing.key(part.id)) else true
             }
             // Only drop the message when it HAD parts and lost them all. A
             // plain text message legitimately carries no contentParts and must
@@ -300,7 +304,7 @@ internal object OutgoingHistory {
             // placeholder results it never got, so the pair is complete.
             if (msg.role != LLMMessage.Role.ASSISTANT) continue
             val unanswered = kept.filterIsInstance<AgentContentPart.ToolUse>()
-                .filter { orphanedUses.contains(it.id) }
+                .filter { orphanedUses.contains(ToolPairing.key(it.id)) }
             if (unanswered.isNotEmpty()) {
                 cleaned.add(
                     LLMMessage(

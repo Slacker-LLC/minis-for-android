@@ -505,7 +505,21 @@ internal fun OpenAIProvider.buildResponsesAPIBody(
             })
         }
     }
-    body.put("input", input)
+    // [T-android-responses-orphan-tool-output] Last gate on the tool pairing, over the
+    // ids this request actually carries (split on "|" and capped). Without it a stranded
+    // or duplicated tool result 400s every send until the chat is cleared.
+    // See ResponsesToolPairing (ported from OpenMinis 1.14).
+    val paired = ResponsesToolPairing.sanitize(input)
+    if (paired.changed) {
+        com.openminis.app.logging.AppLogger.warning(
+            "OpenAIProvider",
+            "[sanitize-responses] repaired outgoing tool pairing: " +
+                "droppedOrphanOutputs=${paired.droppedOrphanOutputs} " +
+                "droppedDuplicateOutputs=${paired.droppedDuplicateOutputs} " +
+                "placeholderCalls=${paired.placeholderCalls} items=${input.length()}",
+        )
+    }
+    body.put("input", paired.items)
 
     // [T-android-model-use-passthrough-mode GH#72] Same verbatim merge as the
     // chat-completions builder. Skipped for Codex OAuth inside mergeChatExtraBody.

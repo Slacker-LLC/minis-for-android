@@ -23,6 +23,7 @@ Minis for Android 含有从开源项目 **OpenMinis** 衍生的代码：
   - 长按用户消息的「压缩以上内容」入口与确认框（`[T-android-compact-above]`）；`compactBefore` 本仓库早已具备，只引入入口。
   - 回复 Token 用量的读取与格式（`ChatTokenUsage`、`[T-android-usage-capsule-time]`）；展示位置改为回复长按菜单底部，不引入其「点空白处」的手势与聊天列表渲染改动。
   - 子代理（`SubAgentDefinition` / `SubAgentRoster` 的规范化规则、`subagent_task` 工具合同与文案、回调文案，`[T-sub-agents-v1]`）：花名册规则、工具 schema 与回调文案取自上游；运行时与注册表按本仓库的 `AgentRunner` 重写，模型绑定由「模型组」改为模型条目，工具沿用本仓库既有名称 `subagent`。差异记录在 `docs/development/SUB-AGENTS.md`。
+  - 工具调用与结果的配对（`ToolPairing`、`ResponsesToolPairing`，`[T-android-responses-tool-id-normalize]`、`[T-android-responses-orphan-tool-output]`）：两个文件原样取自上游；`OutgoingHistory.dropOrphanedToolParts` 与 `ToolBatchRepair` 按上游 `ChatViewModel` 的同名逻辑改为按 `ToolPairing.key` 比较，Responses 请求体在写入 `input` 前经过 `ResponsesToolPairing.sanitize`。测试按本仓库的结构改写。
 
 ## Referenced projects
 
