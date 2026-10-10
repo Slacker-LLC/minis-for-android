@@ -98,6 +98,7 @@ class ProviderBridgeTest {
             p("ark", ProviderType.openAI, "https://ark.cn-beijing.volces.com/api/coding/v3"),
             p("mini", ProviderType.anthropic, "https://api.minimax.io/anthropic"),
             p("kimi", ProviderType.kimiCode),
+            p("cc", ProviderType.openAI, "https://api.commandcode.ai/provider/v1"),
         )
         assertEquals("key-glm", out["ZHIPU_API_KEY"])
         assertEquals("key-groq", out["GROQ_API_KEY"])
@@ -105,6 +106,7 @@ class ProviderBridgeTest {
         assertEquals("key-ark", out["ARK_CODING_PLAN_API_KEY"])
         assertEquals("key-mini", out["MINIMAX_API_KEY"])
         assertEquals("key-kimi", out["KIMI_API_KEY"])
+        assertEquals("the CLI logs in with it", "key-cc", out["COMMAND_CODE_API_KEY"])
         assertEquals("https://api.kimi.com/coding/v1", out["KIMI_BASE_URL"])
         assertNull("known services are not relays", out["OPENAI_BASE_URL"])
     }

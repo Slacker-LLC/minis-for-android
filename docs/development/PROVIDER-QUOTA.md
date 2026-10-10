@@ -38,3 +38,12 @@ credits) is only ever empty, never low. A currency with nothing left does not hi
 
 - The line in the composer that alternates context usage and quota.
 - Providers with no endpoint above (other than the console link for Xiaomi).
+
+## Command Code
+
+An API-key provider on `api.commandcode.ai` (Add provider > Coding plans > Command Code) is read with `GET https://api.commandcode.ai/alpha/billing/credits`
+and `Authorization: Bearer <key>`: the call behind the CLI's `/usage` (found in `command-code` 1.79.2, `dist/cli.mjs`: `fetchUsageCredits`,
+`projectUsageView`). The docs name no such endpoint, so this follows that source and has not been run against a real account.
+`credits.monthlyCredits + purchasedCredits + freeCredits` is what is left, in dollars; `credits.windowLimits.{fiveHour,weekly}` = `{used, cap, resetAt in ms}`
+is shown while `limited` is true. Organisation accounts pass an `orgId` (from `/alpha/whoami`); this app asks without one, i.e. the personal account.
+The same key is exported to the sandbox as `COMMAND_CODE_API_KEY`, the variable the CLI reads.

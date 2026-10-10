@@ -12,6 +12,7 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 - Add provider: about fifty more services in one tap (DeepSeek, Moonshot, Zhipu / Z.ai, Qwen, Doubao, MiMo, StepFun, MiniMax, Groq, Together, Mistral, NVIDIA, Hugging Face, gateways such as Vercel AI Gateway / OpenCode Zen, local Ollama / LM Studio, coding plans), each with its endpoint pre-filled.
 - One-tap authorize shares more: known services under the variable their tools read, and relays / added services as custom endpoints for pi, Command Code and OpenCode (no key is written to any config file).
 - One-tap authorize also turns on "run in the background" and, on Xiaomi / HyperOS, Autostart.
+- Command Code is in Add provider (Coding plans); its remaining credits and 5-hour / weekly windows show like any other provider's, and the same key logs the Command Code CLI in.
 - `provider_quota` answers for the model of the chat by default (`provider=all` for every provider). The terminal and provider-quota tools have their own switches under Settings > System prompt (modules `tools.terminal`, `tools.providerQuota`).
 
 ## 0.0.1 — 2026-10-09

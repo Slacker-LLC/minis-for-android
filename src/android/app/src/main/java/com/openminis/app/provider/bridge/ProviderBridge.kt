@@ -204,6 +204,7 @@ object ProviderBridge {
         Triple("ai-gateway.helicone.ai", null, "HELICONE_API_KEY"),
         Triple("api.kilo.ai", null, "KILO_API_KEY"),
         Triple("opencode.ai", null, "OPENCODE_API_KEY"),
+        Triple("api.commandcode.ai", null, "COMMAND_CODE_API_KEY"),
     )
 
     /** Claude Code wants the origin the `/v1/messages` path hangs off, not the `/v1` the app appends itself. */

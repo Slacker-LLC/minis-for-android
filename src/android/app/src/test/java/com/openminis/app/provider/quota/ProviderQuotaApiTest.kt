@@ -40,6 +40,7 @@ class ProviderQuotaApiTest {
         assertNull(ProviderQuotaApi.detect(instance(credential = ProviderCredential.oauth), manualBearer = true))
         // No balance API is documented for Xiaomi MiMo: the page links to its console.
         assertEquals(QuotaKind.CONSOLE, ProviderQuotaApi.detect(instance(base = "https://token-plan-cn.xiaomimimo.com/v1")))
+        assertNull(ProviderQuotaApi.consoleUrl(instance(base = "https://api.commandcode.ai/provider/v1")))
         assertEquals("https://platform.xiaomimimo.com", ProviderQuotaApi.consoleUrl(instance(base = "https://api.xiaomimimo.com/v1")))
     }
 
@@ -216,5 +217,37 @@ class ProviderQuotaApiTest {
         assertTrue(ProviderQuotaText.describe("x", ProviderQuotaRepository.State.Console("https://c.example")).contains("https://c.example"))
         assertTrue(ProviderQuotaText.describe("x", ProviderQuotaRepository.State.Unsupported).contains("no balance endpoint"))
         assertTrue(ProviderQuotaText.describe("x", ProviderQuotaRepository.State.Failed("HTTP 500", null)).contains("could not read (HTTP 500)"))
+    }
+
+    @Test
+    fun `command code reads the credits call its own usage screen makes`() {
+        val cc = instance(base = "https://api.commandcode.ai/provider/v1")
+        assertEquals(QuotaKind.COMMAND_CODE, ProviderQuotaApi.detect(cc))
+        assertNull("a look-alike host is not it", ProviderQuotaApi.detect(instance(base = "http://api.commandcode.ai.evil.example/v1")))
+        val request = ProviderQuotaApi.request(QuotaKind.COMMAND_CODE, cc, "k")
+        assertEquals("https://api.commandcode.ai/alpha/billing/credits", request.url.toString())
+        assertEquals("Bearer k", request.header("Authorization"))
+        val q = ProviderQuotaApi.parse(
+            QuotaKind.COMMAND_CODE,
+            """{"credits":{"monthlyCredits":12.5,"purchasedCredits":3,"freeCredits":1,"planId":"individual-pro","windowLimits":{"limited":true,
+              "fiveHour":{"used":30,"cap":100,"resetAt":1790000000000},"weekly":{"used":50,"cap":200,"resetAt":1790500000000}}}}""",
+            now = 1L,
+        )!!
+        assertEquals(16.5, q.balances.single().total, 0.0001)
+        assertEquals("USD", q.balances.single().currency)
+        assertEquals(listOf(30, 25), q.windows.map { it.usedPercent })
+        assertEquals(1_790_000_000L, q.windows[0].resetAtEpochSec)
+        assertEquals("pro", q.plan)
+    }
+
+    @Test
+    fun `command code windows are shown only while limited, and a body of another shape is no answer`() {
+        val q = ProviderQuotaApi.parse(
+            QuotaKind.COMMAND_CODE,
+            """{"credits":{"monthlyCredits":0,"windowLimits":{"limited":false,"fiveHour":{"used":1,"cap":2,"resetAt":1}}}}""", 1L,
+        )!!
+        assertTrue(q.windows.isEmpty())
+        assertEquals(QuotaLevel.EMPTY, q.level)
+        assertNull(ProviderQuotaApi.parse(QuotaKind.COMMAND_CODE, """{"error":"nope"}""", 1L))
     }
 }

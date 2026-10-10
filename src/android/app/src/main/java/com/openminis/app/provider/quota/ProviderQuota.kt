@@ -63,6 +63,8 @@ enum class QuotaKind {
     CLAUDE,
     /** Kimi Code subscription (OAuth): `GET /coding/v1/usages`. */
     KIMI_CODE,
+    /** Command Code (API key): `GET https://api.commandcode.ai/alpha/billing/credits`, the call its CLI's `/usage` makes. */
+    COMMAND_CODE,
     /** A relay on a custom https base (Sub2API / New API style); asks the same origin the chat requests already go to. */
     RELAY,
     /** No documented balance API: the page only links to the service's own console. */
@@ -91,7 +93,8 @@ object ProviderQuotaApi {
             host("api.moonshot.cn", "api.moonshot.ai") -> QuotaKind.MOONSHOT
             host("api.siliconflow.cn", "api.siliconflow.com") -> QuotaKind.SILICONFLOW
             host("openrouter.ai") -> QuotaKind.OPENROUTER
-            host in XIAOMI_HOSTS -> QuotaKind.CONSOLE
+            host("api.commandcode.ai") -> QuotaKind.COMMAND_CODE
+            host in CONSOLES -> QuotaKind.CONSOLE
             // The official endpoints of the big three have nothing to ask with an API key.
             host("api.openai.com", "api.anthropic.com", "generativelanguage.googleapis.com", "api.x.ai") -> null
             url.isHttps && instance.providerType in RELAY_TYPES && instance.credentialType == ProviderCredential.apiKey -> QuotaKind.RELAY
@@ -102,12 +105,16 @@ object ProviderQuotaApi {
     private val XIAOMI_HOSTS = setOf(
         "api.xiaomimimo.com", "token-plan-cn.xiaomimimo.com", "token-plan-sgp.xiaomimimo.com", "token-plan-ams.xiaomimimo.com",
     )
+
+    /** Services whose docs name no balance API: the host and the page where the user reads usage and credits. */
+    private val CONSOLES: Map<String, String> =
+        XIAOMI_HOSTS.associateWith { "https://platform.xiaomimimo.com" }
     private val RELAY_TYPES = setOf(ProviderType.openAI, ProviderType.openAIResponses, ProviderType.anthropic)
 
     /** The console page to open for a [QuotaKind.CONSOLE] provider (no balance API is documented for it). */
     fun consoleUrl(instance: ProviderInstance): String? {
         val host = instance.customBaseURL?.toHttpUrlOrNull()?.host ?: return null
-        return if (host in XIAOMI_HOSTS) "https://platform.xiaomimimo.com" else null
+        return CONSOLES[host]
     }
 
     /** The request for [kind]. The key goes only to the service's own host, whatever path the instance's base had. */
@@ -125,6 +132,7 @@ object ProviderQuotaApi {
             QuotaKind.CLAUDE -> builder.url("https://api.anthropic.com/api/oauth/usage")
                 .header("anthropic-beta", "oauth-2025-04-20")
             QuotaKind.KIMI_CODE -> builder.url("https://api.kimi.com/coding/v1/usages")
+            QuotaKind.COMMAND_CODE -> builder.url("https://api.commandcode.ai/alpha/billing/credits")
             QuotaKind.RELAY, QuotaKind.CONSOLE -> throw IllegalArgumentException("$kind has no single request")
         }.header("Authorization", "Bearer $key").build()
     }
@@ -209,6 +217,28 @@ object ProviderQuotaApi {
                 if (windows.isEmpty()) return@runCatching null
                 // The same label twice (7d and the overage window) would be two identical rows.
                 ProviderQuota(windows = windows.distinctBy { it.label }, fetchedAtMs = now)
+            }
+            QuotaKind.COMMAND_CODE -> {
+                // `command-code` 1.79.2 `dist/cli.mjs`, projectUsageView: credits.{monthly,purchased,free}Credits are what is LEFT, in
+                // dollars; windowLimits.{fiveHour,weekly} = {used, cap, resetAt in ms}, shown only while `limited`.
+                val c = json.getJSONObject("credits")
+                fun left(name: String) = c.optDouble(name, 0.0).takeIf { it.isFinite() && it > 0.0 } ?: 0.0
+                val limits = c.optJSONObject("windowLimits")
+                val windows = if (limits?.optBoolean("limited") == true) {
+                    listOf("fiveHour" to 18_000L, "weekly" to 604_800L).mapNotNull { (key, seconds) ->
+                        val w = limits.optJSONObject(key) ?: return@mapNotNull null
+                        val cap = w.optDouble("cap", 0.0)
+                        if (!(cap > 0.0)) return@mapNotNull null
+                        val resetMs = w.optLong("resetAt", 0L)
+                        UsageWindow(windowLabel(seconds), (w.optDouble("used", 0.0) * 100 / cap).toInt().coerceIn(0, 100), resetMs.takeIf { it > 0 }?.div(1000))
+                    }
+                } else emptyList()
+                ProviderQuota(
+                    balances = listOf(Balance("USD", left("monthlyCredits") + left("purchasedCredits") + left("freeCredits"), left("freeCredits"), left("purchasedCredits"))),
+                    windows = windows,
+                    plan = c.optString("planId").removePrefix("individual-").removePrefix("teams-").takeIf { it.isNotBlank() },
+                    fetchedAtMs = now,
+                )
             }
             QuotaKind.KIMI_CODE -> {
                 // `kimi_cli/ui/shell/usage.py`: usage (weekly) and limits[] (each with detail / window / name).

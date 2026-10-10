@@ -49,6 +49,7 @@ data class ProviderPreset(
             an("minimax", "MiniMax Coding Plan (global)", "https://api.minimax.io/anthropic", Group.CODING_PLAN),
             an("kimi-claude", "Kimi (Anthropic format)", "https://api.moonshot.ai/anthropic", Group.CODING_PLAN),
             an("deepseek-claude", "DeepSeek (Anthropic format)", "https://api.deepseek.com/anthropic", Group.CODING_PLAN),
+            oa("commandcode", "Command Code", "https://api.commandcode.ai/provider/v1", Group.CODING_PLAN),
             oa("opencode-zen", "OpenCode Zen", "https://opencode.ai/zen/v1", Group.CODING_PLAN),
             oa("opencode-go", "OpenCode Go", "https://opencode.ai/zen/go/v1", Group.CODING_PLAN),
             // Global
