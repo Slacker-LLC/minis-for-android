@@ -2407,4 +2407,28 @@
     <string name="quota_window_left">%1$s 窗口：剩余 %2$d%%</string>
     <string name="quota_unlimited">额度不限</string>
     <string name="quota_open_console">到服务商官网查看余额</string>
+    <string name="terminal_tab_default">终端 %1$d</string>
+    <string name="terminal_fgs_channel">运行中的终端</string>
+    <string name="terminal_fgs_stop_all">全部结束</string>
+    <string name="terminal_tab_new">新建终端</string>
+    <string name="terminal_tab_close">关闭终端</string>
+    <string name="terminal_tab_limit">最多同时开 %1$d 个终端，请先关闭一个。</string>
+    <string name="terminal_close_busy_title">还有程序在运行</string>
+    <string name="terminal_close_busy_body">关闭这个终端会结束其中正在运行的程序。</string>
+    <string name="terminal_close_busy_confirm">关闭终端</string>
+    <string name="terminal_rename_title">重命名终端</string>
+    <string name="terminal_rename_action">重命名</string>
+    <string name="terminal_restart">重新启动</string>
+    <string name="terminal_exited">Shell 已退出</string>
+    <string name="terminal_agent_badge">Agent</string>
+    <string name="terminal_agent_readonly">Agent 的终端，只读</string>
+    <string name="terminal_agent_takeover">接管</string>
+    <string name="terminal_agent_release">交还</string>
+    <string name="terminal_paste">粘贴</string>
+    <string name="terminal_maintenance_title">终端已被结束</string>
+    <string name="terminal_maintenance_body">运行时更新或修复结束了终端，其中 %1$d 个还有程序在运行。</string>
+    <string name="terminal_maintenance_ok">知道了</string>
+    <plurals name="terminal_fgs_running">
+        <item quantity="other">%d 个终端运行中</item>
+    </plurals>
 </resources>

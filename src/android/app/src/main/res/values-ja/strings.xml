@@ -2212,4 +2212,28 @@
     <string name="quota_window_left">%1$s ウィンドウ：残り %2$d%%</string>
     <string name="quota_unlimited">無制限</string>
     <string name="quota_open_console">プロバイダーのサイトで残高を確認</string>
+    <string name="terminal_tab_default">ターミナル %1$d</string>
+    <string name="terminal_fgs_channel">実行中のターミナル</string>
+    <string name="terminal_fgs_stop_all">すべて終了</string>
+    <string name="terminal_tab_new">新しいターミナル</string>
+    <string name="terminal_tab_close">ターミナルを閉じる</string>
+    <string name="terminal_tab_limit">ターミナルは最大 %1$d 個までです。先にどれかを閉じてください。</string>
+    <string name="terminal_close_busy_title">プログラムが実行中です</string>
+    <string name="terminal_close_busy_body">このターミナルを閉じると、実行中のプログラムも終了します。</string>
+    <string name="terminal_close_busy_confirm">ターミナルを閉じる</string>
+    <string name="terminal_rename_title">ターミナル名を変更</string>
+    <string name="terminal_rename_action">名前を変更</string>
+    <string name="terminal_restart">再起動</string>
+    <string name="terminal_exited">シェルが終了しました</string>
+    <string name="terminal_agent_badge">Agent</string>
+    <string name="terminal_agent_readonly">Agent のターミナル（読み取り専用）</string>
+    <string name="terminal_agent_takeover">引き継ぐ</string>
+    <string name="terminal_agent_release">返す</string>
+    <string name="terminal_paste">貼り付け</string>
+    <string name="terminal_maintenance_title">ターミナルが終了されました</string>
+    <string name="terminal_maintenance_body">ランタイムの更新または修復でターミナルが終了しました。そのうち %1$d 個は実行中のプログラムがありました。</string>
+    <string name="terminal_maintenance_ok">了解</string>
+    <plurals name="terminal_fgs_running">
+        <item quantity="other">%d 個のターミナルを実行中</item>
+    </plurals>
 </resources>

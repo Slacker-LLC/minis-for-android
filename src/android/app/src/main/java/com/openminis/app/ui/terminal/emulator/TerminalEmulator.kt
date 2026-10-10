@@ -31,6 +31,14 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
         private set
     var bracketedPaste: Boolean = false
         private set
+
+    /** Mouse reporting a program asked for (DECSET 1000/1002/1003); touch is sent to it instead of scrolling. */
+    var mouseTracking: MouseTracking = MouseTracking.OFF
+        private set
+
+    /** DECSET 1006: report with the SGR encoding (no coordinate limit). */
+    var mouseSgr: Boolean = false
+        private set
     var applicationKeypad: Boolean = false
         private set
     var originMode: Boolean = false
@@ -48,7 +56,11 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     val programStatus: State<List<StatusRecord>> = _programStatus
 
     /** Process exit: working, blocked and idle records go, done and error stay (OSC 7501 lifetime). */
-    fun onProcessExit() = publishStatus(statusStore.dropTransient())
+    fun onProcessExit() {
+        // A program that died while holding the mouse must not leave touch swallowed by nobody.
+        mouseTracking = MouseTracking.OFF
+        publishStatus(statusStore.dropTransient())
+    }
 
     fun effectiveApp(record: StatusRecord): String? = statusStore.effectiveApp(record)
 
@@ -339,6 +351,10 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
                 switchBuffer(false)
                 cursorStyle.copyFrom(primaryBuffer.restoreCursor())
             }
+            1000 -> mouseTracking = if (set) MouseTracking.BUTTON else MouseTracking.OFF
+            1002 -> mouseTracking = if (set) MouseTracking.DRAG else MouseTracking.OFF
+            1003 -> mouseTracking = if (set) MouseTracking.ANY else MouseTracking.OFF
+            1006 -> mouseSgr = set
             2004 -> bracketedPaste = set
         }
     }
@@ -460,6 +476,8 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
         autoWrap = true
         cursorVisible = true
         bracketedPaste = false
+        mouseTracking = MouseTracking.OFF
+        mouseSgr = false
         applicationKeypad = false
         originMode = false
         cursorShape = CursorShape.BLOCK

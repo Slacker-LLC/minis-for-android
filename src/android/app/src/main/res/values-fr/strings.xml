@@ -2111,4 +2111,29 @@
     <string name="quota_window_left">Fenêtre %1$s : %2$d%% restant</string>
     <string name="quota_unlimited">Illimité</string>
     <string name="quota_open_console">Voir le solde sur le site du fournisseur</string>
+    <string name="terminal_tab_default">Terminal %1$d</string>
+    <string name="terminal_fgs_channel">Terminaux en cours</string>
+    <string name="terminal_fgs_stop_all">Tout arrêter</string>
+    <string name="terminal_tab_new">Nouveau terminal</string>
+    <string name="terminal_tab_close">Fermer le terminal</string>
+    <string name="terminal_tab_limit">%1$d terminaux au maximum. Fermez-en un d\'abord.</string>
+    <string name="terminal_close_busy_title">Un programme est encore en cours</string>
+    <string name="terminal_close_busy_body">Fermer ce terminal arrête le programme en cours d\'exécution.</string>
+    <string name="terminal_close_busy_confirm">Fermer le terminal</string>
+    <string name="terminal_rename_title">Renommer le terminal</string>
+    <string name="terminal_rename_action">Renommer</string>
+    <string name="terminal_restart">Redémarrer</string>
+    <string name="terminal_exited">Shell terminé</string>
+    <string name="terminal_agent_badge">Agent</string>
+    <string name="terminal_agent_readonly">Terminal de l\'agent, lecture seule</string>
+    <string name="terminal_agent_takeover">Prendre la main</string>
+    <string name="terminal_agent_release">Rendre</string>
+    <string name="terminal_paste">Coller</string>
+    <string name="terminal_maintenance_title">Les terminaux ont été arrêtés</string>
+    <string name="terminal_maintenance_body">Une mise à jour ou une réparation du runtime a arrêté les terminaux. %1$d avaient encore un programme en cours.</string>
+    <string name="terminal_maintenance_ok">Compris</string>
+    <plurals name="terminal_fgs_running">
+        <item quantity="one">%d terminal en cours</item>
+        <item quantity="other">%d terminaux en cours</item>
+    </plurals>
 </resources>

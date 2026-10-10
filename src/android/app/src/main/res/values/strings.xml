@@ -2497,4 +2497,29 @@
     <string name="quota_window_left">%1$s window: %2$d%% left</string>
     <string name="quota_unlimited">No limit</string>
     <string name="quota_open_console">Check the balance on the provider website</string>
+    <string name="terminal_tab_default">Terminal %1$d</string>
+    <string name="terminal_fgs_channel">Running terminals</string>
+    <string name="terminal_fgs_stop_all">End all</string>
+    <string name="terminal_tab_new">New terminal</string>
+    <string name="terminal_tab_close">Close terminal</string>
+    <string name="terminal_tab_limit">At most %1$d terminals. Close one first.</string>
+    <string name="terminal_close_busy_title">A program is still running</string>
+    <string name="terminal_close_busy_body">Closing this terminal ends the program running in it.</string>
+    <string name="terminal_close_busy_confirm">Close terminal</string>
+    <string name="terminal_rename_title">Rename terminal</string>
+    <string name="terminal_rename_action">Rename</string>
+    <string name="terminal_restart">Restart</string>
+    <string name="terminal_exited">Shell ended</string>
+    <string name="terminal_agent_badge">Agent</string>
+    <string name="terminal_agent_readonly">Agent\'s terminal, read only</string>
+    <string name="terminal_agent_takeover">Take over</string>
+    <string name="terminal_agent_release">Release</string>
+    <string name="terminal_paste">Paste</string>
+    <string name="terminal_maintenance_title">Terminals were ended</string>
+    <string name="terminal_maintenance_body">A runtime update or repair ended the terminals. %1$d of them still had a program running.</string>
+    <string name="terminal_maintenance_ok">Got it</string>
+    <plurals name="terminal_fgs_running">
+        <item quantity="one">%d terminal running</item>
+        <item quantity="other">%d terminals running</item>
+    </plurals>
 </resources>

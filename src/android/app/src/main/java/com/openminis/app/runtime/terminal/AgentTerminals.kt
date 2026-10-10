@@ -7,6 +7,9 @@ import com.openminis.app.ui.terminal.emulator.TerminalEmulator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -18,7 +21,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * REPL) the way a person at the keyboard would; plain commands stay on the pipe-based shell, which is cheaper.
  *
  * A few terminals per chat session and in total; a terminal ends with its session, with a runtime stop, or when it has
- * sat unused for a long time.
+ * sat unused for a long time. "Unused" never includes a terminal with a program still running in the foreground: a long
+ * build or coding agent the agent has not looked at for an hour is still working, so only an idle shell is reclaimed.
  */
 class AgentTerminals(
     private val newSession: () -> TerminalSession,
@@ -56,6 +60,12 @@ class AgentTerminals(
     private val counter = AtomicInteger(0)
     private val admission = Any()
 
+    private val _changes = MutableStateFlow(0)
+
+    /** Ticks whenever a terminal is opened or closed, so the Terminal page can list the agent's terminals. */
+    val changes: StateFlow<Int> = _changes.asStateFlow()
+    private fun changed() { _changes.value += 1 }
+
     fun get(id: String): Terminal? = terminals[id]
 
     fun list(sessionId: String? = null): List<Terminal> =
@@ -79,6 +89,7 @@ class AgentTerminals(
             terminal = Terminal("t${counter.incrementAndGet()}", sessionId, session, emulator, now())
             terminals[terminal.id] = terminal
         }
+        changed()
         // The terminal answers the queries a program makes (device attributes, cursor position, OSC 7501 support).
         terminal.emulator.onResponse = { bytes -> terminal.session.sendRawBytes(bytes) }
         // Collect before the shell starts: the output flow has no replay, so the first prompt would be lost.
@@ -155,6 +166,7 @@ class AgentTerminals(
     fun close(id: String): Boolean {
         val terminal = terminals.remove(id) ?: return false
         stop(terminal)
+        changed()
         return true
     }
 
@@ -173,10 +185,15 @@ class AgentTerminals(
         terminal.jobs.forEach { it.cancel() }
     }
 
-    /** Terminals nobody has used for [IDLE_LIMIT_MS] are closed when a new one is asked for. */
+    /**
+     * Terminals nobody has used for [IDLE_LIMIT_MS] are closed when a new one is asked for, but only a shell at its
+     * prompt (or one that has already ended): anything with a foreground program, or whose state cannot be told, stays.
+     */
     private fun sweepIdle() {
         val t = now()
-        terminals.values.filter { t - it.lastUsedAtMs > IDLE_LIMIT_MS }.forEach { close(it.id) }
+        terminals.values
+            .filter { t - it.lastUsedAtMs > IDLE_LIMIT_MS && it.session.foregroundState() == TerminalSession.ForegroundState.IDLE }
+            .forEach { close(it.id) }
     }
 
     companion object {
