@@ -2,6 +2,7 @@ package com.openminis.app.agent
 
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.model.LLMMessage
+import com.openminis.app.provider.ToolPairing
 
 /**
  * [T-tool-batch-repair-android] Keeps the conversation well-formed for the provider, and
@@ -57,8 +58,11 @@ object ToolBatchRepair {
             }
             val answered = repaired.getOrNull(index + 1)?.contentParts
                 ?.filterIsInstance<AgentContentPart.ToolResult>()
-                ?.map { it.id }?.toSet() ?: emptySet()
-            val missing = toolUses.filter { it.id !in answered }
+                ?.map { ToolPairing.key(it.id) }?.toSet() ?: emptySet()
+            // [T-android-responses-tool-id-normalize] Paired on ToolPairing.key, not the raw
+            // id: the Responses path stores "call|fc" and a history can hold both forms for one
+            // call. On raw ids a correctly paired result was called an orphan and deleted below.
+            val missing = toolUses.filter { ToolPairing.key(it.id) !in answered }
             if (missing.isEmpty()) {
                 index++
                 continue
@@ -95,7 +99,7 @@ object ToolBatchRepair {
         // some of them; drop it, and drop the message if that was all it carried.
         val knownCalls = repaired.flatMap { it.contentParts }
             .filterIsInstance<AgentContentPart.ToolUse>()
-            .map { it.id }
+            .map { ToolPairing.key(it.id) }
             .toSet()
         var droppedResults = 0
         var droppedMessages = 0
@@ -104,7 +108,7 @@ object ToolBatchRepair {
             val message = iterator.next()
             if (message.role != LLMMessage.Role.USER) continue
             val kept = message.contentParts.filter { part ->
-                val drop = part is AgentContentPart.ToolResult && part.id !in knownCalls
+                val drop = part is AgentContentPart.ToolResult && ToolPairing.key(part.id) !in knownCalls
                 if (drop) droppedResults++
                 !drop
             }
