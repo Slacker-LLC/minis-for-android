@@ -253,7 +253,7 @@ internal fun OpenAIProvider.buildResponsesAPIBody(
                     // ids and the text follows as a message item.
                     for (raw in msg.providerOutputItems) {
                         val item = try { JSONObject(raw) } catch (_: Exception) { null }
-                        if (item != null) input.put(item)
+                        if (item != null) input.put(responsesReplayItem(item))
                     }
                     val textParts = msg.contentParts.filterIsInstance<AgentContentPart.Text>()
                     if (textParts.isNotEmpty()) {
@@ -519,6 +519,31 @@ internal fun OpenAIProvider.buildResponsesAPIBody(
  * can carry through tool_use/tool_result blocks. The next request splits it
  * back apart so the API sees the original ids verbatim.
  */
+/**
+ * Re-serialize a captured output item the way official Codex does before it is
+ * sent back as input (`codex-rs/protocol` `ResponseItem::Reasoning`: `id`,
+ * `summary`, `content`, `encrypted_content`; `content` is skipped when it holds
+ * `reasoning_text`). The backend's output item can carry fields its input schema
+ * rejects, so replaying the raw object risks `400 Unknown parameter`. Only
+ * `reasoning` items are rewritten; every other type passes through unchanged.
+ */
+internal fun responsesReplayItem(item: JSONObject): JSONObject {
+    if (item.optString("type") != "reasoning") return item
+    val out = JSONObject().put("type", "reasoning")
+    item.optString("id").takeIf { it.isNotEmpty() }?.let { out.put("id", it) }
+    out.put("summary", item.optJSONArray("summary") ?: org.json.JSONArray())
+    val content = item.optJSONArray("content")
+    if (content != null) {
+        var hasReasoningText = false
+        for (i in 0 until content.length()) {
+            if (content.optJSONObject(i)?.optString("type") == "reasoning_text") hasReasoningText = true
+        }
+        if (!hasReasoningText) out.put("content", content)
+    }
+    item.opt("encrypted_content")?.takeIf { it != JSONObject.NULL }?.let { out.put("encrypted_content", it) }
+    return out
+}
+
 internal fun OpenAIProvider.combineResponsesAPIIds(callId: String, fcId: String): String =
     if (fcId.isEmpty()) callId else "$callId|$fcId"
 
