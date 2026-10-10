@@ -191,8 +191,18 @@ class ToolResultImageSerializationTest {
     @Test
     fun `responses api emits an input_image block for a tool-result image`() {
         // The Responses path is a separate builder, not a flag on buildRequestBody.
+        // [T-android-responses-orphan-tool-output] With its call: a result with no call is an
+        // orphan the Responses request now drops (the API 400s on it), which is not what this
+        // test is about.
+        val history = historyWithToolResultImage().toMutableList().apply {
+            add(1, LLMMessage(
+                role = LLMMessage.Role.ASSISTANT,
+                content = "",
+                contentParts = listOf(AgentContentPart.ToolUse(id = "call_abc123", name = "read_image", input = JSONObject())),
+            ))
+        }
         val body = provider(visionModel, useResponsesAPI = true).buildResponsesAPIBody(
-            messages = historyWithToolResultImage(),
+            messages = history,
             systemPrompt = null,
             maxTokens = 1024,
             stream = false,

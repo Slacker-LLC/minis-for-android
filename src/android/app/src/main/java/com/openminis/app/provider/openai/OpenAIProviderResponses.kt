@@ -11,6 +11,7 @@ import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.provider.HostedWebSearchPolicy
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.safeOptString
+import com.openminis.app.provider.thinking.ThinkingRuleResolver
 import com.openminis.app.util.Sha256
 import java.io.IOException
 import org.json.JSONArray
@@ -175,7 +176,13 @@ internal fun OpenAIProvider.buildResponsesAPIBody(
         !thinkingLevel.isEnabled && model.supportsReasoning == true &&
             !model.id.lowercase().let { it.contains("mimo") || it.contains("agnes") } -> {
             explicitOffEffort()?.let { offEffort ->
-                body.put("reasoning", JSONObject().put("effort", offEffort))
+                // [OpenMinis#377] Clamp the off tier onto what this model accepts.
+                // explicitOffEffort() answers "which vendor is this" (official OpenAI →
+                // "none"), never "what does this model take": gpt-6-astra declares
+                // [low…max] and rejects "none", so every compaction (and its halving
+                // retries) died with HTTP 400 on the parameter rather than the size.
+                val safe = ThinkingRuleResolver.clampOffEffort(offEffort, model.reasoningEffortValues)
+                body.put("reasoning", JSONObject().put("effort", safe))
             }
         }
     }
@@ -209,7 +216,19 @@ internal fun OpenAIProvider.buildResponsesAPIBody(
     // through, so no isOAuth narrowing. Ineligible upstreams ignore the
     // field or silently downgrade (receipt visible via the
     // response.completed service_tier log).
+    //
+    // [T-android-xai-priority] The per-instance (xAI) tier is resolved first and the
+    // gpt-family rule only fills a missing key, so neither clobbers the other. The two
+    // gates are disjoint today: that toggle is xAI-only and xAI never reaches this builder.
+    // The gpt-family rule had been replaced by the xAI call alone, which made Fast Mode a
+    // silent no-op for every GPT model (OpenMinis 1.14 keeps both).
     resolvedServiceTier()?.let { body.put("service_tier", it) }
+    if (!body.has("service_tier") &&
+        com.openminis.app.data.FastModePrefs.isEnabled() &&
+        model.id.contains("gpt", ignoreCase = true)
+    ) {
+        body.put("service_tier", "priority")
+    }
 
     if (systemPrompt != null) {
         body.put("instructions", systemPrompt)
@@ -253,7 +272,7 @@ internal fun OpenAIProvider.buildResponsesAPIBody(
                     // ids and the text follows as a message item.
                     for (raw in msg.providerOutputItems) {
                         val item = try { JSONObject(raw) } catch (_: Exception) { null }
-                        if (item != null) input.put(item)
+                        if (item != null) input.put(responsesReplayItem(item))
                     }
                     val textParts = msg.contentParts.filterIsInstance<AgentContentPart.Text>()
                     if (textParts.isNotEmpty()) {
@@ -505,7 +524,21 @@ internal fun OpenAIProvider.buildResponsesAPIBody(
             })
         }
     }
-    body.put("input", input)
+    // [T-android-responses-orphan-tool-output] Last gate on the tool pairing, over the
+    // ids this request actually carries (split on "|" and capped). Without it a stranded
+    // or duplicated tool result 400s every send until the chat is cleared.
+    // See ResponsesToolPairing (ported from OpenMinis 1.14).
+    val paired = ResponsesToolPairing.sanitize(input)
+    if (paired.changed) {
+        com.openminis.app.logging.AppLogger.warning(
+            "OpenAIProvider",
+            "[sanitize-responses] repaired outgoing tool pairing: " +
+                "droppedOrphanOutputs=${paired.droppedOrphanOutputs} " +
+                "droppedDuplicateOutputs=${paired.droppedDuplicateOutputs} " +
+                "placeholderCalls=${paired.placeholderCalls} items=${input.length()}",
+        )
+    }
+    body.put("input", paired.items)
 
     // [T-android-model-use-passthrough-mode GH#72] Same verbatim merge as the
     // chat-completions builder. Skipped for Codex OAuth inside mergeChatExtraBody.
@@ -519,6 +552,31 @@ internal fun OpenAIProvider.buildResponsesAPIBody(
  * can carry through tool_use/tool_result blocks. The next request splits it
  * back apart so the API sees the original ids verbatim.
  */
+/**
+ * Re-serialize a captured output item the way official Codex does before it is
+ * sent back as input (`codex-rs/protocol` `ResponseItem::Reasoning`: `id`,
+ * `summary`, `content`, `encrypted_content`; `content` is skipped when it holds
+ * `reasoning_text`). The backend's output item can carry fields its input schema
+ * rejects, so replaying the raw object risks `400 Unknown parameter`. Only
+ * `reasoning` items are rewritten; every other type passes through unchanged.
+ */
+internal fun responsesReplayItem(item: JSONObject): JSONObject {
+    if (item.optString("type") != "reasoning") return item
+    val out = JSONObject().put("type", "reasoning")
+    item.optString("id").takeIf { it.isNotEmpty() }?.let { out.put("id", it) }
+    out.put("summary", item.optJSONArray("summary") ?: org.json.JSONArray())
+    val content = item.optJSONArray("content")
+    if (content != null) {
+        var hasReasoningText = false
+        for (i in 0 until content.length()) {
+            if (content.optJSONObject(i)?.optString("type") == "reasoning_text") hasReasoningText = true
+        }
+        if (!hasReasoningText) out.put("content", content)
+    }
+    item.opt("encrypted_content")?.takeIf { it != JSONObject.NULL }?.let { out.put("encrypted_content", it) }
+    return out
+}
+
 internal fun OpenAIProvider.combineResponsesAPIIds(callId: String, fcId: String): String =
     if (fcId.isEmpty()) callId else "$callId|$fcId"
 

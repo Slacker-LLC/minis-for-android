@@ -4,9 +4,12 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+- Fixed a chat that kept failing with `400 No tool output found for function call …` (or `No tool call found for function call output …`) on OpenAI Responses models and never recovered, while a new chat worked. A tool call stored as `call_x|fc_y` and its result stored as `call_x` were treated as two different ids, so the history repair deleted a real result and the request went out unpaired on every retry. Calls and results are now matched on the `call_x` part, and the Responses request is checked once more just before sending: a result with no call and a repeated result are dropped, a call with no result gets a placeholder. Ported from OpenMinis 1.14.
 - Device protection (Settings > Permissions, on by default): privileged commands from the agent, `android-root-cli` and the Android tools can no longer write partitions or the system partitions, remove `/data/system`, `/data/misc`, `/metadata` or `/data/adb`, uninstall or disable core system apps, factory-reset or remove user 0. Nothing is asked: the agent gets `DEVICE_PROTECTED: <category>: <target>` and tries another way. Everything else stays open. Refusals are listed under the switch. When `/data` is nearly full the app freezes its own terminals and refuses new bulk writes until space is freed. `android-root-cli partition read` exports a partition read-only.
+- Reasoning items replayed on a Responses conversation are re-serialized to the fields official Codex sends (id, summary, content, encrypted_content) instead of the raw backend object, so extra backend-only fields can no longer cause `400 Unknown parameter`.
 - Root only: Shizuku (and AXManager / Sui) support is removed; Root is the app's one privileged path. The code before this change is kept on the branch `archive/before-root-only`.
 - `android-shizuku-cli` is now `android-root-cli`: the same subcommands and JSON, run as root through `su`. Its Agent permission switch carries over.
+- Fixed `400 reasoning.effort: 'none' is not supported` on the Responses path with thinking off (for example context compaction on GPT-6 Astra): the "off" value is now clamped to the lowest effort tier the model declares. Ported from OpenMinis 1.14.
 - The virtual screen runs in a root service (libsu) instead of a Shizuku UserService. Run its compatibility check once more to switch it back on.
 - Accessibility repair, clearing restricted settings and one-tap authorize use Root; Settings > System has a Root page in place of "Root & Shizuku", and the readiness checklist no longer lists Shizuku.
 - Terminals belong to the app, not to the Terminal page: leaving the page, going to another app or locking the screen no longer ends the shell or the program in it, and the screen and scrollback are as you left them. A shell ends when you close its tab, when it exits, from "End all" on the notification, or when the runtime is stopped for maintenance (you are told).
@@ -14,6 +17,7 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 - Tabs in the Terminal page: new, switch, close, long-press to rename, a status dot from OSC 7501, up to 8. Closing a tab with a program running asks once. The agent's terminals appear as read-only "Agent" tabs; "Take over" lets you type into one.
 - Touch: mouse reporting (DECSET 1000 / 1002 / 1003, SGR 1006) so vim, htop, tmux and TUIs can be clicked and scrolled; a swipe on a full-screen program that did not ask for the mouse sends arrow keys (application cursor mode respected); pinch changes the text size and the terminal is resized; Paste in the selection menu and on a long press on empty space, wrapped in bracketed paste when the program asked for it.
 - The agent's terminal idle clean-up no longer closes a terminal that has a program running in the foreground.
+- Fast Mode works for GPT models again on the Responses path (Codex login and Responses relays): with the toggle on, requests carry `service_tier: "priority"`, as OpenMinis 1.14 does. A change that kept only the xAI case had turned the toggle into a no-op for GPT.
 
 ## 0.0.2 — 2026-10-10
 
