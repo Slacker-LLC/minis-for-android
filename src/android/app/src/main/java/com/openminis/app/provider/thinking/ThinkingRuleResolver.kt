@@ -691,6 +691,35 @@ object ThinkingRuleResolver {
     fun clampEffortForModel(effort: String, lid: String): String =
         if (effort == "xhigh" && (lid.contains("mimo") || lid.contains("agnes"))) "high" else effort
 
+    /**
+     * [OpenMinis#377] Snap an OFF-tier value onto what the model will actually accept.
+     *
+     * Distinct from [clampEffort], and the difference is the whole point. clampEffort
+     * walks DOWN then UP, so a `["high","max"]` model turns an OFF request into "high" —
+     * inverting the user's intent. The right answer for OFF is always the LOWEST tier the
+     * model declares: the closest thing to "don't think" that the model will accept, and
+     * never more than a higher explicit level would have sent.
+     *
+     * Returns [effort] unchanged when the model declares nothing (or declares the requested
+     * value), so models without catalog effort data behave exactly as before.
+     *
+     * Why it exists: gpt-6-astra declares `[low, medium, high, xhigh, max]` and rejects
+     * `reasoning.effort:"none"` with HTTP 400. Compaction sends OFF, the official-OpenAI off
+     * tier is "none", and every compact died on the parameter rather than on its size.
+     * Ported from OpenMinis 1.14.
+     */
+    fun clampOffEffort(effort: String, values: List<String>?): String {
+        if (values.isNullOrEmpty()) return effort
+        if (values.contains(effort)) return effort
+        val ladder = listOf("none", "minimal", "low", "medium", "high", "xhigh", "max")
+        // Lowest DECLARED tier by ladder order; unknown spellings are ignored rather than
+        // guessed at, and if none are recognisable the original value stands.
+        return values.mapNotNull { v -> ladder.indexOf(v).takeIf { it >= 0 }?.to(v) }
+            .minByOrNull { it.first }
+            ?.second
+            ?: effort
+    }
+
     /** Snap a requested tier onto the model's declared set, walking DOWN then up. */
     fun clampEffort(effort: String, values: List<String>?): String {
         if (values.isNullOrEmpty()) return effort

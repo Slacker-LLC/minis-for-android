@@ -11,6 +11,7 @@ import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.provider.HostedWebSearchPolicy
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.safeOptString
+import com.openminis.app.provider.thinking.ThinkingRuleResolver
 import com.openminis.app.util.Sha256
 import java.io.IOException
 import org.json.JSONArray
@@ -175,7 +176,13 @@ internal fun OpenAIProvider.buildResponsesAPIBody(
         !thinkingLevel.isEnabled && model.supportsReasoning == true &&
             !model.id.lowercase().let { it.contains("mimo") || it.contains("agnes") } -> {
             explicitOffEffort()?.let { offEffort ->
-                body.put("reasoning", JSONObject().put("effort", offEffort))
+                // [OpenMinis#377] Clamp the off tier onto what this model accepts.
+                // explicitOffEffort() answers "which vendor is this" (official OpenAI →
+                // "none"), never "what does this model take": gpt-6-astra declares
+                // [low…max] and rejects "none", so every compaction (and its halving
+                // retries) died with HTTP 400 on the parameter rather than the size.
+                val safe = ThinkingRuleResolver.clampOffEffort(offEffort, model.reasoningEffortValues)
+                body.put("reasoning", JSONObject().put("effort", safe))
             }
         }
     }
