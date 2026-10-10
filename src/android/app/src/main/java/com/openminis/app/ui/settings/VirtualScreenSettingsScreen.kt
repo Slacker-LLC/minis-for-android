@@ -57,7 +57,7 @@ private data class ProbeRow(val id: String, val status: String, val code: String
 private data class PreviewResult(val displayId: Int?, val bitmap: Bitmap?)
 
 @Composable
-fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = {}) {
+fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenRoot: () -> Unit = {}) {
     val context = LocalContext.current
     val client = remember(context) { VirtualScreenClientProvider.get(context) }
     val preferences = remember(context) { VirtualScreenPreferences(context) }
@@ -209,7 +209,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = 
                     MinisTextButton(onClick = {
                         showFailures = false
                         when (action) {
-                            VirtualScreenCopyPolicy.FailAction.SHIZUKU -> onOpenShizuku()
+                            VirtualScreenCopyPolicy.FailAction.ROOT -> onOpenRoot()
                             VirtualScreenCopyPolicy.FailAction.DEVELOPER_OPTIONS -> runCatching {
                                 context.startActivity(
                                     android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
@@ -220,8 +220,8 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = 
                     }) {
                         Text(
                             stringResource(
-                                if (action == VirtualScreenCopyPolicy.FailAction.SHIZUKU) {
-                                    R.string.vscreen_fail_action_shizuku
+                                if (action == VirtualScreenCopyPolicy.FailAction.ROOT) {
+                                    R.string.vscreen_fail_action_root
                                 } else {
                                     R.string.vscreen_fail_action_devopts
                                 },

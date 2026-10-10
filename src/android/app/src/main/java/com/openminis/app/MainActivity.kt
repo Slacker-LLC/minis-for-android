@@ -396,7 +396,7 @@ class MainActivity : ComponentActivity() {
         // [T-android-a11y-force-stop-recovery] Bridge: the accessibility-grant
         // repair prompt. Raised from the a11y tool path when the framework has
         // stripped our component out of ENABLED_ACCESSIBILITY_SERVICES (the
-        // force-stop case). Two shapes depending on whether Shizuku can do the
+        // force-stop case). Two shapes depending on whether Root can do the
         // privileged write for us.
         //
         // setCancelable(true) + setOnCancelListener, unlike the settings gate
@@ -422,8 +422,8 @@ class MainActivity : ComponentActivity() {
                                 AccessibilityRecoveryManager.Decision.CANCEL
                             )
                         }
-                    if (prompt.shizukuAvailable) {
-                        b.setMessage(getString(R.string.a11y_repair_dialog_message_shizuku))
+                    if (prompt.rootAvailable) {
+                        b.setMessage(getString(R.string.a11y_repair_dialog_message_root))
                             .setPositiveButton(R.string.a11y_repair_action_repair) { d, _ ->
                                 d.dismiss()
                                 AccessibilityRecoveryManager.respond(

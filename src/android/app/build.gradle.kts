@@ -584,10 +584,10 @@ dependencies {
     // ACRA local crash report capture. acra-core has no HTTP sender.
     implementation("ch.acra:acra-core:5.12.0")
 
-    // Shizuku-compatible privileged Android API bridge. AXManager/Sui-compatible
-    // implementations reuse the same Shizuku protocol surface.
-    implementation("dev.rikka.shizuku:api:13.1.5")
-    implementation("dev.rikka.shizuku:provider:13.1.5")
+    // libsu RootService: hosts the virtual-screen service in a root process (app_process
+    // started through su) and hands its binder back to the app. Apache-2.0; JitPack only.
+    implementation("com.github.topjohnwu.libsu:core:6.0.0")
+    implementation("com.github.topjohnwu.libsu:service:6.0.0")
 
     // Testing — JVM unit tests
     testImplementation("junit:junit:4.13.2")

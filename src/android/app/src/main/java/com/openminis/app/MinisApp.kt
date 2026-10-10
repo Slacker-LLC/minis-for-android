@@ -50,7 +50,7 @@ import com.openminis.app.runtime.guest.DeviceOffloadHandler
 import com.openminis.app.runtime.guest.LocationOffloadHandler
 import com.openminis.app.runtime.guest.ModelUseOffloadHandler
 import com.openminis.app.runtime.guest.SessionsOffloadHandler
-import com.openminis.app.runtime.guest.ShizukuOffloadHandler
+import com.openminis.app.runtime.guest.RootCliOffloadHandler
 import com.openminis.app.runtime.guest.NotificationOffloadHandler
 import com.openminis.app.runtime.guest.OpenOffloadHandler
 import com.openminis.app.runtime.guest.PhotosOffloadHandler
@@ -908,13 +908,10 @@ class MinisApp : Application(), ImageLoaderFactory {
             "minis-scheduled",
             com.openminis.app.runtime.guest.ScheduledTaskOffloadHandler(this),
         )
-        // T322: android-shizuku-cli — privileged Android control via Shizuku.
-        // The handler short-circuits with a typed error envelope when the
-        // user hasn't installed / started / authorized Shizuku, so we
-        // can register unconditionally; ShizukuManager.init below wires
-        // up the binder lifecycle listeners + StateFlow.
-        NativeOffloadServer.register("android-shizuku-cli", ShizukuOffloadHandler(this))
-        com.openminis.app.offload.ShizukuManager.init(this)
+        // android-root-cli — privileged Android control as root. The handler
+        // answers with a typed error envelope when su is missing or refused,
+        // so it is registered unconditionally.
+        NativeOffloadServer.register("android-root-cli", RootCliOffloadHandler(this))
 
         // T-android-minis-debug-cli: shell-side CLI wrapper around the in-app
         // DebugServer (127.0.0.1:5321) JSON-RPC. DEBUG-only — Release builds

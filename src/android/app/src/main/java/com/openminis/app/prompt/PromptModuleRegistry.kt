@@ -96,7 +96,7 @@ object PromptModuleRegistry {
         PromptModule(
             id = "android.debugLoop",
             title = "Android 调试闭环",
-            description = "android_* 命名工具的调试流程、证据要求与 Root/Shizuku/Accessibility 能力边界。",
+            description = "android_* 命名工具的调试流程、证据要求与 Root/Accessibility 能力边界。",
             group = GROUP_ANDROID,
         ),
         PromptModule(

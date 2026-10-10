@@ -4,6 +4,11 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+- Root only: Shizuku (and AXManager / Sui) support is removed; Root is the app's one privileged path. The code before this change is kept on the branch `archive/before-root-only`.
+- `android-shizuku-cli` is now `android-root-cli`: the same subcommands and JSON, run as root through `su`. Its Agent permission switch carries over.
+- The virtual screen runs in a root service (libsu) instead of a Shizuku UserService. Run its compatibility check once more to switch it back on.
+- Accessibility repair, clearing restricted settings and one-tap authorize use Root; Settings > System has a Root page in place of "Root & Shizuku", and the readiness checklist no longer lists Shizuku.
+
 ## 0.0.2 — 2026-10-10
 
 - The terminal understands OSC 7501 (program status): a program reports working / done / blocked / error and the top bar shows it; the feature probe `OSC 7501;?` is answered.

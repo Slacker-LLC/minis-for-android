@@ -2,13 +2,16 @@ package com.openminis.app.tools.android.vscreen
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.ParcelFileDescriptor
-import com.openminis.app.BuildConfig
-import com.openminis.app.offload.ShizukuManager
-import com.openminis.app.tools.android.vscreen.service.VirtualScreenUserService
+import com.openminis.app.offload.RootProcess
+import com.openminis.app.tools.android.vscreen.service.VirtualScreenRootService
+import com.topjohnwu.superuser.ipc.RootService
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Callable
 import java.util.concurrent.CountDownLatch
@@ -19,7 +22,6 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
-import rikka.shizuku.Shizuku
 
 class VirtualScreenClient(context: Context) : AutoCloseable {
     private val appContext = context.applicationContext
@@ -42,13 +44,14 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
     private var closed = false
     private var frameSink: IVirtualScreenFrameSink? = null
 
-    private val args = Shizuku.UserServiceArgs(
-        ComponentName(appContext, VirtualScreenUserService::class.java),
-    ).daemon(true)
-        .processNameSuffix("vscreen")
-        .tag("minis-vscreen")
-        .version(USER_SERVICE_VERSION)
-        .debuggable(BuildConfig.DEBUG)
+    /**
+     * The root service, in libsu daemon mode: its process, and the virtual display it holds, outlive
+     * this app process; libsu ends it when the app is updated or uninstalled.
+     */
+    private val serviceIntent = Intent(appContext, VirtualScreenRootService::class.java)
+        .addCategory(RootService.CATEGORY_DAEMON_MODE)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    @Volatile private var bindError: Throwable? = null
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
@@ -104,9 +107,9 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
     fun runProbe(): String {
         val result = try {
             execute(DEFAULT_TIMEOUT_MS) {
-                ShizukuManager.refresh()
-                if (!ShizukuManager.isReady()) {
-                    unavailableProbe("shizuku_not_ready", "Shizuku is not running and authorized")
+                val rootProblem = RootProcess.unavailableReason()
+                if (rootProblem != null) {
+                    unavailableProbe("root_not_ready", rootProblem)
                 } else {
                     val binder = requireRemote(DEFAULT_TIMEOUT_MS)
                     mergeRemoteProbe(binder.probe())
@@ -243,7 +246,13 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
             connectionLatch.countDown()
             wasBinding
         }
-        if (shouldUnbind) runCatching { Shizuku.unbindUserService(args, connection, remove) }
+        if (shouldUnbind) {
+            onMainThread {
+                runCatching { RootService.unbind(connection) }
+                // Unbinding leaves a daemon running; only stop() ends it and releases its display.
+                if (remove) runCatching { RootService.stop(serviceIntent) }
+            }
+        }
     }
 
     override fun close() {
@@ -262,38 +271,49 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
         }
         if (lost) {
             scheduleReconnectOnce()
-            throw VirtualScreenClientException(VirtualScreenPolicy.DISPLAY_GONE, "The UserService died; its virtual display was released")
+            throw VirtualScreenClientException(VirtualScreenPolicy.DISPLAY_GONE, "The root virtual-screen service died; its virtual display was released")
         }
 
         var shouldBind = false
         val latch = synchronized(stateLock) {
             remote?.let { return it }
             if (closed) throw VirtualScreenClientException("vscreen_client_closed", "VScreen client is closed")
-            if (!ShizukuManager.isReady()) throw VirtualScreenClientException("shizuku_not_ready", "Shizuku is not running and authorized")
+            RootProcess.unavailableReason()?.let { throw VirtualScreenClientException("root_not_ready", it) }
             if (!binding) {
                 binding = true
+                bindError = null
                 connectionLatch = CountDownLatch(1)
                 shouldBind = true
             }
             connectionLatch
         }
         if (shouldBind) {
-            try {
-                Shizuku.bindUserService(args, connection)
-            } catch (error: Throwable) {
-                synchronized(stateLock) {
-                    binding = false
-                    connectionLatch.countDown()
+            // libsu binds only on the main thread; the connection callbacks run inline (they only update
+            // state under the lock), so they never wait for this worker thread.
+            onMainThread {
+                try {
+                    RootService.bind(serviceIntent, { it.run() }, connection)
+                } catch (error: Throwable) {
+                    synchronized(stateLock) {
+                        binding = false
+                        bindError = error
+                        connectionLatch.countDown()
+                    }
                 }
-                throw VirtualScreenClientException("vscreen_bind_failed", error.message ?: error.javaClass.simpleName, error)
             }
         }
         if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
-            throw VirtualScreenClientException("vscreen_timeout", "Timed out waiting for Shizuku UserService")
+            throw VirtualScreenClientException("vscreen_timeout", "Timed out waiting for the root virtual-screen service")
         }
         return synchronized(stateLock) {
-            remote ?: throw VirtualScreenClientException("vscreen_service_disconnected", "UserService did not connect")
+            remote ?: bindError?.let {
+                throw VirtualScreenClientException("vscreen_bind_failed", it.message ?: it.javaClass.simpleName, it)
+            } ?: throw VirtualScreenClientException("vscreen_service_disconnected", "The root virtual-screen service did not connect")
         }
+    }
+
+    private fun onMainThread(block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) block() else mainHandler.post(block)
     }
 
     private fun onServiceLost() {
@@ -351,14 +371,14 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
         val steps = listOf(
             VirtualScreenProbeStep("environment", if (sdk >= 29) "pass" else "fail",
                 if (sdk >= 29) "android_supported" else "android_version_unsupported", "API $sdk; ${Build.MANUFACTURER} ${Build.MODEL}"),
-            VirtualScreenProbeStep("shizuku", "fail", code, detail.take(512)),
-            VirtualScreenProbeStep("context", "skipped", "shizuku_unavailable", "UserService was not started"),
-            VirtualScreenProbeStep("virtual_display", "skipped", "shizuku_unavailable", "UserService was not started"),
-            VirtualScreenProbeStep("ime", "skipped", "shizuku_unavailable", "UserService was not started"),
-            VirtualScreenProbeStep("uiautomation", "skipped", "shizuku_unavailable", "UserService was not started"),
-            VirtualScreenProbeStep("input", "skipped", "shizuku_unavailable", "UserService was not started"),
-            VirtualScreenProbeStep("launch", "skipped", "shizuku_unavailable", "UserService was not started"),
-            VirtualScreenProbeStep("screenshot", "skipped", "shizuku_unavailable", "UserService was not started"),
+            VirtualScreenProbeStep("root", "fail", code, detail.take(512)),
+            VirtualScreenProbeStep("context", "skipped", code, SERVICE_NOT_STARTED),
+            VirtualScreenProbeStep("virtual_display", "skipped", code, SERVICE_NOT_STARTED),
+            VirtualScreenProbeStep("ime", "skipped", code, SERVICE_NOT_STARTED),
+            VirtualScreenProbeStep("uiautomation", "skipped", code, SERVICE_NOT_STARTED),
+            VirtualScreenProbeStep("input", "skipped", code, SERVICE_NOT_STARTED),
+            VirtualScreenProbeStep("launch", "skipped", code, SERVICE_NOT_STARTED),
+            VirtualScreenProbeStep("screenshot", "skipped", code, SERVICE_NOT_STARTED),
         )
         return VirtualScreenProbeReport(System.currentTimeMillis(), fingerprint, steps)
     }
@@ -403,9 +423,7 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
     ) : IllegalStateException(message, cause)
 
     companion object {
-        // Bumped whenever the UserService code or its AIDL changes: a daemon service outlives the app, so
-        // Shizuku only replaces it when this number differs. 2 = frame stream, raw touch, display info; 3 = Home starts Minis's own desktop; 4 = UiAutomation keeps other accessibility services, launches never move a task; 5 = focus is handed back to the physical screen (and again a moment later); 7 = UiAutomation really connects with DONT_SUPPRESS; 8 = act() replaces the index-based target calls.
-        private const val USER_SERVICE_VERSION = 8
+        private const val SERVICE_NOT_STARTED = "The root virtual-screen service was not started"
         private const val DEFAULT_TIMEOUT_MS = 8_000L
         private const val ACT_TIMEOUT_MS = 12_000L
         private const val SCREENSHOT_TIMEOUT_MS = 15_000L

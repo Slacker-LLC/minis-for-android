@@ -8,11 +8,9 @@ internal object VirtualScreenCopyPolicy {
     private val reasons: Map<String, Int> = mapOf(
         "android_supported" to R.string.vscreen_reason_android_ready,
         "android_version_unsupported" to R.string.vscreen_reason_android_old,
-        "shizuku_shell_user_service" to R.string.vscreen_reason_shizuku_ready,
-        "shizuku_not_ready" to R.string.vscreen_reason_shizuku_missing,
-        "shizuku_unavailable" to R.string.vscreen_reason_shizuku_missing,
-        "permission_denied" to R.string.vscreen_reason_shizuku_missing,
-        "root_user_service_refused" to R.string.vscreen_reason_wrong_identity,
+        "root_service_ready" to R.string.vscreen_reason_root_ready,
+        "root_not_ready" to R.string.vscreen_reason_root_missing,
+        "permission_denied" to R.string.vscreen_reason_root_missing,
         "unexpected_user_service_uid" to R.string.vscreen_reason_wrong_identity,
         "shell_context_ready" to R.string.vscreen_reason_context_ready,
         "shell_context_unavailable" to R.string.vscreen_reason_context_failed,
@@ -46,7 +44,7 @@ internal object VirtualScreenCopyPolicy {
 
     private val steps: Map<String, Int> = mapOf(
         "environment" to R.string.vscreen_step_environment,
-        "shizuku" to R.string.vscreen_step_shizuku,
+        "root" to R.string.vscreen_step_root,
         "context" to R.string.vscreen_step_context,
         "virtual_display" to R.string.vscreen_step_display,
         "ime" to R.string.vscreen_step_ime,
@@ -68,11 +66,10 @@ internal object VirtualScreenCopyPolicy {
     }
 
     /** Where a failed check can be fixed, so the result dialog can offer a single "go there" button. */
-    enum class FailAction { NONE, SHIZUKU, DEVELOPER_OPTIONS }
+    enum class FailAction { NONE, ROOT, DEVELOPER_OPTIONS }
 
     fun actionFor(code: String, xiaomi: Boolean): FailAction = when (code) {
-        "shizuku_not_ready", "shizuku_unavailable", "permission_denied", "unexpected_user_service_uid",
-        "root_user_service_refused" -> FailAction.SHIZUKU
+        "root_not_ready", "permission_denied", "unexpected_user_service_uid" -> FailAction.ROOT
         "input_injection_failed" -> if (xiaomi) FailAction.DEVELOPER_OPTIONS else FailAction.NONE
         else -> FailAction.NONE
     }
@@ -82,8 +79,8 @@ internal object VirtualScreenCopyPolicy {
 
     /** Probe reports returned by V1, including app-side failure and skipped codes. */
     fun requiredProbeReasonCodes(): Set<String> = setOf(
-        "android_supported", "android_version_unsupported", "shizuku_shell_user_service",
-        "shizuku_not_ready", "shizuku_unavailable", "permission_denied", "root_user_service_refused",
+        "android_supported", "android_version_unsupported", "root_service_ready",
+        "root_not_ready", "permission_denied",
         "unexpected_user_service_uid", "shell_context_ready", "shell_context_unavailable",
         "virtual_display_created", "virtual_display_create_failed", "virtual_display_invalid_id",
         "probe_display_busy", "display_unavailable", "display_ime_local", "ime_policy_unavailable",

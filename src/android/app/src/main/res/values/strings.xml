@@ -95,19 +95,17 @@
     <!-- [T-android-a11y-force-stop-recovery] Accessibility grant repair. Shown
          when a force-stop has stripped the service out of Settings.Secure. -->
     <string name="a11y_repair_dialog_title">Accessibility turned off</string>
-    <string name="a11y_repair_dialog_message_shizuku">Minis lost its accessibility permission — this happens after the app is force-stopped. Shizuku is available, so it can be restored right now without opening Settings.</string>
+    <string name="a11y_repair_dialog_message_root">Minis lost its accessibility permission — this happens after the app is force-stopped. Root is granted, so it can be restored right now without opening Settings.</string>
     <string name="a11y_repair_dialog_message_manual">Minis lost its accessibility permission — this happens after the app is force-stopped. Re-enable Minis under Settings → Accessibility to continue.</string>
     <string name="a11y_repair_action_repair">Repair now</string>
     <string name="a11y_repair_action_open_settings">Open Settings</string>
     <string name="a11y_repair_cancel">Not now</string>
     <string name="a11y_repair_section_header">Needs attention</string>
-    <string name="a11y_repair_row_shizuku">Repair accessibility permission</string>
+    <string name="a11y_repair_row_root">Repair accessibility permission</string>
     <string name="a11y_repair_row_manual">Re-enable accessibility</string>
     <string name="a11y_repair_row_sub">The permission was revoked, likely by a force-stop</string>
     <string name="a11y_repair_in_progress">Repairing…</string>
     <string name="a11y_repair_failed">Repair failed — try enabling it in Settings</string>
-    <string name="a11y_repair_footer_shizuku">Android removes the accessibility grant whenever an app is force-stopped, and does not restore it automatically. Shizuku can write it back directly.</string>
-    <string name="a11y_repair_footer_manual">Android removes the accessibility grant whenever an app is force-stopped, and does not restore it automatically. Install and authorize Shizuku to repair this in one tap in future.</string>
     <string name="bg_service_notification_title">Minis Agent Active</string>
     <string name="bg_service_notification_text">%1$s | %2$s | %3$s</string>
     <!-- Shown on the ongoing notification / Live Update chip once the agent
@@ -782,14 +780,14 @@
          the system-layer authorization status with an inline action
          row when system Settings need attention. -->
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
-    <string name="perm_tool_shizuku_cli">android-shizuku-cli</string>
+    <string name="perm_tool_root_cli">android-root-cli</string>
     <string name="perm_tool_apt_cli">minis-apt</string>
     <string name="perm_section_a11y">Accessibility</string>
     <string name="perm_a11y_section_footer">android-a11y-cli lets the agent read on-screen UI structure, perform taps and gestures, and watch system events. Both rows below must be set: pick an Agent permission and enable the Accessibility service in system Settings.</string>
-    <string name="perm_shizuku_section_footer">android-shizuku-cli grants the agent privileged Android APIs (package install, settings put, force-stop, …) via the Shizuku service authorized over wireless ADB or root. Both rows below must be set.</string>
     <string name="perm_a11y_cli_description">Lets the agent read screen UI, tap, type, and watch events</string>
     <string name="perm_a11y_open_settings">Open Accessibility Settings</string>
     <string name="perm_system_authorization">System authorization</string>
+    <string name="perm_root_not_granted">Not granted</string>
     <string name="perm_agent_policy">Agent permission</string>
     <string name="perm_a11y_system_ready">Service enabled</string>
     <string name="perm_a11y_system_disabled">Service not enabled</string>
@@ -804,61 +802,21 @@
     <string name="perm_tool_contacts">Contacts</string>
     <string name="perm_tool_photos">Photos</string>
 
-    <!-- T322: Shizuku permission walkthrough -->
-    <string name="shizuku_title">Root &amp; Shizuku</string>
-    <string name="shizuku_status_header">Status</string>
-    <string name="shizuku_status_footer">Shizuku exposes privileged system APIs to user apps without root, by running a small service started via wireless ADB or root. Three compatible providers are supported — Shizuku (RikkaApps), AXManager (Axeron), and Sui (a Magisk/KernelSU module for rooted devices); install any one. Once authorized, Minis can use the android-shizuku-cli CLI for package, permission, settings, input, and activity management.</string>
-    <string name="shizuku_actions_header">Next Step</string>
-    <string name="shizuku_capabilities_header">Capabilities</string>
-    <string name="shizuku_capabilities_footer">Run `android-shizuku-cli --help` in a shell for full usage. Available whether the binder comes from Shizuku, AXManager, or Sui — the command surface is identical.</string>
-    <string name="shizuku_cap_package_desc">Install, uninstall, list, and query apps</string>
-    <string name="shizuku_cap_permission_desc">Grant or revoke runtime permissions</string>
-    <string name="shizuku_cap_activity_desc">Start activities and send broadcasts</string>
-    <string name="shizuku_cap_display_desc">Query and adjust display settings</string>
-    <string name="shizuku_cap_settings_desc">Read and write system / secure / global settings</string>
-    <string name="shizuku_cap_user_desc">List and manage device users</string>
-    <string name="shizuku_cap_network_desc">Inspect and toggle network state</string>
-    <string name="shizuku_cap_input_desc">Inject taps, swipes, keys, and text</string>
-    <string name="shizuku_cap_notification_desc">Post and manage notifications</string>
-    <string name="shizuku_cap_file_desc">Read and write privileged file paths</string>
-    <string name="shizuku_cap_device_desc">Query device properties and hardware state</string>
-    <string name="shizuku_cap_service_desc">Call and inspect system services</string>
-    <string name="shizuku_install_footer">Install any one of Shizuku (RikkaApps), AXManager (Axeron), or Sui (RikkaApps) — all three implement the same protocol and are fully interchangeable. Shizuku and AXManager are regular apps activated via wireless ADB. Sui is for already-rooted devices: it installs as a Magisk/KernelSU module, needs no app, and stays active across reboots. On KernelSU or APatch, Sui also requires a Zygisk implementation (Zygisk Next / ReZygisk / NeoZygisk) — without it Sui will not load. Install one, then return here.</string>
-    <string name="shizuku_start_footer">Open the manager app and start the service via wireless ADB (no PC) or root. After it shows running, return here.\n\nUsing AXManager? Also enable Settings → "AX-Permission Intercept" inside AXManager — only that switch makes AXManager push its Shizuku-compatible binder to Minis.</string>
-    <string name="shizuku_grant_footer">The service is running. Tap Authorize Minis to grant access. A system dialog from the manager app will ask you to confirm.</string>
-    <string name="shizuku_grant_footer_sui">Sui is running. Tap Authorize Minis to grant access — Sui will show the confirmation dialog itself. There is no separate manager app to open.</string>
+    <string name="root_cli_cap_package_desc">Install, uninstall, list, and query apps</string>
+    <string name="root_cli_cap_permission_desc">Grant or revoke runtime permissions</string>
+    <string name="root_cli_cap_activity_desc">Start activities and send broadcasts</string>
+    <string name="root_cli_cap_display_desc">Query and adjust display settings</string>
+    <string name="root_cli_cap_settings_desc">Read and write system / secure / global settings</string>
+    <string name="root_cli_cap_user_desc">List and manage device users</string>
+    <string name="root_cli_cap_network_desc">Inspect and toggle network state</string>
+    <string name="root_cli_cap_input_desc">Inject taps, swipes, keys, and text</string>
+    <string name="root_cli_cap_notification_desc">Post and manage notifications</string>
+    <string name="root_cli_cap_file_desc">Read and write privileged file paths</string>
+    <string name="root_cli_cap_device_desc">Query device properties and hardware state</string>
+    <string name="root_cli_cap_service_desc">Check whether Root is available</string>
 
-    <string name="shizuku_state_not_installed">Manager Not Installed</string>
-    <string name="shizuku_state_not_installed_subtitle">Install Shizuku, AXManager, or Sui — any one works.</string>
-    <string name="shizuku_state_not_running">Service Not Running</string>
-    <string name="shizuku_state_not_running_subtitle">Open the manager app and press Start.</string>
-    <string name="shizuku_state_need_permission">Authorization Required</string>
-    <string name="shizuku_state_need_permission_subtitle">The service is running but Minis is not authorized.</string>
-    <string name="shizuku_state_ready">Ready</string>
-    <string name="shizuku_ready_subtitle">version=%1$d, uid=%2$d</string>
-    <string name="shizuku_ready_subtitle_sui">Sui (root) · version=%1$d, uid=%2$d</string>
-
-    <string name="shizuku_badge_not_installed">Not Installed</string>
-    <string name="shizuku_badge_not_running">Stopped</string>
-    <string name="shizuku_badge_need_permission">Permission</string>
-    <string name="shizuku_badge_ready">Ready</string>
-
-    <string name="shizuku_install_btn">Install Shizuku</string>
-    <string name="shizuku_install_btn_subtitle">RikkaApps · opens the GitHub releases page</string>
-    <string name="shizuku_install_btn_axmanager">Install AXManager</string>
-    <string name="shizuku_install_btn_axmanager_subtitle">Axeron · opens the GitHub releases page</string>
-    <string name="shizuku_install_btn_sui">Install Sui</string>
-    <string name="shizuku_install_btn_sui_subtitle">RikkaApps · for rooted devices (Magisk/KernelSU) · no app, survives reboots</string>
-    <string name="shizuku_open_btn">Open Manager App</string>
-    <string name="shizuku_open_btn_subtitle">Launch the installed manager to start or manage the service</string>
-    <string name="shizuku_recheck_btn">Recheck</string>
-    <string name="shizuku_recheck_subtitle">Re-poll state after starting the service</string>
-    <string name="shizuku_grant_btn">Authorize Minis</string>
-    <string name="shizuku_grant_subtitle">Show the permission dialog</string>
-
-    <!-- [T-android-privileged-backend] Privileged backend (Shizuku / AXManager) -->
     <string name="perm_section_privileged_backend">Privileged Backend</string>
-    <string name="perm_privileged_cli_description">Let the agent run ADB-level system commands through a privileged backend (Shizuku or AXManager)</string>
+    <string name="perm_privileged_cli_description">Let the agent run ADB-level system commands as root (pm, am, settings, input…)</string>
 
     <string name="skill_title">Skills</string>
     <string name="skill_add">Add Skill</string>
@@ -1716,7 +1674,6 @@
     <string name="system_permissions_module_a11y_header">Module protection</string>
     <string name="system_permissions_module_a11y_toggle">Keep the accessibility service enabled</string>
     <string name="system_permissions_module_a11y_unavailable">The Minis module is not installed or not active</string>
-    <string name="system_permissions_module_a11y_footer">Works only with the Minis LSPosed module installed and scoped to Minis. The module then keeps the accessibility service enabled inside the system, without Shizuku.</string>
 
     <string name="module_settings_title">Module settings</string>
     <string name="module_settings_row_subtitle">Switches the LSPosed module reads</string>
@@ -1816,7 +1773,7 @@
     <string name="settings_cat_chat_sub">Return key, focus after reply, thinking, grouping</string>
     <string name="settings_cat_appearance_sub2">Theme, fonts, language, app icon, desktop pet</string>
     <string name="settings_cat_runtime_sub2">Rootfs, environment variables</string>
-    <string name="settings_cat_system_sub2">Root, Shizuku, agent permissions, background and notifications</string>
+    <string name="settings_cat_system_sub2">Root, agent permissions, background and notifications</string>
     <string name="settings_cat_data_sub">Logs, updates, privacy</string>
     <string name="settings_root_footer">The terminal is in the session drawer; the team and scheduled tasks are under Agent.</string>
     <string name="settings_attention_count">%1$d need attention</string>
@@ -1859,7 +1816,7 @@
     <string name="module_settings_assistant_role_hint">Minis takes over the power key only once it is the default assistant of the system - set that under Permissions.</string>
     <string name="settings_tool_permissions">Agent permissions</string>
     <string name="settings_tool_permissions_sub">What the agent may do on its own</string>
-    <string name="settings_shizuku_sub">Root status, Shizuku install and authorisation</string>
+    <string name="settings_root_sub">Root status and what it unlocks</string>
     <string name="system_permissions_overlay_section">Overlay permission</string>
     <string name="system_permissions_overlay_row">Display over other apps</string>
     <string name="system_permissions_overlay_granted">Granted</string>
@@ -2239,7 +2196,7 @@
     <string name="scheduled_vscreen_unattended_hint">Unattended runs use only the virtual screen for UI actions.</string>
     <string name="scheduled_vscreen_unavailable_warning">Virtual display is not currently enabled with a passing device check. This routine can still be saved, but its UI actions may fail.</string>
     <string name="settings_vscreen_entry">Virtual display (experimental)</string>
-    <string name="settings_vscreen_subtitle">Shizuku virtual screen and compatibility self-check</string>
+    <string name="settings_vscreen_subtitle">Root virtual screen and compatibility self-check</string>
     <string name="vscreen_allow_physical_unattended">Allow unattended physical-screen actions</string>
     <string name="vscreen_allow_physical_unattended_risk">Risk: background routines could control the screen you are using. Off by default; virtual-screen-only access is safer.</string>
     <string name="vscreen_check_compatibility">Check device compatibility</string>
@@ -2247,11 +2204,10 @@
     <string name="vscreen_enabled_label">Enable virtual display</string>
     <string name="vscreen_enabled_summary">Enabling runs a fresh device self-check first.</string>
     <string name="vscreen_height">Height (px)</string>
-    <string name="vscreen_intro">Experimental. It needs a Shizuku-protocol service running as Root or ADB (with Root, start Shizuku with Root). It is off by default, creates one isolated virtual display, and never falls back to the physical screen.</string>
     <string name="vscreen_no_display">There is no active virtual display.</string>
     <string name="vscreen_reason_service_timeout">The service process did not start in time. Update the app and try again; if it keeps happening, report this code.</string>
     <string name="vscreen_fail_dialog_title">These checks did not pass</string>
-    <string name="vscreen_fail_action_shizuku">Open Shizuku</string>
+    <string name="vscreen_fail_action_root">Open Root settings</string>
     <string name="vscreen_fail_action_devopts">Developer options</string>
     <string name="vscreen_view_failures">See what failed</string>
     <string name="vscreen_viewer_title">Virtual screen</string>
@@ -2268,13 +2224,13 @@
     <string name="vscreen_reason_app_moved">The app left the virtual display. Stop the action; Minis will not continue on the physical screen.</string>
     <string name="vscreen_reason_cleanup_ready">The temporary self-check display was released.</string>
     <string name="vscreen_reason_cleanup_skipped">No temporary display was created, so there was nothing to release.</string>
-    <string name="vscreen_reason_context_failed">System context setup failed. Restart Shizuku and Minis, then retry.</string>
+    <string name="vscreen_reason_context_failed">System context setup failed. Restart Minis, then retry.</string>
     <string name="vscreen_reason_context_ready">The isolated system context is ready.</string>
     <string name="vscreen_reason_display_busy">Close the current virtual display, then run the compatibility check again.</string>
     <string name="vscreen_reason_display_failed">The virtual display could not be created. Close any active virtual display and retry; if it persists, this ROM may not support the required APIs.</string>
     <string name="vscreen_reason_display_ready">A temporary virtual display was created successfully.</string>
-    <string name="vscreen_reason_generic_failure">This check failed. Review its device detail, verify Shizuku is authorized, and retry.</string>
-    <string name="vscreen_reason_hidden_api">A required hidden API is unavailable in this Shizuku UserService. VScreen cannot be enabled on this device.</string>
+    <string name="vscreen_reason_generic_failure">This check failed. Review its device detail, verify Minis has Root, and retry.</string>
+    <string name="vscreen_reason_hidden_api">A required hidden API is unavailable in the root service. VScreen cannot be enabled on this device.</string>
     <string name="vscreen_reason_ime_ready">The keyboard is routed to the virtual display.</string>
     <string name="vscreen_reason_ime_unavailable">This ROM could not isolate keyboard routing. Text entry may not work reliably; use only after testing.</string>
     <string name="vscreen_reason_input_failed">Input injection was rejected. On Xiaomi/HyperOS, enable Developer options → USB debugging (Security settings), then retry.</string>
@@ -2285,13 +2241,13 @@
     <string name="vscreen_reason_screenshot_blocked">The frame is black; FLAG_SECURE or an unsupported capture policy may block pixels. Use the UI node tree or ask the user to take over. Do not try OCR or another capture path.</string>
     <string name="vscreen_reason_screenshot_failed">No safe image was available. Secure or blank screens are intentionally blocked; do not use OCR or another screen path.</string>
     <string name="vscreen_reason_screenshot_ready">A non-blank virtual-screen image was captured.</string>
-    <string name="vscreen_reason_shizuku_missing">Start Shizuku and authorize Minis, then run the compatibility check again.</string>
-    <string name="vscreen_reason_shizuku_ready">Shizuku is authorized and the shell UserService is running.</string>
-    <string name="vscreen_reason_timeout">The device check timed out. Keep Shizuku running and try again.</string>
-    <string name="vscreen_reason_uiautomation_failed">UI observation was blocked. Check Shizuku authorization and device compatibility, then retry.</string>
-    <string name="vscreen_reason_uiautomation_ready">UI observation is available in the Shizuku service.</string>
+    <string name="vscreen_reason_root_missing">Grant Minis Root, then run the compatibility check again.</string>
+    <string name="vscreen_reason_root_ready">Root is granted and the virtual-screen service is running as root.</string>
+    <string name="vscreen_reason_timeout">The device check timed out. Make sure Root is granted and try again.</string>
+    <string name="vscreen_reason_uiautomation_failed">UI observation was blocked. Check Root and device compatibility, then retry.</string>
+    <string name="vscreen_reason_uiautomation_ready">UI observation is available in the root service.</string>
     <string name="vscreen_reason_unknown">Unrecognized check result. Keep VScreen off and report this code.</string>
-    <string name="vscreen_reason_wrong_identity">The service did not run as an authorized shell (2000) or Root (0) identity. Restart Shizuku and retry.</string>
+    <string name="vscreen_reason_wrong_identity">The service did not run as Root (UID 0). Grant Minis Root and retry.</string>
     <string name="vscreen_release">Release virtual display</string>
     <string name="vscreen_released">Virtual display released.</string>
     <string name="vscreen_resolution">Resolution and density</string>
@@ -2309,7 +2265,7 @@
     <string name="vscreen_step_input">Display-local input</string>
     <string name="vscreen_step_launch">App launch on the virtual display</string>
     <string name="vscreen_step_screenshot">Non-blank screenshot</string>
-    <string name="vscreen_step_shizuku">Shizuku authorization and service identity</string>
+    <string name="vscreen_step_root">Root authorization and service identity</string>
     <string name="vscreen_step_uiautomation">UI observation</string>
     <string name="vscreen_step_unknown">Compatibility check</string>
     <string name="vscreen_title">Virtual display</string>
@@ -2385,9 +2341,6 @@
     <string name="perm_tool_vscreen_ui">Operate the virtual screen</string>
     <string name="perm_vscreen_master_title">Let the agent use the virtual screen</string>
     <string name="perm_vscreen_master_sub">Master switch; the items below are its permissions</string>
-    <string name="settings_ready_shizuku_title">Shizuku</string>
-    <string name="settings_ready_shizuku_ok">Connected · used by the virtual screen and Agent tools</string>
-    <string name="settings_ready_shizuku_bad">Not ready · install, start or authorize Shizuku</string>
     <string name="settings_ready_overlay_title">Display over other apps</string>
     <string name="settings_ready_overlay_ok">Allowed</string>
     <string name="settings_ready_overlay_bad">Off · the desktop pet and floating controls need it</string>
@@ -2497,7 +2450,7 @@
     <string name="agent_models_cli_only">minis-model-use only (not a chat model)</string>
     <string name="oneclick_header">One-tap authorize</string>
     <string name="oneclick_title">Authorize everything</string>
-    <string name="oneclick_sub">Needs root. Grants every Android permission the app declares, turns on its accessibility service, notification access and default-assistant role, enables the module switches and the virtual screen (Shizuku must be running), and allows every Agent tool. Switching off puts the Agent tools back to their defaults; Android grants stay. Also shares your API-key providers with pi, Claude Code and Codex in the terminal.</string>
+    <string name="oneclick_sub">Needs root. Grants every Android permission the app declares, turns on its accessibility service, notification access and default-assistant role, enables the module switches and the virtual screen, and allows every Agent tool. Switching off puts the Agent tools back to their defaults; Android grants stay. Also shares your API-key providers with pi, Claude Code and Codex in the terminal.</string>
     <string name="oneclick_working">Granting…</string>
     <string name="module_settings_restart_title">Restart Minis to connect</string>
     <string name="module_settings_restart_sub">Use this after enabling the module while Minis was already running.</string>

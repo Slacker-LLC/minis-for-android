@@ -30,7 +30,7 @@ internal class UiBridge(private val settle: SettleTracker) {
     @Volatile private var windowDisplay: Map<Int, Int> = emptyMap()
     @Volatile private var lastWindowRefreshAt = 0L
 
-    /** This reflection executes only in Shizuku's separate shell UserService process. */
+    /** This reflection executes only in the separate root virtual-screen service process. */
     @SuppressLint("SoonBlockedPrivateApi")
     @Synchronized
     fun connect(): Boolean {
@@ -264,7 +264,7 @@ internal class UiBridge(private val settle: SettleTracker) {
         return false
     }
 
-    /** This reflection executes only in Shizuku's separate shell UserService process. */
+    /** This reflection executes only in the separate root virtual-screen service process. */
     @SuppressLint("SoonBlockedPrivateApi")
     @Synchronized
     fun disconnect() {

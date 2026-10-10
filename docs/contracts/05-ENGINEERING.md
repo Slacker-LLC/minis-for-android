@@ -38,7 +38,7 @@ README / 专题 docs → 面向读者说明
 
 ## VScreen 与例程权限档位
 
-- VScreen 仅在 Shizuku 协议 UserService 自检通过后启用。该服务的身份可以是 shell（2000，adb 启动的 Shizuku）或 root（0，以 Root 启动的 Shizuku / Sui），由用户自己选择如何运行 Shizuku；App 不自行通过 `su`/`DirectRootRunner` 启动任何 VScreen 进程，也不得以 KernelSU 直连、LSPosed、视频/OCR 或未经认证的 socket 作为后备路径。其它 uid 一律拒绝。拉起应用走系统的 `cmd activity start-activity`（参数向量由已校验的包名/组件构造，不经 shell）。
+- VScreen 仅在 root 服务自检通过后启用。服务由 libsu `RootService`（`VirtualScreenRootService`，daemon 模式）经 `su` 以 `app_process` 拉起，身份必须是 root（0），其它 uid 一律拒绝；binder 只经 libsu 交回本 App，服务本身没有网络或 socket 监听。daemon 进程在 App 被杀后保留虚拟屏，App 升级或卸载时由 libsu 结束，因此不需要服务版本号。不得以 LSPosed、视频/OCR 或未经认证的 socket 作为后备路径。2026-10 之前它运行在 Shizuku 协议 UserService 里，该路径已移除。拉起应用走系统的 `cmd activity start-activity`（参数向量由已校验的包名/组件构造，不经 shell）。
 - 物理屏与虚拟屏的 UI observation 均不得序列化 Android 标记为 password 节点的 text、content description 或 hint；仅可保留字段结构及 password 标记。
 - `ScheduledTask` 权限档位保存在现有 JSON 存储中，不新增或迁移 Room schema。新建例程默认为 `READ_ONLY`；旧 JSON 缺字段时保留既有 `FULL` 行为，未知/畸形档位按 `READ_ONLY` 处理。
 - 档位仅由 `ScheduledAgentRunner` 对正在运行的例程 session 建立；不同 session 的委派目标和唤醒回合不继承该档位，继续由 F3 既有无人值守策略保护；若共用同一 `sessionId`，所有回合共享最严格的活跃档位，denial preview 目前也按 session 收集而非按 turn 归属。
@@ -103,7 +103,7 @@ cd src/android
 ```
 
 VScreen/V4 的 JVM 安全回归至少覆盖 `ScheduledReadOnlyPolicyTest`、`ScheduledTaskPermissionTierJsonTest`、
-`ScheduledTaskTierMutationPolicyTest` 与 `OffloadPermissionManagerScheduledTierTest`。这些宿主测试只证明解析/权限策略，不能替代 Shizuku UserService 和 OEM 显示行为的真机验收。
+`ScheduledTaskTierMutationPolicyTest` 与 `OffloadPermissionManagerScheduledTierTest`。这些宿主测试只证明解析/权限策略，不能替代 root 服务和 OEM 显示行为的真机验收。
 
 Release/R8/JNI 敏感改动必须跑对应 Release 检查；Debug 不能替代。Root、mount、SELinux、VPN/DNS/BPF/Fake-IP、OEM 生命周期等设备行为，只有明确真机实测后才能声称通过。
 

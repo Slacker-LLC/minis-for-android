@@ -121,8 +121,8 @@ First-run: enable "Minis" under Settings → Accessibility, then `service ping`.
         // never self-heals, so without this every subsequent a11y call just
         // returns SERVICE_NOT_RUNNING and the user has no idea the grant is the
         // problem. Detect it here — the single point every real operation
-        // passes through — and offer a repair (one-tap via Shizuku when
-        // available, otherwise a trip to Settings).
+        // passes through — and offer a repair (one-tap as root when
+        // granted, otherwise a trip to Settings).
         //
         // `service` / `--version` are exempt for the same reason they bypass
         // the gate above: they are how you DIAGNOSE this state, and prompting
@@ -143,8 +143,8 @@ First-run: enable "Minis" under Settings → Accessibility, then `service ping`.
                     args,
                     "SERVICE_NOT_RUNNING",
                     "Accessibility permission was revoked (this happens after a force-stop). " +
-                        "Re-enable Minis under Settings → Accessibility, or use Settings → " +
-                        "Permissions → Integrations to repair it with Shizuku.",
+                        "Re-enable Minis under Settings → Accessibility, or repair it as root " +
+                        "under Settings → System → System permissions.",
                     exit = 77,
                 )
             }
@@ -384,7 +384,7 @@ First-run: enable "Minis" under Settings → Accessibility, then `service ping`.
     private fun uiScreenshot(args: OffloadArgs): NativeOffloadResult {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             return err(args, "NOT_SUPPORTED",
-                "ui screenshot requires Android 11 (API 30); use `android-shizuku-cli exec screencap` instead.")
+                "ui screenshot requires Android 11 (API 30); use `android-root-cli exec screencap` instead.")
         }
         val svc = svcOrThrow()
         val scale = (args.getDouble("scale") ?: 0.5).toFloat().coerceIn(0.05f, 1.0f)
@@ -605,7 +605,7 @@ First-run: enable "Minis" under Settings → Accessibility, then `service ping`.
             "RECENTS" -> AccessibilityService.GLOBAL_ACTION_RECENTS
             "NOTIFICATIONS" -> AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
             else -> return err(args, "INVALID_ARGS",
-                "key '$keyName' not supported via accessibility (try BACK/HOME/RECENTS/NOTIFICATIONS; for ENTER/DPAD use shizuku-cli `input keyevent`)")
+                "key '$keyName' not supported via accessibility (try BACK/HOME/RECENTS/NOTIFICATIONS; for ENTER/DPAD use `android-root-cli input key`)")
         }
         // Ported evidence semantics: the platform accepting the action is not proof of
         // an effect, a call that never started is a refusal, and a call that started

@@ -31,16 +31,18 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.min
 import kotlin.math.sqrt
 
-/** Shizuku-protocol UserService (shell or root). It intentionally has no network or local-socket listener. */
+/**
+ * The virtual-screen service. It runs as root inside the process libsu starts for
+ * [com.openminis.app.tools.android.vscreen.service.VirtualScreenRootService], and is reached only
+ * through that service's binder: it has no network or local-socket listener.
+ */
 @Keep
 class VirtualScreenUserService : IVirtualScreenService.Stub() {
     private val lock = Any()
-    // The Shizuku-protocol server decides the uid: shell (adb-started Shizuku) or root (a root-started
-    // Shizuku, or Sui). Both can create a virtual display and drive it; anything else is not a
-    // Shizuku-protocol service and is refused. (Binder identity is per process, so a root service
-    // cannot be narrowed to shell from the inside.)
+    // libsu starts this process through su, so it must be root. Anything else means su handed out a
+    // different identity, and the service refuses to act rather than half-work.
     private val identityError: String? =
-        if (Process.myUid() == Process.SHELL_UID || Process.myUid() == 0) null else "unexpected_user_service_uid"
+        if (Process.myUid() == 0) null else "unexpected_user_service_uid"
     private val contextError: String? = if (identityError == null) ShellContext.initialize() else identityError
     private var session: VirtualDisplaySession? = null
     private var uiBridge: UiBridge? = null
@@ -58,9 +60,9 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
             }
             "Android ${Build.VERSION.RELEASE} API $sdk; ${Build.MANUFACTURER} ${Build.MODEL}; supported range Android 10+"
         }
-        recorder.check("shizuku", "shizuku_shell_user_service") {
-            if (identityError != null) throw VirtualScreenProbeFailure(identityError, "VScreen requires a Shizuku-protocol shell (2000) or root (0) service; actual UID=${Process.myUid()}")
-            "UserService active as ${if (Process.myUid() == 0) "root" else "shell"} UID ${Process.myUid()} (app-side READY state was checked before binding)"
+        recorder.check("root", "root_service_ready") {
+            if (identityError != null) throw VirtualScreenProbeFailure(identityError, "VScreen requires a root (0) service; actual UID=${Process.myUid()}")
+            "Root service active as UID ${Process.myUid()}"
         }
         recorder.check("context", "shell_context_ready") {
             if (contextError != null) throw VirtualScreenProbeFailure("shell_context_unavailable", contextError)
@@ -70,7 +72,7 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         val hadDisplay = session != null
         var probeSession: VirtualDisplaySession? = null
         if (identityError != null) {
-            recorder.skipped("virtual_display", identityError, "Non-shell service identity is not permitted")
+            recorder.skipped("virtual_display", identityError, "Only a root service identity is permitted")
         } else if (hadDisplay) {
             recorder.record("virtual_display", "fail", "probe_display_busy", "Close the current VScreen before running a disruptive probe")
         } else {
@@ -87,7 +89,7 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         val active = probeSession
         if (active == null) {
             val code = if (identityError != null) identityError else "display_unavailable"
-            val detail = if (identityError != null) "Non-shell service identity is not permitted" else "Virtual display could not be created"
+            val detail = if (identityError != null) "Only a root service identity is permitted" else "Virtual display could not be created"
             recorder.skipped("ime", code, detail)
             recorder.skipped("uiautomation", code, detail)
             recorder.skipped("input", code, detail)
@@ -101,7 +103,7 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
             uiBridge = ui
             recorder.check("uiautomation", "uiautomation_connected") {
                 if (!ui.connect()) throw VirtualScreenProbeFailure("uiautomation_unavailable", "UiAutomation connect returned false")
-                "UiAutomation connected in Shizuku UserService"
+                "UiAutomation connected in the root service"
             }
             recorder.check("launch", "settings_window_on_virtual_display") {
                 if (!ui.connect()) throw VirtualScreenProbeFailure("uiautomation_unavailable", "UiAutomation is not connected")
@@ -345,15 +347,13 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         readEnd
     }
 
-    /** Reserved Shizuku UserService transaction. Cleanup precedes process exit. */
-    @Keep
-    override fun destroy() {
+    /**
+     * Called by [VirtualScreenRootService.onDestroy] when the root service is stopped. It releases the
+     * virtual display; libsu ends the process once no service is left in it.
+     */
+    fun shutdown() {
         if (!destroyed.compareAndSet(false, true)) return
-        try {
-            synchronized(lock) { releaseSession() }
-        } finally {
-            System.exit(0)
-        }
+        synchronized(lock) { releaseSession() }
     }
 
     private fun ensureUi(): UiBridge {
@@ -419,7 +419,7 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
     }
 
     private fun requireShellIdentity() {
-        if (identityError != null) fail(identityError, "VScreen requires a Shizuku-protocol shell (2000) or root (0) service; actual UID=${Process.myUid()}")
+        if (identityError != null) fail(identityError, "VScreen requires a root (0) service; actual UID=${Process.myUid()}")
     }
 
     private fun releaseSession() {
@@ -434,7 +434,7 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
     }
 
     private fun checkNotDestroyed() {
-        if (destroyed.get()) fail("vscreen_service_destroyed", "UserService is shutting down")
+        if (destroyed.get()) fail("vscreen_service_destroyed", "The virtual-screen service is shutting down")
     }
 
     private fun probeDisplaySpec(): DisplaySpec {

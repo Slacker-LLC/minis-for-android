@@ -34,7 +34,7 @@ class ScheduledReadOnlyPolicyTest {
             "curl https://example.test", "wget https://example.test", "ssh host", "scp a host:b",
             "nc -l 1234", "git push", "git commit -m x", "git checkout main", "git reset --hard",
             "rm -rf /", "mv a b", "cp a b", "chmod 777 a", "pip install x", "apt update", "npm install",
-            "minis-scheduled list", "android-shizuku-cli status", "git branch new-branch",
+            "minis-scheduled list", "android-root-cli status", "git branch new-branch",
             "git branch -D old-branch", "git diff --ext-diff", "git show --textconv", "git status && ls",
             "git status --help", "git log --show-signature",
         )

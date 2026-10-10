@@ -52,7 +52,7 @@ import com.openminis.app.R
 import com.openminis.app.accessibility.AccessibilityRecoveryManager
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.accessibility.RestrictedSettingsManager
-import com.openminis.app.offload.ShizukuManager
+import com.openminis.app.offload.RootProcess
 import com.openminis.app.power.PowerOptimizationManager
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.theme.ChatColors
@@ -100,7 +100,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
     ) { refreshAssistantRole() }
     var a11yDegraded by remember { mutableStateOf(false) }
     var a11yRevoked by remember { mutableStateOf(false) }
-    var shizukuReady by remember { mutableStateOf(false) }
+    var rootGranted by remember { mutableStateOf(false) }
     var repairing by remember { mutableStateOf(false) }
     var repairFailed by remember { mutableStateOf(false) }
     var a11yRestricted by remember { mutableStateOf(false) }
@@ -117,7 +117,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
             a11yDegraded = inSettings && !connected
             a11yRevoked = !inSettings && !connected &&
                 AccessibilityRecoveryManager.hasEverBeenGranted(context)
-            shizukuReady = ShizukuManager.isReady()
+            rootGranted = RootProcess.isGranted()
             a11yRestricted = !a11yEnabled && RestrictedSettingsManager.isRestricted(context)
             overlayGranted = Settings.canDrawOverlays(context)
             delay(1000)
@@ -192,7 +192,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
             }
 
             // [T-eta-xposed-groups] The module's accessibility protection: it keeps this app's
-            // service enabled from inside system_server, so it needs neither Shizuku nor the user
+            // service enabled from inside system_server, so it needs neither Root nor the user
             // coming back to this screen. Off until asked, and the row says when the module is not
             // there instead of pretending the switch did something.
             var moduleProtectionEnabled by remember {
@@ -228,25 +228,25 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                 SettingsSection(
                     header = stringResource(R.string.system_permissions_a11y_restricted_header),
                 ) {
-                    if (shizukuReady) {
+                    if (rootGranted) {
                         SettingsRow(
                             icon = Icons.Outlined.LockOpen,
                             iconColor = ChatColors.ok,
-                            title = stringResource(R.string.system_permissions_a11y_restricted_shizuku),
+                            title = stringResource(R.string.system_permissions_a11y_restricted_root),
                             subtitle = when {
                                 unrestricting ->
                                     stringResource(R.string.system_permissions_a11y_restricted_working)
                                 unrestrictFailed ->
                                     stringResource(R.string.system_permissions_a11y_restricted_failed)
                                 else ->
-                                    stringResource(R.string.system_permissions_a11y_restricted_shizuku_sub)
+                                    stringResource(R.string.system_permissions_a11y_restricted_root_sub)
                             },
                             onClick = {
                                 if (unrestricting) return@SettingsRow
                                 unrestricting = true
                                 unrestrictFailed = false
                                 scope.launch {
-                                    val ok = RestrictedSettingsManager.clearWithShizuku(context)
+                                    val ok = RestrictedSettingsManager.clearWithRoot(context)
                                     unrestricting = false
                                     unrestrictFailed = !ok
                                 }
@@ -308,7 +308,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                         icon = Icons.Outlined.Build,
                         iconColor = ChatColors.bad,
                         title = stringResource(
-                            if (shizukuReady) R.string.a11y_repair_row_shizuku
+                            if (rootGranted) R.string.a11y_repair_row_root
                             else R.string.a11y_repair_row_manual,
                         ),
                         subtitle = when {
@@ -317,7 +317,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                             else -> stringResource(R.string.a11y_repair_row_sub)
                         },
                         onClick = {
-                            if (!shizukuReady) {
+                            if (!rootGranted) {
                                 openAccessibilitySettings(context)
                                 return@SettingsRow
                             }
@@ -325,7 +325,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                             repairing = true
                             repairFailed = false
                             scope.launch {
-                                val ok = AccessibilityRecoveryManager.repairWithShizuku(context)
+                                val ok = AccessibilityRecoveryManager.repairWithRoot(context)
                                 repairing = false
                                 repairFailed = !ok
                             }

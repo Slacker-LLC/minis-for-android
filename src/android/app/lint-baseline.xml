@@ -3905,469 +3905,59 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_title&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_title&quot;>Shizuku&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="791"
-            column="13"/>
-    </issue>
 
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_status_header&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_status_header&quot;>Status&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="793"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_status_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_status_footer&quot;>Shizuku exposes privileged system APIs to user apps without root, by running a small service started via wireless ADB or root. Three compatible providers are supported — Shizuku (RikkaApps), AXManager (Axeron), and Sui (a Magisk/KernelSU module for rooted devices); install any one. Once authorized, Minis can use the android-shizuku-cli CLI for package, permission, settings, input, and activity management.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="794"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_actions_header&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_actions_header&quot;>Next Step&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="795"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_capabilities_header&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_capabilities_header&quot;>Capabilities&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="796"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_capabilities_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_capabilities_footer&quot;>Run `android-shizuku-cli --help` in a shell for full usage. Available whether the binder comes from Shizuku, AXManager, or Sui — the command surface is identical.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="797"
-            column="13"/>
-    </issue>
 
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_package_desc&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_package_desc&quot;>Install, uninstall, list, and query apps&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="799"
-            column="13"/>
-    </issue>
 
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_permission_desc&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_permission_desc&quot;>Grant or revoke runtime permissions&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="801"
-            column="13"/>
-    </issue>
 
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_activity_desc&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_activity_desc&quot;>Start activities and send broadcasts&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="803"
-            column="13"/>
-    </issue>
 
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_display_desc&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_display_desc&quot;>Query and adjust display settings&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="805"
-            column="13"/>
-    </issue>
 
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_settings_desc&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_settings_desc&quot;>Read and write system / secure / global settings&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="807"
-            column="13"/>
-    </issue>
 
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_user_desc&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_user_desc&quot;>List and manage device users&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="809"
-            column="13"/>
-    </issue>
 
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_network_desc&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_network_desc&quot;>Inspect and toggle network state&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="811"
-            column="13"/>
-    </issue>
 
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_input_desc&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_input_desc&quot;>Inject taps, swipes, keys, and text&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="813"
-            column="13"/>
-    </issue>
 
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_notification_desc&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_notification_desc&quot;>Post and manage notifications&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="815"
-            column="13"/>
-    </issue>
 
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_file_desc&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_file_desc&quot;>Read and write privileged file paths&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="817"
-            column="13"/>
-    </issue>
 
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_device_desc&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_device_desc&quot;>Query device properties and hardware state&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="819"
-            column="13"/>
-    </issue>
 
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_cap_service_desc&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_cap_service_desc&quot;>Call and inspect system services&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="821"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_start_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_start_footer&quot;>Open the manager app and start the service via wireless ADB (no PC) or root. After it shows running, return here.\n\nUsing AXManager? Also enable Settings → &quot;AX-Permission Intercept&quot; inside AXManager — only that switch makes AXManager push its Shizuku-compatible binder to Minis.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="823"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_grant_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_grant_footer&quot;>The service is running. Tap Authorize Minis to grant access. A system dialog from the manager app will ask you to confirm.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="824"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_state_not_installed&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_state_not_installed&quot;>Manager Not Installed&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="827"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_state_not_running&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_state_not_running&quot;>Service Not Running&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="829"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_state_not_running_subtitle&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_state_not_running_subtitle&quot;>Open the manager app and press Start.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="830"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_state_need_permission&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_state_need_permission&quot;>Authorization Required&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="831"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_state_need_permission_subtitle&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_state_need_permission_subtitle&quot;>The service is running but Minis is not authorized.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="832"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_state_ready&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_state_ready&quot;>Ready&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="833"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_ready_subtitle&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_ready_subtitle&quot;>version=%1$d, uid=%2$d&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="834"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_badge_not_installed&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_badge_not_installed&quot;>Not Installed&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="837"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_badge_not_running&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_badge_not_running&quot;>Stopped&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="838"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_badge_need_permission&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_badge_need_permission&quot;>Permission&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="839"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_badge_ready&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_badge_ready&quot;>Ready&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="840"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_install_btn&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_install_btn&quot;>Install Shizuku&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="842"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_install_btn_subtitle&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_install_btn_subtitle&quot;>RikkaApps · opens the GitHub releases page&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="843"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_install_btn_axmanager&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_install_btn_axmanager&quot;>Install AXManager&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="844"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_install_btn_axmanager_subtitle&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_install_btn_axmanager_subtitle&quot;>Axeron · opens the GitHub releases page&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="845"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_open_btn&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_open_btn&quot;>Open Manager App&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="848"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_open_btn_subtitle&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_open_btn_subtitle&quot;>Launch the installed manager to start or manage the service&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="849"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_recheck_btn&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_recheck_btn&quot;>Recheck&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="850"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_recheck_subtitle&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_recheck_subtitle&quot;>Re-poll state after starting the service&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="851"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_grant_btn&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_grant_btn&quot;>Authorize Minis&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="852"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;shizuku_grant_subtitle&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;shizuku_grant_subtitle&quot;>Show the permission dialog&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="853"
-            column="13"/>
-    </issue>
+
+
+
+
 
     <issue
         id="MissingTranslation"
@@ -7871,38 +7461,8 @@
             column="22"/>
     </issue>
 
-    <issue
-        id="TypographyDashes"
-        message="Replace &quot;--&quot; with an &quot;em dash&quot; character (—, &amp;#8212;) ?"
-        errorLine1="    &lt;string name=&quot;shizuku_capabilities_footer&quot;>在终端执行 `android-shizuku-cli --help` 查看完整用法。无论 binder 来自 Shizuku、AXManager 还是 Sui，命令集完全一致。&lt;/string>"
-        errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values-zh/strings.xml"
-            line="434"
-            column="48"/>
-    </issue>
 
-    <issue
-        id="TypographyDashes"
-        message="Replace &quot;--&quot; with an &quot;em dash&quot; character (—, &amp;#8212;) ?"
-        errorLine1="    &lt;string name=&quot;shizuku_capabilities_footer&quot;>Выполните `android-shizuku-cli --help` в оболочке для полной справки. Набор команд одинаков независимо от того, откуда binder — Shizuku, AXManager или Sui.&lt;/string>"
-        errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values-ru/strings.xml"
-            line="557"
-            column="48"/>
-    </issue>
 
-    <issue
-        id="TypographyDashes"
-        message="Replace &quot;--&quot; with an &quot;em dash&quot; character (—, &amp;#8212;) ?"
-        errorLine1="    &lt;string name=&quot;shizuku_capabilities_footer&quot;>Run `android-shizuku-cli --help` in a shell for full usage. Available whether the binder comes from Shizuku, AXManager, or Sui — the command surface is identical.&lt;/string>"
-        errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="797"
-            column="48"/>
-    </issue>
 
     <issue
         id="TypographyEllipsis"
@@ -10135,16 +9695,6 @@
             column="9"/>
     </issue>
 
-    <issue
-        id="UseKtx"
-        message="Use the KTX extension function `String.toUri` instead?"
-        errorLine1="        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))"
-        errorLine2="                                                ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/openminis/app/offload/ShizukuBackend.kt"
-            line="155"
-            column="49"/>
-    </issue>
 
     <issue
         id="UseKtx"

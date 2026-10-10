@@ -32,6 +32,4 @@ interface IVirtualScreenService {
     /** One raw touch event (MotionEvent action) at display-local x/y, for dragging by hand. */
     boolean touch(int displayId, int action, int x, int y, long downTimeMs) = 23;
 
-    // Reserved by the Shizuku server. The server invokes transaction 16777115.
-    void destroy() = 16777114;
 }

@@ -14,6 +14,6 @@ object ShellActionOutcomePolicy {
         else -> Outcome.FAILED
     }
 
-    /** Minis' privileged runner reports its own deadline as 124 (see ShizukuOffloadHandler T343). */
+    /** Minis' privileged runner reports its own deadline as 124 (see RootCliOffloadHandler T343). */
     const val PROCESS_TIMEOUT_EXIT_CODE = 124
 }

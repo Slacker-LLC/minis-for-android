@@ -33,7 +33,8 @@ import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.accessibility.RestrictedSettingsManager
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.offload.OffloadPermissionManager
-import com.openminis.app.offload.ShizukuManager
+import com.openminis.app.runtime.guest.RootCliOffloadHandler
+import com.openminis.app.runtime.ubuntu.RootAccess
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.delay
@@ -43,7 +44,7 @@ import com.openminis.app.ui.components.MinisAlertDialog
 @Composable
 fun OffloadPermissionScreen(
     onBack: () -> Unit,
-    onOpenPrivilegedBackend: () -> Unit = {},
+    onOpenRoot: () -> Unit = {},
     onOpenSystemPermissions: () -> Unit = {},
 ) {
     val grouped = OffloadPermissionManager.toolRegistry
@@ -66,7 +67,7 @@ fun OffloadPermissionScreen(
             delay(1000)
         }
     }
-    val shizukuSnap by ShizukuManager.snapshot.collectAsState()
+    val rootState by RootAccess.state.collectAsState()
 
     SettingsScaffold(
         title = stringResource(R.string.perm_title),
@@ -138,13 +139,17 @@ fun OffloadPermissionScreen(
             iconVector = Icons.Outlined.Shield,
             iconTint = Color(0xFFAF52DE),
             sectionHeaderRes = R.string.perm_section_privileged_backend,
-            toolName = "shizuku_cli",
+            toolName = RootCliOffloadHandler.TOOL_NAME,
             descriptionRes = R.string.perm_privileged_cli_description,
-            systemReady = ShizukuManager.isReady(),
-            systemStatusTitleRes = shizukuSubtitleRes(shizukuSnap.state),
-            systemActionTitleRes = shizukuActionTitleRes(shizukuSnap.state),
-            onSystemAction = onOpenPrivilegedBackend,
-            onStatusRowClick = onOpenPrivilegedBackend,
+            systemReady = rootState.isGranted,
+            systemStatusTitleRes = when {
+                rootState.isGranted -> R.string.system_enhance_root_granted
+                rootState.isChecking -> R.string.system_enhance_root_checking
+                else -> R.string.perm_root_not_granted
+            },
+            systemActionTitleRes = R.string.system_enhance_root_action,
+            onSystemAction = onOpenRoot,
+            onStatusRowClick = onOpenRoot,
             resetEpoch = resetEpoch,
         )
 
@@ -338,7 +343,7 @@ private fun toolTitleRes(toolName: String): Int = when (toolName) {
     "contacts" -> R.string.perm_tool_contacts
     "photos" -> R.string.perm_tool_photos
     "a11y_cli" -> R.string.perm_tool_a11y_cli
-    "shizuku_cli" -> R.string.perm_tool_shizuku_cli
+    RootCliOffloadHandler.TOOL_NAME -> R.string.perm_tool_root_cli
     "apt_cli" -> R.string.perm_tool_apt_cli
     "android.vscreen.open" -> R.string.perm_tool_vscreen_open
     "android.vscreen.launch" -> R.string.perm_tool_vscreen_launch
@@ -391,29 +396,6 @@ private fun openAppDetailsSettings(context: Context) {
                 },
             )
         } catch (_: Throwable) {}
-    }
-}
-
-private fun shizukuSubtitleRes(state: ShizukuManager.State): Int = when (state) {
-    ShizukuManager.State.NOT_INSTALLED -> R.string.shizuku_state_not_installed
-    ShizukuManager.State.NOT_RUNNING -> R.string.shizuku_state_not_running
-    ShizukuManager.State.NEED_PERMISSION -> R.string.shizuku_state_need_permission
-    ShizukuManager.State.READY -> R.string.shizuku_state_ready
-}
-
-private fun shizukuActionTitleRes(state: ShizukuManager.State): Int = when (state) {
-    ShizukuManager.State.NOT_INSTALLED -> R.string.shizuku_install_btn
-    ShizukuManager.State.NOT_RUNNING -> R.string.shizuku_open_btn
-    ShizukuManager.State.NEED_PERMISSION -> R.string.shizuku_grant_btn
-    ShizukuManager.State.READY -> 0
-}
-
-private fun performShizukuAction(context: Context, state: ShizukuManager.State) {
-    when (state) {
-        ShizukuManager.State.NOT_INSTALLED -> ShizukuManager.openInstallPage(context)
-        ShizukuManager.State.NOT_RUNNING -> ShizukuManager.openShizukuApp(context)
-        ShizukuManager.State.NEED_PERMISSION -> ShizukuManager.requestPermission()
-        ShizukuManager.State.READY -> {}
     }
 }
 

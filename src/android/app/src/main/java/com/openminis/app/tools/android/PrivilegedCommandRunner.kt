@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Backend selected for one privileged Android command. */
-enum class PrivilegedBackend { ROOT, SHIZUKU, NONE }
+enum class PrivilegedBackend { ROOT, NONE }
 
 /** Risk classification retained for audit logging and conservative command analysis. */
 enum class CommandRisk(val severity: Int) {

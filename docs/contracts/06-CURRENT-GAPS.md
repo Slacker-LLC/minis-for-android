@@ -42,7 +42,7 @@ HTTP/DNS 检查仍可用受控的 `curl`。
 
 此前确认的“`/usr/local/bin` 只有 `minis-config` 和 `minis-model-use`”缺口已经在当前工作树闭合。Direct Root 不复制上游 PRoot 的 `native_offload` stub，而是在 Ubuntu 启动/恢复时由 `GuestCommandBridge` 为当前已注册的 Android/Minis handler 生成带 loopback token 鉴权的 wrapper；因此命令名、argv/session/cwd/stdin 语义和 Android handler 保持一致，同时不恢复 PRoot、旧 broker 或通用 Root shell。
 
-小米 `24129PN74C` 真机已验证这些命令的 PATH 入口：`android-alarm`、`android-calendar`、`android-clipboard`、`android-contacts`、`android-device`、`android-location`、`android-notification`、`android-open`、`android-photos`、`android-player`、`android-speak`、`android-speech`、`android-weather`、`android-a11y-cli`、`android-shizuku-cli`、`minis-browser-use`、`minis-scheduled`、`minis-sessions-cli`、`minis-config`、`minis-model-use`、`minis-open` 及其浏览器别名；Debug APK 另有 `minis-debug`。`android-device info` 和多个 `--help`/`--version` 调用已获得实际输出。
+小米 `24129PN74C` 真机已验证这些命令的 PATH 入口（其中 `android-shizuku-cli` 已于 2026-10-10 改名 `android-root-cli`，改名后未在真机复验）：`android-alarm`、`android-calendar`、`android-clipboard`、`android-contacts`、`android-device`、`android-location`、`android-notification`、`android-open`、`android-photos`、`android-player`、`android-speak`、`android-speech`、`android-weather`、`android-a11y-cli`、`android-shizuku-cli`、`minis-browser-use`、`minis-scheduled`、`minis-sessions-cli`、`minis-config`、`minis-model-use`、`minis-open` 及其浏览器别名；Debug APK 另有 `minis-debug`。`android-device info` 和多个 `--help`/`--version` 调用已获得实际输出。
 
 **仍未补齐：`minis-mcp-cli`。** 上游 Python 命令随旧资产树删除后，当前 Guest 没有同名入口；Android 原生 MCP client/server 不是 CLI 的等价替代。提示词这一侧已经不再引导模型运行该命令：`MCPRepository.mcpPromptFragment()` 现在让模型直接调用 `mcp_<server>_<tool>` 工具。缺的只是 Guest 内的 CLI 入口本身。另外，原生 client 的 STDIO 服务目前在 Android 宿主进程里启动，而不是在 Ubuntu Guest 里，装在 Guest 里的 MCP 服务无法通过 STDIO 连接（2026-10-04 审计 F29，未修复）。
 
@@ -87,6 +87,8 @@ CI/宿主测试不能替代以下证据：
 
 ## VScreen 真机记录（2026-10-01，小米 24129PN74C / Android 17 / 以 Root 启动的 Shizuku）
 
+> 历史记录：这是 Shizuku UserService 时期的实测。2026-10-10 起虚拟屏服务改由 libsu root 服务承载，见下方「纯 Root 路线」一节；下文提到的 `USER_SERVICE_VERSION`、adb 启动的 Shizuku 等不再适用。
+
 - 此前设置页显示「Shizuku 授权失败」并不是授权问题：`network_security_config.xml` 里冗余的 `localhost`/`127.0.0.1` `domain-config` 会让 Shizuku 拉起的 UserService 进程在初始化时抛出 `Found multiple conflicting per-domain rules` 并退出，App 侧表现为 8 秒 Binder 超时。已删除该冗余配置（`base-config` 已允许明文，HTTP 仍由 `ProviderTransportPolicy` 限制）。
 - Root 启动的 Shizuku 使服务以 uid 0 运行，旧代码硬性拒绝（`root_user_service_refused`）；现按上文接受 root。Binder 身份是按进程而不是按线程的（实测线程内 `setuid` 后虚拟屏所有者仍为 uid 0），所以不能在进程内降为 shell。
 - 拉起应用改用 `cmd activity start-activity --display`：手工构造的 `ActivityThread` 不是系统认识的调用方进程，`Context.startActivity` 会得到 `Not allowed to start activity`。输入探测放在拉起之后（空显示屏上没有窗口可接收按键）。
@@ -105,6 +107,8 @@ CI/宿主测试不能替代以下证据：
 - 探测与 UiAutomation 互斥：同一时刻系统只允许一个 UiAutomation 客户端，Maestro 等自动化驱动在后台时会让「UiAutomation」步骤报 `already registered`。
 
 ## VScreen capability pending hardware validation（2026-09-30）
+
+> 历史记录：写于 Shizuku 时期。服务宿主已换成 libsu root 服务，V1–V4 的待验收项仍然有效，只是「UserService」现在指 root 服务。
 
 VScreen 使用 Shizuku 协议 **UserService**（shell 或 root 身份，见 05 合同）和随 Android/OEM 版本变化的隐藏系统 API；能力默认关闭，只有当前系统/ROM 指纹下的设备自检全部通过才允许用户启用。指纹变化或自检失败会持久清除 enabled 状态，必须重新通过自检并由用户再次启用。UserService 仅接受非物理 display ID；物理主屏输入/观察、未经限定的 socket、视频/OCR 路径均不属于本功能，本实现也不增加系统网络出口拦截。
 
@@ -192,6 +196,28 @@ config registry 暴露为 `prompt.custom`（带确认与审计回退）。内置
 - 启动健康状态是首个失败短路，没有聚合视图。
 
 以上开放项均未做真机验证，不得据此声称设备行为结论。
+
+## 纯 Root 路线：移除 Shizuku（2026-10-10）
+
+项目只走 Root，不再接入 Shizuku 协议（Shizuku / AXManager / Sui）。移除前的完整代码存档在分支 `archive/before-root-only`（`6a6b450`）；免 Root 的 PRoot + Ubuntu 后端记为暂缓的 Issue #184。
+
+改动：
+
+- `android-shizuku-cli` 改名 `android-root-cli`，子命令和 JSON 不变，底层经 `RootProcess` → `DirectRootRunner` 用 `su` 执行。权限开关 `shizuku_cli` 自动迁移为 `root_cli`。旧 rootfs 里残留的 `android-shizuku-cli` 包装脚本在下次安装 guest CLI 时删除。
+- 虚拟屏服务改由 libsu `RootService`（daemon 模式）承载，只接受 uid 0；保存的旧探测结果因指纹里多了宿主标记而失效，需要重新通过一次自检才能启用。
+- 无障碍授权修复、受限设置解除、一键授权都改用 Root；设置里的「Root 与 Shizuku」页换成「Root」页，就绪清单去掉 Shizuku 项。
+
+只有编译、JVM 单测和 lint 的证据，以下**全部未在真机验证**：
+
+- libsu `RootService` 在 HyperOS / KernelSU 上的首次绑定（含 su 授权弹窗）、daemon 模式下强杀 App 后虚拟屏保留与重新接回、App 升级后旧 daemon 被结束；
+- `ShellContext.initialize()` 在 libsu 拉起的 `app_process` 进程里的行为（此前只在 Shizuku UserService 进程里验证过）、10 步探测、UiAutomation、帧流与触摸；
+- `android-root-cli` 各子命令经 `su` 的结果与耗时（每次调用都新起一个 su 进程）；
+- Release（R8）构建下 libsu 自带的 keep 规则是否足够。
+
+已知缺口：
+
+- MCP 调用方可以经 `linux.shell`（需用户确认）在 guest 里调用 `android-root-cli exec`，等于远程拿到 root shell，与「禁止向远程调用方提供任意 Root shell」冲突。移除前的 `android-shizuku-cli` 有同样问题。应让 `RootCliOffloadHandler` 只接受本地 Agent 与终端 session 的请求。
+- 设备完整性保护（Issue #182）尚未实现：`exec`、`file rm -r`、`package uninstall` 等目前没有任何保护线。
 
 ## 2026-10-08 之后新增的未验证项
 

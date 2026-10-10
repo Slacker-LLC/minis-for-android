@@ -15,7 +15,7 @@ import java.io.ByteArrayOutputStream
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** Display-targeted Android UI operations over the Shizuku virtual-display service. */
+/** Display-targeted Android UI operations over the root virtual-display service. */
 internal object VirtualScreenUiBackend {
     suspend fun execute(
         sessionId: String,

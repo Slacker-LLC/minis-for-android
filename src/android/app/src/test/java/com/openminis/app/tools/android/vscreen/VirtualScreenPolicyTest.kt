@@ -70,4 +70,12 @@ class VirtualScreenPolicyTest {
         assertFalse(VirtualScreenProbeCachePolicy.isCurrentAndPassed(true, "rom|34", "rom|35"))
         assertFalse(VirtualScreenProbeCachePolicy.isCurrentAndPassed(true, null, "rom|34"))
     }
+
+    @Test fun probePassedUnderTheShizukuHostDoesNotEnableTheRootHost() {
+        val current = VirtualScreenPreferences.currentDeviceFingerprint()
+        assertTrue(current.endsWith("|${VirtualScreenPreferences.SERVICE_HOST}"))
+        // What a pre-2026-10 build saved: the same device fields, no host marker.
+        val shizukuEra = current.removeSuffix("|${VirtualScreenPreferences.SERVICE_HOST}")
+        assertFalse(VirtualScreenProbeCachePolicy.isCurrentAndPassed(true, shizukuEra, current))
+    }
 }

@@ -68,7 +68,7 @@ object AndroidPackageController {
                 .put(
                     "scope",
                     "Android 11+ package visibility: only launcher activities visible to this app " +
-                        "are listed; other packages need an authorized Root/Shizuku pm query",
+                        "are listed; other packages need an authorized Root pm query",
                 )
         }
 

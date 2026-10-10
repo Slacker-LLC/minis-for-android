@@ -18,12 +18,12 @@ class SettingsReadinessTest {
 
     @Test fun checklistCoversEverythingSystemAndPermissionsManages() {
         val ids = items().map { it.id }.toSet()
-        // Root & Shizuku, all files, accessibility, overlay, assistant role, battery, notifications
+        // Root, all files, accessibility, overlay, assistant role, battery, notifications
         // and the Android grants behind the Agent's tools.
         assertTrue(
             ids.containsAll(
                 listOf(
-                    ReadinessId.ROOT, ReadinessId.SHIZUKU, ReadinessId.ALL_FILES, ReadinessId.ACCESSIBILITY,
+                    ReadinessId.ROOT, ReadinessId.ALL_FILES, ReadinessId.ACCESSIBILITY,
                     ReadinessId.OVERLAY, ReadinessId.ASSISTANT_ROLE, ReadinessId.BACKGROUND,
                     ReadinessId.NOTIFICATIONS, ReadinessId.CALENDAR, ReadinessId.LOCATION,
                     ReadinessId.CONTACTS, ReadinessId.PHOTOS,
@@ -48,7 +48,7 @@ class SettingsReadinessTest {
 
     @Test fun optionalItemsAreNeverCountedButStayInTheChecklist() {
         val optional = listOf(
-            ReadinessId.SHIZUKU, ReadinessId.ACCESSIBILITY, ReadinessId.OVERLAY, ReadinessId.ASSISTANT_ROLE,
+            ReadinessId.ACCESSIBILITY, ReadinessId.OVERLAY, ReadinessId.ASSISTANT_ROLE,
             ReadinessId.CALENDAR, ReadinessId.LOCATION, ReadinessId.CONTACTS, ReadinessId.PHOTOS,
         )
         val all = items(*optional.toTypedArray())
@@ -65,6 +65,11 @@ class SettingsReadinessTest {
             listOf(ReadinessId.ROOT, ReadinessId.ALL_FILES, ReadinessId.BACKGROUND, ReadinessId.NOTIFICATIONS),
             items().filter { !it.optional }.map { it.id },
         )
+    }
+
+    @Test fun shizukuIsNoLongerAChecklistItem() {
+        // Root-only since 2026-10: nothing in the checklist may point the user at Shizuku again.
+        assertFalse(ReadinessId.entries.any { it.name.contains("SHIZUKU") })
     }
 
     @Test fun itemsThatDoNotApplyAreLeftOut() {

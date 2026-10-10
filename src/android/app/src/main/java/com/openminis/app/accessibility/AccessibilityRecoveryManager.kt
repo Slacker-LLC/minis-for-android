@@ -3,7 +3,7 @@ package com.openminis.app.accessibility
 import android.content.Context
 import android.provider.Settings
 import com.openminis.app.logging.AppLogger
-import com.openminis.app.offload.ShizukuManager
+import com.openminis.app.offload.RootProcess
 import com.openminis.app.xposed.system.AccessibilityProtectionClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -45,14 +45,14 @@ import kotlin.coroutines.resume
  *
  * Writing ENABLED_ACCESSIBILITY_SERVICES requires WRITE_SECURE_SETTINGS, which
  * is not grantable to a normal app. That is why none of the apps surveyed even
- * *detect* the loss. Minis is in a better position because it already ships a
- * Shizuku client: with Shizuku authorized we can run `settings put secure`
- * with shell privilege and repair the grant in place, which was verified to
- * take effect immediately (the service rebinds without a relaunch).
+ * *detect* the loss. Minis is in a better position because it runs on a rooted
+ * phone: with Root granted we can run `settings put secure` as root and
+ * repair the grant in place, which takes effect immediately (the service
+ * rebinds without a relaunch).
  *
  * So there are two tiers:
- *  - Shizuku READY  → one-tap repair, no trip to Settings.
- *  - otherwise      → explain the situation and deep-link to Settings.
+ *  - Root granted → one-tap repair, no trip to Settings.
+ *  - otherwise    → explain the situation and deep-link to Settings.
  */
 object AccessibilityRecoveryManager {
 
@@ -76,7 +76,7 @@ object AccessibilityRecoveryManager {
         status == AccessibilityProtectionClient.ControlStatus.APPLIED
 
     /**
-     * After a Shizuku write, how long to wait for the framework to actually
+     * After a Root write, how long to wait for the framework to actually
      * rebind the service. The write returns before `onServiceConnected` runs,
      * so a naive "did it work" check immediately after would report false.
      */
@@ -105,11 +105,11 @@ object AccessibilityRecoveryManager {
      * A pending repair prompt. Collected by MainActivity, which renders it as
      * an AlertDialog and calls [respond].
      *
-     * @param shizukuAvailable when true the dialog offers in-place repair;
+     * @param rootAvailable when true the dialog offers in-place repair;
      *   when false it can only offer a trip to Settings.
      */
     data class RepairPrompt(
-        val shizukuAvailable: Boolean,
+        val rootAvailable: Boolean,
     )
 
     private val _pendingPrompt = MutableStateFlow<RepairPrompt?>(null)
@@ -152,7 +152,7 @@ object AccessibilityRecoveryManager {
      * Latch that the grant has existed. Called from
      * [MinisAccessibilityService.onServiceConnected] — the one moment we know
      * for certain the user granted it, whichever route they took (Settings
-     * toggle, Shizuku repair, or a restore).
+     * toggle, Root repair, or a restore).
      */
     fun markGranted(context: Context) {
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -242,7 +242,7 @@ object AccessibilityRecoveryManager {
     }
 
     /**
-     * Repair the grant with Shizuku shell privilege.
+     * Repair the grant as root.
      *
      * Appends our component to the existing ENABLED_ACCESSIBILITY_SERVICES
      * value rather than overwriting it — a blind overwrite would disable every
@@ -251,15 +251,15 @@ object AccessibilityRecoveryManager {
      * `accessibility_enabled=1`, which force-stop also clears and without
      * which the framework ignores the service list entirely.
      *
-     * Runs `settings put secure` through [ShizukuManager.runProcess] — the
-     * same privileged path `android-shizuku-cli settings set` uses, so there
-     * is one implementation of the write.
+     * Runs `settings put secure` through [RootProcess] — the same Root path
+     * `android-root-cli settings set` uses, so there is one implementation of
+     * the write.
      *
      * @return true once the service has actually rebound.
      */
     /**
      * [T-eta-xposed-groups] Ask the module backend to put the grant back. It runs inside
-     * system_server, so this path needs neither Shizuku nor a decision from the user; it is only
+     * system_server, so this path needs neither Root nor a decision from the user; it is only
      * asked while the protection switch is on, and anything other than an explicit confirmation
      * makes the caller fall through to the prompt.
      *
@@ -290,9 +290,9 @@ object AccessibilityRecoveryManager {
         return true
     }
 
-    suspend fun repairWithShizuku(context: Context): Boolean {
-        if (!ShizukuManager.isReady()) {
-            AppLogger.info(TAG, "repair skipped: Shizuku not ready")
+    suspend fun repairWithRoot(context: Context): Boolean {
+        if (!RootProcess.isGranted()) {
+            AppLogger.info(TAG, "repair skipped: Root not granted")
             return false
         }
         val target = componentId(context)
@@ -306,15 +306,15 @@ object AccessibilityRecoveryManager {
 
         val merged = (existing + target).distinct().joinToString(":")
 
-        val r1 = ShizukuManager.runProcess(
-            arrayOf("settings", "put", "secure", Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, merged)
+        val r1 = RootProcess.exec(
+            listOf("settings", "put", "secure", Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, merged)
         )
         if (r1.exitCode != 0) {
             AppLogger.warning(TAG, "repair failed writing service list: exit=${r1.exitCode} ${r1.combined}")
             return false
         }
-        val r2 = ShizukuManager.runProcess(
-            arrayOf("settings", "put", "secure", Settings.Secure.ACCESSIBILITY_ENABLED, "1")
+        val r2 = RootProcess.exec(
+            listOf("settings", "put", "secure", Settings.Secure.ACCESSIBILITY_ENABLED, "1")
         )
         if (r2.exitCode != 0) {
             AppLogger.warning(TAG, "repair failed writing accessibility_enabled: exit=${r2.exitCode} ${r2.combined}")
@@ -330,7 +330,7 @@ object AccessibilityRecoveryManager {
 
         invalidateCache()
         _revoked.value = isGrantRevoked(context)
-        AppLogger.info(TAG, "repair via Shizuku wrote grant; rebound=$bound")
+        AppLogger.info(TAG, "repair via Root wrote grant; rebound=$bound")
         // Report on the write succeeding: on a slow device the rebind can land
         // just after our window, and the grant itself is what we were asked to
         // restore. `bound` is logged for diagnosis.
@@ -386,16 +386,16 @@ object AccessibilityRecoveryManager {
     suspend fun ensureGrantOrPrompt(context: Context): Boolean {
         if (!isGrantRevoked(context)) return true
 
-        // The module backend repairs from inside the system, with no prompt and no Shizuku; it is
+        // The module backend repairs from inside the system, with no prompt and no Root; it is
         // asked first and a refusal falls through to the prompt below.
         if (repairWithModule(context)) return true
 
-        val shizuku = ShizukuManager.isReady()
-        AppLogger.info(TAG, "grant revoked — prompting (shizukuReady=$shizuku)")
+        val root = RootProcess.isGranted()
+        AppLogger.info(TAG, "grant revoked — prompting (rootGranted=$root)")
         _revoked.value = true
 
-        return when (awaitDecision(RepairPrompt(shizukuAvailable = shizuku))) {
-            Decision.REPAIR -> repairWithShizuku(context)
+        return when (awaitDecision(RepairPrompt(rootAvailable = root))) {
+            Decision.REPAIR -> repairWithRoot(context)
             // The user was sent to Settings; they may or may not finish. Don't
             // block the turn waiting — report unusable and let them retry.
             Decision.OPEN_SETTINGS -> false

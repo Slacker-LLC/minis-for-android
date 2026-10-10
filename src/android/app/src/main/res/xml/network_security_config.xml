@@ -11,6 +11,7 @@
         </trust-anchors>
     </base-config>
     <!-- No <domain-config> for localhost / 127.0.0.1: base-config above already permits cleartext, and on
-         Android 17 the duplicate rule makes the process Shizuku starts for VScreen die during startup
+         Android 17 the duplicate rule made the separate process started for VScreen (then a Shizuku
+         UserService; now the libsu root process) die during startup
          ("Found multiple conflicting per-domain rules"). -->
 </network-security-config>

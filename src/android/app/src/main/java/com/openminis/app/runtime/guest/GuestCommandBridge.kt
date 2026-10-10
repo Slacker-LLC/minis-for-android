@@ -171,6 +171,12 @@ internal object GuestCommandBridge {
                     .forEach(::appendLine)
             }
             appendLine("mkdir -p ${shellQuote(binDir)} ${shellQuote(etcDir)} ${shellQuote(usrLocalBin)}")
+            // A wrapper an older build wrote for a command that no longer exists would only answer
+            // "unsupported command"; drop it. Plain files only, the same rule as generated paths.
+            RETIRED_COMMAND_NAMES.filter { it !in commandNames }.forEach { name ->
+                val quoted = shellQuote("$usrLocalBin/$name")
+                appendLine("if [ -f $quoted ] && [ ! -L $quoted ]; then rm -f -- $quoted; fi")
+            }
             generatedFiles.forEach { file ->
                 val quoted = shellQuote(file)
                 appendLine("[ ! -L $quoted ] || exit 75")
@@ -620,6 +626,12 @@ exit 0
 
     private val SAFE_COMMAND_NAME = Regex("^[A-Za-z0-9][A-Za-z0-9._-]*$")
     private val CORE_COMMAND_NAMES = setOf("minis-config", "minis-model-use")
+
+    /** Commands earlier builds installed and this one no longer provides. */
+    internal val RETIRED_COMMAND_NAMES = setOf(
+        // Replaced by android-root-cli when Shizuku was removed (2026-10).
+        "android-shizuku-cli",
+    )
     private val URL_COMMAND_NAMES = setOf(
         "minis-open",
         "xdg-open",
@@ -644,7 +656,7 @@ exit 0
         "android-speech",
         "android-weather",
         "android-a11y-cli",
-        "android-shizuku-cli",
+        "android-root-cli",
         "minis-apt",
         "minis-browser-use",
         "minis-scheduled",
