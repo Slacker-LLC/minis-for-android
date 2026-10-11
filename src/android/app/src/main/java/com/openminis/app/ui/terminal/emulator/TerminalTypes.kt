@@ -78,6 +78,18 @@ object TerminalPalette {
     val defaultBackground: Color
         get() = if (light) Color.White else Color.Black
 
+    /**
+     * The (text, background) colours a cell is drawn with. Each is resolved as what it is and then swapped for reverse
+     * video, so default-on-default swaps too; resolving the swapped colours in their new roles left it unchanged and a
+     * reverse-video status line or selection was invisible in the default colours.
+     */
+    fun cellColors(cell: TerminalCell): Pair<Color, Color> {
+        val bold = cell.attributes.has(TextAttributes.BOLD)
+        val text = resolve(cell.foreground, isForeground = true, bold = bold)
+        val back = resolve(cell.background, isForeground = false)
+        return if (cell.attributes.has(TextAttributes.INVERSE)) back to text else text to back
+    }
+
     fun resolve(color: TerminalColor, isForeground: Boolean, bold: Boolean = false): Color = when (color) {
         is TerminalColor.Default -> if (isForeground) defaultForeground else defaultBackground
         is TerminalColor.Indexed -> {
@@ -115,9 +127,22 @@ data class TerminalCell(
     val attributes: TextAttributes = TextAttributes(),
     val width: Int = 1,
     val isWideTrailer: Boolean = false,
+    /** Combining marks, joiners and variation selectors that belong to [char] (an accent, an emoji modifier). */
+    val extra: String? = null,
+    /** The web link this cell belongs to (OSC 8), or null. The same string is shared by every cell of a link. */
+    val link: String? = null,
 ) {
+    /** The text of this cell: its character and what is attached to it. */
+    fun text(): String = if (char <= 0) " " else if (extra == null) String(Character.toChars(char)) else String(Character.toChars(char)) + extra
+
     companion object {
         val BLANK = TerminalCell()
+
+        /**
+         * The empty last cell of a soft-wrapped row where a wide character did not fit. Compared by identity: it is not
+         * text, so copying and reflowing skip it.
+         */
+        val WRAP_PAD = TerminalCell(char = 0)
     }
 }
 
@@ -126,9 +151,11 @@ data class CursorStyle(
     var foreground: TerminalColor = TerminalColor.Default,
     var background: TerminalColor = TerminalColor.Default,
     var attributes: TextAttributes = TextAttributes(),
+    /** The OSC 8 hyperlink being written, or null. Not part of SGR: a reset of the attributes does not end it. */
+    var link: String? = null,
 ) {
     fun makeCell(char: Int, width: Int = 1): TerminalCell =
-        TerminalCell(char, foreground, background, attributes, width)
+        TerminalCell(char, foreground, background, attributes, width, link = link)
 
     fun copyFrom(other: CursorStyle) {
         foreground = other.foreground

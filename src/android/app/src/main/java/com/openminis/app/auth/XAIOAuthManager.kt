@@ -503,6 +503,8 @@ class XAIOAuthManager(context: Context, instanceId: String) : OAuthManager(conte
                     throw Exception("xAI OAuth state mismatch — possible CSRF, refusing to exchange")
                 }
 
+                // [T-android-oauth-foreground-exchange] See OAuthForegroundGate.
+                OAuthForegroundGate.awaitForeground(TAG)
                 exchangeCodeForToken(code)
             }
 

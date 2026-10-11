@@ -14,3 +14,9 @@
 # the identifying line Claude Code itself sends, or the endpoint rejects them.
 # We ship no private value — supply your own in provider-customization.properties.
 ANTHROPIC_OAUTH_IDENTIFIER_PROMPT=
+
+# Only needed for the Antigravity (Google account) sign-in: the OAuth client id and secret of the Antigravity IDE.
+# Both must be present, or the sign-in is compiled as unavailable (the build itself stays valid). Not kept in the
+# source: supply them here.
+ANTIGRAVITY_OAUTH_CLIENT_ID=
+ANTIGRAVITY_OAUTH_CLIENT_SECRET=

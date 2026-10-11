@@ -397,7 +397,20 @@ suspend fun ProviderRepository.refreshModels(instance: ProviderInstance): Boolea
                 // [T-android-provider-type-parity] No models endpoint to
                 // query for a type this build cannot drive; the instance
                 // keeps whatever entries the restore brought with it.
-                ProviderType.antigravity, ProviderType.unsupported -> emptyList()
+                // Cloud Code serves the account's own model list from the base
+                // URL the login pinned; no project, no list.
+                ProviderType.antigravity -> {
+                    val manager = com.openminis.app.auth.AntigravityOAuthManager(context, instance.id)
+                    manager.discoverProjectIfNeeded()
+                    com.openminis.app.provider.antigravity.AntigravityModelsApi.fetchModels(
+                        accessToken = apiKey,
+                        baseURL = manager.activeBaseURL
+                            ?: com.openminis.app.provider.antigravity.AntigravityWire.BASE_URLS.first(),
+                        projectId = manager.gcpProjectId,
+                        context = context,
+                    )
+                }
+                ProviderType.unsupported -> emptyList()
             }
         } catch (e: Exception) {
             android.util.Log.e("ProviderRepo", "refreshModels fetch error: ${e.message}", e)
@@ -548,7 +561,8 @@ internal fun ProviderRepository.modelsDevBaseURL(instance: ProviderInstance): St
         ProviderType.kimiCode -> "${com.openminis.app.auth.KimiDeviceFlow.CODING_API_BASE}/v1"
         // No canonical host for a type this build cannot drive. Callers
         // reaching here have already exhausted effectiveBaseURL.
-        ProviderType.antigravity, ProviderType.unsupported -> "https://api.openai.com/v1"
+        ProviderType.antigravity -> "https://cloudcode-pa.googleapis.com"
+        ProviderType.unsupported -> "https://api.openai.com/v1"
     }
 }
 
@@ -586,7 +600,7 @@ fun ProviderRepository.deleteApiKey(instanceId: String) {
 
 /**
  * [T-android-provider-export-oauth-token] OAuth manager for [instance],
- * covering EVERY OAuth provider type — including gemini / antigravity, which
+ * covering EVERY OAuth provider type — including gemini, which
  * OAuthManager.forInstance deliberately omits (it's tuned for the
  * login/logout/manual-bearer UI paths). Used only by the export/import
  * round-trip so we don't widen forInstance's shared behavior.
@@ -598,6 +612,7 @@ internal fun ProviderRepository.oauthManagerFor(
     ProviderType.openAI -> com.openminis.app.auth.OpenAIOAuthManager(context, instance.id)
     ProviderType.xAI -> com.openminis.app.auth.XAIOAuthManager(context, instance.id)
     ProviderType.gemini -> com.openminis.app.auth.GeminiOAuthManager(context, instance.id)
+    ProviderType.antigravity -> com.openminis.app.auth.AntigravityOAuthManager(context, instance.id)
     ProviderType.kimiCode -> com.openminis.app.auth.KimiOAuthManager(context, instance.id)
     else -> null
 }
@@ -719,7 +734,7 @@ fun ProviderRepository.exportInstanceJSON(instanceId: String): String? {
             // Gemini also stores the resolved account email + GCP project as
             // separate OAuth strings (mirrors iOS oauthEmail / oauthGcpProject);
             // carry them so the imported instance can call the API.
-            if (instance.providerType == ProviderType.gemini && mgr != null) {
+            if (instance.providerType.isGoogleAccountOAuth && mgr != null) {
                 mgr.exportOAuthString("email")?.takeIf { it.isNotEmpty() }?.let {
                     put("oauthEmail", Base64.encodeToString(it.toByteArray(), Base64.NO_WRAP))
                 }
@@ -822,7 +837,7 @@ fun ProviderRepository.importInstanceJSON(jsonStr: String): String? {
         oauthManagerFor(instance)?.importStoredTokensJson(tokenJson)
     }
     // Gemini account email + GCP project (base64-encoded OAuth strings).
-    if (instance.providerType == ProviderType.gemini) {
+    if (instance.providerType.isGoogleAccountOAuth) {
         val mgr = oauthManagerFor(instance)
         dict.optString("oauthEmail", "").ifEmpty { null }?.let { b64 ->
             val email = try { String(Base64.decode(b64, Base64.NO_WRAP)) } catch (_: Exception) { b64 }
@@ -1000,8 +1015,8 @@ fun ProviderRepository.collectBackupProviderSecret(instance: ProviderInstance): 
     val mgr = oauthManagerFor(instance) ?: com.openminis.app.auth.OAuthManager.forInstance(context, instance)
     val manualToken = mgr?.loadManualBearerToken()
     val tokenJson = mgr?.exportStoredTokensJson()
-    val email = if (instance.providerType == ProviderType.gemini && mgr != null) mgr.exportOAuthString("email") else null
-    val gcpProject = if (instance.providerType == ProviderType.gemini && mgr != null) mgr.exportOAuthString("gcp_project") else null
+    val email = if (instance.providerType.isGoogleAccountOAuth && mgr != null) mgr.exportOAuthString("email") else null
+    val gcpProject = if (instance.providerType.isGoogleAccountOAuth && mgr != null) mgr.exportOAuthString("gcp_project") else null
     val sec = com.openminis.app.backup.BackupSecrets.ProviderSecret(
         instanceId = instance.id,
         label = instance.label,
@@ -1147,7 +1162,7 @@ fun ProviderRepository.restoreBackupProviderSecret(secret: com.openminis.app.bac
                 wrote = true
             }
         }
-        if (instance.providerType == ProviderType.gemini) {
+        if (instance.providerType.isGoogleAccountOAuth) {
             deb64(secret.oauthEmail)?.let { email ->
                 if (oauthManager.exportOAuthString("email").isNullOrBlank()) {
                     oauthManager.importOAuthString("email", email)

@@ -845,6 +845,9 @@
     <string name="add_provider_signing_in">正在登录…</string>
     <!-- T-android-codex-oauth-dns -->
     <string name="add_provider_oauth_network_unreachable">无法连接到登录服务器，请检查网络或代理设置后重试。</string>
+    <string name="oauth_waiting_for_authorization">等待授权… 请在浏览器中完成授权，然后返回 Minis。</string>
+    <string name="oauth_completing_sign_in">正在完成登录…</string>
+    <string name="oauth_sign_in_failed">登录失败：%1$s</string>
     <string name="add_provider_or_configure_manually">或手动配置</string>
     <string name="add_provider_for_third_party_coding_plans_e_g_minimax">第三方 Coding Plan（如 MiniMax、Kimi）或兼容的代理端点，请手动填入 API 基础 URL 和 Bearer Token。</string>
     <string name="add_provider_bearer_token">Bearer Token</string>
@@ -906,6 +909,7 @@
     <string name="add_provider_subtitle_openai">支持 Codex、DeepSeek、Moonshot、Groq 等兼容厂商</string>
     <string name="add_provider_subtitle_anthropic">支持 Claude 及兼容 Anthropic 协议的服务商</string>
     <string name="add_provider_subtitle_gemini">支持 Gemini 系列及 Google AI Studio</string>
+    <string name="add_provider_subtitle_antigravity">用 Google 账号登录:通过 Antigravity 使用 Gemini、Claude 和 GPT 模型</string>
     <string name="add_provider_subtitle_openrouter">聚合 GPT、Claude、Gemini、Llama 等主流模型</string>
     <string name="add_provider_subtitle_xai">支持 Grok 系列模型</string>
     <string name="add_provider_configure_provider">配置 %1$s</string>
@@ -2420,4 +2424,30 @@
     <string name="quota_window_left">%1$s 窗口：剩余 %2$d%%</string>
     <string name="quota_unlimited">额度不限</string>
     <string name="quota_open_console">到服务商官网查看余额</string>
+    <string name="terminal_tab_default">终端 %1$d</string>
+    <string name="terminal_fgs_channel">运行中的终端</string>
+    <string name="terminal_fgs_stop_all">全部结束</string>
+    <string name="terminal_tab_new">新建终端</string>
+    <string name="terminal_open_link">打开链接</string>
+    <string name="terminal_clipboard_set">已从终端复制</string>
+    <string name="terminal_tab_close">关闭终端</string>
+    <string name="terminal_tab_limit">最多同时开 %1$d 个终端，请先关闭一个。</string>
+    <string name="terminal_close_busy_title">还有程序在运行</string>
+    <string name="terminal_close_busy_body">关闭这个终端会结束其中正在运行的程序。</string>
+    <string name="terminal_close_busy_confirm">关闭终端</string>
+    <string name="terminal_rename_title">重命名终端</string>
+    <string name="terminal_rename_action">重命名</string>
+    <string name="terminal_restart">重新启动</string>
+    <string name="terminal_exited">Shell 已退出</string>
+    <string name="terminal_agent_badge">Agent</string>
+    <string name="terminal_agent_readonly">Agent 的终端，只读</string>
+    <string name="terminal_agent_takeover">接管</string>
+    <string name="terminal_agent_release">交还</string>
+    <string name="terminal_paste">粘贴</string>
+    <string name="terminal_maintenance_title">终端已被结束</string>
+    <string name="terminal_maintenance_body">运行时更新或修复结束了终端，其中 %1$d 个还有程序在运行。</string>
+    <string name="terminal_maintenance_ok">知道了</string>
+    <plurals name="terminal_fgs_running">
+        <item quantity="other">%d 个终端运行中</item>
+    </plurals>
 </resources>

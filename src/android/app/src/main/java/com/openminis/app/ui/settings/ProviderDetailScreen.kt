@@ -870,14 +870,23 @@ private fun OAuthCredentialBlock(
     // ProviderInstanceDetailView's `oauthRefreshTrigger.toggle()`.
     var displayedKey by remember(instance.id) { mutableStateOf(storedKey) }
     var isAuthenticating by remember(instance.id) { mutableStateOf(false) }
-    val oauthAvailableInThisBuild = instance.providerType != ProviderType.anthropic ||
-        com.openminis.app.auth.ClaudeOAuthManager.isAvailableInThisBuild
+    val oauthAvailableInThisBuild = when (instance.providerType) {
+        ProviderType.anthropic -> com.openminis.app.auth.ClaudeOAuthManager.isAvailableInThisBuild
+        ProviderType.antigravity -> com.openminis.app.auth.AntigravityOAuthManager.isAvailableInThisBuild
+        else -> true
+    }
     // [T-kimi-oauth] Device-code dialog state for Kimi re-auth (see
     // AddProviderScreen.OAuthConfigSection for the rationale).
     var kimiDeviceAuth by remember(instance.id) {
         mutableStateOf<com.openminis.app.auth.KimiDeviceFlow.DeviceAuthorization?>(null)
     }
     var kimiLoginJob by remember(instance.id) { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    // [T-android-oauth-foreground-exchange] Sign-in progress and failure, made
+    // visible. A pending sign-in used to look identical to signed-out and a
+    // failure was only written to the log: after authorizing in the browser the
+    // user came back to an unchanged screen and no explanation.
+    var authError by remember(instance.id) { mutableStateOf<String?>(null) }
+    val oauthPhase by com.openminis.app.auth.OAuthForegroundGate.phase.collectAsState()
     kimiDeviceAuth?.let { auth ->
         KimiDeviceLoginDialog(
             userCode = auth.userCode,
@@ -953,6 +962,8 @@ private fun OAuthCredentialBlock(
             onClick = {
                 if (isAuthenticating) return@MinisSmallOutlinedButton
                 isAuthenticating = true
+                authError = null
+                com.openminis.app.auth.OAuthForegroundGate.begin()
                 kimiLoginJob = scope.launch {
                     try {
                         val token = when (instance.providerType) {
@@ -977,6 +988,10 @@ private fun OAuthCredentialBlock(
                                 com.openminis.app.auth.XAIOAuthManager.login(
                                     context, instance.id, providerRepository,
                                 )
+                            ProviderType.antigravity ->
+                                com.openminis.app.auth.AntigravityOAuthManager.login(
+                                    context, instance.id, providerRepository,
+                                )
                             else -> null
                         }
                         // login() persists the token via providerRepository.saveApiKey;
@@ -987,10 +1002,24 @@ private fun OAuthCredentialBlock(
                             AppLogger.info(TAG, "OAuth signed in for ${instance.id}")
                         }
                     } catch (e: Exception) {
+                        // A cancelled sign-in (user backed out, screen left) is not
+                        // an error to show.
+                        if (e is kotlinx.coroutines.CancellationException) throw e
                         AppLogger.warning(TAG, "OAuth sign-in failed for ${instance.id}: ${e.message}")
+                        authError = when (e) {
+                            is com.openminis.app.auth.ProviderCustomizationUnavailableException ->
+                                context.getString(R.string.provider_oauth_not_available_in_this_build)
+                            is com.openminis.app.auth.OAuthNetworkUnreachableException ->
+                                context.getString(R.string.add_provider_oauth_network_unreachable)
+                            else -> context.getString(
+                                R.string.oauth_sign_in_failed,
+                                e.message ?: e.javaClass.simpleName,
+                            )
+                        }
                     } finally {
                         isAuthenticating = false
                         kimiDeviceAuth = null
+                        com.openminis.app.auth.OAuthForegroundGate.end()
                     }
                 }
             },
@@ -998,6 +1027,50 @@ private fun OAuthCredentialBlock(
         ) {
             Text(stringResource(R.string.provider_detail_sign_in))
         }
+        OAuthProgressLine(isAuthenticating = isAuthenticating, phase = oauthPhase, error = authError)
+    }
+}
+
+/**
+ * [T-android-oauth-foreground-exchange] What a sign-in is doing right now, or
+ * why it failed. The waiting line is the point: without it, coming back from
+ * the browser looked exactly like never having started.
+ */
+@Composable
+private fun OAuthProgressLine(
+    isAuthenticating: Boolean,
+    phase: com.openminis.app.auth.OAuthForegroundGate.Phase?,
+    error: String?,
+) {
+    if (isAuthenticating) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(top = 8.dp),
+        ) {
+            androidx.compose.material3.CircularProgressIndicator(
+                modifier = Modifier.size(14.dp),
+                strokeWidth = 2.dp,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                stringResource(
+                    if (phase == com.openminis.app.auth.OAuthForegroundGate.Phase.COMPLETING) {
+                        R.string.oauth_completing_sign_in
+                    } else {
+                        R.string.oauth_waiting_for_authorization
+                    },
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    } else if (error != null) {
+        Text(
+            error,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(top = 8.dp),
+        )
     }
 }
 

@@ -41,7 +41,13 @@ val appVersionCode: Int = run {
 // intentionally omit provider-customization.properties and compile the
 // affected integration as an explicit disabled capability. Private/production
 // builds opt into strict validation with -PproviderCustomizationRequired=true.
-val providerCustomizationFile = rootProject.file("app/provider-customization.properties")
+// MINIS_PROVIDER_CUSTOMIZATION_FILE points a build at a file kept outside the
+// checkout (for example ~/.minis/release/provider-customization.properties), so
+// every worktree and release build picks the same values up.
+val providerCustomizationFile = System.getenv("MINIS_PROVIDER_CUSTOMIZATION_FILE")
+    ?.takeIf { it.isNotBlank() }
+    ?.let { file(it) }
+    ?: rootProject.file("app/provider-customization.properties")
 
 private fun readU16(bytes: ByteArray, offset: Int): Int =
     (bytes[offset].toInt() and 0xff) or ((bytes[offset + 1].toInt() and 0xff) shl 8)
@@ -175,6 +181,13 @@ if (providerCustomizationRequired && anthropicOAuthIdentifierPrompt == null) {
     )
 }
 
+// The Antigravity sign-in uses the Antigravity IDE's installed-app OAuth client. Its id and secret are not kept in the
+// source (GitHub's push protection treats them as secrets): a build that is not given them has the sign-in switched off,
+// the same way the Claude sign-in is. They are optional even in required mode, so a build can ship without Antigravity.
+val antigravityOAuthClientId = appCustomization.getProperty("ANTIGRAVITY_OAUTH_CLIENT_ID")?.trim()?.takeIf { it.isNotEmpty() }
+val antigravityOAuthClientSecret = appCustomization.getProperty("ANTIGRAVITY_OAUTH_CLIENT_SECRET")?.trim()?.takeIf { it.isNotEmpty() }
+val antigravityOAuthAvailable = antigravityOAuthClientId != null && antigravityOAuthClientSecret != null
+
 val claudeOAuthCustomizationAvailable = anthropicOAuthIdentifierPrompt != null
 val compiledAnthropicOAuthIdentifierPrompt =
     anthropicOAuthIdentifierPrompt ?: providerCustomizationUnavailable
@@ -237,6 +250,17 @@ android {
             "String",
             "ANTHROPIC_OAUTH_IDENTIFIER_PROMPT",
             buildConfigString(compiledAnthropicOAuthIdentifierPrompt)
+        )
+        buildConfigField("boolean", "ANTIGRAVITY_OAUTH_AVAILABLE", antigravityOAuthAvailable.toString())
+        buildConfigField(
+            "String",
+            "ANTIGRAVITY_OAUTH_CLIENT_ID",
+            buildConfigString(if (antigravityOAuthAvailable) antigravityOAuthClientId!! else providerCustomizationUnavailable)
+        )
+        buildConfigField(
+            "String",
+            "ANTIGRAVITY_OAUTH_CLIENT_SECRET",
+            buildConfigString(if (antigravityOAuthAvailable) antigravityOAuthClientSecret!! else providerCustomizationUnavailable)
         )
 
         ndk {
@@ -341,6 +365,7 @@ ksp {
 tasks.register("printProviderCustomizationCapability") {
     doLast {
         println("CLAUDE_OAUTH_CUSTOMIZATION_AVAILABLE=$claudeOAuthCustomizationAvailable")
+        println("ANTIGRAVITY_OAUTH_AVAILABLE=$antigravityOAuthAvailable")
         println(
             "ANTHROPIC_OAUTH_IDENTIFIER_PROMPT_STATE=" +
                 if (claudeOAuthCustomizationAvailable) "CONFIGURED" else providerCustomizationUnavailable

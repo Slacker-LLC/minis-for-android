@@ -22,16 +22,10 @@ import org.json.JSONObject
  *   - **Dict**: `{"models": {"gemini-3-pro-high": {"displayName": ...}, ...}}`
  *   - **Array**: `{"models": [{"name": "gemini-3-pro-high", "displayName": ...}, ...]}`
  *
- * Both are accepted. On total failure across all candidate base URLs (and
- * empty cache) the caller is returned an empty list — provider wiring layer
- * should fall back to a curated list if one gets added to `LLMModel`.
- *
- * **Scaffolding only**: there's no Antigravity `ProviderType` in Android yet,
- * so this API has no runtime consumer. It lands here so the OAuth + provider
- * code that will wire it later has a stable surface to call.
+ * Both are accepted. On failure (and an empty cache) the caller is returned
+ * an empty list.
  */
 object AntigravityModelsApi {
-    private const val USER_AGENT = "antigravity/1.107.0 android/aarch64"
     private val client = ProviderTransportPolicy.protectedHttpsClient()
     private val cache = ProviderModelsCache("antigravity")
 
@@ -43,6 +37,7 @@ object AntigravityModelsApi {
     suspend fun fetchModels(
         accessToken: String,
         baseURL: String,
+        projectId: String? = null,
         context: Context? = null,
         forceRefresh: Boolean = false,
     ): List<LLMModel> = withContext(Dispatchers.IO) {
@@ -51,13 +46,12 @@ object AntigravityModelsApi {
             cache.load(context, cacheKey)?.let { return@withContext it }
         }
 
+        val requestBody = JSONObject().apply { if (!projectId.isNullOrEmpty()) put("project", projectId) }
         val request = Request.Builder()
             .url("${baseURL.trimEnd('/')}/v1internal:fetchAvailableModels")
-            .post("{}".toRequestBody("application/json".toMediaType()))
+            .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
             .header("Authorization", "Bearer $accessToken")
-            .header("User-Agent", USER_AGENT)
-            .header("X-Client-Name", "antigravity")
-            .header("X-Client-Version", "1.107.0")
+            .header("User-Agent", AntigravityWire.USER_AGENT)
             .header("Accept", "application/json")
             .build()
 
@@ -93,7 +87,7 @@ object AntigravityModelsApi {
         enriched
     }
 
-    private fun parseModels(json: JSONObject): List<LLMModel> {
+    internal fun parseModels(json: JSONObject): List<LLMModel> {
         val modelsField = json.opt("models") ?: return emptyList()
         val out = mutableListOf<LLMModel>()
 
@@ -104,7 +98,11 @@ object AntigravityModelsApi {
                 while (keys.hasNext()) {
                     val id = keys.next()
                     val meta = modelsField.optJSONObject(id)
-                    val displayName = meta?.optString("displayName", id) ?: id
+                    // The catalog also lists the IDE's internal models (chat,
+                    // tab completion); they carry no display name or say so.
+                    if (meta == null || meta.optBoolean("isInternal", false)) continue
+                    val displayName = meta.optString("displayName")
+                    if (displayName.isEmpty()) continue
                     out.add(LLMModel(id = id, displayName = displayName, provider = "Antigravity"))
                 }
             }

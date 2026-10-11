@@ -248,3 +248,15 @@ reaped:
     if (WIFSIGNALED(status)) return (jint) -(128 + WTERMSIG(status));
     return -1;
 }
+
+// Foreground process group of the PTY (tcgetpgrp on the master fd), or -1 on error.
+// The terminal manager compares it with the login shell's own group to tell whether a
+// program is running, so a long job is not closed or reclaimed as idle.
+JNIEXPORT jint JNICALL
+Java_com_openminis_app_sandbox_PtyBridge_foregroundPgid(
+    JNIEnv *env, jclass clazz, jint fd)
+{
+    (void) env; (void) clazz;
+    pid_t pgid = tcgetpgrp(fd);
+    return pgid < 0 ? -1 : (jint) pgid;
+}

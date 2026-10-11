@@ -74,11 +74,12 @@ class RestoreProviderTypeToleranceTest {
     }
 
     @Test
-    fun `openAIResponses is usable, antigravity is not`() {
+    fun `openAIResponses and antigravity are usable, unsupported is not`() {
         // openAIResponses routes through the OpenAI provider with the Responses
-        // endpoint forced on, so a restored instance actually works.
+        // endpoint forced on, so a restored instance actually works; antigravity
+        // is served by the Gemini wire format through Cloud Code.
         assertTrue(ProviderType.openAIResponses.isUsable)
-        assertTrue(!ProviderType.antigravity.isUsable)
+        assertTrue(ProviderType.antigravity.isUsable)
         assertTrue(!ProviderType.unsupported.isUsable)
     }
 

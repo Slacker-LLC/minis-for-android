@@ -107,6 +107,8 @@ class OpenAIOAuthManager(context: Context, instanceId: String) : OAuthManager(co
             }
 
             // Step 2: Exchange code for tokens (JSON body, matching iOS CodexOAuthManager)
+            // [T-android-oauth-foreground-exchange] See OAuthForegroundGate.
+            OAuthForegroundGate.awaitForeground(TAG)
             exchangeCodeJson(code)
         }
 

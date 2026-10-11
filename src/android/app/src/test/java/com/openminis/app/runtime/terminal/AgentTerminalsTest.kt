@@ -106,6 +106,81 @@ class AgentTerminalsTest {
     }
 
     @Test
+    fun `click and scroll reach only a program that asked for the mouse`() = runBlocking {
+        val registry = terminals()
+        val t = registry.open("chat-1", 80, 24)
+        eventually("session running") { t.session.isRunning }
+        // A plain shell: nothing to click, nothing to scroll (its history is read with scrollback).
+        assertEquals(AgentTerminals.MouseSupport.NONE, registry.mouseSupport(t))
+        assertFalse(registry.click(t, 3, 5, 1))
+        assertFalse(registry.scroll(t, 3))
+        assertFalse(ptys[0].writtenText().contains("\u001B[<"))
+
+        ptys[0].output.send("\u001B[?1049h\u001B[?1000h\u001B[?1006h".toByteArray())
+        eventually("mouse reporting on") { registry.mouseSupport(t) == AgentTerminals.MouseSupport.REPORTING }
+        assertTrue(registry.click(t, 3, 5, 1))
+        eventually("click written") { ptys[0].writtenText().contains("\u001B[<0;5;3M\u001B[<0;5;3m") }
+        assertTrue(registry.click(t, 1, 1, 2))
+        eventually("double click written") { ptys[0].writtenText().contains("\u001B[<0;1;1M\u001B[<0;1;1m\u001B[<0;1;1M\u001B[<0;1;1m") }
+        assertTrue(registry.scroll(t, 2))
+        eventually("wheel written") { ptys[0].writtenText().contains("\u001B[<65;") }
+    }
+
+    @Test
+    fun `a full-screen program without the mouse is scrolled with arrow keys`() = runBlocking {
+        val registry = terminals()
+        val t = registry.open("chat-1", 80, 24)
+        eventually("session running") { t.session.isRunning }
+        ptys[0].output.send("\u001B[?1049h".toByteArray())
+        eventually("alternate screen") { registry.inFullScreen(t) }
+        assertEquals(AgentTerminals.MouseSupport.ARROW_KEYS, registry.mouseSupport(t))
+        assertFalse("no mouse: a click is refused", registry.click(t, 2, 2, 1))
+        assertTrue(registry.scroll(t, 3))
+        eventually("arrows written") { ptys[0].writtenText().contains("\u001B[B\u001B[B\u001B[B") }
+    }
+
+    @Test
+    fun `the report says where the cursor is and marks a menu's selection`() = runBlocking {
+        val registry = terminals()
+        val t = registry.open("chat-1", 80, 24)
+        eventually("session running") { t.session.isRunning }
+        ptys[0].output.send("\u001B[?1049h  one\r\n\u001B[7m> two\u001B[0m\u001B[?25h".toByteArray())
+        eventually("drawn") { registry.screen(t).contains("two") }
+        assertTrue(registry.inFullScreen(t))
+        assertEquals("  one\n⟦> two⟧", registry.screen(t, marks = true))
+        assertTrue(registry.cursorAndModes(t), registry.cursorAndModes(t).startsWith("cursor row 2, col 6"))
+        assertTrue(registry.cursorAndModes(t).contains("full-screen app"))
+    }
+
+    @Test
+    fun `until_prompt ends when the shell's prompt is back, not on a short silence`() = runBlocking {
+        val registry = terminals()
+        val t = registry.open("chat-1", 80, 24)
+        eventually("session running") { t.session.isRunning }
+        // The shell reports its prompt (OSC 133;A), so the terminal can tell it is idle without asking the pty.
+        ptys[0].output.send("\u001B]133;A\u0007minis$ ".toByteArray())
+        eventually("prompt seen") { t.session.foregroundState() == TerminalSession.ForegroundState.IDLE }
+        val started = System.currentTimeMillis()
+        val end = registry.await(t, maxMs = 5_000, quietMs = 100, untilPrompt = true)
+        assertEquals(AgentTerminals.End.PROMPT, end)
+        // Never in the first moments: right after Enter the shell has not started the command yet.
+        assertTrue(System.currentTimeMillis() - started >= 350)
+    }
+
+    @Test
+    fun `until_prompt does not call a silent running command finished`() = runBlocking {
+        val registry = terminals()
+        val t = registry.open("chat-1", 80, 24)
+        eventually("session running") { t.session.isRunning }
+        ptys[0].output.send("\u001B]133;A\u0007minis$ ".toByteArray())
+        eventually("prompt seen") { t.session.foregroundState() == TerminalSession.ForegroundState.IDLE }
+        // A line is sent and no prompt comes back: the command is still running, however quiet the screen.
+        registry.send(t, "make\r".toByteArray())
+        eventually("busy") { t.session.foregroundState() == TerminalSession.ForegroundState.BUSY }
+        assertEquals(AgentTerminals.End.TIMEOUT, registry.await(t, maxMs = 1_200, quietMs = 100, untilPrompt = true))
+    }
+
+    @Test
     fun `an exited program ends the wait`() = runBlocking {
         val registry = terminals()
         val t = registry.open("chat-1", 80, 24)

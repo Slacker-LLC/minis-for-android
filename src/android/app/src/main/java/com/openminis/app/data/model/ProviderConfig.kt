@@ -39,8 +39,8 @@ enum class ProviderType(val displayName: String) {
     openAIResponses("Responses API (v3)"),
 
     /**
-     * iOS `antigravity`. Decode-only here — Android has no implementation, so
-     * an instance restores and is visible but cannot serve a request.
+     * Antigravity: Google's Cloud Code Assist endpoint (Gemini, Claude and GPT
+     * models) behind a Google-account OAuth sign-in. Not an API-key provider.
      */
     antigravity("Antigravity"),
 
@@ -65,9 +65,12 @@ enum class ProviderType(val displayName: String) {
         get() = when (this) {
             // openAIResponses included: it routes through the OpenAI provider
             // with the Responses endpoint forced on.
-            anthropic, gemini, openAI, openRouter, xAI, kimiCode, openAIResponses -> true
-            antigravity, unsupported -> false
+            anthropic, gemini, openAI, openRouter, xAI, kimiCode, openAIResponses, antigravity -> true
+            unsupported -> false
         }
+
+    /** Signs in with a Google account, which also stores the account email and Cloud Code project. */
+    val isGoogleAccountOAuth: Boolean get() = this == gemini || this == antigravity
 
     val builtInModels: List<LLMModel>
         get() {
@@ -328,7 +331,7 @@ data class ProviderInstance(
      */
     val supportsCustomThinkingRules: Boolean
         get() = when (providerType) {
-            ProviderType.anthropic, ProviderType.gemini -> false
+            ProviderType.anthropic, ProviderType.gemini, ProviderType.antigravity -> false
             else -> {
                 val codexOAuth = credentialType == ProviderCredential.oauth &&
                     customBaseURL.isNullOrBlank()

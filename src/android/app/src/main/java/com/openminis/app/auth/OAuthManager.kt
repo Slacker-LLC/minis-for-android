@@ -73,6 +73,7 @@ abstract class OAuthManager(
                 com.openminis.app.data.model.ProviderType.openAI -> OpenAIOAuthManager(context, instance.id)
                 com.openminis.app.data.model.ProviderType.xAI -> XAIOAuthManager(context, instance.id)
                 com.openminis.app.data.model.ProviderType.kimiCode -> KimiOAuthManager(context, instance.id)
+                com.openminis.app.data.model.ProviderType.antigravity -> AntigravityOAuthManager(context, instance.id)
                 else -> null
             }
         }
@@ -140,10 +141,13 @@ abstract class OAuthManager(
     private var currentState: String? = null
     private var callbackServer: OAuthCallbackServer? = null
 
+    /** Extra, already-encoded `key=value` pairs appended to the authorization URL. */
+    protected open val extraAuthorizationParams: List<String> get() = emptyList()
+
     open fun buildAuthorizationUrl(): String {
         val (_, challenge) = generateAndSavePKCE()
         currentState = generateAndSaveState()
-        return "$authURL?" + listOf(
+        return "$authURL?" + (listOf(
             "client_id=$clientId",
             "redirect_uri=${Uri.encode(redirectUri)}",
             "response_type=code",
@@ -151,7 +155,7 @@ abstract class OAuthManager(
             "state=$currentState",
             "code_challenge=$challenge",
             "code_challenge_method=S256",
-        ).joinToString("&")
+        ) + extraAuthorizationParams).joinToString("&")
     }
 
     suspend fun startLogin(onComplete: (Boolean) -> Unit) {
@@ -163,6 +167,8 @@ abstract class OAuthManager(
                 return@OAuthCallbackServer
             }
             kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                // [T-android-oauth-foreground-exchange] See OAuthForegroundGate.
+                OAuthForegroundGate.awaitForeground(TAG)
                 val success = exchangeCode(code)
                 withContext(Dispatchers.Main) { onComplete(success) }
             }
@@ -176,6 +182,12 @@ abstract class OAuthManager(
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
+    }
+
+    /** Abort an in-flight [startLogin]: stop listening for the loopback redirect. */
+    fun cancelLogin() {
+        callbackServer?.stop()
+        callbackServer = null
     }
 
     suspend fun exchangeCode(code: String): Boolean = withContext(Dispatchers.IO) {

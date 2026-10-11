@@ -19,6 +19,7 @@ public class PtyBridge {
     static native int writeBytes(int fd, byte[] bytes, int off, int len);
     static native int closeFd(int fd);
     static native int terminateAndWait(int pid);
+    static native int foregroundPgid(int fd);
 
     static void check(boolean ok, String message) {
         if (!ok) throw new AssertionError(message);
@@ -47,6 +48,29 @@ public class PtyBridge {
             check(readUntil(fd, null).contains("fixture"), "output lost before EOF");
             check(terminateAndWait(pid[0]) == 7, "normal exit status lost");
             check(terminateAndWait(pid[0]) == -10, "child must be reaped exactly once");
+        } finally {
+            closeFd(fd);
+            terminateAndWait(pid[0]);
+        }
+
+        // Issue #183: the PTY's foreground group is the shell's own while it waits, and another group while a
+        // program it started holds the terminal (job control puts the program in its own group).
+        fd = forkExec("/bin/sh", new String[]{"sh", "-c", "set -m; printf ready; read x; sleep 3; printf finished"},
+            new String[]{"PATH=/usr/bin:/bin"}, "/", 80, 24, pid);
+        check(fd >= 0, "foreground fork failed");
+        try {
+            check(readUntil(fd, "ready").contains("ready"), "foreground fixture did not become ready");
+            check(foregroundPgid(fd) == pid[0], "an idle shell must hold the foreground: " + foregroundPgid(fd));
+            byte[] enter = "\n".getBytes();
+            check(writeBytes(fd, enter, 0, enter.length) == enter.length, "could not send Enter");
+            long until = System.nanoTime() + 2_000_000_000L;
+            int seen = foregroundPgid(fd);
+            while (seen == pid[0] && System.nanoTime() < until) {
+                try { Thread.sleep(20); } catch (InterruptedException e) { throw new AssertionError(e); }
+                seen = foregroundPgid(fd);
+            }
+            check(seen > 0 && seen != pid[0], "a running program must hold the foreground, not the shell: " + seen);
+            check(foregroundPgid(-1) == -1, "a bad descriptor must report -1");
         } finally {
             closeFd(fd);
             terminateAndWait(pid[0]);

@@ -75,4 +75,37 @@ class TerminalPaletteTest {
             TerminalPalette.resolve(TerminalColor.Rgb(10, 20, 30), isForeground = true),
         )
     }
+
+    @Test
+    fun reverseVideoSwapsTheDefaultColoursToo() {
+        val plain = TerminalCell('x'.code)
+        val inverse = plain.copy(attributes = TextAttributes().with(TextAttributes.INVERSE))
+        val (text, back) = TerminalPalette.cellColors(plain)
+        val (invText, invBack) = TerminalPalette.cellColors(inverse)
+        assertEquals(TerminalPalette.defaultForeground, text)
+        assertEquals(TerminalPalette.defaultBackground, back)
+        assertEquals("reverse video: text takes the background colour", TerminalPalette.defaultBackground, invText)
+        assertEquals("reverse video: the cell takes the text colour", TerminalPalette.defaultForeground, invBack)
+    }
+
+    @Test
+    fun reverseVideoSwapsExplicitColours() {
+        val cell = TerminalCell(
+            'x'.code,
+            foreground = TerminalColor.Rgb(1, 2, 3),
+            background = TerminalColor.Rgb(9, 8, 7),
+            attributes = TextAttributes().with(TextAttributes.INVERSE),
+        )
+        val (text, back) = TerminalPalette.cellColors(cell)
+        assertEquals(androidx.compose.ui.graphics.Color(9, 8, 7), text)
+        assertEquals(androidx.compose.ui.graphics.Color(1, 2, 3), back)
+    }
+
+    @Test
+    fun boldBrightensTheTextColourOnly() {
+        val cell = TerminalCell('x'.code, foreground = TerminalColor.Indexed(1), attributes = TextAttributes().with(TextAttributes.BOLD))
+        val (text, back) = TerminalPalette.cellColors(cell)
+        assertEquals(TerminalPalette.resolve(TerminalColor.Indexed(9), true), text)
+        assertEquals(TerminalPalette.defaultBackground, back)
+    }
 }

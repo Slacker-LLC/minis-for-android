@@ -8,10 +8,18 @@ sealed class ParsedAction {
         val params: IntArray,
         val intermediate: Char?,
         val finalByte: Char,
+        /**
+         * `colon[i]` is true when parameter i was written after a `:` rather than a `;`, i.e. it is a sub-parameter
+         * of the parameter before it (`4:3` curly underline, `38:2::255:0:0` true colour). Empty when there were none.
+         */
+        val colon: BooleanArray = NO_COLON,
     ) : ParsedAction()
-    data class EscDispatch(val char: Char) : ParsedAction()
+    /** An ESC sequence; [intermediate] is the byte between ESC and the final one (`(` in `ESC ( 0`, `#` in `ESC # 8`). */
+    data class EscDispatch(val char: Char, val intermediate: Char? = null) : ParsedAction()
     data class OscDispatch(val command: Int, val payload: String) : ParsedAction()
 }
+
+internal val NO_COLON = BooleanArray(0)
 
 /**
  * VT100/xterm escape sequence parser — state machine port of iOS ANSIParser.swift.
@@ -22,17 +30,23 @@ class AnsiParser {
         GROUND, ESCAPE, ESCAPE_INTERMEDIATE,
         CSI_ENTRY, CSI_PARAM, CSI_INTERMEDIATE,
         OSC_PARAM, OSC_STRING,
+        /** DCS / APC / PM / SOS: a string for the terminal to skip, ended by ST. */
+        IGNORED_STRING,
     }
 
     private var state = State.GROUND
 
     private val csiParams = mutableListOf<Int>()
+    private val csiColon = mutableListOf<Boolean>()
+    private var nextIsSub = false
     private var currentParam = 0
     private var hasParam = false
     private var csiIntermediate: Char? = null
+    private var escIntermediate: Char? = null
 
     private var oscCommand = 0
-    private var oscPayload = StringBuilder()
+    // OSC text is UTF-8: it is collected as bytes and decoded once, or a CJK title would arrive as Latin-1 noise.
+    private var oscPayload = java.io.ByteArrayOutputStream()
     private var oscOverflow = false
 
     private val utf8Buffer = ByteArray(4)
@@ -46,11 +60,14 @@ class AnsiParser {
     fun reset() {
         state = State.GROUND
         csiParams.clear()
+        csiColon.clear()
+        nextIsSub = false
         currentParam = 0
         hasParam = false
         csiIntermediate = null
+        escIntermediate = null
         oscCommand = 0
-        oscPayload.setLength(0)
+        oscPayload.reset()
         oscOverflow = false
         utf8Len = 0
         utf8Remaining = 0
@@ -84,6 +101,7 @@ class AnsiParser {
             State.CSI_INTERMEDIATE -> processCsiIntermediate(byte, action)
             State.OSC_PARAM -> processOscParam(byte, action)
             State.OSC_STRING -> processOscString(byte, action)
+            State.IGNORED_STRING -> processIgnoredString(byte)
         }
     }
 
@@ -111,6 +129,8 @@ class AnsiParser {
             0x5B -> { // [
                 state = State.CSI_ENTRY
                 csiParams.clear()
+                csiColon.clear()
+                nextIsSub = false
                 currentParam = 0
                 hasParam = false
                 csiIntermediate = null
@@ -118,10 +138,13 @@ class AnsiParser {
             0x5D -> { // ]
                 state = State.OSC_PARAM
                 oscCommand = 0
-                oscPayload.setLength(0)
+                oscPayload.reset()
                 oscOverflow = false
             }
+            // DCS, SOS, PM, APC: strings the terminal does not act on. Skipped whole, or their text would be printed.
+            0x50, 0x58, 0x5E, 0x5F -> state = State.IGNORED_STRING
             in 0x20..0x2F -> {
+                escIntermediate = byte.toChar()
                 state = State.ESCAPE_INTERMEDIATE
             }
             in 0x30..0x7E -> {
@@ -137,12 +160,20 @@ class AnsiParser {
         when (byte) {
             in 0x20..0x2F -> { /* absorb additional intermediates */ }
             in 0x30..0x7E -> {
-                action(ParsedAction.EscDispatch(byte.toChar()))
+                action(ParsedAction.EscDispatch(byte.toChar(), escIntermediate))
+                escIntermediate = null
                 state = State.GROUND
             }
             0x1B -> state = State.ESCAPE
             else -> state = State.GROUND
         }
+    }
+
+    /** Adds a finished parameter; [sub] says the NEXT one follows a colon. The one added now follows [nextIsSub]. */
+    private fun pushParam(value: Int, sub: Boolean = false) {
+        csiParams.add(value)
+        csiColon.add(nextIsSub)
+        nextIsSub = sub
     }
 
     private fun processCsiEntry(byte: Int, action: (ParsedAction) -> Unit) {
@@ -153,7 +184,11 @@ class AnsiParser {
                 state = State.CSI_PARAM
             }
             0x3B -> {
-                csiParams.add(0)
+                pushParam(0)
+                state = State.CSI_PARAM
+            }
+            0x3A -> {
+                pushParam(0, sub = true)
                 state = State.CSI_PARAM
             }
             in 0x3C..0x3F -> {
@@ -182,7 +217,13 @@ class AnsiParser {
                 hasParam = true
             }
             0x3B -> {
-                csiParams.add(if (hasParam) currentParam else 0)
+                pushParam(if (hasParam) currentParam else 0)
+                currentParam = 0
+                hasParam = false
+            }
+            // A colon starts a sub-parameter of the parameter before it (4:3, 38:2::r:g:b).
+            0x3A -> {
+                pushParam(if (hasParam) currentParam else 0, sub = true)
                 currentParam = 0
                 hasParam = false
             }
@@ -191,7 +232,7 @@ class AnsiParser {
             }
             in 0x20..0x2F -> {
                 if (hasParam) {
-                    csiParams.add(currentParam)
+                    pushParam(currentParam)
                     currentParam = 0
                     hasParam = false
                 }
@@ -199,11 +240,12 @@ class AnsiParser {
                 state = State.CSI_INTERMEDIATE
             }
             in 0x40..0x7E -> {
-                if (hasParam) csiParams.add(currentParam)
+                if (hasParam || nextIsSub) pushParam(currentParam)
                 action(ParsedAction.CsiDispatch(
                     csiParams.toIntArray(),
                     csiIntermediate,
-                    byte.toChar()
+                    byte.toChar(),
+                    if (csiColon.any { it }) csiColon.toBooleanArray() else NO_COLON,
                 ))
                 state = State.GROUND
             }
@@ -216,11 +258,12 @@ class AnsiParser {
         when (byte) {
             in 0x20..0x2F -> { /* more intermediates */ }
             in 0x40..0x7E -> {
-                if (hasParam) csiParams.add(currentParam)
+                if (hasParam || nextIsSub) pushParam(currentParam)
                 action(ParsedAction.CsiDispatch(
                     csiParams.toIntArray(),
                     csiIntermediate,
-                    byte.toChar()
+                    byte.toChar(),
+                    if (csiColon.any { it }) csiColon.toBooleanArray() else NO_COLON,
                 ))
                 state = State.GROUND
             }
@@ -230,7 +273,7 @@ class AnsiParser {
     }
 
     private fun dispatchOsc(action: (ParsedAction) -> Unit) {
-        if (!oscOverflow) action(ParsedAction.OscDispatch(oscCommand, oscPayload.toString()))
+        if (!oscOverflow) action(ParsedAction.OscDispatch(oscCommand, String(oscPayload.toByteArray(), Charsets.UTF_8)))
         oscOverflow = false
     }
 
@@ -252,6 +295,15 @@ class AnsiParser {
         }
     }
 
+    /** Skips a DCS / APC / PM / SOS string: it ends at ST (ESC \\) or BEL; a new ESC starts the next sequence. */
+    private fun processIgnoredString(byte: Int) {
+        when (byte) {
+            0x07 -> state = State.GROUND
+            0x1B -> state = State.ESCAPE
+            else -> Unit
+        }
+    }
+
     private fun processOscString(byte: Int, action: (ParsedAction) -> Unit) {
         when (byte) {
             0x07 -> {
@@ -264,7 +316,7 @@ class AnsiParser {
             }
             in 0x20..0x7E, in 0x80..0xFF -> {
                 // OSC text is untrusted and unbounded; an oversize string is dropped whole, never truncated.
-                if (oscPayload.length >= MAX_OSC_PAYLOAD) oscOverflow = true else oscPayload.append(byte.toChar())
+                if (oscPayload.size() >= MAX_OSC_PAYLOAD) oscOverflow = true else oscPayload.write(byte)
             }
             else -> { /* ignore */ }
         }

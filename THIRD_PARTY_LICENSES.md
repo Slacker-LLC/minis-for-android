@@ -14,6 +14,7 @@ This file is a project-level inventory, not a substitute for license files shipp
 | [OpenMinis/OpenMinis](https://github.com/OpenMinis/OpenMinis) | GPL-3.0 | The upstream this project derives from; the application's base code and lineage |
 | [Mangi-11/Eta](https://github.com/Mangi-11/Eta) | PolyForm Noncommercial 1.0.0 | Ported capability modules (see below); those modules stay under the noncommercial terms |
 | [android-notes/ShadowAuto](https://github.com/android-notes/ShadowAuto) | Apache-2.0 | Adapted virtual-screen support code |
+| [termux/termux-app](https://github.com/termux/termux-app) (`terminal-emulator`, `terminal-view`) | Apache-2.0 | Character width tables; terminal behaviour (resize, wrapping, escape sequences) used as the reference for the emulator |
 
 Everything else below is a library, runtime component or asset the application uses or ships.
 
@@ -148,6 +149,14 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `tools/runtime/ToolResultBudget.kt` (the per-result cap at the dispatch boundary; the spill and prune policies it calls are already recorded above) | `agent/runtime/AgentRuntimeWire.kt` (`MAX_RESULT_CONTENT_CHARS`, the single per-result bound) |
 | `agent/ToolBatchRepair.kt` (the tool-call/result pairing repair and the interrupted-batch placeholder) | `agent/model/AgentToolBatchRecovery.kt` |
 
+
+## Ported source: Termux terminal libraries
+
+| Component | Source | License | Current use |
+|---|---|---|---|
+| `ui/terminal/emulator/WcWidth.kt` | [termux/termux-app](https://github.com/termux/termux-app) `terminal-emulator/src/main/java/com/termux/terminal/WcWidth.java` @ `8629e632fcb95da272221be327db653fb24befe9` (its tables are Unicode 15 data from [jquast/wcwidth](https://github.com/jquast/wcwidth), MIT) | Apache-2.0 | Column width of a character: the two range tables are copied, the lookup is rewritten in Kotlin |
+
+The `terminal-emulator` and `terminal-view` libraries of Termux are Apache-2.0 (the rest of the Termux app is GPL-3.0 only; nothing from it is used). License text: [third_party/termux/LICENSE](third_party/termux/LICENSE). Behaviour such as keeping the cursor line when the screen shrinks, joining soft-wrapped rows when copying and reflowing on a width change follows `TerminalBuffer.java` of the same libraries; those parts are re-implemented here, not copied.
 
 ## Ported source: ShadowAuto
 
