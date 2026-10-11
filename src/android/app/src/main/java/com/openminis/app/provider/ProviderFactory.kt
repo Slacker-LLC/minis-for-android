@@ -184,11 +184,23 @@ object ProviderFactory {
             }
             // [T-android-provider-type-parity] Types this build can decode and
             // display but not drive. Reaching here means the user selected a
-            // model on an instance restored from another platform (or a newer
-            // build) whose provider Android cannot speak. Fail with a clear
+            // model on an instance restored from a newer build whose provider
+            // Android cannot speak. Fail with a clear
             // credential error rather than constructing a provider that would
             // emit malformed requests. iOS throws FactoryError here likewise.
-            ProviderType.antigravity, ProviderType.unsupported -> {
+            // Antigravity: Gemini wire format through Google's Cloud Code endpoint,
+            // authenticated by the Google account's refresh-aware OAuth token.
+            ProviderType.antigravity -> {
+                if (context == null) throw com.openminis.app.data.model.LLMError.InvalidApiKey()
+                GeminiProvider(
+                    apiKey = "",
+                    model = model,
+                    cloud = com.openminis.app.provider.antigravity.AntigravityTransport(
+                        com.openminis.app.auth.AntigravityOAuthManager(context, instance.id),
+                    ),
+                )
+            }
+            ProviderType.unsupported -> {
                 throw com.openminis.app.data.model.LLMError.InvalidApiKey()
             }
         }

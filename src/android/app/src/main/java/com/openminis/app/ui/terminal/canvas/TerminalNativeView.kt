@@ -22,6 +22,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.view.ActionMode
 import android.view.GestureDetector
@@ -29,11 +30,18 @@ import android.view.HapticFeedbackConstants
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
+import android.widget.OverScroller
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import com.openminis.app.R
 import com.openminis.app.ui.terminal.emulator.CursorShape
+import com.openminis.app.ui.terminal.emulator.MouseTracking
+import com.openminis.app.ui.terminal.emulator.TerminalFontScale
+import com.openminis.app.ui.terminal.emulator.TerminalLinks
+import com.openminis.app.ui.terminal.emulator.TerminalMouse
 import com.openminis.app.ui.terminal.emulator.TerminalCell
 import com.openminis.app.ui.terminal.emulator.TerminalEmulator
 import com.openminis.app.ui.terminal.emulator.TerminalPalette
@@ -50,9 +58,15 @@ import com.openminis.app.ui.terminal.rememberJetBrainsMonoTypeface
 fun TerminalNativeViewCompose(
     emulator: TerminalEmulator,
     modifier: Modifier = Modifier,
-    fontSizeSp: Float = 13f,
+    fontSizeSp: Float = TerminalFontScale.DEFAULT_SP,
     onResize: (cols: Int, rows: Int) -> Unit,
     onTap: () -> Unit = {},
+    /** Bytes the view itself sends to the program: mouse reports, swipe keys, pasted text. */
+    onSend: (ByteArray) -> Unit = {},
+    /** A pinch changed the size; [commit] is true once when the fingers lift, so only then is it saved. */
+    onFontSizeChange: (sp: Float, commit: Boolean) -> Unit = { _, _ -> },
+    /** Uncommitted IME text, drawn at the cursor with an underline until it is committed. */
+    preedit: String = "",
 ) {
     val typeface = rememberJetBrainsMonoTypeface()
     AndroidView(
@@ -60,12 +74,13 @@ fun TerminalNativeViewCompose(
         factory = { ctx ->
             TerminalNativeView(ctx, typeface).apply {
                 setFontSizeSp(fontSizeSp)
-                attachEmulator(emulator, onResize, onTap)
+                attachEmulator(emulator, onResize, onTap, onSend, onFontSizeChange)
             }
         },
         update = { view ->
             view.setFontSizeSp(fontSizeSp)
-            view.attachEmulator(emulator, onResize, onTap)
+            view.attachEmulator(emulator, onResize, onTap, onSend, onFontSizeChange)
+            view.setPreedit(preedit)
         },
     )
 }
@@ -78,6 +93,9 @@ class TerminalNativeView @JvmOverloads constructor(
     private var emulator: TerminalEmulator? = null
     private var onResize: (cols: Int, rows: Int) -> Unit = { _, _ -> }
     private var onTap: () -> Unit = {}
+    private var onSend: (ByteArray) -> Unit = {}
+    private var onFontSizeChange: (Float, Boolean) -> Unit = { _, _ -> }
+    private var fontSp: Float = TerminalFontScale.DEFAULT_SP
 
     private val basePaint = Paint().apply {
         this.typeface = this@TerminalNativeView.typeface
@@ -88,8 +106,9 @@ class TerminalNativeView @JvmOverloads constructor(
     private var cellWidth: Float = 0f
     private var cellHeight: Float = 0f
     private var baselineOffset: Float = 0f
-    private var cols: Int = 80
-    private var rows: Int = 24
+    // 0 until the first layout, so the first measured grid is always reported to the emulator and the pty.
+    private var cols: Int = 0
+    private var rows: Int = 0
 
     // Cursor blink — flips every 500 ms.
     private var cursorVisible: Boolean = true
@@ -116,18 +135,78 @@ class TerminalNativeView @JvmOverloads constructor(
         emulator: TerminalEmulator,
         onResize: (Int, Int) -> Unit,
         onTap: () -> Unit,
+        onSend: (ByteArray) -> Unit = {},
+        onFontSizeChange: (Float, Boolean) -> Unit = { _, _ -> },
     ) {
+        if (this.emulator !== emulator) {
+            this.emulator?.let { old -> old.onBell = null; old.onClipboardSet = null }
+            emulator.onBell = { post { ringBell() } }
+            emulator.onClipboardSet = { text -> post { putOnClipboard(text) } }
+        }
         this.emulator = emulator
         this.onResize = onResize
         this.onTap = onTap
+        this.onSend = onSend
+        this.onFontSizeChange = onFontSizeChange
+        reportCellSize()
         invalidate()
     }
 
-    fun setFontSizeSp(sp: Float) {
-        basePaint.textSize = sp * resources.displayMetrics.scaledDensity
-        recomputeMetrics()
-        requestLayout()
+    private var lastBellMs = 0L
+    private var lastClipboardMs = 0L
+
+    /** A program rang the bell: a short tick, at most once a second, so a loop that rings does not buzz the phone. */
+    private fun ringBell() {
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastBellMs < 1000) return
+        lastBellMs = now
+        performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+    }
+
+    /** A program (OSC 52) asked to copy text. It is written, never read back, at most once a second, and the user is told. */
+    private fun putOnClipboard(text: String) {
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastClipboardMs < 1000) return
+        lastClipboardMs = now
+        val cb = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+        cb.setPrimaryClip(ClipData.newPlainText("Minis Shell", text))
+        android.widget.Toast.makeText(context, R.string.terminal_clipboard_set, android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    private var preedit: String = ""
+    private val preeditPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isUnderlineText = true }
+    private val preeditBgPaint = Paint().apply { color = 0xFF2C2C2E.toInt() }
+
+    fun setPreedit(text: String) {
+        if (text == preedit) return
+        preedit = text
         invalidate()
+    }
+
+    /** Changes the text size and fits the grid to the view again, which tells the program through the pty. */
+    fun setFontSizeSp(sp: Float) {
+        val clamped = sp.coerceIn(TerminalFontScale.MIN_SP, TerminalFontScale.MAX_SP)
+        if (fontApplied && clamped == fontSp) return
+        fontSp = clamped
+        fontApplied = true
+        basePaint.textSize = clamped * resources.displayMetrics.scaledDensity
+        recomputeMetrics()
+        fitGrid()
+        invalidate()
+    }
+
+    private var fontApplied = false
+
+    /** Recomputes columns and rows from the view size and the cell size; reports only a real change. */
+    private fun fitGrid() {
+        if (width <= 0 || height <= 0 || cellWidth <= 0f || cellHeight <= 0f) return
+        val newCols = maxOf(1, (width / cellWidth).toInt())
+        val newRows = maxOf(1, (height / cellHeight).toInt())
+        if (newCols != cols || newRows != rows) {
+            cols = newCols
+            rows = newRows
+            onResize(newCols, newRows)
+        }
     }
 
     private fun recomputeMetrics() {
@@ -135,6 +214,16 @@ class TerminalNativeView @JvmOverloads constructor(
         val fm = basePaint.fontMetrics
         cellHeight = fm.bottom - fm.top
         baselineOffset = -fm.top
+        reportCellSize()
+    }
+
+    /** The emulator answers the programs' size queries (XTWINOPS) with the real cell size. */
+    private fun reportCellSize() {
+        val em = emulator ?: return
+        if (cellWidth > 0f && cellHeight > 0f) {
+            em.cellWidthPx = cellWidth.toInt().coerceAtLeast(1)
+            em.cellHeightPx = cellHeight.toInt().coerceAtLeast(1)
+        }
     }
 
     override fun onAttachedToWindow() {
@@ -149,8 +238,10 @@ class TerminalNativeView @JvmOverloads constructor(
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        emulator?.let { it.onBell = null; it.onClipboardSet = null }
         removeCallbacks(blinkRunnable)
         removeCallbacks(emulatorTick)
+        stopFling()
         actionMode?.finish()
     }
 
@@ -170,23 +261,148 @@ class TerminalNativeView @JvmOverloads constructor(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        val newCols = maxOf(1, (w / cellWidth).toInt())
-        val newRows = maxOf(1, (h / cellHeight).toInt())
-        if (newCols != cols || newRows != rows) {
-            cols = newCols
-            rows = newRows
-            onResize(newCols, newRows)
-        }
+        layoutPill()
+        fitGrid()
     }
 
     // ── Touch handling ─────────────────────────────────────────────────────
 
+    /** What the finger is doing in the current gesture, decided on the first movement. */
+    private enum class Drag { NONE, SCROLLBACK, KEYS, WHEEL, MOUSE_DRAG, IGNORE }
+
+    private var drag = Drag.NONE
+    private var remainderY = 0f
+
+    // Inertia: a quick flick keeps the scrollback moving and slows to a stop, like any scrolling list.
+    private val flinger = OverScroller(context)
+    private var flingLastY = 0
+    private val flingRunnable = object : Runnable {
+        override fun run() {
+            val em = emulator
+            if (em == null || !flinger.computeScrollOffset()) return
+            val y = flinger.currY
+            val before = em.scrollOffset
+            val lines = takeLines((flingLastY - y).toFloat())
+            flingLastY = y
+            if (lines != 0) em.scrollOffset = (before - lines).coerceAtLeast(0)
+            // Reaching either end of the scrollback ends the flick.
+            if (lines != 0 && em.scrollOffset == before) flinger.abortAnimation() else postOnAnimation(this)
+        }
+    }
+
+    private fun stopFling() {
+        flinger.abortAnimation()
+        removeCallbacks(flingRunnable)
+    }
+
+    // Selection: after a long press the finger can keep going to extend the selection.
+    private var selDragging = false
+    private var selStartCol = 0
+    private var selEndCol = 0
+    private var selRow = 0
+
+    // The way back to the live screen while scrolled up, and where in the history the view is.
+    private val painter = CellPainter()
+    private val pillRect = RectF()
+    private val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xE62C2C2E.toInt() }
+    private val pillTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt()
+        textAlign = Paint.Align.CENTER
+    }
+    private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x66FFFFFF }
+
+    private fun layoutPill() {
+        val d = resources.displayMetrics.density
+        val size = 40f * d
+        val margin = 16f * d
+        pillRect.set(width - margin - size, height - margin - size, width - margin, height - margin)
+    }
+    private var dragCol = 0
+    private var dragRow = 0
+    private var pinching = false
+    private var ignoreUntilUp = false
+
+    private fun cellCol(x: Float) = (x / cellWidth).toInt().coerceIn(0, maxOf(0, cols - 1))
+    private fun cellRow(y: Float) = (y / cellHeight).toInt().coerceIn(0, maxOf(0, rows - 1))
+
+    private fun mouseOn(): Boolean = (emulator?.mouseTracking ?: MouseTracking.OFF) != MouseTracking.OFF
+
+    private fun send(bytes: ByteArray?) {
+        if (bytes != null && bytes.isNotEmpty()) onSend(bytes)
+    }
+
+    private fun chooseDrag(em: TerminalEmulator, start: MotionEvent?, now: MotionEvent): Drag {
+        val tracking = em.mouseTracking
+        if (tracking != MouseTracking.OFF) {
+            val x0 = start?.x ?: now.x
+            val y0 = start?.y ?: now.y
+            val horizontal = kotlin.math.abs(now.x - x0) > kotlin.math.abs(now.y - y0)
+            return when {
+                !horizontal -> Drag.WHEEL
+                // A press that never gets a motion report would just be a click, so button-only mode ignores sideways drags.
+                tracking == MouseTracking.BUTTON -> Drag.IGNORE
+                else -> {
+                    dragCol = cellCol(x0)
+                    dragRow = cellRow(y0)
+                    send(TerminalMouse.press(dragCol, dragRow, em.mouseSgr))
+                    Drag.MOUSE_DRAG
+                }
+            }
+        }
+        return if (em.isAlternateActive) Drag.KEYS else Drag.SCROLLBACK
+    }
+
+    /** Whole lines gathered from [distanceY] so slow drags are not lost to rounding. Positive: finger moved up. */
+    private fun takeLines(distanceY: Float): Int {
+        remainderY += distanceY
+        val lines = (remainderY / cellHeight).toInt()
+        remainderY -= lines * cellHeight
+        return lines
+    }
+
+    private fun finishDrag() {
+        val em = emulator
+        if (drag == Drag.MOUSE_DRAG && em != null) send(TerminalMouse.release(dragCol, dragRow, em.mouseSgr))
+        drag = Drag.NONE
+        remainderY = 0f
+    }
+
     private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        override fun onDown(e: MotionEvent): Boolean {
+            stopFling()
+            drag = Drag.NONE
+            remainderY = 0f
+            return true
+        }
+
+        override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+            if (drag != Drag.SCROLLBACK || cellHeight <= 0f) return false
+            // Finger moving down (positive velocity) shows older lines, like the drag itself.
+            flingLastY = 0
+            flinger.fling(0, 0, 0, velocityY.toInt(), 0, 0, Int.MIN_VALUE / 2, Int.MAX_VALUE / 2)
+            postOnAnimation(flingRunnable)
+            return true
+        }
+
         override fun onSingleTapUp(e: MotionEvent): Boolean {
+            val live = emulator
+            if (live != null && live.scrollOffset > 0 && pillRect.contains(e.x, e.y)) {
+                live.scrollOffset = 0
+                return true
+            }
             // Tapping outside an active selection cancels it; otherwise pass focus.
             if (emulator?.selectionRect?.value != null) {
                 emulator?.clearSelectionRect()
                 actionMode?.finish()
+                return true
+            }
+            val em = emulator
+            if (em != null && mouseOn()) {
+                // The program asked for the mouse: a tap is a click, and the keyboard stays where it is.
+                val col = cellCol(e.x)
+                val row = cellRow(e.y)
+                send(TerminalMouse.press(col, row, em.mouseSgr))
+                send(TerminalMouse.release(col, row, em.mouseSgr))
                 return true
             }
             onTap()
@@ -197,46 +413,188 @@ class TerminalNativeView @JvmOverloads constructor(
             startSelectionAt(e.x, e.y)
         }
 
+        // Double tap selects the word, as in any text view; the program's mouse mode keeps its own clicks.
+        override fun onDoubleTap(e: MotionEvent): Boolean {
+            if (mouseOn()) return false
+            startSelectionAt(e.x, e.y)
+            return true
+        }
+
         override fun onScroll(
             e1: MotionEvent?,
             e2: MotionEvent,
             distanceX: Float,
             distanceY: Float,
         ): Boolean {
-            // distanceY is e1.y - e2.y in Android's GestureDetector — i.e.
-            // positive when the finger moves up. Scroll back through history
-            // means moving content down on screen, which from the user's
-            // POV is dragging the finger down, distanceY < 0.
+            // distanceY is e1.y - e2.y: positive when the finger moves up.
             val em = emulator ?: return false
-            // Reverse sign: dragging down (distanceY < 0) increases scrollOffset.
-            val rowDelta = (-distanceY / cellHeight).toInt()
-            if (rowDelta != 0) {
-                em.scrollOffset = (em.scrollOffset + rowDelta).coerceAtLeast(0)
+            if (cellHeight <= 0f) return false
+            if (drag == Drag.NONE) drag = chooseDrag(em, e1, e2)
+            when (drag) {
+                Drag.SCROLLBACK -> {
+                    // Dragging down shows older lines.
+                    val lines = takeLines(distanceY)
+                    if (lines != 0) em.scrollOffset = (em.scrollOffset - lines).coerceAtLeast(0)
+                }
+                Drag.KEYS -> {
+                    val lines = takeLines(distanceY)
+                    send(TerminalMouse.scrollKeys(lines, em.applicationCursorKeys))
+                }
+                Drag.WHEEL -> {
+                    val lines = takeLines(distanceY)
+                    send(TerminalMouse.wheelEvents(lines, cellCol(e2.x), cellRow(e2.y), em.mouseSgr))
+                }
+                Drag.MOUSE_DRAG -> {
+                    val col = cellCol(e2.x)
+                    val row = cellRow(e2.y)
+                    if (col != dragCol || row != dragRow) {
+                        dragCol = col
+                        dragRow = row
+                        send(TerminalMouse.drag(col, row, em.mouseSgr))
+                    }
+                }
+                Drag.IGNORE, Drag.NONE -> Unit
             }
             return true
         }
     })
 
+    private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+            // Two fingers are a pinch, not a scroll or a click: drop whatever the first finger started.
+            finishDrag()
+            val cancel = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_CANCEL, 0f, 0f, 0)
+            gestureDetector.onTouchEvent(cancel)
+            cancel.recycle()
+            pinching = true
+            ignoreUntilUp = true
+            return true
+        }
+
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            val sp = TerminalFontScale.scaled(fontSp, detector.scaleFactor)
+            if (sp != fontSp) {
+                setFontSizeSp(sp)
+                onFontSizeChange(sp, false)
+            }
+            return true
+        }
+
+        override fun onScaleEnd(detector: ScaleGestureDetector) {
+            pinching = false
+            onFontSizeChange(fontSp, true)
+        }
+    })
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        return gestureDetector.onTouchEvent(event) || super.onTouchEvent(event)
+        scaleDetector.onTouchEvent(event)
+        val action = event.actionMasked
+        if (pinching || ignoreUntilUp) {
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) ignoreUntilUp = false
+            return true
+        }
+        val handled = gestureDetector.onTouchEvent(event)
+        if (selDragging) {
+            if (action == MotionEvent.ACTION_MOVE) extendSelectionTo(event.x, event.y)
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) selDragging = false
+        }
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) finishDrag()
+        return handled || super.onTouchEvent(event)
     }
 
-    // ── Selection lifecycle ───────────────────────────────────────────────
+    // ── Selection and paste ───────────────────────────────────────────────
 
     private fun startSelectionAt(px: Float, py: Float) {
         val em = emulator ?: return
         if (cellWidth <= 0f || cellHeight <= 0f) return
-        val col = (px / cellWidth).toInt().coerceIn(0, cols - 1)
-        val row = (py / cellHeight).toInt().coerceIn(0, rows - 1)
+        val col = cellCol(px)
+        val row = cellRow(py)
+        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        pressedLink = em.visibleLines().getOrNull(row)?.getOrNull(col)?.link
+
+        // A long press on empty space has nothing to select: offer Paste there. The mouse mode does not change
+        // this: a long press is always the terminal's own gesture, never the program's.
+        if (isBlankCell(col, row)) {
+            lastSelEndX = ((col + 1) * cellWidth).toInt()
+            lastSelEndY = ((row + 1) * cellHeight).toInt()
+            pasteAnchor.set((col * cellWidth).toInt(), (row * cellHeight).toInt(), ((col + 1) * cellWidth).toInt(), ((row + 1) * cellHeight).toInt())
+            startActionModeFloating(withSelection = false)
+            return
+        }
 
         // Word-expand on whitespace boundaries.
         val (sx, ex) = wordExpand(col, row)
         em.setSelectionRect(sx, row, ex, row)
         lastSelEndX = ((ex + 1) * cellWidth).toInt()
         lastSelEndY = ((row + 1) * cellHeight).toInt()
+        selStartCol = sx
+        selEndCol = ex
+        selRow = row
+        selDragging = true
+        startActionModeFloating(withSelection = true)
+    }
 
-        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-        startActionModeFloating()
+    /** The finger kept moving after the long press: the selection runs from the pressed word to the finger. */
+    private fun extendSelectionTo(px: Float, py: Float) {
+        val em = emulator ?: return
+        if (cellWidth <= 0f || cellHeight <= 0f) return
+        val col = cellCol(px)
+        val row = cellRow(py)
+        val afterWord = row > selRow || (row == selRow && col >= selEndCol)
+        if (afterWord) em.setSelectionRect(selStartCol, selRow, col, row) else em.setSelectionRect(selEndCol, selRow, col, row)
+        lastSelEndX = ((col + 1) * cellWidth).toInt()
+        lastSelEndY = ((row + 1) * cellHeight).toInt()
+        actionMode?.invalidateContentRect()
+    }
+
+    private val pasteAnchor = Rect()
+
+    private var pressedLink: String? = null
+
+    /** The link under the finger (OSC 8), else the selected text when it is a web link; "Open link" is offered only for those. */
+    private fun selectedLink(): String? {
+        pressedLink?.let { return it }
+        val em = emulator ?: return null
+        val sel = em.selectionRect.value ?: return null
+        return TerminalLinks.webLink(em.getSelectedText(sel[0], sel[1], sel[2], sel[3]))
+    }
+
+    private fun openLink(url: String) {
+        try {
+            context.startActivity(
+                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        } catch (_: android.content.ActivityNotFoundException) {
+            // No app can open it; nothing to do.
+        }
+    }
+
+    private fun isBlankCell(col: Int, row: Int): Boolean {
+        val line = emulator?.visibleLines()?.getOrNull(row) ?: return true
+        val cell = line.getOrNull(col) ?: return true
+        return cell.char == ' '.code || cell.char == 0
+    }
+
+    /** Whether the clipboard holds text, without reading it (reading shows Android's "pasted from" notice). */
+    private fun clipboardHasText(): Boolean {
+        val cb = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return false
+        return cb.hasPrimaryClip() && cb.primaryClipDescription?.hasMimeType("text/*") == true
+    }
+
+    private fun clipboardText(): String? {
+        val cb = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return null
+        val clip = cb.primaryClip ?: return null
+        if (clip.itemCount == 0) return null
+        return clip.getItemAt(0).coerceToText(context)?.toString()?.takeIf { it.isNotEmpty() }
+    }
+
+    private fun pasteFromClipboard() {
+        val em = emulator ?: return
+        val text = clipboardText() ?: return
+        em.scrollOffset = 0
+        // Bracketed paste (DECSET 2004) makes a shell take a multi-line paste as one piece instead of running each line.
+        send(TerminalMouse.paste(text, em.bracketedPaste))
     }
 
     private fun wordExpand(col: Int, row: Int): Pair<Int, Int> {
@@ -262,17 +620,29 @@ class TerminalNativeView @JvmOverloads constructor(
         return sx to ex
     }
 
-    private fun startActionModeFloating() {
+    private fun startActionModeFloating(withSelection: Boolean) {
         if (actionMode != null) return
         val callback = object : ActionMode.Callback2() {
             override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
-                menu.add(Menu.NONE, MENU_COPY, 0, android.R.string.copy)
+                if (withSelection) {
+                    menu.add(Menu.NONE, MENU_COPY, 0, android.R.string.copy)
+                        .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+                    menu.add(Menu.NONE, MENU_SELECT_ALL, 2, android.R.string.selectAll)
+                        .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+                    if (selectedLink() != null) {
+                        menu.add(Menu.NONE, MENU_OPEN_LINK, 3, R.string.terminal_open_link)
+                            .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+                    }
+                }
+                menu.add(Menu.NONE, MENU_PASTE, 1, R.string.terminal_paste)
                     .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
-                menu.add(Menu.NONE, MENU_SELECT_ALL, 1, android.R.string.selectAll)
-                    .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
                 return true
             }
-            override fun onPrepareActionMode(mode: ActionMode, menu: Menu) = false
+            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
+                // Paste is only offered while there is something to paste.
+                menu.findItem(MENU_PASTE)?.isVisible = clipboardHasText()
+                return true
+            }
             override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
                 val em = emulator ?: return false
                 return when (item.itemId) {
@@ -288,6 +658,17 @@ class TerminalNativeView @JvmOverloads constructor(
                         mode.finish()
                         true
                     }
+                    MENU_PASTE -> {
+                        pasteFromClipboard()
+                        mode.finish()
+                        true
+                    }
+                    MENU_OPEN_LINK -> {
+                        val link = selectedLink()
+                        mode.finish()
+                        if (link != null) openLink(link)
+                        true
+                    }
                     MENU_SELECT_ALL -> {
                         em.setSelectionRect(0, 0, cols - 1, rows - 1)
                         lastSelEndX = (cols * cellWidth).toInt()
@@ -299,13 +680,14 @@ class TerminalNativeView @JvmOverloads constructor(
             }
             override fun onDestroyActionMode(mode: ActionMode) {
                 actionMode = null
+                pressedLink = null
                 emulator?.clearSelectionRect()
             }
             override fun onGetContentRect(mode: ActionMode, view: View?, outRect: Rect) {
                 val em = emulator
                 val sel = em?.selectionRect?.value
                 if (sel == null) {
-                    super.onGetContentRect(mode, view, outRect)
+                    if (!withSelection) outRect.set(pasteAnchor) else super.onGetContentRect(mode, view, outRect)
                     return
                 }
                 // Anchor toolbar above the bottom-right corner of the selection.
@@ -331,7 +713,10 @@ class TerminalNativeView @JvmOverloads constructor(
         val em = emulator ?: return
         val lines = em.visibleLines()
 
-        // Clear background — matches default palette.
+        // Clear background — matches default palette. drawColor fills the whole clip, and a View
+        // hosted in Compose is not clipped to its own bounds, so without this clip the black
+        // painted over the tab strip drawn above the terminal.
+        canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
         canvas.drawColor(TerminalPalette.defaultBackground.toArgbInt())
 
         for (r in lines.indices) {
@@ -340,7 +725,7 @@ class TerminalNativeView @JvmOverloads constructor(
             for (c in row.indices) {
                 val cell = row[c]
                 if (cell.isWideTrailer) continue
-                drawCellNative(canvas, basePaint, cell, c * cellWidth, y, cellWidth, cellHeight, baselineOffset)
+                painter.draw(canvas, basePaint, cell, c * cellWidth, y, cellWidth, cellHeight, baselineOffset)
             }
         }
 
@@ -387,10 +772,7 @@ class TerminalNativeView @JvmOverloads constructor(
                             val textPaint = Paint(basePaint).apply {
                                 color = TerminalPalette.defaultBackground.toArgbInt()
                             }
-                            canvas.drawText(
-                                String(intArrayOf(cell.char), 0, 1),
-                                cx, cy + baselineOffset, textPaint,
-                            )
+                            canvas.drawText(cell.text(), cx, cy + baselineOffset, textPaint)
                         }
                     }
                     CursorShape.UNDERLINE -> canvas.drawRect(
@@ -403,11 +785,50 @@ class TerminalNativeView @JvmOverloads constructor(
                 }
             }
         }
+
+        if (preedit.isNotEmpty() && em.scrollOffset == 0) drawPreedit(canvas, em)
+        if (em.scrollOffset > 0) drawScrollIndicators(canvas, em)
+    }
+
+    /** The IME's uncommitted text at the cursor: it is not in the terminal yet, so it is drawn over it. */
+    private fun drawPreedit(canvas: Canvas, em: TerminalEmulator) {
+        val (col, row) = em.cursorPos()
+        preeditPaint.typeface = basePaint.typeface
+        preeditPaint.textSize = basePaint.textSize
+        preeditPaint.color = TerminalPalette.defaultForeground.toArgbInt()
+        val x = col * cellWidth
+        val y = row * cellHeight
+        // Keep the end of a long reading in view: drop characters from the front until it fits the line.
+        var shown = preedit
+        while (shown.length > 1 && x + preeditPaint.measureText(shown) > width) shown = shown.substring(1)
+        val w = preeditPaint.measureText(shown)
+        canvas.drawRect(x, y, x + w, y + cellHeight, preeditBgPaint)
+        canvas.drawText(shown, x, y + baselineOffset, preeditPaint)
+    }
+
+    /** A thin bar for where the view sits in the history, and a round button back to the live screen. */
+    private fun drawScrollIndicators(canvas: Canvas, em: TerminalEmulator) {
+        val d = resources.displayMetrics.density
+        val history = em.activeBuffer.scrollback.size
+        val total = (history + rows).toFloat()
+        if (total > 0f && history > 0) {
+            val thumb = (rows / total * height).coerceAtLeast(24f * d)
+            val travel = height - thumb
+            // scrollOffset 0 is the live screen (bottom); the full history is the top.
+            val top = travel * (1f - em.scrollOffset.toFloat() / history)
+            canvas.drawRoundRect(width - 4f * d, top, width - 1f * d, top + thumb, 2f * d, 2f * d, barPaint)
+        }
+        layoutPill()
+        canvas.drawRoundRect(pillRect, pillRect.width() / 2f, pillRect.width() / 2f, pillPaint)
+        pillTextPaint.textSize = 20f * d
+        canvas.drawText("↓", pillRect.centerX(), pillRect.centerY() + 7f * d, pillTextPaint)
     }
 
     companion object {
         private const val MENU_COPY = 1
         private const val MENU_SELECT_ALL = 2
+        private const val MENU_PASTE = 3
+        private const val MENU_OPEN_LINK = 4
     }
 }
 
@@ -421,59 +842,62 @@ private fun androidx.compose.ui.graphics.Color.toArgbInt(): Int =
         (blue * 255f).toInt(),
     )
 
-private fun drawCellNative(
-    canvas: Canvas,
-    basePaint: Paint,
-    cell: TerminalCell,
-    x: Float,
-    y: Float,
-    w: Float,
-    h: Float,
-    baselineOffset: Float,
-) {
-    val attrs = cell.attributes
-    val inverse = attrs.has(TextAttributes.INVERSE)
-    val bold = attrs.has(TextAttributes.BOLD)
-    val fgColor = TerminalPalette.resolve(
-        if (inverse) cell.background else cell.foreground,
-        isForeground = true,
-        bold = bold,
-    )
-    val bgColor = TerminalPalette.resolve(
-        if (inverse) cell.foreground else cell.background,
-        isForeground = false,
-    )
-    val cellW = if (cell.width == 2) w * 2 else w
+/**
+ * Draws one cell. The paints and the bold / italic typefaces are kept and reused: building a Paint and a Typeface for every
+ * cell of every frame made scrolling a large output allocate hundreds of thousands of objects a second.
+ */
+private class CellPainter {
+    private val bgPaint = Paint().apply { style = Paint.Style.FILL }
+    private val glyphPaint = Paint()
+    private var faceBase: Typeface? = null
+    private val faces = arrayOfNulls<Typeface>(4)
 
-    if (bgColor != TerminalPalette.defaultBackground) {
-        val bgPaint = Paint().apply {
-            color = bgColor.toArgbInt()
-            style = Paint.Style.FILL
+    private fun face(base: Typeface, bold: Boolean, italic: Boolean): Typeface {
+        if (faceBase !== base) {
+            faceBase = base
+            faces[0] = base
+            faces[1] = Typeface.create(base, Typeface.BOLD)
+            faces[2] = Typeface.create(base, Typeface.ITALIC)
+            faces[3] = Typeface.create(base, Typeface.BOLD_ITALIC)
         }
-        canvas.drawRect(x, y, x + cellW, y + h, bgPaint)
+        return faces[(if (bold) 1 else 0) + (if (italic) 2 else 0)]!!
     }
 
-    val ch = cell.char
-    if (ch == ' '.code &&
-        !attrs.has(TextAttributes.UNDERLINE) &&
-        !attrs.has(TextAttributes.STRIKETHROUGH)
-    ) return
+    fun draw(
+        canvas: Canvas,
+        basePaint: Paint,
+        cell: TerminalCell,
+        x: Float,
+        y: Float,
+        w: Float,
+        h: Float,
+        baselineOffset: Float,
+    ) {
+        val attrs = cell.attributes
+        val inverse = attrs.has(TextAttributes.INVERSE)
+        val bold = attrs.has(TextAttributes.BOLD)
+        val (fgColor, bgColor) = TerminalPalette.cellColors(cell)
+        val cellW = if (cell.width == 2) w * 2 else w
 
-    val glyphPaint = Paint(basePaint).apply {
-        color = fgColor.toArgbInt()
-        isFakeBoldText = bold
-        val italic = attrs.has(TextAttributes.ITALIC)
-        val base = basePaint.typeface ?: Typeface.MONOSPACE
-        typeface = when {
-            bold && italic -> Typeface.create(base, Typeface.BOLD_ITALIC)
-            bold -> Typeface.create(base, Typeface.BOLD)
-            italic -> Typeface.create(base, Typeface.ITALIC)
-            else -> base
+        if (bgColor != TerminalPalette.defaultBackground) {
+            bgPaint.color = bgColor.toArgbInt()
+            canvas.drawRect(x, y, x + cellW, y + h, bgPaint)
         }
-        if (attrs.has(TextAttributes.UNDERLINE)) isUnderlineText = true
-        if (attrs.has(TextAttributes.STRIKETHROUGH)) isStrikeThruText = true
-        if (attrs.has(TextAttributes.DIM)) alpha = 128
-        if (attrs.has(TextAttributes.HIDDEN)) alpha = 0
+
+        val blank = cell.char == ' '.code || cell.char <= 0
+        if (blank && cell.extra == null &&
+            !attrs.has(TextAttributes.UNDERLINE) &&
+            !attrs.has(TextAttributes.STRIKETHROUGH)
+        ) return
+
+        glyphPaint.set(basePaint)
+        glyphPaint.color = fgColor.toArgbInt()
+        glyphPaint.isFakeBoldText = bold
+        glyphPaint.typeface = face(basePaint.typeface ?: Typeface.MONOSPACE, bold, attrs.has(TextAttributes.ITALIC))
+        glyphPaint.isUnderlineText = attrs.has(TextAttributes.UNDERLINE)
+        glyphPaint.isStrikeThruText = attrs.has(TextAttributes.STRIKETHROUGH)
+        if (attrs.has(TextAttributes.DIM)) glyphPaint.alpha = 128
+        if (attrs.has(TextAttributes.HIDDEN)) glyphPaint.alpha = 0
+        canvas.drawText(cell.text(), x, y + baselineOffset, glyphPaint)
     }
-    canvas.drawText(String(intArrayOf(ch), 0, 1), x, y + baselineOffset, glyphPaint)
 }

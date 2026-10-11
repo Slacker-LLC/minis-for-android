@@ -11,4 +11,7 @@ internal interface PtyBackend {
     fun resize(fd: Int, cols: Int, rows: Int)
     fun close(fd: Int)
     fun terminateAndWait(pid: Int)
+
+    /** Foreground process group of the PTY (`tcgetpgrp`), or -1 when it cannot be read. */
+    fun foregroundPgid(fd: Int): Int = -1
 }

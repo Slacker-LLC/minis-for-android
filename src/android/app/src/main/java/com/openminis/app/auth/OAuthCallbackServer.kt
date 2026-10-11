@@ -184,7 +184,7 @@ class OAuthCallbackServer(
                             }
 
                             // Send response
-                            val html = "<html><body><h1>Authorization complete</h1><p>You can close this tab.</p><script>window.close()</script></body></html>"
+                            val html = "<html><body><h1>Authorization received</h1><p>Return to Minis to finish signing in.</p><script>window.close()</script></body></html>"
                             val response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ${html.length}\r\nConnection: close\r\n\r\n$html"
                             socket.getOutputStream().write(response.toByteArray())
                             socket.close()

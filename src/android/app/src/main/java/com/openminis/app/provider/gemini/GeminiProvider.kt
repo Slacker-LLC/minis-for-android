@@ -13,6 +13,8 @@ import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.LLMProvider
+import com.openminis.app.provider.antigravity.AntigravityTransport
+import com.openminis.app.provider.antigravity.AntigravityWire
 import com.openminis.app.provider.safeOptString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -36,8 +38,12 @@ class GeminiProvider(
     private val apiKey: String,
     override var model: LLMModel = com.openminis.app.provider.rules.ModelRulesProvider.staticModelOrFallback("gemini", "gemini-2.5-flash", "Gemini 2.5 Flash", "Google"),
     private val basePath: String = "https://generativelanguage.googleapis.com/v1beta",
+    // Set for an Antigravity instance: the same Gemini body goes to Google's
+    // Cloud Code endpoint inside an envelope, authenticated by the account's
+    // OAuth token instead of an API key.
+    private val cloud: AntigravityTransport? = null,
 ) : LLMProvider {
-    override val name = "Google"
+    override val name = if (cloud != null) "Antigravity" else "Google"
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -59,15 +65,19 @@ class GeminiProvider(
         thinkingLevel: ThinkingLevel,
     ): LLMResponse = withContext(Dispatchers.IO) {
         val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
-        val url = "$basePath/models/${model.id}:generateContent?key=$apiKey"
-        val request = Request.Builder()
-            .url(url)
-            .post(body.toString().toRequestBody("application/json".toMediaType()))
-            // [T-android-default-ua] Brand the outbound UA so server logs
-            // can trace the request back to the Minis build. Gemini has no
-            // SDK-specific UA requirement, so the helper's default kicks in.
-            .applyUserAgentOverride(null)
-            .build()
+        val request = if (cloud != null) {
+            cloud.buildRequest(model.id, body, streaming = false, thinkingEnabled = thinkingLevel.isEnabled)
+        } else {
+            val url = "$basePath/models/${model.id}:generateContent?key=$apiKey"
+            Request.Builder()
+                .url(url)
+                .post(body.toString().toRequestBody("application/json".toMediaType()))
+                // [T-android-default-ua] Brand the outbound UA so server logs
+                // can trace the request back to the Minis build. Gemini has no
+                // SDK-specific UA requirement, so the helper's default kicks in.
+                .applyUserAgentOverride(null)
+                .build()
+        }
 
         val response = client.newCall(request).execute()
         val responseBody = response.body?.string() ?: ""
@@ -76,7 +86,7 @@ class GeminiProvider(
             throw mapHttpError(response.code, responseBody)
         }
 
-        val json = JSONObject(responseBody)
+        val json = unwrapCloud(JSONObject(responseBody))
         val text = extractText(json)
         val finishReason = extractFinishReason(json)
         val usage = extractUsage(json)
@@ -106,14 +116,18 @@ class GeminiProvider(
         thinkingLevel: ThinkingLevel,
     ): Flow<LLMStreamChunk> = callbackFlow {
         val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
-        val url = "$basePath/models/${model.id}:streamGenerateContent?alt=sse&key=$apiKey"
-        val request = Request.Builder()
-            .url(url)
-            .post(body.toString().toRequestBody("application/json".toMediaType()))
-            // [T-android-default-ua] same intent as the non-streaming
-            // branch above — brand outbound requests with Minis/<version>.
-            .applyUserAgentOverride(null)
-            .build()
+        val request = if (cloud != null) {
+            cloud.buildRequest(model.id, body, streaming = true, thinkingEnabled = thinkingLevel.isEnabled)
+        } else {
+            val url = "$basePath/models/${model.id}:streamGenerateContent?alt=sse&key=$apiKey"
+            Request.Builder()
+                .url(url)
+                .post(body.toString().toRequestBody("application/json".toMediaType()))
+                // [T-android-default-ua] same intent as the non-streaming
+                // branch above — brand outbound requests with Minis/<version>.
+                .applyUserAgentOverride(null)
+                .build()
+        }
 
         val response = client.newCall(request).execute()
         if (!response.isSuccessful) {
@@ -132,7 +146,7 @@ class GeminiProvider(
                 if (!l.startsWith("data: ")) continue
                 val payload = l.removePrefix("data: ")
 
-                val json = try { JSONObject(payload) } catch (_: Exception) { continue }
+                val json = try { unwrapCloud(JSONObject(payload)) } catch (_: Exception) { continue }
 
                 if (!started) {
                     send(LLMStreamChunk.Started)
@@ -383,6 +397,10 @@ class GeminiProvider(
     }
 
     /** Extract text from all non-thought parts. */
+    /** Cloud Code answers `{"response": {…Gemini response…}}`; a plain Gemini answer passes through. */
+    private fun unwrapCloud(json: JSONObject): JSONObject =
+        if (cloud != null) AntigravityWire.unwrap(json) else json
+
     private fun extractText(json: JSONObject): String {
         return extractTextAndThinking(json).first
     }
@@ -492,7 +510,7 @@ class GeminiProvider(
     private fun mapHttpError(statusCode: Int, body: String): LLMError {
         if (statusCode == 401 || statusCode == 403) return LLMError.InvalidApiKey()
         if (statusCode == 429) return LLMError.RateLimited()
-        val message = "Gemini API error $statusCode: ${body.take(200)}"
+        val message = "${if (cloud != null) "Antigravity" else "Gemini"} API error $statusCode: ${body.take(200)}"
         val transientCodes = setOf(500, 502, 503, 504, 529)
         if (statusCode in transientCodes) return LLMError.TransientError(message)
         return LLMError.ProviderError(message)

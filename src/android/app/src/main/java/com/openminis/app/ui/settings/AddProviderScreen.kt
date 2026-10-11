@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.outlined.GraphicEq
@@ -160,6 +161,7 @@ private val providerDisplayOrder = listOf(
     ProviderType.openAI,
     ProviderType.anthropic,
     ProviderType.gemini,
+    ProviderType.antigravity,
     ProviderType.xAI,
     ProviderType.kimiCode,
     ProviderType.openRouter,
@@ -178,7 +180,8 @@ private fun providerIcon(type: ProviderType): Pair<ImageVector, Color> = when (t
     // package / newer build; never offered in addableProviderTypes, but the
     // icon helper is also used to render an already-restored instance.
     ProviderType.openAIResponses -> Icons.Default.Hub to Color(0xFF4CAF50)
-    ProviderType.antigravity,
+    // Antigravity: Google's own agentic IDE; teal keeps it apart from Gemini's blue.
+    ProviderType.antigravity -> Icons.Default.RocketLaunch to Color(0xFF26A69A)
     ProviderType.unsupported -> Icons.Default.Cloud to Color(0xFF9E9E9E)
 }
 
@@ -200,9 +203,10 @@ private fun availableCredentials(type: ProviderType): List<ProviderCredential> {
         // [T-android-provider-type-parity] Responses API instances authenticate
         // exactly like OpenAI ones (API key, or a Codex OAuth login).
         ProviderType.openAIResponses -> listOf(ProviderCredential.apiKey, ProviderCredential.oauth)
-        // Undrivable types: an API key is the only thing worth showing, and the
-        // screen never offers them for creation anyway.
-        ProviderType.antigravity,
+        // Antigravity has no API key: it is the Google account's sign-in.
+        ProviderType.antigravity -> listOf(ProviderCredential.oauth)
+        // Undrivable type: an API key is the only thing worth showing, and the
+        // screen never offers it for creation anyway.
         ProviderType.unsupported -> listOf(ProviderCredential.apiKey)
     }
 }
@@ -250,7 +254,7 @@ private fun ChooseProviderScreen(
                     // creation; reuse the OpenAI copy for the Responses API and
                     // a generic line for the undrivable types.
                     ProviderType.openAIResponses -> R.string.add_provider_subtitle_openai
-                    ProviderType.antigravity,
+                    ProviderType.antigravity -> R.string.add_provider_subtitle_antigravity
                     ProviderType.unsupported -> R.string.add_provider_subtitle_openai
                 }
                 val (icon, iconColor) = providerIcon(type)
@@ -633,8 +637,11 @@ private fun ColumnScope.OAuthConfigSection(
     var isAuthenticated by remember { mutableStateOf(false) }
     var maskedToken by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val oauthAvailableInThisBuild = providerType != ProviderType.anthropic ||
-        com.openminis.app.auth.ClaudeOAuthManager.isAvailableInThisBuild
+    val oauthAvailableInThisBuild = when (providerType) {
+        ProviderType.anthropic -> com.openminis.app.auth.ClaudeOAuthManager.isAvailableInThisBuild
+        ProviderType.antigravity -> com.openminis.app.auth.AntigravityOAuthManager.isAvailableInThisBuild
+        else -> true
+    }
 
     // Manual OAuth token entry state
     var manualToken by remember { mutableStateOf("") }
@@ -651,7 +658,7 @@ private fun ColumnScope.OAuthConfigSection(
         ProviderType.xAI -> "Sign in with xAI"
         ProviderType.kimiCode -> "Sign in with Kimi Code"
         ProviderType.openAIResponses -> "Sign in with OpenAI"
-        ProviderType.antigravity,
+        ProviderType.antigravity -> "Sign in with Google"
         ProviderType.unsupported -> "Sign in"
     }
 
@@ -731,6 +738,7 @@ private fun ColumnScope.OAuthConfigSection(
                     onClick = {
                         isAuthenticating = true
                         errorMessage = null
+                        com.openminis.app.auth.OAuthForegroundGate.begin()
                         kimiLoginJob = scope.launch {
                             try {
                                 when (providerType) {
@@ -763,6 +771,10 @@ private fun ColumnScope.OAuthConfigSection(
                                         val key = com.openminis.app.auth.XAIOAuthManager.login(context, pendingInstanceId, providerRepository)
                                         maskedToken = maskOAuthToken(key)
                                     }
+                                    ProviderType.antigravity -> {
+                                        val key = com.openminis.app.auth.AntigravityOAuthManager.login(context, pendingInstanceId, providerRepository)
+                                        maskedToken = maskOAuthToken(key)
+                                    }
                                     else -> {
                                         throw Exception("OAuth not yet implemented for ${providerType.displayName}")
                                     }
@@ -791,6 +803,7 @@ private fun ColumnScope.OAuthConfigSection(
                                 }
                             } finally {
                                 isAuthenticating = false
+                                com.openminis.app.auth.OAuthForegroundGate.end()
                             }
                         }
                     },
@@ -820,80 +833,83 @@ private fun ColumnScope.OAuthConfigSection(
         }
 
         // ── Or Configure Manually ──────────────────────────────────────
-        val defaultUrl = when (providerType) {
-            ProviderType.gemini -> "https://generativelanguage.googleapis.com/v1beta"
-            ProviderType.anthropic -> "https://api.anthropic.com"
-            ProviderType.openAI -> "https://api.openai.com"
-            ProviderType.openRouter -> "https://openrouter.ai/api/v1"
-            ProviderType.xAI -> "https://api.x.ai/v1"
-            // [T-kimi-oauth] /v1 is load-bearing (…/coding/… 404s without it).
-            ProviderType.kimiCode -> "https://api.kimi.com/coding/v1"
-            ProviderType.openAIResponses -> "https://api.openai.com"
-            ProviderType.antigravity,
-            ProviderType.unsupported -> ""
-        }
-        SettingsSection(
-            header = stringResource(R.string.add_provider_or_configure_manually),
-        ) {
-            SettingsCardBlock {
-                RowLabel(text = stringResource(R.string.add_provider_custom_api_base_optional))
-                SectionTextField(
-                    value = customBaseURL,
-                    onValueChange = { customBaseURL = it },
-                    placeholder = defaultUrl,
-                    singleLine = true,
-                )
-                if (manualHttpBlocked) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "OAuth/bearer-token endpoints require HTTPS. Cleartext HTTP is not allowed.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+        // Antigravity is the Google account's sign-in only: no bearer token, no custom base.
+        if (providerType != ProviderType.antigravity) {
+            val defaultUrl = when (providerType) {
+                ProviderType.gemini -> "https://generativelanguage.googleapis.com/v1beta"
+                ProviderType.anthropic -> "https://api.anthropic.com"
+                ProviderType.openAI -> "https://api.openai.com"
+                ProviderType.openRouter -> "https://openrouter.ai/api/v1"
+                ProviderType.xAI -> "https://api.x.ai/v1"
+                // [T-kimi-oauth] /v1 is load-bearing (…/coding/… 404s without it).
+                ProviderType.kimiCode -> "https://api.kimi.com/coding/v1"
+                ProviderType.openAIResponses -> "https://api.openai.com"
+                ProviderType.antigravity,
+                ProviderType.unsupported -> ""
+            }
+            SettingsSection(
+                header = stringResource(R.string.add_provider_or_configure_manually),
+            ) {
+                SettingsCardBlock {
+                    RowLabel(text = stringResource(R.string.add_provider_custom_api_base_optional))
+                    SectionTextField(
+                        value = customBaseURL,
+                        onValueChange = { customBaseURL = it },
+                        placeholder = defaultUrl,
+                        singleLine = true,
+                    )
+                    if (manualHttpBlocked) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "OAuth/bearer-token endpoints require HTTPS. Cleartext HTTP is not allowed.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    RowLabel(text = stringResource(R.string.add_provider_bearer_token))
+                    SectionTextField(
+                        value = manualToken,
+                        onValueChange = { manualToken = it },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
                     )
                 }
-                Spacer(Modifier.height(12.dp))
-                RowLabel(text = stringResource(R.string.add_provider_bearer_token))
-                SectionTextField(
-                    value = manualToken,
-                    onValueChange = { manualToken = it },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                )
+                if (providerType != ProviderType.gemini) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.add_provider_auto_append_v1_quoted),
+                        checked = appendV1Suffix,
+                        onCheckedChange = { appendV1Suffix = it },
+                        showDivider = false,
+                    )
+                }
             }
-            if (providerType != ProviderType.gemini) {
-                SettingsSwitchRow(
-                    title = stringResource(R.string.add_provider_auto_append_v1_quoted),
-                    checked = appendV1Suffix,
-                    onCheckedChange = { appendV1Suffix = it },
-                    showDivider = false,
-                )
-            }
-        }
 
-        Spacer(Modifier.height(20.dp))
-        MinisButton(
-            onClick = {
-                val trimmedBase = customBaseURL.trim()
-                val instance = ProviderInstance(
-                    id = UUID.randomUUID().toString(),
-                    label = label.ifBlank { providerType.displayName },
-                    providerType = providerType,
-                    credentialType = ProviderCredential.oauth,
-                    customBaseURL = trimmedBase.ifEmpty { null },
-                    appendV1Suffix = appendV1Suffix,
-                )
-                providerRepository.addInstance(instance)
-                // Store the manual token as API key — ProviderFactory uses loadApiKey() for all credential types
-                providerRepository.saveApiKey(instance.id, manualToken.trim())
-                scope.launch { providerRepository.refreshModels(instance) }
-                onSaved()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            enabled = manualToken.isNotBlank() && !manualHttpBlocked,
-        ) {
-            Text(stringResource(R.string.provider_list_add_provider))
+            Spacer(Modifier.height(20.dp))
+            MinisButton(
+                onClick = {
+                    val trimmedBase = customBaseURL.trim()
+                    val instance = ProviderInstance(
+                        id = UUID.randomUUID().toString(),
+                        label = label.ifBlank { providerType.displayName },
+                        providerType = providerType,
+                        credentialType = ProviderCredential.oauth,
+                        customBaseURL = trimmedBase.ifEmpty { null },
+                        appendV1Suffix = appendV1Suffix,
+                    )
+                    providerRepository.addInstance(instance)
+                    // Store the manual token as API key — ProviderFactory uses loadApiKey() for all credential types
+                    providerRepository.saveApiKey(instance.id, manualToken.trim())
+                    scope.launch { providerRepository.refreshModels(instance) }
+                    onSaved()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                enabled = manualToken.isNotBlank() && !manualHttpBlocked,
+            ) {
+                Text(stringResource(R.string.provider_list_add_provider))
+            }
         }
     }
 }

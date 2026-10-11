@@ -202,7 +202,12 @@ class AnthropicProvider(
                 if (payload == "[DONE]") break
 
                 val event = try { JSONObject(payload) } catch (_: Exception) { continue }
-                android.util.Log.d("ToolChain[Provider]", "RAW SSE: $payload")
+                // The raw payload is every SSE event; interpolating it builds the
+                // string before logcat decides anyone is listening, so release
+                // builds would pay for it (and log message text) on the hot path.
+                if (com.openminis.app.BuildConfig.DEBUG) {
+                    android.util.Log.d("ToolChain[Provider]", "RAW SSE: $payload")
+                }
                 val eventType = event.safeOptString("type", "")
 
                 when (eventType) {
@@ -255,6 +260,32 @@ class AnthropicProvider(
                             currentToolId = null
                             currentToolName = null
                             toolInputBuffer.clear()
+                        }
+                    }
+                    // Anthropic can emit an `error` frame MID-STREAM (overloaded,
+                    // rate limit, an invalidated key) after tokens already flowed.
+                    // Ignoring it would let the loop run to EOF and complete
+                    // NORMALLY: the turn looks successful, nothing throws, and
+                    // fallback is never reached. Throw so it takes the same
+                    // `catch` as any other stream failure.
+                    "error" -> {
+                        val err = event.optJSONObject("error")
+                        val errType = err?.safeOptString("type", "") ?: "error"
+                        val errMessage = err?.safeOptString("message", "") ?: payload.take(500)
+                        android.util.Log.w(
+                            "AnthropicProvider",
+                            "SSE error frame mid-stream: type=$errType message=${errMessage.take(200)}",
+                        )
+                        // Same shapes mapHttpError produces for the equivalent
+                        // HTTP status, so classification is identical whether the
+                        // failure arrived as a status code or as a frame.
+                        throw when (errType) {
+                            "overloaded_error", "api_error" ->
+                                LLMError.TransientError("[$errType] $errMessage")
+                            "rate_limit_error" -> LLMError.RateLimited()
+                            "authentication_error", "permission_error" ->
+                                LLMError.InvalidApiKey("[$errType] $errMessage")
+                            else -> LLMError.ProviderError("[$errType] $errMessage")
                         }
                     }
                     "message_delta" -> {
@@ -402,14 +433,19 @@ class AnthropicProvider(
                     }
                 }
             }
-        } else if (modelUsesAdaptiveThinking(model.id)) {
-            // Adaptive-generation models (4.6+/5) think by DEFAULT when the
-            // request carries no thinking field at all — "off" must be sent
-            // explicitly, or small-maxTokens calls burn the whole budget on
-            // thinking_tokens and return zero text (iOS ea86dd8a observed:
-            // max_tokens=256 → stop_reason=max_tokens, thinking_tokens=256/256,
-            // empty body). Legacy (<=4.5) models default to no thinking, so
-            // absence is fine there.
+        } else if (modelAcceptsExplicitThinkingDisabled(model.id)) {
+            // Claude 4.6-4.x think by DEFAULT when the request carries no
+            // thinking field at all — "off" must be sent explicitly, or
+            // small-maxTokens calls burn the whole budget on thinking_tokens and
+            // return zero text (max_tokens=256 → stop_reason=max_tokens,
+            // thinking_tokens=256/256, empty body). Legacy (<=4.5) models
+            // default to no thinking, so absence is fine there.
+            //
+            // Claude 5+ is the opposite: it rejects the literal with
+            // `"thinking.type.disabled" is not supported for this model` and
+            // treats an absent field as adaptive, which is what OFF wants. So
+            // this asks modelAcceptsExplicitThinkingDisabled, not
+            // modelUsesAdaptiveThinking (true for 4.6+ AND 5+).
             body.put("thinking", JSONObject().put("type", "disabled"))
         }
 
@@ -798,8 +834,13 @@ class AnthropicProvider(
         private fun parseClaudeVersion(modelId: String): Pair<Int, Int>? {
             val lower = modelId.lowercase()
             if (!lower.contains("claude")) return null
-            val regex = Regex("""[-/]?(\d+)(?:[-.](\d+))?(?:$|[^0-9])""")
-            val match = regex.find(lower) ?: return null
+            // The search starts after the word "claude" (digits in a gateway
+            // namespace before it are not the version) and the minor is capped at
+            // 1-2 digits, so a snapshot stamp after a single-segment version
+            // (`claude-sonnet-4-20250514`) is not read as minor 20250514.
+            val afterClaude = lower.substring(lower.indexOf("claude") + "claude".length)
+            val regex = Regex("""[-/]?(\d+)(?:[-.](\d{1,2}))?(?:$|[^0-9])""")
+            val match = regex.find(afterClaude) ?: return null
             val major = match.groupValues[1].toIntOrNull() ?: return null
             val minor = match.groupValues[2].toIntOrNull() ?: 0
             return major to minor
@@ -807,6 +848,18 @@ class AnthropicProvider(
 
         fun modelRejectsTemperature(modelId: String): Boolean =
             com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(modelId).rejectsTemperature == true
+
+        /**
+         * Whether this model accepts an explicit `thinking: {"type": "disabled"}`:
+         * Claude 4.6-4.x do (they think by default), Claude 5+ rejects it with a
+         * 400 and treats an absent field as adaptive. Keyed on the parsed version,
+         * not an allowlist: this is a generation-wide contract change, and a list
+         * would 400 again on the next Claude 5 variant nobody remembered to add.
+         */
+        fun modelAcceptsExplicitThinkingDisabled(modelId: String): Boolean {
+            val (major, minor) = parseClaudeVersion(modelId) ?: return false
+            return major == 4 && minor >= 6
+        }
 
         /** Claude versions configured for adaptive effort thinking are listed in model-rules.json. */
         fun modelUsesAdaptiveThinking(modelId: String): Boolean =
@@ -939,18 +992,15 @@ class AnthropicProvider(
 
         // Stainless / CLI fingerprint headers — only on OAuth; bump in lockstep
         // with sub2api when the real CLI version moves.
+        //
+        // The values live in ClaudeCliMimicryHeaders so the chat path and the
+        // OAuth token requests present one client identity. The User-Agent
+        // version is gated by the backend: below 2.1.251 a Fable 5.1 request is
+        // refused, below 2.1.280 an Opus 5.5 one is (the floor only rises).
         if (isOAuth) {
-            builder.header("User-Agent", "claude-cli/2.1.195 (external, cli)")
-            builder.header("X-Stainless-Lang", "js")
-            builder.header("X-Stainless-Package-Version", "0.106.0")
-            builder.header("X-Stainless-OS", "Linux")
-            builder.header("X-Stainless-Arch", "arm64")
-            builder.header("X-Stainless-Runtime", "node")
-            builder.header("X-Stainless-Runtime-Version", "v24.18.0")
-            builder.header("X-Stainless-Retry-Count", "0")
-            builder.header("X-Stainless-Timeout", "600")
-            builder.header("X-App", "cli")
-            builder.header("Anthropic-Dangerous-Direct-Browser-Access", "true")
+            for ((name, value) in com.openminis.app.auth.ClaudeCliMimicryHeaders.ALL) {
+                builder.header(name, value)
+            }
         }
 
         if (isOAuth) {
@@ -970,7 +1020,7 @@ class AnthropicProvider(
         // [T-provider-custom-user-agent] Applied last so a non-blank override
         // wins over the OAuth claude-cli UA above. null/blank → fall back to
         // the branded Minis UA on the regular apiKey path, but on the OAuth
-        // path keep the claude-cli/2.1.195 fingerprint set at line ~779 (the
+        // path keep the claude-cli fingerprint set above (the
         // Anthropic OAuth backend pairs UA + X-Stainless-* and rejects calls
         // whose UA doesn't match the registered client identity). T-android-
         // default-ua: pass defaultUserAgent=null on OAuth, branded default

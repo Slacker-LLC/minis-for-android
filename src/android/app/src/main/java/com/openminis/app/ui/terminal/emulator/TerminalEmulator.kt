@@ -31,6 +31,14 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
         private set
     var bracketedPaste: Boolean = false
         private set
+
+    /** Mouse reporting a program asked for (DECSET 1000/1002/1003); touch is sent to it instead of scrolling. */
+    var mouseTracking: MouseTracking = MouseTracking.OFF
+        private set
+
+    /** DECSET 1006: report with the SGR encoding (no coordinate limit). */
+    var mouseSgr: Boolean = false
+        private set
     var applicationKeypad: Boolean = false
         private set
     var originMode: Boolean = false
@@ -38,8 +46,16 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     var cursorShape: CursorShape = CursorShape.BLOCK
         private set
 
-    var title: String = ""
-        private set
+    private val _title = mutableStateOf("")
+
+    /** The title the program set with OSC 0 / OSC 2 (a shell's `user@host: dir`, an editor's file name); empty until one is set. */
+    val title: String get() = _title.value
+
+    private companion object {
+        const val MAX_TITLE = 64
+        const val MAX_CLIPBOARD_BYTES = 100_000
+        const val MAX_LINK_LENGTH = 2048
+    }
 
     private val statusStore = ProgramStatusStore()
     private val _programStatus = mutableStateOf<List<StatusRecord>>(emptyList())
@@ -48,7 +64,11 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     val programStatus: State<List<StatusRecord>> = _programStatus
 
     /** Process exit: working, blocked and idle records go, done and error stay (OSC 7501 lifetime). */
-    fun onProcessExit() = publishStatus(statusStore.dropTransient())
+    fun onProcessExit() {
+        // A program that died while holding the mouse must not leave touch swallowed by nobody.
+        mouseTracking = MouseTracking.OFF
+        publishStatus(statusStore.dropTransient())
+    }
 
     fun effectiveApp(record: StatusRecord): String? = statusStore.effectiveApp(record)
 
@@ -79,6 +99,19 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     fun feed(bytes: ByteArray, len: Int = bytes.size) {
         parser.feed(bytes, len) { handleAction(it) }
         _version.value = _version.value + 1
+    }
+
+    /** For each row [visibleLines] returns: whether it soft-wrapped into the row after it. */
+    fun visibleWrapped(): List<Boolean> {
+        val buf = activeBuffer
+        if (scrollOffset == 0) return buf.gridWrapped.toList()
+        val scrollbackCount = buf.scrollback.size
+        val totalLines = scrollbackCount + buf.grid.size
+        val viewStart = maxOf(0, totalLines - rows - scrollOffset)
+        return (viewStart until viewStart + rows).map { i ->
+            if (i < scrollbackCount) buf.scrollbackWrapped.elementAt(i)
+            else buf.gridWrapped.getOrElse(i - scrollbackCount) { false }
+        }
     }
 
     /** Return exactly [rows] lines to display, applying scrollOffset. */
@@ -131,7 +164,7 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
             val sb = StringBuilder(row.size)
             for (cell in row) {
                 if (cell.isWideTrailer) continue
-                sb.appendCodePoint(if (cell.char <= 0) ' '.code else cell.char)
+                sb.append(cell.text())
             }
             return sb.toString().trimEnd()
         }
@@ -188,6 +221,7 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     fun getSelectedText(col1: Int, row1: Int, col2: Int, row2: Int): String {
         val lines = visibleLines()
         if (lines.isEmpty()) return ""
+        val wrapped = visibleWrapped()
 
         // Normalize: ensure (sx,sy) ≤ (ex,ey) in reading order.
         val (sx, sy, ex, ey) = if (row1 < row2 || (row1 == row2 && col1 <= col2)) {
@@ -208,14 +242,15 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
             val cEnd = if (r == ry2) (ex + 1).coerceIn(0, w) else w
             val lineSb = StringBuilder()
             for (c in cStart until cEnd) {
-                val cp = row[c].char
-                if (cp != 0) lineSb.appendCodePoint(cp)
+                val cell = row[c]
+                if (cell.char != 0 && !cell.isWideTrailer) lineSb.append(cell.text())
             }
-            // Trim trailing spaces on each line (Termux behaviour).
+            // A row that soft-wrapped into the next is one line of text: no trailing blanks cut, no line break.
+            val joinsNext = r < ry2 && wrapped.getOrElse(r) { false }
             var end = lineSb.length
-            while (end > 0 && lineSb[end - 1] == ' ') end--
+            if (!joinsNext) while (end > 0 && lineSb[end - 1] == ' ') end--
             sb.append(lineSb, 0, end)
-            if (r < ry2) sb.append('\n')
+            if (r < ry2 && !joinsNext) sb.append('\n')
         }
         return sb.toString()
     }
@@ -223,37 +258,77 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     // ────────────────────────────────────────────────────────────────────────
     private fun handleAction(action: ParsedAction) {
         when (action) {
-            is ParsedAction.Printable -> activeBuffer.writeChar(action.codePoint, cursorStyle, autoWrap)
+            is ParsedAction.Printable -> printChar(action.codePoint)
             is ParsedAction.ControlChar -> handleControlChar(action.byte)
-            is ParsedAction.CsiDispatch -> handleCsi(action.params, action.intermediate, action.finalByte)
-            is ParsedAction.EscDispatch -> handleEsc(action.char)
+            is ParsedAction.CsiDispatch -> handleCsi(action.params, action.intermediate, action.finalByte, action.colon)
+            is ParsedAction.EscDispatch -> handleEsc(action.char, action.intermediate)
             is ParsedAction.OscDispatch -> handleOsc(action.command, action.payload)
         }
+    }
+
+    /** Called when a program rings the bell (BEL outside a string); the view decides how to signal it. */
+    var onBell: (() -> Unit)? = null
+
+    /** Insert mode (IRM, CSI 4 h): a printed character pushes the rest of the line right instead of overwriting. */
+    private var insertMode = false
+
+    // Character sets: G0 and G1 are ASCII or DEC special graphics (line drawing, `ESC ( 0`); SO / SI pick which one prints.
+    private var g0Graphics = false
+    private var g1Graphics = false
+    private var shiftedToG1 = false
+    private var lastPrinted = 0
+
+    private fun printChar(codePoint: Int) {
+        val graphics = if (shiftedToG1) g1Graphics else g0Graphics
+        val cp = if (graphics) DecSpecialGraphics.map(codePoint) else codePoint
+        lastPrinted = cp
+        val buf = activeBuffer
+        if (insertMode) buf.insertCharacters(TerminalBuffer.characterWidth(cp))
+        buf.writeChar(cp, cursorStyle, autoWrap)
     }
 
     private fun handleControlChar(byte: Int) {
         val buf = activeBuffer
         when (byte) {
-            0x07 -> { /* BEL */ }
+            0x07 -> onBell?.invoke()
             0x08 -> buf.moveCursorBackward(1)
             0x09 -> buf.tabForward()
             0x0A, 0x0B, 0x0C -> buf.lineFeed()
             0x0D -> buf.carriageReturn()
-            0x0E, 0x0F -> { /* charset shifts ignored */ }
+            0x0E -> shiftedToG1 = true
+            0x0F -> shiftedToG1 = false
         }
     }
 
-    private fun handleCsi(params: IntArray, intermediate: Char?, finalByte: Char) {
+    private fun handleCsi(params: IntArray, intermediate: Char?, finalByte: Char, colon: BooleanArray = NO_COLON) {
         val buf = activeBuffer
         if (intermediate == '?') {
-            handleDecPrivateMode(params, set = (finalByte == 'h'))
+            when (finalByte) {
+                'h', 'l' -> handleDecPrivateMode(params, set = (finalByte == 'h'))
+                // DECXCPR: the cursor position again, in the private form some programs ask for.
+                'n' -> when (params.getOrElse(0) { 0 }) {
+                    6 -> respond("\u001B[?${buf.cursorRow + 1};${buf.cursorCol + 1}R")
+                    15 -> respond("\u001B[?13n")
+                }
+                // DECRQM: is this DEC private mode set (1), reset (2) or not known (0)? A program that asks
+                // before it uses a mode waits for the answer, so a silent terminal stalls its start-up.
+                'p' -> for (ps in params) respond("\u001B[?$ps;${decModeReport(ps)}$" + "y")
+            }
             return
         }
-        if (intermediate == '>' && finalByte == 'c') {
-            onResponse?.invoke("\u001B[>0;0;0c".toByteArray(Charsets.UTF_8))
+        if (intermediate == '>') {
+            when (finalByte) {
+                'c' -> respond("\u001B[>0;0;0c")
+                // XTVERSION: who is this terminal. Programs gate features on the name.
+                'q' -> respond("\u001BP>|Minis\u001B\\")
+            }
             return
         }
-        if (intermediate == '>') return
+        // DECSTR: soft reset (modes and attributes back to defaults, the screen kept).
+        if (intermediate == '!' && finalByte == 'p') {
+            softReset()
+            return
+        }
 
         when (finalByte) {
             'A' -> buf.moveCursorUp(maxOf(1, params.getOrElse(0) { 1 }))
@@ -288,7 +363,20 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
                 buf.setScrollRegion(top, bottom)
                 if (originMode) buf.moveCursorTo(0, buf.scrollTop) else buf.moveCursorTo(0, 0)
             }
-            'm' -> handleSgr(if (params.isEmpty()) intArrayOf(0) else params)
+            'm' -> if (params.isEmpty()) handleSgr(intArrayOf(0), NO_COLON) else handleSgr(params, colon)
+            // CBT: back tab. REP: repeat the last character. HPA / HPR / VPR: absolute and relative cursor moves.
+            'Z' -> buf.tabBackward(maxOf(1, params.getOrElse(0) { 1 }))
+            'b' -> if (lastPrinted != 0) repeat(params.getOrElse(0) { 1 }.coerceIn(1, 2000)) { printChar(lastPrinted) }
+            '`' -> buf.moveCursorToColumn(maxOf(1, params.getOrElse(0) { 1 }) - 1)
+            'a' -> buf.moveCursorForward(maxOf(1, params.getOrElse(0) { 1 }))
+            'e' -> buf.moveCursorDown(maxOf(1, params.getOrElse(0) { 1 }))
+            // TBC: clear the tab stop here (0) or all of them (3).
+            'g' -> when (params.getOrElse(0) { 0 }) {
+                0 -> buf.clearTabStop()
+                3 -> buf.clearAllTabStops()
+            }
+            // The ANSI (not DEC private) modes: only insert mode matters here.
+            'h', 'l' -> for (p in params) if (p == 4) insertMode = (finalByte == 'h')
             'n' -> {
                 val code = params.getOrElse(0) { 0 }
                 when (code) {
@@ -303,9 +391,16 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
             'c' -> if ((params.getOrElse(0) { 0 }) == 0) {
                 onResponse?.invoke("\u001B[?62;22c".toByteArray(Charsets.UTF_8))
             }
+            // XTWINOPS size reports: text area and screen in characters, text area and one cell in pixels.
+            't' -> when (params.getOrElse(0) { 0 }) {
+                18 -> respond("\u001B[8;$rows;${cols}t")
+                19 -> respond("\u001B[9;$rows;${cols}t")
+                14 -> respond("\u001B[4;${rows * cellHeightPx};${cols * cellWidthPx}t")
+                16 -> respond("\u001B[6;$cellHeightPx;${cellWidthPx}t")
+            }
             's' -> buf.saveCursor(cursorStyle)
             'u' -> cursorStyle.copyFrom(buf.restoreCursor())
-            'I' -> repeat(params.getOrElse(0) { 1 }.coerceIn(1, cols)) { buf.tabForward() }
+            'I' -> buf.tabForward(params.getOrElse(0) { 1 }.coerceIn(1, cols))
             'q' -> if (intermediate == ' ') {
                 when (params.getOrElse(0) { 1 }) {
                     0, 1, 2 -> cursorShape = CursorShape.BLOCK
@@ -315,6 +410,60 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
             }
             else -> {}
         }
+    }
+
+    private fun rgbReport(c: androidx.compose.ui.graphics.Color): String {
+        fun hex(v: Float) = "%04x".format((v * 255f + 0.5f).toInt().coerceIn(0, 255) * 257)
+        return "rgb:${hex(c.red)}/${hex(c.green)}/${hex(c.blue)}"
+    }
+
+    /**
+     * Called with text a program asked to put on the clipboard (OSC 52). The view decides whether to honour it; with no
+     * callback the request is dropped.
+     */
+    var onClipboardSet: ((String) -> Unit)? = null
+
+    private fun setClipboard(payload: String) {
+        val semi = payload.indexOf(';')
+        if (semi < 0) return
+        val data = payload.substring(semi + 1)
+        // "?" asks for the clipboard back: a terminal that answered would let any program read what the user copied.
+        if (data == "?" || data.isEmpty()) return
+        val bytes = try { java.util.Base64.getDecoder().decode(data) } catch (_: IllegalArgumentException) { return }
+        if (bytes.size > MAX_CLIPBOARD_BYTES) return
+        val text = String(bytes, Charsets.UTF_8)
+        if (text.isNotEmpty()) onClipboardSet?.invoke(text)
+    }
+
+    private fun setHyperlink(payload: String) {
+        // "params;uri": the params (an id) are not needed. An empty uri ends the link.
+        val uri = payload.substringAfter(';', "")
+        cursorStyle.link = if (TerminalLinks.webLink(uri) != null && uri.length <= MAX_LINK_LENGTH) uri else null
+    }
+
+    private fun respond(text: String) {
+        onResponse?.invoke(text.toByteArray(Charsets.UTF_8))
+    }
+
+    /** Pixel size of one cell for the size reports; the view sets the real value, a headless terminal keeps this guess. */
+    var cellWidthPx: Int = 8
+    var cellHeightPx: Int = 16
+
+    private fun decModeReport(ps: Int): Int {
+        val set: Boolean? = when (ps) {
+            1 -> applicationCursorKeys
+            6 -> originMode
+            7 -> autoWrap
+            25 -> cursorVisible
+            47, 1047, 1049 -> isAlternateActive
+            1000 -> mouseTracking == MouseTracking.BUTTON
+            1002 -> mouseTracking == MouseTracking.DRAG
+            1003 -> mouseTracking == MouseTracking.ANY
+            1006 -> mouseSgr
+            2004 -> bracketedPaste
+            else -> null
+        }
+        return when (set) { true -> 1; false -> 2; null -> 0 }
     }
 
     private fun handleDecPrivateMode(params: IntArray, set: Boolean) {
@@ -339,14 +488,33 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
                 switchBuffer(false)
                 cursorStyle.copyFrom(primaryBuffer.restoreCursor())
             }
+            1000 -> mouseTracking = if (set) MouseTracking.BUTTON else MouseTracking.OFF
+            1002 -> mouseTracking = if (set) MouseTracking.DRAG else MouseTracking.OFF
+            1003 -> mouseTracking = if (set) MouseTracking.ANY else MouseTracking.OFF
+            1006 -> mouseSgr = set
             2004 -> bracketedPaste = set
         }
     }
 
-    private fun handleSgr(params: IntArray) {
+    private fun handleSgr(params: IntArray, colon: BooleanArray) {
         var i = 0
         while (i < params.size) {
             val p = params[i]
+            // Sub-parameters written with colons belong to this parameter (4:3, 38:2::r:g:b).
+            var groupEnd = i + 1
+            while (groupEnd < params.size && colon.getOrElse(groupEnd) { false }) groupEnd++
+            val sub = if (groupEnd > i + 1) params.copyOfRange(i + 1, groupEnd) else null
+            if (sub != null) {
+                when (p) {
+                    // 4:0 no underline; 4:1..5 single, double, curly, dotted, dashed: all drawn as an underline.
+                    4 -> cursorStyle.attributes = if (sub[0] == 0) cursorStyle.attributes.without(TextAttributes.UNDERLINE)
+                        else cursorStyle.attributes.with(TextAttributes.UNDERLINE)
+                    38, 48 -> colonColor(sub)?.let { c -> if (p == 38) cursorStyle.foreground = c else cursorStyle.background = c }
+                    // 58 is the underline colour: not drawn, but its arguments must not be read as attributes.
+                }
+                i = groupEnd
+                continue
+            }
             when (p) {
                 0 -> { cursorStyle.foreground = TerminalColor.Default; cursorStyle.background = TerminalColor.Default; cursorStyle.attributes = TextAttributes() }
                 1 -> cursorStyle.attributes = cursorStyle.attributes.with(TextAttributes.BOLD)
@@ -370,10 +538,32 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
                 in 40..47 -> cursorStyle.background = TerminalColor.Indexed(p - 40)
                 48 -> i = parseSgrColor(params, i, isForeground = false)
                 49 -> cursorStyle.background = TerminalColor.Default
+                // 58 sets the underline colour, 59 resets it: not drawn, but the `58;2;r;g;b` arguments are skipped.
+                58 -> i = skipSgrColor(params, i)
                 in 90..97 -> cursorStyle.foreground = TerminalColor.Indexed(p - 90 + 8)
                 in 100..107 -> cursorStyle.background = TerminalColor.Indexed(p - 100 + 8)
             }
             i++
+        }
+    }
+
+    /** The colour in `38:5:n`, `38:2:r:g:b` or `38:2::r:g:b` (an empty colour-space id), given what follows the 38. */
+    private fun colonColor(sub: IntArray): TerminalColor? = when (sub[0]) {
+        5 -> sub.getOrNull(1)?.let { TerminalColor.Indexed(it.coerceIn(0, 255)) }
+        2 -> {
+            // The colour-space id is optional: r:g:b is 4 values after the 2 only when it is present.
+            val rgb = if (sub.size >= 5) sub.copyOfRange(2, 5) else if (sub.size == 4) sub.copyOfRange(1, 4) else null
+            rgb?.let { TerminalColor.Rgb(it[0].coerceIn(0, 255), it[1].coerceIn(0, 255), it[2].coerceIn(0, 255)) }
+        }
+        else -> null
+    }
+
+    private fun skipSgrColor(params: IntArray, index: Int): Int {
+        if (index + 1 >= params.size) return index
+        return when (params[index + 1]) {
+            5 -> minOf(index + 2, params.size - 1)
+            2 -> minOf(index + 4, params.size - 1)
+            else -> index
         }
     }
 
@@ -400,8 +590,16 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
         }
     }
 
-    private fun handleEsc(char: Char) {
+    private fun handleEsc(char: Char, intermediate: Char? = null) {
+        when (intermediate) {
+            // Character set designation: `0` is DEC special graphics, anything else (B, A, ...) is plain text.
+            '(' -> { g0Graphics = (char == '0'); return }
+            ')' -> { g1Graphics = (char == '0'); return }
+            // DECALN: the alignment test fills the screen with E.
+            '#' -> { if (char == '8') fillWithE(); return }
+        }
         when (char) {
+            'H' -> activeBuffer.setTabStop()
             '7' -> activeBuffer.saveCursor(cursorStyle)
             '8' -> cursorStyle.copyFrom(activeBuffer.restoreCursor())
             'D' -> activeBuffer.lineFeed()
@@ -416,7 +614,13 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
 
     private fun handleOsc(command: Int, payload: String) {
         when (command) {
-            0, 2 -> title = payload
+            0, 2 -> _title.value = payload.filter { !it.isISOControl() }.take(MAX_TITLE)
+            // Colour queries: full-screen programs ask for the default colours to pick a light or dark theme.
+            10, 11, 12 -> if (payload == "?") respond("\u001B]$command;${rgbReport(if (command == 11) TerminalPalette.defaultBackground else TerminalPalette.defaultForeground)}\u001B\\")
+            // OSC 8: a hyperlink around the text that follows, until an empty one ends it.
+            8 -> setHyperlink(payload)
+            // OSC 52: a program (vim, tmux over ssh) puts text on the clipboard. Write only: a query is never answered.
+            52 -> setClipboard(payload)
             133 -> if (payload == "A" || payload.startsWith("A;")) publishStatus(statusStore.dropTransient())
             1337 -> handleITermOsc(payload)
             7501 -> handleProgramStatus(payload)
@@ -452,7 +656,36 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
         }
     }
 
+    private fun fillWithE() {
+        val buf = activeBuffer
+        for (r in 0 until buf.rows) for (c in 0 until buf.cols) buf.grid[r][c] = TerminalCell('E'.code)
+        buf.moveCursorTo(0, 0)
+    }
+
+    private fun softReset() {
+        cursorStyle.link = null
+        cursorStyle.foreground = TerminalColor.Default
+        cursorStyle.background = TerminalColor.Default
+        cursorStyle.attributes = TextAttributes()
+        applicationCursorKeys = false
+        applicationKeypad = false
+        autoWrap = true
+        originMode = false
+        cursorVisible = true
+        insertMode = false
+        g0Graphics = false
+        g1Graphics = false
+        shiftedToG1 = false
+        activeBuffer.resetScrollRegion()
+        activeBuffer.resetTabStops()
+    }
+
     private fun resetTerminal() {
+        cursorStyle.link = null
+        insertMode = false
+        g0Graphics = false
+        g1Graphics = false
+        shiftedToG1 = false
         cursorStyle.foreground = TerminalColor.Default
         cursorStyle.background = TerminalColor.Default
         cursorStyle.attributes = TextAttributes()
@@ -460,6 +693,8 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
         autoWrap = true
         cursorVisible = true
         bracketedPaste = false
+        mouseTracking = MouseTracking.OFF
+        mouseSgr = false
         applicationKeypad = false
         originMode = false
         cursorShape = CursorShape.BLOCK

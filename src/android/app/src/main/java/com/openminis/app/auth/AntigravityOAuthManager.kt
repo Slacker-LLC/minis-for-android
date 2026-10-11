@@ -1,59 +1,85 @@
 package com.openminis.app.auth
 
 import android.content.Context
-import android.net.Uri
 import android.util.Log
+import com.openminis.app.BuildConfig
+import com.openminis.app.data.repository.saveApiKey
+import com.openminis.app.provider.antigravity.AntigravityWire
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
- * Antigravity OAuth manager — mirrors iOS `AntigravityOAuthManager`.
+ * Google sign-in for Antigravity: Google's Cloud Code Assist endpoint serving
+ * Gemini, Claude and GPT models through one Google account.
  *
- * Antigravity is Google's experimental "Cloud Code Assist" proxy that routes
- * Claude / Gemini / GPT models through a Gemini-format request envelope. It
- * reuses Google's OAuth endpoints but with its own client_id + client_secret
- * and two extra scopes (`cclog`, `experimentsandconfigs`), and runs a local
- * HTTP callback on port 8086 (distinct from Gemini's 8085 so the two can
- * coexist).
+ * It uses the Antigravity IDE's own installed-app OAuth client, so the consent
+ * screen and the free tier are the IDE's. Installed-app client secrets are not
+ * confidential (they ship inside the IDE); the client id/secret/scopes and the
+ * `/oauth-callback` loopback redirect are the IDE's published values.
  *
- * **Scaffolding only** — this file captures the OAuth constants and project
- * discovery flow so the provider layer can consume them. Actual request
- * dispatch (the `AntigravityProvider` + `AntigravityAgentProvider` pair from
- * iOS) is not wired yet; when it lands it will reuse
- * [activeBaseURL] + [gcpProjectId] persisted here.
+ * After the token exchange the account's Cloud Code project is discovered
+ * (`loadCodeAssist`, then `onboardUser` for an account that never used it) and
+ * the base URL that answered is pinned, so requests do not re-probe.
  */
 class AntigravityOAuthManager(context: Context, instanceId: String) : OAuthManager(context, instanceId) {
     companion object {
         private const val TAG = "AntigravityOAuth"
-        private const val USER_AGENT = "antigravity/1.107.0 android/aarch64"
+
+        /** True only when this APK was built with the Antigravity OAuth client id and secret. */
+        val isAvailableInThisBuild: Boolean get() = BuildConfig.ANTIGRAVITY_OAUTH_AVAILABLE
+
+        /** Fails closed before any login side effect when the sign-in is compiled out of this build. */
+        internal fun requireAvailable(available: Boolean = BuildConfig.ANTIGRAVITY_OAUTH_AVAILABLE) {
+            if (!available) throw ProviderCustomizationUnavailableException()
+        }
+        private const val USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo?alt=json"
+        private const val ONBOARD_POLLS = 24
+        private const val ONBOARD_POLL_MS = 5_000L
+        private const val LOGIN_TIMEOUT_MS = 5 * 60_000L
 
         /**
-         * Candidate Cloud Code Assist base URLs, probed in order on login.
-         * `daily-cloudcode-pa` is the preview / daily release channel; the
-         * public `cloudcode-pa` is the fallback. Matches iOS
-         * `AntigravityOAuthManager.cloudCodeBaseURLs`.
+         * Sign in with Google in the system browser and store the access token as
+         * the instance's credential, as the other OAuth providers do. Returns the
+         * token; throws when the sign-in is refused, cancelled or times out.
          */
-        val cloudCodeBaseURLs = listOf(
-            "https://daily-cloudcode-pa.sandbox.googleapis.com",
-            "https://cloudcode-pa.googleapis.com",
-        )
+        suspend fun login(
+            context: Context,
+            instanceId: String,
+            providerRepository: com.openminis.app.data.repository.ProviderRepository,
+        ): String {
+            // Before anything is started: no callback server, no browser, no network when the sign-in is compiled out.
+            requireAvailable()
+            val manager = AntigravityOAuthManager(context, instanceId)
+            val done = kotlinx.coroutines.CompletableDeferred<Boolean>()
+            val signedIn = try {
+                manager.startLogin { done.complete(it) }
+                kotlinx.coroutines.withTimeout(LOGIN_TIMEOUT_MS) { done.await() }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                manager.cancelLogin()
+                throw Exception("Google sign-in timed out. Try again.")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                manager.cancelLogin()
+                throw e
+            }
+            if (!signedIn) throw Exception("Google sign-in failed. Check the network and try again.")
+            val token = manager.validAccessToken() ?: throw Exception("Google sign-in returned no token.")
+            providerRepository.saveApiKey(instanceId, token)
+            return token
+        }
     }
 
     override val authURL = "https://accounts.google.com/o/oauth2/v2/auth"
     override val tokenURL = "https://oauth2.googleapis.com/token"
-    override val clientId = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
-    // Placeholder. Google OAuth requires a client secret alongside the
-    // client id; supply your own from Google Cloud Console to use this
-    // sign-in. API-key providers are unaffected.
-    override val clientSecret = "GOCSPX-xxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    override val callbackPort = 8086
-    override val redirectPath = "/oauth2callback"
+    // Injected at build time from the private provider-customization.properties; see [isAvailableInThisBuild].
+    override val clientId: String get() = requireAvailable().let { BuildConfig.ANTIGRAVITY_OAUTH_CLIENT_ID }
+    override val clientSecret: String get() = requireAvailable().let { BuildConfig.ANTIGRAVITY_OAUTH_CLIENT_SECRET }
+    override val callbackPort = 51121
+    override val redirectPath = "/oauth-callback"
     override val scopes = listOf(
         "https://www.googleapis.com/auth/cloud-platform",
         "https://www.googleapis.com/auth/userinfo.email",
@@ -62,100 +88,120 @@ class AntigravityOAuthManager(context: Context, instanceId: String) : OAuthManag
         "https://www.googleapis.com/auth/experimentsandconfigs",
     ).joinToString(" ")
 
-    override fun buildAuthorizationUrl(): String {
-        val (_, challenge) = generateHexPKCE()
-        val state = generateState()
-        return "$authURL?" + listOf(
-            "client_id=$clientId",
-            "redirect_uri=${Uri.encode(redirectUri)}",
-            "response_type=code",
-            "scope=${Uri.encode(scopes)}",
-            "state=$state",
-            "code_challenge=$challenge",
-            "code_challenge_method=S256",
-            "access_type=offline",
-            "prompt=consent",
-        ).joinToString("&")
-    }
+    // Google only returns a refresh token for `access_type=offline` + `prompt=consent`.
+    override val extraAuthorizationParams = listOf("access_type=offline", "prompt=consent")
 
-    /** Cached user email from Google userinfo. */
+    /** Cached Google account email, for the provider page. */
     var email: String?
         get() = loadOAuthString("email")
         private set(value) { value?.let { saveOAuthString("email", it) } }
 
-    /** GCP project ID discovered via Cloud Code Assist loadCodeAssist. */
+    /** Cloud Code project the account is served from. */
     var gcpProjectId: String?
         get() = loadOAuthString("gcp_project")
         private set(value) { value?.let { saveOAuthString("gcp_project", it) } }
 
-    /**
-     * Cloud Code Assist base URL that successfully returned the project on
-     * login. Subsequent requests pin to this URL so the provider doesn't
-     * re-probe the daily/fallback pair on every call.
-     */
+    /** Base URL that answered during discovery; requests are pinned to it. */
     var activeBaseURL: String?
         get() = loadOAuthString("base_url")
         private set(value) { value?.let { saveOAuthString("base_url", it) } }
 
     override suspend fun onTokensReceived(json: JSONObject) {
-        fetchUserEmail()
-        discoverProjectIfNeeded()
-    }
-
-    private suspend fun fetchUserEmail() = withContext(Dispatchers.IO) {
-        val token = validAccessToken() ?: return@withContext
-        try {
-            val conn = URL("https://www.googleapis.com/oauth2/v1/userinfo").openConnection() as HttpURLConnection
-            conn.setRequestProperty("Authorization", "Bearer $token")
-            if (conn.responseCode == 200) {
-                val body = conn.inputStream.bufferedReader().readText()
-                email = JSONObject(body).optString("email")
-            }
-            conn.disconnect()
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to fetch email", e)
-        }
+        val token = json.optString("access_token").ifEmpty { return }
+        fetchEmail(token)
+        discoverProject(token)
     }
 
     /**
-     * Probe each candidate Cloud Code Assist base URL in [cloudCodeBaseURLs]
-     * until one returns a project ID. Persists the winning URL in
-     * [activeBaseURL] so the provider avoids re-probing.
+     * Discover the project on demand: the login may have finished while offline
+     * or the account may have needed onboarding, so a chat request retries it.
      */
-    suspend fun discoverProjectIfNeeded(): Boolean = withContext(Dispatchers.IO) {
-        if (!gcpProjectId.isNullOrEmpty() && !activeBaseURL.isNullOrEmpty()) return@withContext true
-        val token = validAccessToken() ?: return@withContext false
+    suspend fun discoverProjectIfNeeded(): Boolean {
+        if (!gcpProjectId.isNullOrEmpty() && !activeBaseURL.isNullOrEmpty()) return true
+        val token = validAccessToken() ?: return false
+        return discoverProject(token)
+    }
 
-        for (baseURL in cloudCodeBaseURLs) {
-            val projectId = loadCodeAssist(token, baseURL)
-            if (!projectId.isNullOrEmpty()) {
-                gcpProjectId = projectId
-                activeBaseURL = baseURL
-                Log.i(TAG, "Antigravity project discovered via $baseURL")
+    private suspend fun fetchEmail(token: String) = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url(USERINFO_URL)
+                .header("Authorization", "Bearer $token")
+                .header("User-Agent", AntigravityWire.USER_AGENT)
+                .build()
+            httpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    JSONObject(response.body?.string().orEmpty()).optString("email")
+                        .takeIf { it.isNotEmpty() }?.let { email = it }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to fetch email: ${e.javaClass.simpleName}")
+        }
+    }
+
+    private suspend fun discoverProject(token: String): Boolean = withContext(Dispatchers.IO) {
+        var tierId = "free-tier"
+        for (baseUrl in AntigravityWire.BASE_URLS) {
+            val load = post(baseUrl, "loadCodeAssist", token, AntigravityWire.loadCodeAssistBody()) ?: continue
+            val project = AntigravityWire.projectIdFrom(load)
+            if (project != null) {
+                gcpProjectId = project
+                activeBaseURL = baseUrl
+                Log.i(TAG, "Cloud Code project discovered via $baseUrl")
                 return@withContext true
             }
+            tierId = AntigravityWire.defaultTierId(load)
         }
-        Log.w(TAG, "Antigravity project discovery failed on all base URLs")
+        // The account has no project yet: onboard it, then poll the operation.
+        for (baseUrl in AntigravityWire.BASE_URLS) {
+            val project = onboard(baseUrl, token, tierId) ?: continue
+            gcpProjectId = project
+            activeBaseURL = baseUrl
+            Log.i(TAG, "Cloud Code project onboarded via $baseUrl")
+            return@withContext true
+        }
+        Log.w(TAG, "Cloud Code project discovery failed on every base URL")
         false
     }
 
-    private fun loadCodeAssist(token: String, baseURL: String): String? {
-        return try {
-            val req = Request.Builder()
-                .url("$baseURL/v1internal:loadCodeAssist")
-                .post("{}".toRequestBody("application/json".toMediaType()))
-                .header("Authorization", "Bearer $token")
-                .header("User-Agent", USER_AGENT)
-                .header("X-Client-Name", "antigravity")
-                .header("X-Client-Version", "1.107.0")
-                .build()
-            val response = httpClient.newCall(req).execute()
-            val body = if (response.isSuccessful) response.body?.string() else null
-            response.close()
-            body?.let { JSONObject(it).optString("gcpProjectId").ifEmpty { null } }
-        } catch (e: Exception) {
-            Log.d(TAG, "loadCodeAssist failed on $baseURL: ${e.message}")
-            null
+    private suspend fun onboard(baseUrl: String, token: String, tierId: String): String? {
+        val started = post(baseUrl, "onboardUser", token, AntigravityWire.onboardUserBody(tierId)) ?: return null
+        AntigravityWire.projectIdFrom(started.optJSONObject("response"))?.let { return it }
+        val operation = started.optString("name").takeIf { "operations/" in it } ?: return null
+        repeat(ONBOARD_POLLS) {
+            delay(ONBOARD_POLL_MS)
+            val poll = get(baseUrl, "v1internal/$operation", token) ?: return@repeat
+            if (poll.optBoolean("done", false)) {
+                return AntigravityWire.projectIdFrom(poll.optJSONObject("response"))
+            }
         }
+        return null
+    }
+
+    private fun post(baseUrl: String, method: String, token: String, body: JSONObject): JSONObject? =
+        call(
+            Request.Builder().url("${baseUrl.trimEnd('/')}/v1internal:$method")
+                .post(body.toString().toRequestBody("application/json".toMediaType())),
+            token,
+        )
+
+    private fun get(baseUrl: String, path: String, token: String): JSONObject? =
+        call(Request.Builder().url("${baseUrl.trimEnd('/')}/$path").get(), token)
+
+    private fun call(builder: Request.Builder, token: String): JSONObject? = try {
+        val request = builder
+            .header("Authorization", "Bearer $token")
+            .header("User-Agent", AntigravityWire.USER_AGENT)
+            .header("Accept", "application/json")
+            .build()
+        httpClient.newCall(request).execute().use { response ->
+            if (response.isSuccessful) JSONObject(response.body?.string().orEmpty()) else {
+                Log.d(TAG, "${request.url.encodedPath} -> ${response.code}")
+                null
+            }
+        }
+    } catch (e: Exception) {
+        Log.d(TAG, "Cloud Code call failed: ${e.javaClass.simpleName}")
+        null
     }
 }

@@ -71,7 +71,13 @@ scripts/release-check.sh vX.Y-beta.1
 
 脚本只检查、只打印命令，不会打 tag 或推送。它核对：tag 与 `appVersionName` 一致；当前在对的分支（当前版本在 `main`，已成为历史的版本在它自己的 `release/vX.Y`）；工作区干净；`HEAD` 就是远端同名分支的末端；tag 尚不存在；`CHANGELOG.md` 有对应标题。
 
-然后用生产密钥构建、验证，再打 tag：
+然后用生产密钥构建、验证，再打 tag。生产构建必须带上私有的 `provider-customization.properties`（里面是 Claude Code 的标识行；缺了它 Claude 登录会被编译成不可用，按钮是灰的；Antigravity 的 Google OAuth 客户端 id/secret 也在这个文件里，缺了同样不可用，源码里不放，GitHub 推送保护会拦）。文件放在仓库之外，`~/.minis/release/signing.env` 里的 `MINIS_PROVIDER_CUSTOMIZATION_FILE` 指向它，`source` 之后构建时加 `-PproviderCustomizationRequired=true`，缺值就直接失败：
+
+```bash
+. ~/.minis/release/signing.env
+MINIS_REQUIRE_RUNTIME_PAYLOAD=1 ./gradlew :app:assembleRelease -PproviderCustomizationRequired=true
+```
+
 
 ```bash
 scripts/verify-android-release.sh path/to/app-release.apk

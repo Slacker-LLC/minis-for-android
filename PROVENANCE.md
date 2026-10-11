@@ -24,6 +24,11 @@ Minis for Android 含有从开源项目 **OpenMinis** 衍生的代码：
   - 回复 Token 用量的读取与格式（`ChatTokenUsage`、`[T-android-usage-capsule-time]`）；展示位置改为回复长按菜单底部，不引入其「点空白处」的手势与聊天列表渲染改动。
   - 子代理（`SubAgentDefinition` / `SubAgentRoster` 的规范化规则、`subagent_task` 工具合同与文案、回调文案，`[T-sub-agents-v1]`）：花名册规则、工具 schema 与回调文案取自上游；运行时与注册表按本仓库的 `AgentRunner` 重写，模型绑定由「模型组」改为模型条目，工具沿用本仓库既有名称 `subagent`。差异记录在 `docs/development/SUB-AGENTS.md`。
   - 工具调用与结果的配对（`ToolPairing`、`ResponsesToolPairing`，`[T-android-responses-tool-id-normalize]`、`[T-android-responses-orphan-tool-output]`）：两个文件原样取自上游；`OutgoingHistory.dropOrphanedToolParts` 与 `ToolBatchRepair` 按上游 `ChatViewModel` 的同名逻辑改为按 `ToolPairing.key` 比较，Responses 请求体在写入 `input` 前经过 `ResponsesToolPairing.sanitize`。测试按本仓库的结构改写。
+  - Claude 登录（`[T-android-oauth-foreground-exchange]`、OpenMinis#360）：`ClaudeCliMimicryHeaders`（Claude CLI 客户端指纹，OAuth 对话与 token 请求共用）、`OAuthForegroundGate`（前台才交换授权码）、token 端点 `claude.ai`、对话流中途 `error` 帧、Claude 5 的 `thinking` 关闭编码与版本解析修正；登录页的进度与失败提示取自上游登录界面。
+- Termux `8629e632`（<https://github.com/termux/termux-app>，仅 `terminal-emulator` / `terminal-view` 两个库，Apache-2.0）
+  - 终端字符宽度表（`WcWidth.kt`，表来自 `WcWidth.java`，查找逻辑用 Kotlin 重写）；窗口大小变化时保住光标行、软换行拼接复制、列数变化重排等行为参照其 `TerminalBuffer.java` 在本仓库重新实现。许可文本见 `third_party/termux/LICENSE`。
+- CLIProxyAPI `3de4e248`（<https://github.com/router-for-me/CLIProxyAPI>，MIT）
+  - Antigravity 登录与请求格式的参照：OAuth 客户端 ID/密钥与 scope、`loadCodeAssist`/`onboardUser` 的 `ANTIGRAVITY` 元数据、Cloud Code 请求信封与各模型族规则、客户端版本下限（`AntigravityWire`、`AntigravityOAuthManager`）。常量为 Antigravity IDE 公开发布的值。
 
 ## Referenced projects
 

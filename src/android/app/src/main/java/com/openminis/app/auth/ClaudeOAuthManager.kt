@@ -130,7 +130,13 @@ class ClaudeOAuthManager(context: Context, instanceId: String) : OAuthManager(co
     }
 
     override val authURL = "https://claude.ai/oauth/authorize"
-    override val tokenURL = "https://console.anthropic.com/v1/oauth/token"
+    /**
+     * `claude.ai`, not the older `console.anthropic.com`: the old host answers the
+     * OAuth token POST with a Cloudflare challenge page (HTTP 403, "Just a
+     * moment...") instead of JSON, so login and silent refresh both fail. Paired
+     * with [applyClaudeCliMimicryHeaders] on every request to this URL.
+     */
+    override val tokenURL = "https://claude.ai/v1/oauth/token"
     override val clientId = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
     override val clientSecret: String? = null
     override val callbackPort = 54545
@@ -198,6 +204,11 @@ class ClaudeOAuthManager(context: Context, instanceId: String) : OAuthManager(co
             }
 
             // Step 3: Exchange code for tokens (JSON body, NOT form-urlencoded)
+            // [T-android-oauth-foreground-exchange] The callback lands while the
+            // user is still in the Custom Tab, i.e. with Minis in the background,
+            // where the OS blocks this app's network (DNS answers "no address").
+            // Exchange only once the user is back.
+            OAuthForegroundGate.awaitForeground(TAG)
             exchangeCodeJson(code)
         }
 
@@ -227,8 +238,34 @@ class ClaudeOAuthManager(context: Context, instanceId: String) : OAuthManager(co
         val request = okhttp3.Request.Builder()
             .url(tokenURL)
             .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .applyClaudeCliMimicryHeaders()
             .build()
-        val response = httpClient.newCall(request).execute()
+        // OAuthForegroundGate has already waited for the app to be foreground;
+        // this short retry only covers the lag between foregrounding and the OS
+        // lifting the background network block. A failure that outlasts it is
+        // surfaced as OAuthNetworkUnreachableException so the UI can say "check
+        // your network" rather than print a raw UnknownHostException.
+        var response: okhttp3.Response? = null
+        var lastError: Exception? = null
+        for (attempt in 1..3) {
+            try {
+                response = httpClient.newCall(request).execute()
+                lastError = null
+                break
+            } catch (e: java.io.IOException) {
+                Log.w(TAG, "Token exchange attempt $attempt failed: ${e.javaClass.simpleName}")
+                lastError = e
+                if (attempt < 3) Thread.sleep(1000L * attempt)
+            }
+        }
+        if (response == null) {
+            val e = lastError ?: Exception("Token exchange failed")
+            throw if (e is java.net.UnknownHostException || e is java.net.SocketTimeoutException) {
+                OAuthNetworkUnreachableException(e)
+            } else {
+                e
+            }
+        }
         val responseCode = response.code
         val responseBody = response.body?.string() ?: ""
         response.close()
@@ -311,6 +348,7 @@ class ClaudeOAuthManager(context: Context, instanceId: String) : OAuthManager(co
                 val request = okhttp3.Request.Builder()
                     .url(tokenURL)
                     .post(body.toString().toRequestBody("application/json".toMediaType()))
+                    .applyClaudeCliMimicryHeaders()
                     .build()
                 val response = httpClient.newCall(request).execute()
                 val responseCode = response.code

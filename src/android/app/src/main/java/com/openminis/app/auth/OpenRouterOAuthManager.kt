@@ -102,6 +102,8 @@ object OpenRouterOAuthManager {
             Log.i(TAG, "Callback received — code length: ${code.length}")
 
             // Exchange code for permanent API key
+            // [T-android-oauth-foreground-exchange] See OAuthForegroundGate.
+            OAuthForegroundGate.awaitForeground(TAG)
             exchangeCode(code, verifier)
         }
 

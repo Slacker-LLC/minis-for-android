@@ -1016,6 +1016,9 @@
     <!-- T-android-codex-oauth-dns: shown when token-exchange POST to the
          OAuth provider fails with DNS / timeout. -->
     <string name="add_provider_oauth_network_unreachable">Couldn\'t reach the sign-in server. Check your network or proxy settings and try again.</string>
+    <string name="oauth_waiting_for_authorization">Waiting for authorization… Finish in the browser, then return to Minis.</string>
+    <string name="oauth_completing_sign_in">Completing sign-in…</string>
+    <string name="oauth_sign_in_failed">Sign-in failed: %1$s</string>
     <string name="add_provider_or_configure_manually">Or Configure Manually</string>
     <string name="add_provider_for_third_party_coding_plans_e_g_minimax">For third-party Coding Plans (e.g. MiniMax, Kimi) or compatible proxy endpoints, enter the API base URL and bearer token manually.</string>
     <string name="add_provider_bearer_token">Bearer Token</string>
@@ -1077,6 +1080,7 @@
     <string name="add_provider_subtitle_openai">Works with Codex, DeepSeek, Moonshot, Groq and other compatible vendors</string>
     <string name="add_provider_subtitle_anthropic">Works with Claude and Anthropic-protocol-compatible services</string>
     <string name="add_provider_subtitle_gemini">Works with the Gemini series and Google AI Studio</string>
+    <string name="add_provider_subtitle_antigravity">Sign in with Google: Gemini, Claude and GPT models through your Antigravity account</string>
     <string name="add_provider_subtitle_openrouter">Aggregates GPT, Claude, Gemini, Llama and other mainstream models</string>
     <string name="add_provider_subtitle_xai">Works with the Grok series of models</string>
     <string name="add_provider_configure_provider">Configure %1$s</string>
@@ -2510,4 +2514,31 @@
     <string name="quota_window_left">%1$s window: %2$d%% left</string>
     <string name="quota_unlimited">No limit</string>
     <string name="quota_open_console">Check the balance on the provider website</string>
+    <string name="terminal_tab_default">Terminal %1$d</string>
+    <string name="terminal_fgs_channel">Running terminals</string>
+    <string name="terminal_fgs_stop_all">End all</string>
+    <string name="terminal_tab_new">New terminal</string>
+    <string name="terminal_open_link">Open link</string>
+    <string name="terminal_clipboard_set">Copied from the terminal</string>
+    <string name="terminal_tab_close">Close terminal</string>
+    <string name="terminal_tab_limit">At most %1$d terminals. Close one first.</string>
+    <string name="terminal_close_busy_title">A program is still running</string>
+    <string name="terminal_close_busy_body">Closing this terminal ends the program running in it.</string>
+    <string name="terminal_close_busy_confirm">Close terminal</string>
+    <string name="terminal_rename_title">Rename terminal</string>
+    <string name="terminal_rename_action">Rename</string>
+    <string name="terminal_restart">Restart</string>
+    <string name="terminal_exited">Shell ended</string>
+    <string name="terminal_agent_badge">Agent</string>
+    <string name="terminal_agent_readonly">Agent\'s terminal, read only</string>
+    <string name="terminal_agent_takeover">Take over</string>
+    <string name="terminal_agent_release">Release</string>
+    <string name="terminal_paste">Paste</string>
+    <string name="terminal_maintenance_title">Terminals were ended</string>
+    <string name="terminal_maintenance_body">A runtime update or repair ended the terminals. %1$d of them still had a program running.</string>
+    <string name="terminal_maintenance_ok">Got it</string>
+    <plurals name="terminal_fgs_running">
+        <item quantity="one">%d terminal running</item>
+        <item quantity="other">%d terminals running</item>
+    </plurals>
 </resources>

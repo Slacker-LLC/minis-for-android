@@ -484,6 +484,18 @@
                 android:value="Active AI agent turn with model streaming and bounded tool execution" />
         </service>
 
+        <!-- Issue #183: terminals with a live process (the user's tabs and the agent's) keep the app
+             alive while it is in the background. Only while a process runs; specialUse, never
+             mediaPlayback or dataSync. See docs/AGENT-FOREGROUND-SERVICE.md. -->
+        <service
+            android:name=".service.TerminalForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Interactive terminal sessions with a live shell process started by the user or the agent" />
+        </service>
+
         <!-- Alarm broadcast receiver (also handles BOOT_COMPLETED for re-scheduling).
              exported=false: BOOT_COMPLETED is a protected broadcast that the
              system still delivers to non-exported receivers, while exported=true
