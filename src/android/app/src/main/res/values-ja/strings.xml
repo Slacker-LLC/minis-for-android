@@ -2251,4 +2251,8 @@
     <plurals name="terminal_fgs_running">
         <item quantity="other">%d 個のターミナルを実行中</item>
     </plurals>
+    <string name="oauth_waiting_for_authorization">認証を待っています… ブラウザで完了してから Minis に戻ってください。</string>
+    <string name="oauth_completing_sign_in">サインインを完了しています…</string>
+    <string name="oauth_sign_in_failed">サインインに失敗しました: %1$s</string>
+    <string name="add_provider_subtitle_antigravity">Google アカウントでサインイン: Antigravity 経由で Gemini・Claude・GPT モデルを利用</string>
 </resources>

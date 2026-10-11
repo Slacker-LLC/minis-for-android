@@ -2255,4 +2255,8 @@
         <item quantity="one">%d Terminal läuft</item>
         <item quantity="other">%d Terminals laufen</item>
     </plurals>
+    <string name="oauth_waiting_for_authorization">Warte auf Autorisierung… Schließe sie im Browser ab und kehre dann zu Minis zurück.</string>
+    <string name="oauth_completing_sign_in">Anmeldung wird abgeschlossen…</string>
+    <string name="oauth_sign_in_failed">Anmeldung fehlgeschlagen: %1$s</string>
+    <string name="add_provider_subtitle_antigravity">Mit Google-Konto anmelden: Gemini-, Claude- und GPT-Modelle über Antigravity</string>
 </resources>

@@ -2243,4 +2243,8 @@
     <plurals name="terminal_fgs_running">
         <item quantity="other">터미널 %d개 실행 중</item>
     </plurals>
+    <string name="oauth_waiting_for_authorization">승인을 기다리는 중… 브라우저에서 완료한 뒤 Minis로 돌아오세요.</string>
+    <string name="oauth_completing_sign_in">로그인을 완료하는 중…</string>
+    <string name="oauth_sign_in_failed">로그인 실패: %1$s</string>
+    <string name="add_provider_subtitle_antigravity">Google 계정으로 로그인: Antigravity로 Gemini, Claude, GPT 모델 사용</string>
 </resources>

@@ -2433,4 +2433,8 @@
         <item quantity="many">Работают %d терминалов</item>
         <item quantity="other">Работают %d терминала</item>
     </plurals>
+    <string name="oauth_waiting_for_authorization">Ожидание авторизации… Завершите её в браузере, затем вернитесь в Minis.</string>
+    <string name="oauth_completing_sign_in">Завершение входа…</string>
+    <string name="oauth_sign_in_failed">Не удалось войти: %1$s</string>
+    <string name="add_provider_subtitle_antigravity">Вход через аккаунт Google: модели Gemini, Claude и GPT через Antigravity</string>
 </resources>

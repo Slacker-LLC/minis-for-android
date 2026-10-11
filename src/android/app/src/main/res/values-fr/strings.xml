@@ -2151,4 +2151,8 @@
         <item quantity="one">%d terminal en cours</item>
         <item quantity="other">%d terminaux en cours</item>
     </plurals>
+    <string name="oauth_waiting_for_authorization">En attente d\'autorisation… Terminez dans le navigateur, puis revenez à Minis.</string>
+    <string name="oauth_completing_sign_in">Finalisation de la connexion…</string>
+    <string name="oauth_sign_in_failed">Échec de la connexion : %1$s</string>
+    <string name="add_provider_subtitle_antigravity">Connexion avec un compte Google : modèles Gemini, Claude et GPT via Antigravity</string>
 </resources>
