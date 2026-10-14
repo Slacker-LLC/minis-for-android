@@ -2232,6 +2232,13 @@
     <string name="voice_call_title">Sprachgespräch</string>
     <string name="voice_call_permission">Mikrofonberechtigung erforderlich. Bitte erlauben und erneut versuchen.</string>
     <string name="voice_call_paused">Audio pausiert</string>
+    <string name="voice_call_state_idle">Bereit</string>
+    <string name="voice_call_state_listening">Hört zu</string>
+    <string name="voice_call_state_thinking">Denkt nach…</string>
+    <string name="voice_call_state_speaking">Spricht</string>
+    <string name="voice_call_state_confused">Nicht verstanden</string>
+    <string name="voice_call_state_success">Fertig</string>
+    <string name="voice_call_state_error">Ein Fehler ist aufgetreten</string>
     <string name="voice_call_model">Aktuelles Chatmodell</string>
     <string name="voice_call_preparing">Mikrofon wird vorbereitet…</string>
     <string name="voice_call_hint">Sprich, um Aufgaben in diesem Chat auszuführen. Unterbrechen stoppt diese Sprachaufgabe. Nach dem Verlassen laufen angenommene Aufgaben im Chat weiter.</string>

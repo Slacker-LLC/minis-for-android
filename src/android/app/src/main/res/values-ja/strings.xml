@@ -2228,6 +2228,13 @@
     <string name="voice_call_title">音声会話</string>
     <string name="voice_call_permission">マイクの許可が必要です。許可して再試行してください。</string>
     <string name="voice_call_paused">音声を一時停止中</string>
+    <string name="voice_call_state_idle">待機中</string>
+    <string name="voice_call_state_listening">聞いています</string>
+    <string name="voice_call_state_thinking">考えています…</string>
+    <string name="voice_call_state_speaking">話しています</string>
+    <string name="voice_call_state_confused">聞き取れませんでした</string>
+    <string name="voice_call_state_success">完了しました</string>
+    <string name="voice_call_state_error">エラーが発生しました</string>
     <string name="voice_call_model">現在のチャットモデル</string>
     <string name="voice_call_preparing">マイクを準備中…</string>
     <string name="voice_call_hint">話しかけると、このチャットでタスクを実行します。中断ボタンで今回の音声タスクを止められます。音声を終了しても、受け付けたタスクはチャットで続きます。</string>

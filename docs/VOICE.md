@@ -39,6 +39,25 @@ audio playback
 | Pet model path | `pet/PetChatEngine.kt` | short conversational model requests |
 | Pet voice entry | `pet/PetOverlayService.kt` | connects ASR, model, and TTS |
 | Inline chat voice input | `ui/chat/voice/InlineVoiceInputPanel.kt` | writes ASR results into chat input |
+| Voice-conversation call sheet | `voicecall/VoiceConversationHost.kt` | full-screen dialog: character, state line, live subtitle, grouped controls, call timer |
+| Voice-conversation state | `voicecall/controller/CallController.kt` | call state machine fed by runtime events; the subtitle is only ever the runtime's real text |
+| Voice character | `voicecall/grok/VoiceBotAvatar.kt` + Gradle module `:grokbot` | draws the call character and maps the call state to a mood |
+
+## Voice-conversation screen
+
+`VoiceConversationHost` owns the whole call sheet. The center is the character; below it the semantic state
+(`待机 / 我在听 / 思考中 / 正在说 / 已静音 / 没听清 / 已完成 / 出错了`) and the live subtitle, which is the
+recognized speech or the assistant's reply. Actions are grouped into one primary row, one wrapping secondary
+row (follow-up instructions, cancel recording, stop playback, stop this turn) and a footer that always leaves
+the sheet. The header shows the current chat model and the call timer. Long replies are truncated in the
+sheet; the full text stays in the chat.
+
+The character is the vendored Compose engine `:grokbot` (Mr-XiaoLiang/GrokBot, MIT — see
+`PROVENANCE.md` for the source commit and the upstream statement that the likeness itself belongs to
+xAI / Grok and is not covered by that grant). It is drawn as vectors at any size, follows the theme's light
+and dark stops of its own palette, honours the system "remove animations" setting, and replaces the earlier
+SVG-asset avatar: `assets/moods/*.svg` and the hand-drawn `BloubRenderer` are gone, so the sheet no longer
+ships the 312 KB of SVG expression assets.
 
 ## ASR selection
 

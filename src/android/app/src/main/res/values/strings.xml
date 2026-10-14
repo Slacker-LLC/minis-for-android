@@ -2516,6 +2516,13 @@
     <string name="voice_call_title">Voice conversation</string>
     <string name="voice_call_permission">Microphone permission is required. Grant permission and retry.</string>
     <string name="voice_call_paused">Audio paused</string>
+    <string name="voice_call_state_idle">Ready</string>
+    <string name="voice_call_state_listening">Listening</string>
+    <string name="voice_call_state_thinking">Thinking…</string>
+    <string name="voice_call_state_speaking">Speaking</string>
+    <string name="voice_call_state_confused">Didn\'t catch that</string>
+    <string name="voice_call_state_success">Done</string>
+    <string name="voice_call_state_error">Something went wrong</string>
 
     <string name="voice_call_model">Current chat model</string>
     <string name="voice_call_preparing">Preparing microphone…</string>

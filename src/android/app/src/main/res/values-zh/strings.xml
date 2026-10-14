@@ -2424,6 +2424,13 @@
     <string name="voice_call_title">语音对话</string>
     <string name="voice_call_permission">需要麦克风权限，授权后可重试。</string>
     <string name="voice_call_paused">录音与播报已暂停</string>
+    <string name="voice_call_state_idle">待机</string>
+    <string name="voice_call_state_listening">我在听</string>
+    <string name="voice_call_state_thinking">思考中…</string>
+    <string name="voice_call_state_speaking">正在说</string>
+    <string name="voice_call_state_confused">没听清</string>
+    <string name="voice_call_state_success">已完成</string>
+    <string name="voice_call_state_error">出错了</string>
 
     <string name="voice_call_model">当前会话模型</string>
     <string name="voice_call_preparing">正在准备麦克风…</string>

@@ -2410,6 +2410,13 @@
     <string name="voice_call_title">Голосовой разговор</string>
     <string name="voice_call_permission">Нужен доступ к микрофону. Разрешите его и повторите попытку.</string>
     <string name="voice_call_paused">Аудио приостановлено</string>
+    <string name="voice_call_state_idle">Готов</string>
+    <string name="voice_call_state_listening">Слушаю</string>
+    <string name="voice_call_state_thinking">Думаю…</string>
+    <string name="voice_call_state_speaking">Говорю</string>
+    <string name="voice_call_state_confused">Не расслышал</string>
+    <string name="voice_call_state_success">Готово</string>
+    <string name="voice_call_state_error">Произошла ошибка</string>
     <string name="voice_call_model">Модель текущего чата</string>
     <string name="voice_call_preparing">Подготовка микрофона…</string>
     <string name="voice_call_hint">Говорите, чтобы выполнять задачи в этом чате. Прерывание останавливает текущую голосовую задачу. После выхода принятые задачи продолжаются в чате.</string>

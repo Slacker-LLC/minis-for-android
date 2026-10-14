@@ -30,6 +30,15 @@ Minis for Android 含有从开源项目 **OpenMinis** 衍生的代码：
 - CLIProxyAPI `3de4e248`（<https://github.com/router-for-me/CLIProxyAPI>，MIT）
   - Antigravity 登录与请求格式的参照：OAuth 客户端 ID/密钥与 scope、`loadCodeAssist`/`onboardUser` 的 `ANTIGRAVITY` 元数据、Cloud Code 请求信封与各模型族规则、客户端版本下限（`AntigravityWire`、`AntigravityOAuthManager`）。常量为 Antigravity IDE 公开发布的值。
 
+## Vendored module: GrokBot
+
+- repository: <https://github.com/Mr-XiaoLiang/GrokBot>
+- pinned source commit: `2cd2e82f31cddcec7b825877830362b3ec364e33`（2026-09-22）
+- license: MIT; license text: [third_party/grokbot/LICENSE](third_party/grokbot/LICENSE)
+- 位置：`src/android/grokbot/`（Android Library 模块，namespace 与包名保持上游的 `com.lollipop.grokbot`）。
+- 引入范围：上游 `grokBot/src/main/kotlin/com/lollipop/grokbot/` 下的 4 个公开文件与 16 个 `internal` 文件**原样**复制（未改动任何一行源码），只把 Gradle 模块配置换成本仓库的 toolchain。语音通话界面通过公开 API `GrokBot()` / `GrokBotConfig` / `GrokMood` 驱动角色，映射写在 `src/android/app/src/main/java/com/openminis/app/voicecall/grok/VoiceBotAvatar.kt`；本仓库不修改该模块。
+- 形象与商标：上游 README 声明 GrokBot 的形象、名称与商标相关知识产权属于 xAI / Grok，上游是社区粉丝作品，与 xAI 没有关联或授权；MIT 只覆盖作者自行编写的源代码，不覆盖形象、名称与商标。上游据此要求**含该形象的内容不得用于未经授权的商业用途**。若要改成商业分发，须先替换角色形象或取得授权；引擎本身是 MIT，可在同一引擎上换用自绘形象。
+
 ## Referenced projects
 
 以下外部项目为本仓库提供行为参考，并且**其部分代码已被移植进来**：

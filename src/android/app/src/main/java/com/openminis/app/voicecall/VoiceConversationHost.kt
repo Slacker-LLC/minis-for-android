@@ -7,8 +7,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -23,16 +26,21 @@ import com.openminis.app.deeplink.DeepLinkCoordinator
 import com.openminis.app.speech.ReadAloudPlayer
 import com.openminis.app.speech.SpeechRecognitionManager
 import com.openminis.app.ui.chat.ChatViewModel
+import com.openminis.app.ui.chat.TaskWorkSummary
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisOutlinedButton
-import com.openminis.app.voicecall.bloub.BloubAvatar
+import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.theme.minisPageBackground
 import com.openminis.app.voicecall.controller.CallController
-import com.openminis.app.voicecall.model.BloubSize
+import com.openminis.app.voicecall.grok.VoiceBotAvatar
+import com.openminis.app.voicecall.grok.voiceCallStatusRes
 import com.openminis.app.voicecall.model.BloubState
 import com.openminis.app.voicecall.model.CallMode
 import com.openminis.app.voicecall.runtime.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 /** 所有入口绑定当前聊天 VM；权限确认仍由 ChatScreen 的原有 Dialog 承接。 */
 @Composable
@@ -127,57 +135,130 @@ internal fun VoiceConversationHost(
 
     if (visible) {
         Dialog(onDismissRequest = { endAudio() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-            Surface(Modifier.fillMaxSize()) {
+            Surface(Modifier.fillMaxSize(), color = minisPageBackground(ChatColors.isDark)) {
+                val characterState = controller.state.effectiveBloubState
+                val statusLine = when {
+                    entryError != null -> entryError.orEmpty()
+                    opening -> stringResource(R.string.voice_call_preparing)
+                    else -> stringResource(voiceCallStatusRes(characterState))
+                }
+                val detailLine = if (active) controller.state.ai.subtitle else stringResource(R.string.voice_call_hint)
                 Column(
-                    Modifier.systemBarsPadding().padding(24.dp).verticalScroll(rememberScrollState()),
+                    Modifier
+                        .fillMaxSize()
+                        .systemBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
-                    Text(stringResource(R.string.voice_call_title), style = MaterialTheme.typography.headlineMedium)
-                    Text(modelName.ifBlank { context.getString(R.string.voice_call_model) })
-                    com.openminis.app.ui.chat.TaskWorkSummary(viewModel.agentSession.activeSessionId)
-                    BloubAvatar(controller.state.effectiveBloubState, BloubSize.LARGE)
+                    // 顶栏：只在通话进行时给计时，失败/准备中不显示无意义的 00:00。
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.voice_call_title), style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.weight(1f))
+                        if (active) {
+                            Text(
+                                callClock(controller.state.elapsedSeconds),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = ChatColors.secondaryText,
+                            )
+                        }
+                    }
                     Text(
-                        when {
-                            opening -> stringResource(R.string.voice_call_preparing)
-                            entryError != null -> entryError.orEmpty()
-                            controller.state.muted -> stringResource(R.string.voice_call_paused)
-                            else -> controller.state.ai.subtitle
-                        },
-                        style = MaterialTheme.typography.titleMedium,
+                        modelName.ifBlank { context.getString(R.string.voice_call_model) },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ChatColors.secondaryText,
+                        modifier = Modifier.fillMaxWidth(),
                     )
-                    Text(stringResource(R.string.voice_call_hint), style = MaterialTheme.typography.bodyMedium)
+
+                    // 中部：角色居中，下面是状态词与最近一句字幕（长回答截断，全文在聊天里看）。
+                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Column(
+                            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            VoiceBotAvatar(characterState, Modifier.size(180.dp))
+                            Spacer(Modifier.height(20.dp))
+                            Text(
+                                statusLine,
+                                style = MaterialTheme.typography.headlineSmall,
+                                textAlign = TextAlign.Center,
+                                color = if (characterState == BloubState.ERROR) MaterialTheme.colorScheme.error else Color.Unspecified,
+                            )
+                            if (detailLine.isNotBlank()) {
+                                Text(
+                                    detailLine,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = ChatColors.secondaryText,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 4,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(top = 10.dp),
+                                )
+                            }
+                        }
+                    }
+
+                    TaskWorkSummary(viewModel.agentSession.activeSessionId)
+
+                    // 底部：一行一个主操作（设计语言：整页最多一个强调按钮），
+                    // 其余行是可换行的文字按钮，最后一行始终留给离开/挂断。
                     if (active) {
-                        if (controller.state.ai.bloubState == BloubState.THINKING || controller.state.ai.bloubState == BloubState.SPEAKING) {
-                            TextButton(onClick = {
-                                controller.listenForFollowUp()
-                                controller.setMuted(false)
-                            }) { Text(stringResource(R.string.voice_call_follow_up)) }
+                        val primary = when {
+                            controller.state.muted -> R.string.voice_call_unmute to { controller.setMuted(false) }
+                            characterState == BloubState.LISTENING -> R.string.voice_call_submit to { input.stop() }
+                            characterState == BloubState.ERROR -> R.string.voice_call_retry to { controller.interrupt(); controller.setMuted(false) }
+                            else -> R.string.voice_call_interrupt to { controller.interrupt(); controller.setMuted(false) }
                         }
-                        TextButton(onClick = { input.cancel(); controller.setMuted(true) }, enabled = controller.state.ai.bloubState == BloubState.LISTENING) { Text(stringResource(R.string.voice_cancel_recording)) }
-                        TextButton(onClick = { if (player.isInitialized()) player.value.stop() }) { Text(stringResource(R.string.voice_stop_playback)) }
-                        TextButton(onClick = { gateway.cancel() }) { Text(stringResource(R.string.voice_stop_owned_turn)) }
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            MinisOutlinedButton(onClick = { controller.setMuted(!controller.state.muted) }) {
-                                Text(stringResource(if (controller.state.muted) R.string.voice_call_unmute else R.string.voice_call_mute))
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (!controller.state.muted) {
+                                MinisOutlinedButton(onClick = { controller.setMuted(true) }) {
+                                    Text(stringResource(R.string.voice_call_mute))
+                                }
                             }
-                            MinisButton(onClick = {
-                                controller.interrupt()
-                                controller.setMuted(false)
-                            }) {
-                                Text(stringResource(if (controller.state.ai.bloubState == BloubState.ERROR) R.string.voice_call_retry else R.string.voice_call_interrupt))
-                            }
+                            MinisButton(onClick = primary.second) { Text(stringResource(primary.first)) }
                         }
-                        if (controller.state.ai.bloubState == BloubState.LISTENING && !controller.state.muted) {
-                            TextButton(onClick = { input.stop() }) { Text(stringResource(R.string.voice_call_submit)) }
+                        FlowRow(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                        ) {
+                            if (characterState == BloubState.THINKING || characterState == BloubState.SPEAKING) {
+                                MinisTextButton(onClick = {
+                                    controller.listenForFollowUp()
+                                    controller.setMuted(false)
+                                }) { Text(stringResource(R.string.voice_call_follow_up)) }
+                            }
+                            MinisTextButton(
+                                onClick = { input.cancel(); controller.setMuted(true) },
+                                enabled = characterState == BloubState.LISTENING && !controller.state.muted,
+                            ) { Text(stringResource(R.string.voice_cancel_recording)) }
+                            MinisTextButton(onClick = { if (player.isInitialized()) player.value.stop() }) {
+                                Text(stringResource(R.string.voice_stop_playback))
+                            }
+                            MinisTextButton(onClick = { gateway.cancel() }) {
+                                Text(stringResource(R.string.voice_stop_owned_turn))
+                            }
                         }
                     } else {
                         MinisButton(onClick = { openCall() }, enabled = !opening) { Text(stringResource(R.string.voice_call_retry)) }
                     }
-                    TextButton(onClick = { endAudio() }) { Text(stringResource(R.string.voice_call_back)) }
-                    MinisOutlinedButton(onClick = { endAudio() }) { Text(stringResource(R.string.voice_call_end)) }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        // 「查看聊天」是权限确认被本页遮住时的出口；两个入口都结束音频，
+                        // 已接受的 Agent 任务继续在原会话跑。
+                        MinisTextButton(onClick = { endAudio() }) { Text(stringResource(R.string.voice_call_back)) }
+                        Spacer(Modifier.weight(1f))
+                        MinisOutlinedButton(onClick = { endAudio() }) { Text(stringResource(R.string.voice_call_end)) }
+                    }
                 }
             }
         }
     }
+}
+
+/** 通话计时 `mm:ss`。数字与冒号不随语言变化，所以不进资源。 */
+private fun callClock(seconds: Long): String {
+    val safe = seconds.coerceAtLeast(0L)
+    return String.format(Locale.US, "%02d:%02d", safe / 60, safe % 60)
 }

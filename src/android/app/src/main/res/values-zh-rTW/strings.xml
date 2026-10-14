@@ -2400,6 +2400,13 @@
     <string name="voice_call_title">語音對話</string>
     <string name="voice_call_permission">需要麥克風權限，授權後可重試。</string>
     <string name="voice_call_paused">錄音與播報已暫停</string>
+    <string name="voice_call_state_idle">待機</string>
+    <string name="voice_call_state_listening">我在聽</string>
+    <string name="voice_call_state_thinking">思考中…</string>
+    <string name="voice_call_state_speaking">正在說</string>
+    <string name="voice_call_state_confused">沒聽清</string>
+    <string name="voice_call_state_success">已完成</string>
+    <string name="voice_call_state_error">發生錯誤</string>
     <string name="voice_call_model">目前對話模型</string>
     <string name="voice_call_preparing">正在準備麥克風…</string>
     <string name="voice_call_hint">直接說話即可指揮目前對話執行任務。點擊打斷可停止本次語音任務後繼續說。退出語音後，已接受的任務繼續在聊天裡執行。</string>

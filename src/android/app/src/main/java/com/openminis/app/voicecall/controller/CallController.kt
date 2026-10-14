@@ -3,7 +3,6 @@ package com.openminis.app.voicecall.controller
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.openminis.app.voicecall.bloub.BloubStateMapper
 import com.openminis.app.voicecall.model.BloubState
 import com.openminis.app.voicecall.model.CallAiState
 import com.openminis.app.voicecall.model.CallMode
@@ -37,10 +36,9 @@ class CallController(
             minimized = false,
             muted = false,
             elapsedSeconds = 0L,
-            ai = CallAiState(
-                BloubState.LISTENING,
-                BloubStateMapper.subtitle(BloubState.LISTENING)
-            ),
+            // 字幕只由 Runtime 的真实回调决定（startListening 会立刻推一条），
+            // 这里不再塞演示文案，避免覆盖用户真正听到/说出的话。
+            ai = CallAiState(BloubState.LISTENING),
             model = state.model
         )
         preMute = BloubState.LISTENING
@@ -80,7 +78,7 @@ class CallController(
     }
 
     fun setBloubState(s: BloubState) {
-        state = state.copy(ai = CallAiState(s, BloubStateMapper.subtitle(s)))
+        state = state.copy(ai = state.ai.copy(bloubState = s))
     }
 
     fun setSubtitle(text: String) {

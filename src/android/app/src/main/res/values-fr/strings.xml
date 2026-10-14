@@ -2128,6 +2128,13 @@
     <string name="voice_call_title">Conversation vocale</string>
     <string name="voice_call_permission">Autorisez le microphone, puis réessayez.</string>
     <string name="voice_call_paused">Audio en pause</string>
+    <string name="voice_call_state_idle">Prêt</string>
+    <string name="voice_call_state_listening">À l\'écoute</string>
+    <string name="voice_call_state_thinking">Réflexion…</string>
+    <string name="voice_call_state_speaking">Parle</string>
+    <string name="voice_call_state_confused">Pas compris</string>
+    <string name="voice_call_state_success">Terminé</string>
+    <string name="voice_call_state_error">Une erreur est survenue</string>
     <string name="voice_call_model">Modèle du chat actuel</string>
     <string name="voice_call_preparing">Préparation du microphone…</string>
     <string name="voice_call_hint">Parlez pour lancer des tâches dans ce chat. Interrompre arrête la tâche vocale en cours. Après la fermeture, les tâches acceptées continuent dans le chat.</string>
