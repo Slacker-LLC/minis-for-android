@@ -38,7 +38,7 @@ object RunCheckpointStore {
     const val OPERATION_COMPACT = "compact"
     const val OPERATION_REWRITE = "rewrite"
 
-    /** Entry sources that may open a checkpoint; anything else is refused. */
+    /** Current entry sources plus `bot` for checkpoints written by older builds. */
     private val ENTRY_SOURCES = setOf("chat-ui", "bot", "tool-rerun")
 
     const val STATE_RUNNING = "running"

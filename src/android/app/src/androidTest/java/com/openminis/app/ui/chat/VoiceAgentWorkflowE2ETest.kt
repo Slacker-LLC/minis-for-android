@@ -31,7 +31,7 @@ class VoiceAgentWorkflowE2ETest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val report = JSONObject().put("device", android.os.Build.FINGERPRINT)
             .put("audioFixture", "scripted ASR/TTS; physical audio and OEM wake not verified")
-            .put("modelFixture", "scripted provider; production Bot identity, Room and Android tool dispatch")
+            .put("modelFixture", "scripted provider; production Agent, Room and Android tool dispatch")
             .put("scenarios", JSONArray())
         val artifact = File(context.filesDir, "voice-agent-e2e.json")
         fun passed(name: String) {
@@ -64,14 +64,14 @@ class VoiceAgentWorkflowE2ETest {
                     until { output.texts.size == 1 }
                     assertEquals(2, provider.calls)
                     assertTrue("android.time" in provider.offeredTools)
-                    assertTrue(provider.systemPrompts.first().orEmpty().contains("语音验收成员"))
-                    assertNotNull(repository.getSession(vm.currentSessionId)?.botId)
+                    assertTrue(provider.systemPrompts.first().orEmpty().isNotBlank())
+                    assertNull(repository.getSession(vm.currentSessionId)?.legacyProfileId)
                     val result = provider.requests[1].flatMap { it.contentParts }
                         .filterIsInstance<AgentContentPart.ToolResult>().single { it.id == "voice-time" }
                     assertFalse(result.isError)
                     assertTrue(result.content.isNotBlank())
                     assertEquals("第一轮任务已完成", output.texts.single())
-                    passed("speech -> Bot identity -> real Agent -> Android tool -> persisted answer -> TTS; duplicate final rejected")
+                    passed("speech -> real Agent -> Android tool -> persisted answer -> TTS; duplicate final rejected")
                     ui { output.finish() }
                     until { input.rounds.size == 2 }
                     ui { first.final("上一轮晚到回调") }
@@ -186,8 +186,7 @@ class VoiceAgentWorkflowE2ETest {
         block: suspend (ChatViewModel, com.openminis.app.data.repository.ChatRepository, ScriptedProvider) -> Unit) {
         val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as com.openminis.app.MinisApp
         app.providerRepository.awaitConfigLoaded()
-        val bot = app.botRepository.createBot("语音验收成员", systemPrompt = "Voice identity acceptance")
-        val session = app.chatRepository.createSession("scripted-model", memoryEnabled = false, botId = bot.id)
+        val session = app.chatRepository.createSession("scripted-model", memoryEnabled = false)
         try {
             val vm = withContext(Dispatchers.Main) { chatProjection(app, session.id) }
             withTimeout(20_000) { vm.sessionLoaded.first { it } }
@@ -196,7 +195,6 @@ class VoiceAgentWorkflowE2ETest {
         } finally {
             withContext(Dispatchers.Main) { com.openminis.app.agent.AgentSessionStore.closeAndAwait(session.id); com.openminis.app.agent.AgentSessionStore.release(session.id) }
             app.chatRepository.deleteSession(session.id)
-            app.botRepository.deleteBot(bot.id)
         }
     }
     private class ScriptedInput : CallSpeechInput {

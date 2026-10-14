@@ -868,7 +868,7 @@
     <string name="system_prompt_reset_all_confirm_body">所有自訂文案與開關都會被清除，每個模組都還原為隨 App 發佈的預設內容。</string>
     <string name="system_prompt_custom_section">自訂系統提示詞</string>
     <string name="system_prompt_custom_hint">在這裡寫下你的系統提示詞……</string>
-    <string name="system_prompt_custom_footer">儲存後的內容會注入到每次對話的最前面，並附帶優先級聲明：與人格（Soul）、回覆風格、預設、Bot 指令或會話級 Soul 衝突時，以這段內容為準。留空則不注入。</string>
+    <string name="system_prompt_custom_footer">儲存後的內容會注入到每次對話的最前面，並附帶優先級聲明：與人格（Soul）、回覆風格、預設或會話級 Soul 衝突時，以這段內容為準。留空則不注入。</string>
     <string name="system_prompt_custom_clear">清空</string>
     <string name="system_prompt_custom_clear_confirm_title">清空自訂系統提示詞？</string>
     <string name="system_prompt_custom_clear_confirm_body">輸入框會被清空，這段內容不再注入；其它設定不受影響。</string>
@@ -1921,7 +1921,6 @@
     <string name="drawer_recent">最近</string>
     <string name="drawer_no_search_match">未找到相關對話</string>
     <string name="drawer_search_results">%1$d 個結果</string>
-    <string name="settings_agent_section_team">團隊與例程</string>
     <string name="settings_agent_team_sub">成員及其職責、模型與例程</string>
     <string name="settings_agent_tasks_sub">定期執行、執行紀錄與執行者</string>
     <string name="chat_quick_battery_title">查看電池狀態</string>
@@ -2062,31 +2061,11 @@
     <plurals name="model_slot_backups_count">
         <item quantity="other">+%1$d 個備用模型</item>
     </plurals>
-    <string name="bots_task_budget_summary">自動複核 %1$d/%2$d · 修訂 %3$d/%4$d · 委派 %5$d/%6$d</string>
-    <string name="bots_task_pause">暫停</string>
-    <string name="bots_task_cancel">取消</string>
-    <string name="bots_task_notification_title">Bot 工作：%1$s</string>
-    <string name="bots_task_notification_needs_user">負責 Bot 需要你處理。</string>
-    <string name="bots_task_notification_completed">負責 Bot 已完成結果複核。</string>
-    <string name="bots_task_notification_budget">自動複核預算已用盡。</string>
 
-    <!-- B2: Bot-owned scheduled routines -->
-    <string name="scheduled_task_executor">執行者</string>
-    <string name="scheduled_task_executor_regular">一般聊天（無 Bot）</string>
-    <string name="scheduled_task_executor_loading">正在載入…</string>
-    <string name="scheduled_task_model_bot_default">使用此 Bot 的預設模型</string>
-    <string name="scheduled_task_bot_disabled">Bot 已停用</string>
-    <string name="scheduled_task_bot_label">Bot：%1$s</string>
-    <string name="bots_routines">例程</string>
-    <string name="bots_routines_disabled">此 Bot 已停用。例程仍保持啟用，但會略過執行，直到 Bot 恢復啟用。</string>
-    <string name="bots_new_routine">新增例程</string>
-    <string name="bots_routine_no_next">未安排下次執行</string>
+    <!-- Scheduled task strings -->
 
     <!-- B2: capacity/save errors -->
-    <string name="scheduled_task_bot_routine_limit">此 Bot 已有 %1$d 個例程。請先刪除一個再新增。</string>
     <string name="scheduled_task_save_failed">無法儲存排程任務。</string>
-    <string name="bots_routine_vscreen_busy">虛擬螢幕正由另一個工作階段使用。</string>
-    <string name="bots_routine_vscreen_unavailable">虛擬螢幕已關閉，或裝置相容性自我檢查未通過。</string>
     <string name="scheduled_vscreen_unattended_hint">無人值守執行的 UI 操作只會使用虛擬螢幕。</string>
     <string name="scheduled_vscreen_unavailable_warning">虛擬螢幕尚未在目前裝置自我檢查通過並啟用。仍可儲存例程，但 UI 操作可能失敗。</string>
     <string name="settings_vscreen_entry">虛擬螢幕（實驗性）</string>
@@ -2173,9 +2152,6 @@
 <string name="scheduled_task_tier_full_confirmation_body">FULL 允許此無人值守例程在現有應用程式權限範圍內執行任意 shell 指令、寫入暫存資料夾以外的檔案，並呼叫已連線的 MCP 工具。僅在信任提示詞和已設定工具時選擇。網路存取仍不受限制。</string>
 <string name="scheduled_task_tier_full_confirm">確認完整權限</string>
 <string name="scheduled_task_readonly_denied_preview">READ_ONLY 已封鎖 %1$s：%2$s</string>
-    <string name="bots_progress_running">%1$d 項委派工作進行中</string>
-    <string name="bots_progress_none">暫無進行中的工作</string>
-    <string name="bots_members_header">成員</string>
     <string name="browser_desktop_site">桌面版網頁</string>
     <string name="browser_tab_count_title">%1$d 個分頁</string>
     <string name="browser_share">分享</string>
@@ -2476,7 +2452,6 @@
     <string name="outcome_pending_title">需要檢查的動作</string>
     <string name="outcome_inspect_action">檢查 %1$s</string>
     <string name="outcome_kept_unknown">動作仍未確定，已保留原紀錄。</string>
-    <string name="bots_reception">預設接待成員</string>
     <string name="voice_cancel_recording">取消本次錄音</string>
     <string name="voice_stop_playback">停止播報</string>
     <string name="voice_stop_owned_turn">停止本次語音發起的回合</string>

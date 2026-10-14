@@ -82,7 +82,7 @@ Direct Root 禁止把 PRoot/native broker 重新放回生产路径，因此当�
 
 以下目录和能力只在当前分支出现，属于产品能力而不是可以被上游覆盖的“残留”：
 
-- Bot/Agent 协调：`agent/`、`data/db/Bot*`、`data/repository/Bot*`、Bot UI 和 session coordination；
+- Bot/Agent 协调曾是自定义功能，现已从当前版本移除；此处旧文件清单仅解释此前的上游对账范围；
 - Pi/宠物功能：`pet/` 及其 overlay、控制和模型逻辑；
 - Remote/Web/App 同步及远程命令：`remote/`、相关 debug RPC 和同步入口；
 - Android 工具：`tools/android/`、`tools/internal/`、系统、媒体、电话、天气、TTS 等工具；
@@ -115,7 +115,7 @@ Direct Root 禁止把 PRoot/native broker 重新放回生产路径，因此当�
 |---|---|---|
 | Direct Ubuntu 所需的所有权/路径迁移 | `MinisApp`、`ContextOffload`、`FileMentionIndex`、`MinisDocumentsProvider`、`MinisImageFetcher`、`ChatLinkResolver`、`WebAppPathResolver`、`StorageManagementScreen` | 把旧 broker/PRoot 文件面改为 App-owned guest file API、Direct Root rootfs 和 session workspace；不改变上层文件/分享/网页功能语义 |
 | 生命周期、失败关闭和设备兼容 | `NetworkMonitor`、`SystemResourceMonitor`、`ScheduledTaskAlarmReceiver`、`MinisApp.onTerminate`、CMake/native 文件边界 | 只处理 Direct Ubuntu 子进程、网络回调、Native/JNI 和资源回收；不扩展普通 Agent 的 Root 权限 |
-| 已核实的共享行为对齐 | `AppDatabase`、`LLMModel`、`ProviderRepository`、`ProviderFactory`、`OpenAIProvider`、`FastModePrefs`、`UsageStatsScreen`、`SessionListScreen` | 对应上游行为已有专门测试，详见下方对齐清单；不覆盖 Bot、Pi、Remote、MCP、voicecall 等自定义入口 |
+| 已核实的共享行为对齐 | `AppDatabase`、`LLMModel`、`ProviderRepository`、`ProviderFactory`、`OpenAIProvider`、`FastModePrefs`、`UsageStatsScreen`、`SessionListScreen` | 对应上游行为已有专门测试，详见下方对齐清单；不覆盖 Pi、Remote、MCP、voicecall 等自定义入口 |
 | 纯文本/合同/产品名更新 | README、contracts、各语言 rootfs 文案和注释 | 只同步 Direct Ubuntu 的事实描述，避免文档继续声称旧执行栈存在 |
 
 除此之外，Chat、Browser、Web/App、Session、Settings 等共享 UI 的本轮变更逐项检查后只有 guest 路径/生命周期语义、主题来源 parity 或上述文字同步；没有借清理 Runtime 顺手替换上游 UI 功能。

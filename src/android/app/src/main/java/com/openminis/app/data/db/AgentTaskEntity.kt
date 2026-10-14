@@ -6,28 +6,22 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * Durable root task for a user goal spanning ordinary or Bot turns.
- *
- * A delegation is one work package inside this record. Keeping the root
- * lifecycle separate means a worker finishing a turn cannot accidentally mark
- * the user's goal as delivered before the owner has reviewed the evidence.
+ * Durable lifecycle and evidence for a user goal in an ordinary Agent session.
  */
 @Entity(
-    tableName = "bot_tasks",
+    tableName = "agent_tasks",
     indices = [
-        Index(value = ["origin_session_id", "origin_message_id"], name = "index_bot_tasks_origin"),
-        Index(value = ["owner_bot_id", "status", "updated_at"], name = "index_bot_tasks_owner_status"),
-        Index(value = ["status", "updated_at"], name = "index_bot_tasks_status_updated"),
-        Index(value = ["goal_session_id"], unique = true, name = "index_bot_tasks_goal_session"),
+        Index(value = ["origin_session_id", "origin_message_id"], name = "index_agent_tasks_origin"),
+        Index(value = ["status", "updated_at"], name = "index_agent_tasks_status_updated"),
+        Index(value = ["goal_session_id"], unique = true, name = "index_agent_tasks_goal_session"),
     ],
 )
 @kotlinx.serialization.Serializable
-data class BotTaskEntity(
+data class AgentTaskEntity(
     @PrimaryKey val id: String,
     @ColumnInfo(name = "origin_session_id") val originSessionId: String,
     @ColumnInfo(name = "origin_message_id") val originMessageId: String? = null,
-    @ColumnInfo(name = "owner_bot_id") val ownerBotId: String?,
-    /** Null on legacy delegation roots; otherwise the session's current explicit Goal. */
+    /** Null for a task created from a user request; set for the session's explicit Goal. */
     @ColumnInfo(name = "goal_session_id") val goalSessionId: String? = null,
     val goal: String,
     @ColumnInfo(name = "acceptance_criteria") val acceptanceCriteria: String? = null,
@@ -36,8 +30,6 @@ data class BotTaskEntity(
     val revision: Int = 1,
     @ColumnInfo(name = "current_owner_session_id") val currentOwnerSessionId: String? = null,
     @ColumnInfo(name = "auto_runs_used") val autoRunsUsed: Int = 0,
-    @ColumnInfo(name = "delegations_used") val delegationsUsed: Int = 0,
-    @ColumnInfo(name = "revision_rounds_used") val revisionRoundsUsed: Int = 0,
     @ColumnInfo(name = "stop_generation") val stopGeneration: Int = 0,
     @ColumnInfo(name = "deadline_at") val deadlineAt: Long? = null,
     @ColumnInfo(name = "created_at") val createdAt: Long,

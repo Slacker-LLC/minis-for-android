@@ -129,7 +129,7 @@ internal suspend fun AgentSession.injectQueuedPromptsAsNewTurn(
     finishedAccumulatedText: String,
     finishedAllToolBlocks: List<AssistantBlock>,
 ): InjectedTurn? {
-    val runId = activeBotRunId ?: return null
+    val runId = activeRunId ?: return null
     val rows = chatRepository.dao.pendingRequests(activeSessionId).filter {
         it.requestState == "PENDING" && it.requestDelivery == "STEER"
     }
@@ -325,7 +325,7 @@ internal fun AgentSession.sendMessage(
                 persist = { chatRepository.appendMessage(activeSessionId, "user", parts,
                     idempotencyKey = acceptedTurn.requestId, requestState = "PENDING", requestDelivery = "START",
                     requestTaskId = acceptedTurn.taskId,
-                    requestTaskGeneration = acceptedTurn.taskId?.let { (context.applicationContext as com.openminis.app.MinisApp).botTaskRepository.get(it)?.stopGeneration },
+                    requestTaskGeneration = acceptedTurn.taskId?.let { (context.applicationContext as com.openminis.app.MinisApp).agentTaskRepository.get(it)?.stopGeneration },
                     requestUserInput = acceptedTurn.userInput) },
                 consume = { ids -> _pastedTexts.value = _pastedTexts.value.filterNot { it.id in ids } })
         }
@@ -384,7 +384,7 @@ internal fun AgentSession.sendMessage(
 
         // Start agent loop with fallback. _isStreaming was set synchronously at top.
         launch(Dispatchers.IO) {
-            val sourceRunId = beginBotSourceRun(acceptedTurn)
+            val sourceRunId = beginSourceRun(acceptedTurn)
             val claimed = claimPendingRequest(persistedUser, sourceRunId, steering = false)
             check(claimed != null) { "request_not_claimed" }
             agentHistory.add(requestPayload(claimed))
@@ -401,9 +401,8 @@ internal fun AgentSession.sendMessage(
                 // Build full fallback provider list upfront (mirrors iOS triedEntries approach)
                 val fallbackProviders = buildFallbackProviders(provider)
 
-                var botTurnSucceeded = false
                 try {
-                    withBotTurnLock {
+                    withSessionTurnLock {
                         AppLogger.info(TAG_STREAM, "send runAgentLoop CALL")
                         val outcome = runAgentLoop(
                             provider = provider,
@@ -413,7 +412,6 @@ internal fun AgentSession.sendMessage(
                         )
                         AppLogger.info(TAG_STREAM, "send runAgentLoop RETURN normal")
                         acceptedTurn.record(outcome)
-                        botTurnSucceeded = outcome == AgentTurnOutcome.Completed
                         AppLogger.info(TAG_STREAM, "send request settled")
                     }
                 } catch (e: CancellationException) {
@@ -441,14 +439,12 @@ internal fun AgentSession.sendMessage(
                     SessionActivityTracker.setInactive(activeSessionId)
                     com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(activeSessionId)
                     SessionConcurrencyManager.releaseSlot(activeSessionId)
-                    com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, botTurnSucceeded, sourceRunId)
                     AppLogger.info(TAG_STREAM, "send streamJob FINALLY exit")
                 }
             } catch (e: CancellationException) {
                 acceptedTurn.record(AgentTurnOutcome.Cancelled)
                 AppLogger.info(TAG_STREAM, "send streamJob CANCELLED waiting for slot")
                 Log.d(TAG, "Cancelled while waiting for concurrency slot")
-                com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, false, sourceRunId)
             }
             AppLogger.info(TAG_STREAM, "send streamJob EXIT")
         }
@@ -739,7 +735,7 @@ fun AgentSession.retryLast() {
         // _isStreaming was already set synchronously at the top.
         streamLaunched = true
         launch(Dispatchers.IO) {
-            val sourceRunId = beginBotSourceRun()
+            val sourceRunId = beginSourceRun()
             AppLogger.info(TAG_STREAM, "retryLast streamJob ENTER sid=$activeSessionId")
             try {
                 SessionConcurrencyManager.acquireSlot(activeSessionId)
@@ -747,9 +743,8 @@ fun AgentSession.retryLast() {
                 SessionActivityTracker.setActive(activeSessionId, onStop = { cancelStream() })
                 val activeFallbackStrategy = providerRepository.config.value.fallbackTrigger
                 val fallbackProviders = buildFallbackProviders(provider)
-                var botTurnSucceeded = false
                 try {
-                    withBotTurnLock {
+                    withSessionTurnLock {
                         AppLogger.info(TAG_STREAM, "retryLast runAgentLoop CALL")
                         val outcome = runAgentLoop(
                             provider = provider,
@@ -759,7 +754,6 @@ fun AgentSession.retryLast() {
                             reusingAssistantId = targetAssistantId,
                         )
                         AppLogger.info(TAG_STREAM, "retryLast runAgentLoop RETURN normal")
-                        botTurnSucceeded = outcome == AgentTurnOutcome.Completed
                         AppLogger.info(TAG_STREAM, "retryLast request settled")
                     }
                 } catch (e: CancellationException) {
@@ -784,13 +778,11 @@ fun AgentSession.retryLast() {
                     SessionActivityTracker.setInactive(activeSessionId)
                     com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(activeSessionId)
                     SessionConcurrencyManager.releaseSlot(activeSessionId)
-                    com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, botTurnSucceeded, sourceRunId)
                     AppLogger.info(TAG_STREAM, "retryLast streamJob FINALLY exit")
                 }
             } catch (e: CancellationException) {
                 AppLogger.info(TAG_STREAM, "retryLast streamJob CANCELLED waiting for slot")
                 Log.d(TAG, "Cancelled while waiting for concurrency slot")
-                com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, false, sourceRunId)
             }
             AppLogger.info(TAG_STREAM, "retryLast streamJob EXIT")
         }

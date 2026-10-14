@@ -5,7 +5,7 @@ import androidx.room.withTransaction
 import com.openminis.app.agent.AgentSessionStore
 import com.openminis.app.agent.RunCheckpointStore
 import com.openminis.app.data.db.AppDatabase
-import com.openminis.app.data.db.BotTaskEntity
+import com.openminis.app.data.db.AgentTaskEntity
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.runtime.ToolExecutor
@@ -47,7 +47,7 @@ internal object ToolOutcomeVerification {
 
     /** Read durable receipts even when they are outside the loaded/compacted model history. */
     suspend fun pending(context: Context, sid: String): List<ToolCheckpointStore.IntentRecord> {
-        val tasks = AppDatabase.getInstance(context).botTaskDao()
+        val tasks = AppDatabase.getInstance(context).agentTaskDao()
         check(tasks.incompleteCheckpointRestores(sid) == 0 && tasks.incompleteRestoreEvidence().none { body ->
             val sources = JSONObject(body).getJSONObject("restoration").optJSONArray("checkpoint_sessions") ?: JSONArray()
             (0 until sources.length()).any { sources.optString(it) == sid }
@@ -65,7 +65,7 @@ internal object ToolOutcomeVerification {
             .mapNotNull { it.intentId }.toSet()
         val completedControls = pending.filter { intent ->
             if (intent.intentId == null || intent.taskId == null || ToolRegistry.canonicalName(intent.toolName) != "agent.goal") false
-            else AppDatabase.getInstance(context).botTaskDao().get(intent.taskId)?.takeIf { it.status == BotTaskEntity.STATUS_COMPLETED }
+            else AppDatabase.getInstance(context).agentTaskDao().get(intent.taskId)?.takeIf { it.status == AgentTaskEntity.STATUS_COMPLETED }
                 ?.completionEvidence?.let { JSONObject(it) }?.let { proof ->
                     proof.optString("verified_by_execution_id") == intent.intentId && proof.optString("run_id") == intent.runId &&
                         proof.optString("session_id") == sid && proof.optString("task_id") == intent.taskId
@@ -89,7 +89,7 @@ internal object ToolOutcomeVerification {
         val matches = all.filter { (it.intentId ?: ToolCheckpointStore.legacyKey(it)) == key }
         check(!ToolExecutor.isExecutionInFlight(expected.intentId)) { "execution_still_running" }
         check(matches.isNotEmpty() && matches.all { it == expected }) { "execution_changed_or_settled" }
-        val task = expected.taskId?.let { AppDatabase.getInstance(context).botTaskDao().get(it) }
+        val task = expected.taskId?.let { AppDatabase.getInstance(context).agentTaskDao().get(it) }
         val answer = QuestionCenter.ask(sid, context.getString(com.openminis.app.R.string.outcome_verify_prompt,
             expected.toolName, java.text.DateFormat.getDateTimeInstance().format(java.util.Date(expected.at)), matches.size),
             listOf(QuestionOption(context.getString(com.openminis.app.R.string.outcome_confirm_completed), "completed"),
@@ -105,7 +105,7 @@ internal object ToolOutcomeVerification {
                 check(db.chatDao().getSession(sid) != null) { "session_deleted" }
                 check(!ToolExecutor.isExecutionInFlight(expected.intentId)) { "execution_still_running" }
                 if (task != null) {
-                    val current = checkNotNull(db.botTaskDao().get(task.id))
+                    val current = checkNotNull(db.agentTaskDao().get(task.id))
                     check(current.revision == task.revision && current.stopGeneration == task.stopGeneration) { "task_changed_or_stopped" }
                 }
                 check(ToolCheckpointStore.drainPending(context, sid).filter { (it.intentId ?: ToolCheckpointStore.legacyKey(it)) == key } == matches) { "execution_changed_or_settled" }
@@ -124,20 +124,20 @@ internal object ToolOutcomeVerification {
         }
     }
 
-    suspend fun reviewRestore(context: Context, sid: String, task: BotTaskEntity, args: JSONObject, toolId: String): JSONObject {
+    suspend fun reviewRestore(context: Context, sid: String, task: AgentTaskEntity, args: JSONObject, toolId: String): JSONObject {
         val ownId = requireOwner(context, sid, task, toolId)
         return reviewRestoreRecord(context, sid, task, args, toolId, ownId)
     }
 
     /** Native human review does not impersonate a tool execution or restart a restored task. */
-    suspend fun reviewRestoreFromUi(context: Context, sid: String, task: BotTaskEntity): JSONObject {
+    suspend fun reviewRestoreFromUi(context: Context, sid: String, task: AgentTaskEntity): JSONObject {
         check(task.currentOwnerSessionId == sid || task.originSessionId == sid || task.goalSessionId == sid) { "task_owner_mismatch" }
         check(AgentSessionStore.activeRun(sid) == null) { "task_still_running" }
         return reviewRestoreRecord(context, sid, task, JSONObject().put("task_id", task.id)
             .put("revision", task.revision).put("stop_generation", task.stopGeneration), null, null)
     }
 
-    private suspend fun reviewRestoreRecord(context: Context, sid: String, task: BotTaskEntity, args: JSONObject,
+    private suspend fun reviewRestoreRecord(context: Context, sid: String, task: AgentTaskEntity, args: JSONObject,
                                             toolId: String?, ownId: String?): JSONObject {
         require(args.optString("task_id") == task.id && args.optInt("revision", -1) == task.revision &&
             args.optInt("stop_generation", -1) == task.stopGeneration) { "task_changed_or_missing_identity" }
@@ -153,20 +153,20 @@ internal object ToolOutcomeVerification {
         check(answer?.takeUnless { it.skipped }?.selected == listOf("reviewed")) { "restoration_review_pending" }
         val db = AppDatabase.getInstance(context)
         db.withTransaction {
-            val current = checkNotNull(db.botTaskDao().get(task.id))
+            val current = checkNotNull(db.agentTaskDao().get(task.id))
             check(current.revision == task.revision && current.stopGeneration == task.stopGeneration &&
                 (current.currentOwnerSessionId == sid || (toolId == null && (current.originSessionId == sid || current.goalSessionId == sid))) && current.completionEvidence == saved &&
-                current.status !in BotTaskEntity.TERMINAL_STATUSES) { "task_changed_or_stopped" }
+                current.status !in AgentTaskEntity.TERMINAL_STATUSES) { "task_changed_or_stopped" }
             if (toolId != null) requireOwner(context, sid, current, toolId)
             else check(AgentSessionStore.activeRun(sid) == null) { "task_still_running" }
             restore.put("requires_review", false).put("reviewed_at", System.currentTimeMillis())
             if (ownId != null) restore.put("reviewed_by_execution_id", ownId) else restore.put("reviewed_by", "native_user")
-            db.botTaskDao().replace(current.copy(completionEvidence = proof.toString()))
+            db.agentTaskDao().replace(current.copy(completionEvidence = proof.toString()))
         }
         return JSONObject().put("reviewed", true).put("status", task.status).put("task_id", task.id)
     }
 
-    suspend fun requireOwner(context: Context, sid: String, task: BotTaskEntity, toolId: String): String {
+    suspend fun requireOwner(context: Context, sid: String, task: AgentTaskEntity, toolId: String): String {
         val actual = checkNotNull(kotlin.coroutines.coroutineContext[ToolExecutor.ExecutionIdentity]) { "verification_requires_actual_execution" }
         val run = checkNotNull(AgentSessionStore.activeRun(sid)) { "verification_requires_active_owner_run" }
         val owned = checkNotNull(AgentSessionStore.activeRunTask(sid)) { "verification_requires_owned_task" }
@@ -193,9 +193,9 @@ internal object ToolOutcomeVerification {
         return versions.singleOrNull()
     }
 
-    suspend fun verify(context: Context, sid: String, task: BotTaskEntity, args: JSONObject, toolId: String): JSONObject {
-        check(task.status in setOf(BotTaskEntity.STATUS_ACTIVE, BotTaskEntity.STATUS_WAITING,
-            BotTaskEntity.STATUS_NEEDS_USER)) { "task_changed_or_stopped" }
+    suspend fun verify(context: Context, sid: String, task: AgentTaskEntity, args: JSONObject, toolId: String): JSONObject {
+        check(task.status in setOf(AgentTaskEntity.STATUS_ACTIVE, AgentTaskEntity.STATUS_WAITING,
+            AgentTaskEntity.STATUS_NEEDS_USER)) { "task_changed_or_stopped" }
         val ownId = requireOwner(context, sid, task, toolId)
         require(args.optString("task_id") == task.id && args.optInt("revision", -1) == task.revision &&
             args.optInt("stop_generation", -1) == task.stopGeneration) { "task_changed_or_missing_identity" }
@@ -292,10 +292,10 @@ internal object ToolOutcomeVerification {
         val verified = checkNotNull(proof)
         val settled = withContext(NonCancellable) {
             db.withTransaction {
-                val current = checkNotNull(db.botTaskDao().get(task.id)) { "task_not_found" }
+                val current = checkNotNull(db.agentTaskDao().get(task.id)) { "task_not_found" }
                 check(current.revision == task.revision && current.stopGeneration == task.stopGeneration &&
-                    current.currentOwnerSessionId == sid && current.status in setOf(BotTaskEntity.STATUS_ACTIVE,
-                        BotTaskEntity.STATUS_WAITING, BotTaskEntity.STATUS_NEEDS_USER)) { "task_changed_or_stopped" }
+                    current.currentOwnerSessionId == sid && current.status in setOf(AgentTaskEntity.STATUS_ACTIVE,
+                        AgentTaskEntity.STATUS_WAITING, AgentTaskEntity.STATUS_NEEDS_USER)) { "task_changed_or_stopped" }
                 requireOwner(context, sid, current, toolId)
                 if (existing() == null) {
                     check(ToolCheckpointStore.drainPending(context, sid).any { matches(verified, it) }) { "unknown_execution_not_found" }
@@ -309,7 +309,7 @@ internal object ToolOutcomeVerification {
                         .put("type", "toolResult").put("value", value)).toString())
                 }
                 // Resolving an action is not permission to resume a waiting or user-controlled task.
-                checkNotNull(db.botTaskDao().get(task.id))
+                checkNotNull(db.agentTaskDao().get(task.id))
             }.also { ToolCheckpointStore.acknowledge(context, sid, setOf(execution)) }
         }
         AgentSessionStore.updateRunGoal(sid, settled)

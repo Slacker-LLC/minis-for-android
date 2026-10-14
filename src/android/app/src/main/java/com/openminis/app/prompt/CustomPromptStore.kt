@@ -17,7 +17,7 @@ import java.io.File
  * This is the single free-text box in Settings -> System prompt: whatever the
  * user writes there is injected ahead of every other authored section of the
  * agent prompt and is declared to outrank them (personality, response style,
- * presets, bot instructions, session overlays). Codex-style custom
+ * presets, session overlays). Codex-style custom
  * instructions, not a per-section editor.
  *
  * Stored as a plain file next to the module overrides so it survives app

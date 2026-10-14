@@ -260,7 +260,7 @@
     <string name="system_prompt_reset_all_confirm_body">All custom text and switches are cleared; every module returns to the wording shipped with the app.</string>
     <string name="system_prompt_custom_section">Custom system prompt</string>
     <string name="system_prompt_custom_hint">Write your system prompt here ...</string>
-    <string name="system_prompt_custom_footer">Saved text is injected at the top of every conversation with an explicit precedence header: where it conflicts with the personality (Soul), response style, presets, bot instructions or a session Soul, this text wins. Leave it empty to inject nothing.</string>
+    <string name="system_prompt_custom_footer">Saved text is injected at the top of every conversation with an explicit precedence header: where it conflicts with the personality (Soul), response style, presets or a session Soul, this text wins. Leave it empty to inject nothing.</string>
     <string name="system_prompt_custom_clear">Clear</string>
     <string name="system_prompt_custom_clear_confirm_title">Clear the custom system prompt?</string>
     <string name="system_prompt_custom_clear_confirm_body">The box is emptied and nothing is injected from it. Other settings are not affected.</string>
@@ -2034,7 +2034,6 @@
     <string name="drawer_recent">Recent</string>
     <string name="drawer_no_search_match">No matching conversations</string>
     <string name="drawer_search_results">%1$d results</string>
-    <string name="settings_agent_section_team">Team &amp; routines</string>
     <string name="settings_agent_team_sub">Members, their roles, models and routines</string>
     <string name="settings_agent_tasks_sub">Recurring runs, their history and who runs them</string>
     <string name="chat_quick_battery_title">Check the battery</string>
@@ -2176,31 +2175,11 @@
         <item quantity="one">+%1$d backup model</item>
         <item quantity="other">+%1$d backup models</item>
     </plurals>
-    <string name="bots_task_budget_summary">Automatic reviews %1$d/%2$d · revisions %3$d/%4$d · delegations %5$d/%6$d</string>
-    <string name="bots_task_pause">Pause</string>
-    <string name="bots_task_cancel">Cancel</string>
-    <string name="bots_task_notification_title">Bot task: %1$s</string>
-    <string name="bots_task_notification_needs_user">The owner Bot needs your input.</string>
-    <string name="bots_task_notification_completed">The owner Bot finished reviewing the results.</string>
-    <string name="bots_task_notification_budget">The automatic review budget is exhausted.</string>
 
-    <!-- B2: Bot-owned scheduled routines -->
-    <string name="scheduled_task_executor">Executor</string>
-    <string name="scheduled_task_executor_regular">Regular chat (no Bot)</string>
-    <string name="scheduled_task_executor_loading">Loading…</string>
-    <string name="scheduled_task_model_bot_default">Use this Bot’s default model</string>
-    <string name="scheduled_task_bot_disabled">Bot is disabled</string>
-    <string name="scheduled_task_bot_label">Bot: %1$s</string>
-    <string name="bots_routines">Routines</string>
-    <string name="bots_routines_disabled">This Bot is disabled. Its routines remain enabled but are skipped until the Bot is restored.</string>
-    <string name="bots_new_routine">New routine</string>
-    <string name="bots_routine_no_next">No next run scheduled</string>
+    <!-- Scheduled task strings -->
 
     <!-- B2: capacity/save errors -->
-    <string name="scheduled_task_bot_routine_limit">This Bot already has %1$d routines. Delete one before adding another.</string>
     <string name="scheduled_task_save_failed">Could not save the scheduled task.</string>
-    <string name="bots_routine_vscreen_busy">The virtual display was busy with another session.</string>
-    <string name="bots_routine_vscreen_unavailable">Virtual display is disabled or the device self-check did not pass.</string>
     <string name="scheduled_vscreen_unattended_hint">Unattended runs use only the virtual screen for UI actions.</string>
     <string name="scheduled_vscreen_unavailable_warning">Virtual display is not currently enabled with a passing device check. This routine can still be saved, but its UI actions may fail.</string>
     <string name="settings_vscreen_entry">Virtual display (experimental)</string>
@@ -2287,9 +2266,6 @@
 <string name="scheduled_task_tier_full_confirmation_body">FULL lets this unattended routine run arbitrary shell commands, write files beyond its temporary folder and call connected MCP tools, subject to existing app permissions. Select it only if you trust the prompt and configured tools. Network access remains unrestricted.</string>
 <string name="scheduled_task_tier_full_confirm">Confirm Full</string>
 <string name="scheduled_task_readonly_denied_preview">READ_ONLY blocked %1$s: %2$s</string>
-    <string name="bots_progress_running">%1$d delegated tasks in progress</string>
-    <string name="bots_progress_none">Nothing in progress</string>
-    <string name="bots_members_header">Members</string>
     <string name="browser_desktop_site">Desktop site</string>
     <string name="browser_tab_count_title">%1$d tabs</string>
     <string name="browser_share">Share</string>
@@ -2594,7 +2570,6 @@
     <string name="outcome_pending_title">Actions needing inspection</string>
     <string name="outcome_inspect_action">Inspect %1$s</string>
     <string name="outcome_kept_unknown">The action is still unresolved. Its record is preserved.</string>
-    <string name="bots_reception">Default reception member</string>
     <string name="voice_cancel_recording">Cancel recording</string>
     <string name="voice_stop_playback">Stop speech</string>
     <string name="voice_stop_owned_turn">Stop this voice request</string>
@@ -2607,4 +2582,22 @@
     <string name="work_task_waiting">Waiting for external results</string>
     <string name="work_request_review">Pending instructions: confirm their delivery after recovery.</string>
     <string name="work_task_clear_selection">Clear selected task</string>
+    <string name="settings_agent_section_tasks">Scheduled tasks</string>
+    <string name="agent_task_completed">Completed</string>
+    <string name="agent_task_cancelled">Cancelled</string>
+    <string name="agent_task_failed">Failed</string>
+    <string name="agent_task_paused">Paused</string>
+    <string name="agent_task_needs_user">Needs your input</string>
+    <string name="agent_task_budget_exhausted">Run budget used</string>
+    <string name="agent_task_active">In progress</string>
+    <string name="agent_task_phase_planning">Planning</string>
+    <string name="agent_task_phase_reviewing">Reviewing</string>
+    <string name="agent_task_phase_revising">Revising</string>
+    <string name="agent_task_phase_delivering">Delivering</string>
+    <string name="agent_task_phase_executing">Executing</string>
+    <string name="agent_task_pause">Pause task</string>
+    <string name="agent_task_cancel">Cancel task</string>
+    <string name="scheduled_task_legacy_executor_removed">This task used a removed executor. Review it and save before running it again.</string>
+    <string name="sub_agent_text_model_required">Choose a model that can respond with text.</string>
+    <string name="vscreen_display_busy">The virtual display is currently in use by another session.</string>
 </resources>

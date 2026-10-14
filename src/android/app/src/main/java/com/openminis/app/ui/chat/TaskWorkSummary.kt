@@ -13,7 +13,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.room.withTransaction
 import com.openminis.app.MinisApp
 import com.openminis.app.R
-import com.openminis.app.data.db.BotTaskEntity
+import com.openminis.app.data.db.AgentTaskEntity
 import com.openminis.app.data.model.SessionOverrides
 import com.openminis.app.ui.components.MinisTextButton
 import kotlinx.coroutines.launch
@@ -25,9 +25,8 @@ internal fun TaskWorkSummary(sessionId: String) {
     val context = LocalContext.current
     val app = context.applicationContext as MinisApp
     val scope = rememberCoroutineScope()
-    val tasks by remember(sessionId) { app.database.botTaskDao().observeSessionTasks(sessionId) }.collectAsState(initial = emptyList())
+    val tasks by remember(sessionId) { app.database.agentTaskDao().observeSessionTasks(sessionId) }.collectAsState(initial = emptyList())
     val session by remember(sessionId) { app.database.chatDao().observeSession(sessionId) }.collectAsState(initial = null)
-    val bots by app.botRepository.observeBots().collectAsState(initial = emptyList())
     val pendingReview by remember(sessionId) { app.database.chatDao().observeRequestsNeedingReview(sessionId) }.collectAsState(initial = 0)
     val selectedId = SessionOverrides.fromJson(session?.sessionOverrides).taskId
     var expanded by remember(sessionId) { mutableStateOf(false) }
@@ -54,24 +53,24 @@ internal fun TaskWorkSummary(sessionId: String) {
         MinisTextButton(onClick = { expanded = !expanded }) { Text(stringResource(R.string.work_task_summary)) }
         if (expanded) tasks.forEach { task ->
             val status = stringResource(when (task.status) {
-                BotTaskEntity.STATUS_COMPLETED -> R.string.bots_task_completed
-                BotTaskEntity.STATUS_CANCELLED -> R.string.bots_task_cancelled
-                BotTaskEntity.STATUS_FAILED -> R.string.bots_failed
-                BotTaskEntity.STATUS_PAUSED -> R.string.bots_task_paused
-                BotTaskEntity.STATUS_NEEDS_USER -> R.string.bots_task_needs_user
-                BotTaskEntity.STATUS_BUDGET_EXHAUSTED -> R.string.bots_task_budget_exhausted
-                BotTaskEntity.STATUS_WAITING -> R.string.work_task_waiting
-                else -> R.string.bots_task_active
+                AgentTaskEntity.STATUS_COMPLETED -> R.string.agent_task_completed
+                AgentTaskEntity.STATUS_CANCELLED -> R.string.agent_task_cancelled
+                AgentTaskEntity.STATUS_FAILED -> R.string.agent_task_failed
+                AgentTaskEntity.STATUS_PAUSED -> R.string.agent_task_paused
+                AgentTaskEntity.STATUS_NEEDS_USER -> R.string.agent_task_needs_user
+                AgentTaskEntity.STATUS_BUDGET_EXHAUSTED -> R.string.agent_task_budget_exhausted
+                AgentTaskEntity.STATUS_WAITING -> R.string.work_task_waiting
+                else -> R.string.agent_task_active
             })
             val phase = stringResource(when (task.phase) {
-                BotTaskEntity.PHASE_PLANNING -> R.string.bots_phase_planning
-                BotTaskEntity.PHASE_REVIEWING -> R.string.bots_phase_reviewing
-                BotTaskEntity.PHASE_REVISING -> R.string.bots_phase_revising
-                BotTaskEntity.PHASE_DELIVERING -> R.string.bots_phase_delivering
-                else -> R.string.bots_phase_executing
+                AgentTaskEntity.PHASE_PLANNING -> R.string.agent_task_phase_planning
+                AgentTaskEntity.PHASE_REVIEWING -> R.string.agent_task_phase_reviewing
+                AgentTaskEntity.PHASE_REVISING -> R.string.agent_task_phase_revising
+                AgentTaskEntity.PHASE_DELIVERING -> R.string.agent_task_phase_delivering
+                else -> R.string.agent_task_phase_executing
             })
             Text(task.goal, style = MaterialTheme.typography.bodyMedium, maxLines = 3)
-            Text(listOfNotNull(bots.firstOrNull { it.id == task.ownerBotId }?.name, status, phase).joinToString(" · "),
+            Text(listOf(status, phase).joinToString(" · "),
                 style = MaterialTheme.typography.labelMedium)
             if (task.progress.isNotBlank()) Text(task.progress, style = MaterialTheme.typography.bodySmall, maxLines = 4)
             val restore = task.completionEvidence?.let { runCatching { JSONObject(it).optJSONObject("restoration") }.getOrNull() }
@@ -80,28 +79,27 @@ internal fun TaskWorkSummary(sessionId: String) {
                     Text(stringResource(R.string.work_task_restore_review))
                 }
             }
-            if (task.status == BotTaskEntity.STATUS_PAUSED) {
-                MinisTextButton(onClick = { act { app.database.botTaskDao().resumeReviewedTask(task) } }, enabled = !acting) {
+            if (task.status == AgentTaskEntity.STATUS_PAUSED) {
+                MinisTextButton(onClick = { act { app.database.agentTaskDao().resumeReviewedTask(task) } }, enabled = !acting) {
                     Text(stringResource(R.string.work_task_resume))
                 }
-            } else if (task.status !in BotTaskEntity.TERMINAL_STATUSES) {
+            } else if (task.status !in AgentTaskEntity.TERMINAL_STATUSES) {
                 Row {
                     MinisTextButton(onClick = { act {
-                        app.botTaskRepository.pause(task.id)
-                    } }, enabled = !acting) { Text(stringResource(R.string.bots_task_pause)) }
+                        app.agentTaskRepository.pause(task.id)
+                    } }, enabled = !acting) { Text(stringResource(R.string.agent_task_pause)) }
                     MinisTextButton(onClick = { act {
-                        com.openminis.app.tools.BotDelegationCoordinator.current()?.cancelRootTask(task.id)
-                            ?: app.botTaskRepository.cancel(task.id)
-                    } }, enabled = !acting) { Text(stringResource(R.string.bots_task_cancel)) }
+                        app.agentTaskRepository.cancel(task.id)
+                    } }, enabled = !acting) { Text(stringResource(R.string.agent_task_cancel)) }
                 }
             }
-            if (task.status !in BotTaskEntity.TERMINAL_STATUSES && task.status != BotTaskEntity.STATUS_PAUSED) {
+            if (task.status !in AgentTaskEntity.TERMINAL_STATUSES && task.status != AgentTaskEntity.STATUS_PAUSED) {
                 MinisTextButton(onClick = { act {
                     app.database.withTransaction {
                         val owner = checkNotNull(app.chatRepository.getSession(sessionId))
-                        val current = checkNotNull(app.botTaskRepository.get(task.id))
-                        check(if (current.ownerBotId != null) current.ownerBotId == owner.botId else
-                            current.originSessionId == sessionId || current.goalSessionId == sessionId) { "task_owner_mismatch" }
+                        val current = checkNotNull(app.agentTaskRepository.get(task.id))
+                        check(current.originSessionId == sessionId || current.currentOwnerSessionId == sessionId ||
+                            current.goalSessionId == sessionId) { "task_owner_mismatch" }
                         check(com.openminis.app.agent.AgentSessionStore.activeRun(sessionId) == null) { "current_turn_still_running" }
                         val overrides = JSONObject(owner.sessionOverrides ?: "{}").put("taskId", task.id)
                         app.chatRepository.dao.updateSessionOverrides(sessionId, overrides.toString())
@@ -110,7 +108,7 @@ internal fun TaskWorkSummary(sessionId: String) {
                     Text(stringResource(if (selectedId == task.id) R.string.work_task_selected else R.string.work_task_select))
                 }
             }
-            if (task.status == BotTaskEntity.STATUS_COMPLETED) MinisTextButton(onClick = {
+            if (task.status == AgentTaskEntity.STATUS_COMPLETED) MinisTextButton(onClick = {
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("minis://settings/files")).setPackage(context.packageName))
             }) { Text(stringResource(R.string.work_task_results)) }
         }

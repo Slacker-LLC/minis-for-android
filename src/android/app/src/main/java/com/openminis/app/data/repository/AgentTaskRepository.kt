@@ -1,11 +1,10 @@
 package com.openminis.app.data.repository
 
-import com.openminis.app.data.db.BotTaskDao
-import com.openminis.app.data.db.BotTaskEntity
-import java.util.UUID
+import com.openminis.app.data.db.AgentTaskDao
+import com.openminis.app.data.db.AgentTaskEntity
 
 /** Repository for the root lifecycle shared by owner, workers and the UI. */
-class BotTaskRepository(private val dao: BotTaskDao) {
+class AgentTaskRepository(private val dao: AgentTaskDao) {
     fun observeSessionGoal(sessionId: String) = dao.observeSessionGoal(sessionId)
 
     suspend fun sessionGoal(sessionId: String) = dao.sessionGoal(sessionId)
@@ -31,7 +30,7 @@ class BotTaskRepository(private val dao: BotTaskDao) {
     suspend fun setSessionPlan(sessionId: String, mode: String, plan: String) =
         dao.setSessionPlan(sessionId, mode, normalize(plan, PLAN_MAX_CHARS))
 
-    suspend fun updateOwnedGoal(expected: BotTaskEntity, goal: String, maxRuns: Int?, criteria: String?): BotTaskEntity {
+    suspend fun updateOwnedGoal(expected: AgentTaskEntity, goal: String, maxRuns: Int?, criteria: String?): AgentTaskEntity {
         val text = normalize(goal, GOAL_MAX_CHARS)
         require(text.isNotBlank()) { "goal text is required" }
         return dao.updateOwnedGoal(expected, text, maxRuns, criteria?.let { normalize(it, CRITERIA_MAX_CHARS) })
@@ -41,38 +40,12 @@ class BotTaskRepository(private val dao: BotTaskDao) {
 
     fun observe(id: String) = dao.observe(id)
 
-    suspend fun get(id: String): BotTaskEntity? = dao.get(id)
+    suspend fun get(id: String): AgentTaskEntity? = dao.get(id)
 
     suspend fun taskIdsForSession(sessionId: String) = dao.taskIdsForSession(sessionId)
 
-    suspend fun bindRunOwner(task: BotTaskEntity, sessionId: String) =
+    suspend fun bindRunOwner(task: AgentTaskEntity, sessionId: String) =
         dao.bindRunOwner(task.id, task.revision, task.stopGeneration, sessionId)
-
-    suspend fun ensureRootTask(
-        originSessionId: String,
-        originMessageId: String?,
-        ownerBotId: String,
-        goal: String,
-        acceptanceCriteria: String? = null,
-        deadlineAt: Long? = null,
-    ): BotTaskEntity {
-        val normalizedGoal = normalize(goal, GOAL_MAX_CHARS)
-        require(normalizedGoal.isNotEmpty()) { "Task goal must not be blank" }
-        val normalizedMessageId = originMessageId?.trim()?.takeIf { it.isNotEmpty() }
-        val now = System.currentTimeMillis()
-        val task = BotTaskEntity(
-            id = UUID.randomUUID().toString(),
-            originSessionId = originSessionId,
-            originMessageId = normalizedMessageId,
-            ownerBotId = ownerBotId,
-            goal = normalizedGoal,
-            acceptanceCriteria = acceptanceCriteria?.let { normalize(it, CRITERIA_MAX_CHARS) },
-            deadlineAt = deadlineAt,
-            createdAt = now,
-            updatedAt = now,
-        )
-        return dao.ensureRootTask(task)
-    }
 
     suspend fun updateState(
         id: String,
@@ -90,18 +63,15 @@ class BotTaskRepository(private val dao: BotTaskDao) {
         generation: Int? = null,
     ): Boolean = dao.updateStateIfWakeable(id, status, phase, ownerSessionId, System.currentTimeMillis(), revision, generation) == 1
 
-    suspend fun requestRevision(id: String, maxRounds: Int, revision: Int? = null, generation: Int? = null): Boolean =
-        dao.requestRevision(id, BotTaskEntity.STATUS_ACTIVE, System.currentTimeMillis(), maxRounds, revision, generation) == 1
-
     suspend fun pause(id: String): Boolean {
-        if (dao.stop(id, BotTaskEntity.STATUS_PAUSED, System.currentTimeMillis()) != 1) return false
+        if (dao.stop(id, AgentTaskEntity.STATUS_PAUSED, System.currentTimeMillis()) != 1) return false
         dao.get(id)?.let { task -> com.openminis.app.agent.AgentSessionStore.stopObsoleteGoalRun(
             task.currentOwnerSessionId ?: task.goalSessionId ?: task.originSessionId, task) }
         return true
     }
 
     suspend fun cancel(id: String, stopOwner: Boolean = true): Boolean {
-        if (dao.stop(id, BotTaskEntity.STATUS_CANCELLED, System.currentTimeMillis()) != 1) return false
+        if (dao.stop(id, AgentTaskEntity.STATUS_CANCELLED, System.currentTimeMillis()) != 1) return false
         kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
             dao.get(id)?.let { com.openminis.app.agent.AgentSessionStore.stopTaskWork(it, stopOwner) }
         }
@@ -115,9 +85,6 @@ class BotTaskRepository(private val dao: BotTaskDao) {
 
     suspend fun recordAutoRun(id: String, maxRuns: Int, revision: Int? = null, generation: Int? = null): Boolean =
         dao.recordAutoRun(id, System.currentTimeMillis(), maxRuns, revision, generation) == 1
-
-    suspend fun recordDelegation(id: String, maxDelegations: Int, revision: Int? = null, generation: Int? = null): Boolean =
-        dao.recordDelegation(id, System.currentTimeMillis(), maxDelegations, revision, generation) == 1
 
     suspend fun exhaustBudget(id: String, revision: Int, generation: Int): Boolean =
         dao.exhaustBudget(id, System.currentTimeMillis(), revision, generation) == 1

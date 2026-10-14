@@ -56,7 +56,7 @@ internal object BackupAppSettings {
             "font_message" to 'i', "font_app_base" to 'i', "app_language" to 's',
         ),
         "ui_prefs" to mapOf("tablet_list_pane_width_dp" to 'f', "tablet_list_pane_collapsed" to 'b'),
-        "minis_assistant_home_prefs" to mapOf("assistant_home_actions" to 's', "assistant_home_start_page" to 'b', "reception_bot" to 's'),
+        "minis_assistant_home_prefs" to mapOf("assistant_home_actions" to 's', "assistant_home_start_page" to 'b'),
         "composer_input_prefs" to mapOf("composer_input_mode_pref" to 's'),
         "minis_fast_mode_prefs" to mapOf("codexFastModeEnabled" to 'b'),
         "minis_auto_compact_prefs" to mapOf("autoCompactOnThreshold" to 'b'),

@@ -5,7 +5,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.MinisApp
 import com.openminis.app.agent.AgentRunner
 import com.openminis.app.agent.AgentSessionStore
-import com.openminis.app.data.db.BotTaskEntity
+import com.openminis.app.data.db.AgentTaskEntity
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.repository.TaskArtifacts
 import com.openminis.app.data.repository.awaitConfigLoaded
@@ -33,7 +33,7 @@ class AgentArtifactsE2ETest {
         val marker = "artifact-e2e-${UUID.randomUUID()}"
         val sessions = mutableListOf<String>()
         val tasks = mutableListOf<String>()
-        val dao = app.database.botTaskDao()
+        val dao = app.database.agentTaskDao()
         val report = JSONObject().put("device", android.os.Build.FINGERPRINT).put("scenarios", JSONArray())
         fun passed(name: String) { report.getJSONArray("scenarios").put(JSONObject().put("name", name).put("passed", true)) }
         suspend fun session(): String = app.chatRepository.createSession("scripted-model", title = marker, memoryEnabled = false).id.also(sessions::add)
@@ -42,7 +42,7 @@ class AgentArtifactsE2ETest {
             withTimeout(15_000) { vm.sessionLoaded.first { it } }
             withContext(Dispatchers.Main) { vm.currentProvider = provider; vm.currentModel = provider.model; vm._activeEntryId.value = "artifacts-scripted" }
         }
-        suspend fun complete(sid: String, path: String, content: String): BotTaskEntity {
+        suspend fun complete(sid: String, path: String, content: String): AgentTaskEntity {
             val prefix = "artifact-${UUID.randomUUID()}"
             var identity: JSONObject? = null
             var finalReceipt: AgentContentPart.ToolResult? = null
@@ -68,7 +68,7 @@ class AgentArtifactsE2ETest {
             assertNotNull(finalReceipt); assertFalse(finalReceipt!!.content, finalReceipt!!.isError)
             val task = dao.get(identity!!.getString("task_id"))!!
             tasks.add(task.id)
-            assertEquals(BotTaskEntity.STATUS_COMPLETED, task.status)
+            assertEquals(AgentTaskEntity.STATUS_COMPLETED, task.status)
             return task
         }
         try {
@@ -93,15 +93,15 @@ class AgentArtifactsE2ETest {
             assertEquals(originalContent, WorkspaceFileClient.readAll(reference.sessionId, reference.path).decodeToString())
             assertTrue(TaskArtifacts.page(app, other).references.none { it.taskId == first.id })
             passed("same-name files in another actual session cannot replace the recorded source or enter its session-scoped artifact list")
-            app.botTaskRepository.clearSessionGoal(source)
-            assertNull(app.botTaskRepository.sessionGoal(source))
+            app.agentTaskRepository.clearSessionGoal(source)
+            assertNull(app.agentTaskRepository.sessionGoal(source))
             val afterClear = dao.get(first.id)!!
-            assertEquals(BotTaskEntity.STATUS_COMPLETED, afterClear.status)
+            assertEquals(AgentTaskEntity.STATUS_COMPLETED, afterClear.status)
             assertEquals(first.completionEvidence, afterClear.completionEvidence)
             assertEquals(reference, TaskArtifacts.page(app, source).references.single { it.taskId == first.id })
             passed("clearing the active Goal retains the historical reference with its old proof generation and exact source")
             val second = complete(source, "/workspace/second.txt", "second verified artifact\n")
-            app.botTaskRepository.clearSessionGoal(source)
+            app.agentTaskRepository.clearSessionGoal(source)
             val pageOne = dao.completedEvidence(source, 1, 0); val pageTwo = dao.completedEvidence(source, 1, 1)
             assertEquals(setOf(first.id, second.id), (pageOne + pageTwo).map { it.id }.toSet())
             assertEquals(2, TaskArtifacts.page(app, source).references.size)
@@ -110,11 +110,11 @@ class AgentArtifactsE2ETest {
             val changed = TaskArtifacts.verify(app, reference)
             assertEquals(TaskArtifacts.State.CHANGED, changed.state); assertNotEquals(reference.expectedSha256, changed.sha256)
             assertEquals(first.completionEvidence, dao.get(first.id)!!.completionEvidence)
-            assertEquals(BotTaskEntity.STATUS_COMPLETED, dao.get(first.id)!!.status)
+            assertEquals(AgentTaskEntity.STATUS_COMPLETED, dao.get(first.id)!!.status)
             passed("a real post-delivery edit changes current availability without rewriting historical completion or evidence")
             WorkspaceFileClient.delete(source, path)
             assertEquals(TaskArtifacts.State.UNAVAILABLE, TaskArtifacts.verify(app, reference).state)
-            assertEquals(BotTaskEntity.STATUS_COMPLETED, dao.get(first.id)!!.status)
+            assertEquals(AgentTaskEntity.STATUS_COMPLETED, dao.get(first.id)!!.status)
             WorkspaceFileClient.writeBytes(source, path, originalContent.toByteArray())
             assertEquals(TaskArtifacts.State.VERIFIED, TaskArtifacts.verify(app, reference).state)
             passed("actual deletion is unavailable and restoring the original bytes validates again against the same historical proof")
@@ -143,7 +143,7 @@ class AgentArtifactsE2ETest {
             report.put("artifactSha256", MessageDigest.getInstance("SHA-256").digest(deliveryBytes).joinToString("") { "%02x".format(it) })
             app.chatRepository.deleteSession(source)
             assertEquals(TaskArtifacts.State.UNAVAILABLE, TaskArtifacts.verify(app, reference).state)
-            assertEquals(BotTaskEntity.STATUS_COMPLETED, dao.get(first.id)!!.status)
+            assertEquals(AgentTaskEntity.STATUS_COMPLETED, dao.get(first.id)!!.status)
             assertNull(AgentSessionStore.existing(source))
             assertFalse(SafeFileTree.existsNoFollow(File(UbuntuPaths.hostSessions, source)))
             passed("deleted original Room session leaves historical completion intact and verification creates no owner or replacement directory")
@@ -151,7 +151,7 @@ class AgentArtifactsE2ETest {
         } catch (error: Throwable) { report.put("passed", false).put("failure", error.toString()); throw error }
         finally {
             sessions.forEach { AgentRunner.cancel(app, it); app.chatRepository.deleteSession(it) }
-            tasks.forEach { id -> app.database.openHelper.writableDatabase.execSQL("DELETE FROM bot_tasks WHERE id = ?", arrayOf(id)) }
+            tasks.forEach { id -> app.database.openHelper.writableDatabase.execSQL("DELETE FROM agent_tasks WHERE id = ?", arrayOf(id)) }
             File(app.filesDir, "agent-artifacts-e2e.json").writeText(report.toString(2))
         }
     }

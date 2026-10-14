@@ -26,7 +26,6 @@ internal object LegacyGroupStateParser {
         availableEntryIds: Set<String>,
         sessionBindings: List<LegacyBindingRecord>,
         scheduledBindings: List<LegacyBindingRecord>,
-        botBindings: List<LegacyBindingRecord>,
         legacyAgentLoopGroupIds: List<String> = emptyList(),
         legacyJsonConfig: ProviderConfig? = null,
         json: Json,
@@ -61,7 +60,6 @@ internal object LegacyGroupStateParser {
             availableEntryIds = availableEntryIds,
             sessionBindings = sessionBindings,
             scheduledBindings = scheduledBindings,
-            botBindings = botBindings,
         )
     }
 
@@ -72,7 +70,6 @@ internal object LegacyGroupStateParser {
         availableEntryIds: Set<String>,
         sessionBindings: List<LegacyBindingRecord> = emptyList(),
         scheduledBindings: List<LegacyBindingRecord> = emptyList(),
-        botBindings: List<LegacyBindingRecord> = emptyList(),
     ): LegacyState {
         val root = runCatching { Json.parseToJsonElement(rawJson).jsonObject }.getOrNull() ?: JsonObject(emptyMap())
         val groups = root["modelGroups"]?.let { raw ->
@@ -110,7 +107,6 @@ internal object LegacyGroupStateParser {
             availableEntryIds = availableEntryIds,
             sessionBindings = sessionBindings,
             scheduledBindings = scheduledBindings,
-            botBindings = botBindings,
         )
     }
 

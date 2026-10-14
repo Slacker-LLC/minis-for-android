@@ -23,7 +23,6 @@ import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.R
 import com.openminis.app.data.repository.ChatRepository
-import com.openminis.app.data.repository.BotRepository
 import com.openminis.app.data.repository.MemoryRepository
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.provider.ImageBudget
@@ -76,7 +75,6 @@ class AgentSession(
     val memoryRepository: MemoryRepository? = null,
     val skillRepository: com.openminis.app.data.repository.SkillRepository? = null,
     val mcpRepository: com.openminis.app.data.repository.MCPRepository? = null,
-    val botRepository: BotRepository? = null,
 ) {
 
     internal val execution = AgentExecution()
@@ -216,7 +214,7 @@ class AgentSession(
          */
         internal const val MAX_AGENT_TURNS = 200
         /** [T-android-run-checkpoint] Entry source recorded for a chat-driven run. */
-        internal const val RUN_CHECKPOINT_ENTRY_SOURCE = "bot"
+        internal const val RUN_CHECKPOINT_ENTRY_SOURCE = "chat-ui"
         /** [T-android-run-checkpoint] Block kind of streamed assistant text. */
         internal const val RUN_CHECKPOINT_TEXT_KIND = "text"
         internal const val MIN_MAX_TOKENS = 1024
@@ -634,7 +632,7 @@ class AgentSession(
             request?.record(com.openminis.app.agent.AgentTurnOutcome.Failed(e.message ?: "turn_setup_failed"))
             setInlineError(e)
         } finally {
-            activeBotRunId?.let { run -> settleAcceptedRequests(run,
+            activeRunId?.let { run -> settleAcceptedRequests(run,
                 if (!kotlin.coroutines.coroutineContext.isActive) AgentTurnOutcome.Cancelled
                 else request?.recordedOutcome ?: activeRunOutcome) }
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
@@ -649,11 +647,10 @@ class AgentSession(
     internal var pendingMediaCommitJob: Job? = null
     internal var currentProvider: LLMProvider? = null
     internal var currentModel: LLMModel? = null
-    @Volatile internal var sessionBotId: String? = null
     @Volatile internal var sessionSource: String? = null
     @Volatile internal var activeRunOutcome: AgentTurnOutcome = AgentTurnOutcome.Failed("turn_did_not_finish")
-    @Volatile internal var activeBotRunId: String? = null
-    @Volatile internal var activeGoalTask: com.openminis.app.data.db.BotTaskEntity? = null
+    @Volatile internal var activeRunId: String? = null
+    @Volatile internal var activeGoalTask: com.openminis.app.data.db.AgentTaskEntity? = null
 
     /** [T-android-run-checkpoint] Recovery log of the run this session drives. */
     @Volatile internal var runCheckpointRecorder: RunCheckpointRecorder? = null
@@ -696,9 +693,6 @@ class AgentSession(
             // default for new sessions) chooses the real tool configuration.
             presetToolset = com.openminis.app.remote.AgentPresetRegistry
                 .presetForSession(context, sessionId).toolset,
-            botEnabled = botRepository != null && sessionBotId != null &&
-                sessionSource != ChatSessionEntity.SOURCE_BOT_DELEGATION &&
-                sessionSource != ChatSessionEntity.LEGACY_SOURCE_BOT_DELEGATION,
             subAgentRosterNames = subAgentRoster()?.map { it.name },
             subAgentModelHandles = subAgentCallableModels().map { it.handle },
             subAgentChild = ChatSessionEntity.isSubAgentSource(sessionSource),

@@ -39,37 +39,34 @@ import com.openminis.app.data.repository.primaryEntry
 import com.openminis.app.data.repository.usableApiKey
 import com.openminis.app.data.repository.renameSessionOverrides
 
-internal suspend fun <T> AgentSession.withBotTurnLock(block: suspend () -> T): T {
-    val botId = sessionBotId ?: chatRepository.getSession(activeSessionId)?.botId
-    return com.openminis.app.tools.BotTurnLockRegistry.withLock(botId, activeSessionId, block)
+internal suspend fun <T> AgentSession.withSessionTurnLock(block: suspend () -> T): T {
+    return com.openminis.app.tools.SessionTurnLockRegistry.withLock(activeSessionId, block)
 }
 
 /** Assign one durable source-run key to the whole source stream. */
-internal suspend fun AgentSession.beginBotSourceRun(request: AgentTurnHandle? = null): String {
+internal suspend fun AgentSession.beginSourceRun(request: AgentTurnHandle? = null): String {
     val runId = "run-${java.util.UUID.randomUUID()}"
-    activeBotRunId = null
+    activeRunId = null
     activeRunOutcome = AgentTurnOutcome.Failed("turn_did_not_finish")
     runCheckpointRecorder = null
     runCheckpointTranscript.clear()
     activeGoalTask = null
-    val tasks = (context.applicationContext as com.openminis.app.MinisApp).botTaskRepository
+    val tasks = (context.applicationContext as com.openminis.app.MinisApp).agentTaskRepository
     val explicitTask = request?.taskId ?: if (request?.userInput == true)
         com.openminis.app.data.model.SessionOverrides.fromJson(chatRepository.getSession(activeSessionId)?.sessionOverrides).taskId else null
     activeGoalTask = if (explicitTask != null) {
         val task = checkNotNull(tasks.get(explicitTask)) { "task_not_found" }
-        val owner = checkNotNull(chatRepository.getSession(activeSessionId)) { "session_deleted" }
-        check(if (task.ownerBotId != null) owner.botId == task.ownerBotId else
-            task.goalSessionId == activeSessionId || task.originSessionId == activeSessionId) { "task_owner_mismatch" }
+        check(task.goalSessionId == activeSessionId || task.originSessionId == activeSessionId) { "task_owner_mismatch" }
         if (request?.userInput == true && task.status !in setOf(
-                com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE,
-                com.openminis.app.data.db.BotTaskEntity.STATUS_WAITING,
-                com.openminis.app.data.db.BotTaskEntity.STATUS_NEEDS_USER)) {
+                com.openminis.app.data.db.AgentTaskEntity.STATUS_ACTIVE,
+                com.openminis.app.data.db.AgentTaskEntity.STATUS_WAITING,
+                com.openminis.app.data.db.AgentTaskEntity.STATUS_NEEDS_USER)) {
             // A selected historical task can answer status questions without resuming its work.
             chatOnlyForNextTurn = true
             task
         } else tasks.bindRunOwner(task, activeSessionId)
-    } else tasks.sessionGoal(activeSessionId)?.takeIf { it.status !in com.openminis.app.data.db.BotTaskEntity.TERMINAL_STATUSES }
-    activeBotRunId = runId
+    } else tasks.sessionGoal(activeSessionId)?.takeIf { it.status !in com.openminis.app.data.db.AgentTaskEntity.TERMINAL_STATUSES }
+    activeRunId = runId
     request?.runId = runId
     // [T-android-run-checkpoint] Open this run's recovery record. A run that
     // cannot be checkpointed (blank session, unknown entry source) returns
@@ -317,7 +314,6 @@ internal fun AgentSession.loadSession(): kotlinx.coroutines.Job? {
             it.copy(sessionTitle = session.title ?: "New Chat")
         }
         _sessionCategory.value = session.category
-        sessionBotId = session.botId
         sessionSource = session.source
         _memoryEnabled.value = session.memoryEnabled != 0
         // T239: hydrate persisted thinking-mode override. null = unset

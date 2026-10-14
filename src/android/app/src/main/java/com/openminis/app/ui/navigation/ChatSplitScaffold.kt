@@ -849,28 +849,11 @@ fun ChatSplitScaffoldRoute(
     memoryRepository: com.openminis.app.data.repository.MemoryRepository?,
     skillRepository: com.openminis.app.data.repository.SkillRepository?,
     mcpRepository: com.openminis.app.data.repository.MCPRepository?,
-    botRepository: com.openminis.app.data.repository.BotRepository?,
 ) {
-    var showBots by rememberSaveable { mutableStateOf(false) }
     if (shouldUseTwoPane()) {
         ChatSplitScaffold(
             initialSessionId = initialSessionId,
             listPane = { selectedSessionId, draftPlaceholderId, onSessionSelected ->
-                if (showBots && botRepository != null) {
-                    com.openminis.app.ui.bots.BotsScreen(
-                        botRepository = botRepository,
-                        chatRepository = chatRepository,
-                        providerRepository = providerRepository,
-                        onBack = { showBots = false },
-                        onOpenSession = onSessionSelected,
-                        onMemberDetails = { navController.safeNavigate(Routes.botDetails(it)) },
-                        onAddMember = { navController.safeNavigate(Routes.BOTS_ADD) },
-                        onOpenProgress = { navController.safeNavigate(Routes.BOTS_PROGRESS) },
-                        onOpenRoutineEditor = { taskId, botId ->
-                            navController.safeNavigate(Routes.scheduledTaskEdit(taskId, botId))
-                        },
-                    )
-                } else {
                 com.openminis.app.ui.sessions.SessionListScreen(
                     chatRepository = chatRepository,
                     providerRepository = providerRepository,
@@ -882,14 +865,12 @@ fun ChatSplitScaffoldRoute(
                     onTerminalClick = { navController.safeNavigate(Routes.terminal()) },
                     onRootfsClick = { navController.safeNavigate(Routes.ROOTFS_MANAGEMENT) },
                     onScheduledTasksClick = { navController.safeNavigate(Routes.SCHEDULED_TASKS) },
-                    onBotsClick = { showBots = true },
                     // [T-android-assistant-home] Top-of-list entry into the
                     // assistant home page (roadmap Phase 1 item 2).
                     onOpenAssistantHome = { navController.safeNavigate(Routes.ASSISTANT_HOME) },
                     selectedSessionId = selectedSessionId,
                     draftPlaceholderId = draftPlaceholderId,
                 )
-                }
             },
             detailPane = { sessionId, onBackInPane, onNewChatInPane, onMoveToInPane,
                 onToggleSidebar, sidebarCollapsed ->
@@ -899,10 +880,8 @@ fun ChatSplitScaffoldRoute(
                     providerRepository = providerRepository,
                     memoryRepository = memoryRepository,
                      skillRepository = skillRepository,
-                     mcpRepository = mcpRepository,
-                     botRepository = botRepository,
+                    mcpRepository = mcpRepository,
                     onBack = onBackInPane,
-                    onBotDetails = { navController.safeNavigate(Routes.botDetails(it)) },
                     isTwoPane = true,
                     onToggleSidebar = onToggleSidebar,
                     sidebarCollapsed = sidebarCollapsed,
@@ -936,7 +915,6 @@ fun ChatSplitScaffoldRoute(
             memoryRepository = memoryRepository,
             skillRepository = skillRepository,
             mcpRepository = mcpRepository,
-            botRepository = botRepository,
         )
     }
 }
@@ -950,7 +928,6 @@ private fun ChatPhoneDrawerScaffold(
     memoryRepository: com.openminis.app.data.repository.MemoryRepository?,
     skillRepository: com.openminis.app.data.repository.SkillRepository?,
     mcpRepository: com.openminis.app.data.repository.MCPRepository?,
-    botRepository: com.openminis.app.data.repository.BotRepository?,
 ) {
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -993,6 +970,16 @@ private fun ChatPhoneDrawerScaffold(
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
+    // Let the drawer finish moving before mounting a different, expensive
+    // screen. Running both animations together made the chat composition and
+    // the drawer compete for the same UI frames on phones.
+    fun closeDrawerThen(action: () -> Unit) {
+        scope.launch {
+            drawerState.close()
+            action()
+        }
+    }
+
     LaunchedEffect(drawerState.isOpen) {
         if (drawerState.isOpen) {
             keyboardController?.hide()
@@ -1021,38 +1008,35 @@ private fun ChatPhoneDrawerScaffold(
                     viewModel = sessionListViewModel,
                     chatRepository = chatRepository,
                     selectedSessionId = currentSessionId,
+                    isVisible = drawerState.currentValue != DrawerValue.Closed ||
+                        drawerState.targetValue != DrawerValue.Closed,
                     onSelectSession = { sid ->
-                        currentSessionId = sid
-                        scope.launch { drawerState.close() }
+                        closeDrawerThen { currentSessionId = sid }
                     },
                     onNewChat = {
                         // Already on a blank draft: keep it instead of stacking another.
-                        if (blankDraftProbe?.invoke() != true) currentSessionId = newDraftSessionId()
-                        scope.launch { drawerState.close() }
+                        val startNewChat = blankDraftProbe?.invoke() != true
+                        closeDrawerThen {
+                            if (startNewChat) currentSessionId = newDraftSessionId()
+                        }
                     },
                     onOpenSettings = {
-                        scope.launch { drawerState.close() }
-                        navController.safeNavigate(Routes.SETTINGS)
+                        closeDrawerThen { navController.safeNavigate(Routes.SETTINGS) }
                     },
                     onOpenScheduledTasks = {
-                        scope.launch { drawerState.close() }
-                        navController.safeNavigate(Routes.SCHEDULED_TASKS)
-                    },
-                    onOpenBots = {
-                        scope.launch { drawerState.close() }
-                        navController.safeNavigate(Routes.BOTS)
+                        closeDrawerThen { navController.safeNavigate(Routes.SCHEDULED_TASKS) }
                     },
                     onOpenTerminal = {
-                        scope.launch { drawerState.close() }
-                        navController.safeNavigate(Routes.terminal())
+                        closeDrawerThen { navController.safeNavigate(Routes.terminal()) }
                     },
                     onOpenStorage = {
-                        scope.launch { drawerState.close() }
                         // The drawer's file entry opens the settings "Files" category (storage, shared
                         // folders, mounts, backup) instead of one of its leaf screens.
-                        navController.safeNavigate(
-                            Routes.settingsCategory(com.openminis.app.ui.settings.SettingsCategory.FILES.key),
-                        )
+                        closeDrawerThen {
+                            navController.safeNavigate(
+                                Routes.settingsCategory(com.openminis.app.ui.settings.SettingsCategory.FILES.key),
+                            )
+                        }
                     },
                 )
                 }
@@ -1061,13 +1045,11 @@ private fun ChatPhoneDrawerScaffold(
     ) {
         com.openminis.app.ui.chat.ChatScreen(
             sessionId = currentSessionId,
-            onBotDetails = { navController.safeNavigate(Routes.botDetails(it)) },
             chatRepository = chatRepository,
             providerRepository = providerRepository,
             memoryRepository = memoryRepository,
             skillRepository = skillRepository,
             mcpRepository = mcpRepository,
-            botRepository = botRepository,
             onBack = {
                 scope.launch {
                     if (drawerState.isClosed) drawerState.open() else drawerState.close()

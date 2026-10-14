@@ -135,13 +135,11 @@ class LegacyGroupMigratorTest {
                 LegacyBindingRecord("s-durable", """{"type":"entry","entryId":"provider/model-one"}""", "model-one"),
                 LegacyBindingRecord("s-unknown", """{"type":"entry","entryId":"nobody"}""", "model-one"),
             ),
-            botBindings = listOf(LegacyBindingRecord("b", """{"type":"entry","entryId":"legacy-one"}""", "model-one")),
             scheduledBindings = listOf(LegacyBindingRecord("t", """{"type":"entry","entryId":"legacy-one"}""", "model-one")),
         )
         val result = LegacyGroupMigrator.migrate(state)
         val durable = """{"type":"entry","entryId":"provider/model-one"}"""
         assertEquals(durable, result.sessionBindings.first { it.id == "s" }.binding)
-        assertEquals(durable, result.botBindings.first { it.id == "b" }.binding)
         assertEquals(durable, result.scheduledBindings.first { it.id == "t" }.binding)
         assertEquals("a durable id is kept as it is", durable, result.sessionBindings.first { it.id == "s-durable" }.binding)
         assertEquals(
@@ -180,53 +178,6 @@ class LegacyGroupMigratorTest {
         assertEquals(first.config.slots.voiceInput, second.config.slots.voiceInput)
         assertEquals(first.config.agentLoopModelEntryIds, second.config.agentLoopModelEntryIds)
         assertEquals(first.scheduledBindings, second.scheduledBindings)
-    }
-
-    @Test
-    fun migratesBotBindingsUsingB0SelectionAndFailureRules() {
-        val rawEntry = """{ "type" : "entry", "entryId" : "e3" }"""
-        val result = LegacyGroupMigrator.migrate(
-            LegacyState(
-                config = ProviderConfig(modelEntries = listOf(entry("e1"), entry("e2"), entry("e3")).toMutableList()),
-                groups = listOf(
-                    LegacyModelGroup("available", listOf("e1", "e2")),
-                    LegacyModelGroup("unavailable", listOf("e1")),
-                    LegacyModelGroup("empty", emptyList()),
-                ),
-                pointers = LegacyGroupPointers(),
-                agentLoopGroupIds = emptyList(),
-                entryIdAliases = emptyMap(),
-                availableEntryIds = setOf("e2", "e3"),
-                scheduledBindings = listOf(
-                    LegacyBindingRecord("scheduled-available", """{"type":"group","groupId":"available"}"""),
-                    LegacyBindingRecord("scheduled-unavailable", """{"type":"group","groupId":"unavailable"}"""),
-                ),
-                botBindings = listOf(
-                    LegacyBindingRecord("available", """{"type":"group","groupId":"available"}"""),
-                    LegacyBindingRecord("unavailable", """{"type":"group","groupId":"unavailable"}"""),
-                    LegacyBindingRecord("missing", """{"type":"group","groupId":"gone"}"""),
-                    LegacyBindingRecord("empty", """{"type":"group","groupId":"empty"}"""),
-                    LegacyBindingRecord("entry", rawEntry),
-                    LegacyBindingRecord("malformed", "{bad json"),
-                    LegacyBindingRecord("blank", "   "),
-                    LegacyBindingRecord("legacy-bare-id", "e3"),
-                ),
-            ),
-        )
-        val migrated = result.botBindings.associateBy { it.id }
-        assertEquals("""{"type":"entry","entryId":"e2"}""", migrated.getValue("available").binding)
-        assertEquals("""{"type":"entry","entryId":"e1"}""", migrated.getValue("unavailable").binding)
-        assertNull(migrated.getValue("missing").binding)
-        assertNull(migrated.getValue("empty").binding)
-        assertEquals(rawEntry, migrated.getValue("entry").binding)
-        assertNull(migrated.getValue("malformed").binding)
-        assertNull(migrated.getValue("blank").binding)
-        assertEquals("""{"type":"entry","entryId":"e3"}""", migrated.getValue("legacy-bare-id").binding)
-        assertEquals(2, result.warnings.size)
-        assertEquals(setOf("malformed", "blank"), result.warnings.map { it.substringAfter("has a ").substringBefore(" model binding") }.toSet())
-        val scheduled = result.scheduledBindings.associateBy { it.id }
-        assertEquals("""{"type":"entry","entryId":"e2"}""", scheduled.getValue("scheduled-available").binding)
-        assertEquals("""{"type":"entry","entryId":"e1"}""", scheduled.getValue("scheduled-unavailable").binding)
     }
 
     @Test

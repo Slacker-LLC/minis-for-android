@@ -3,7 +3,7 @@ package com.openminis.app.ui.onboarding
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.LaunchedEffect
 import com.openminis.app.R
-import com.openminis.app.ui.bots.StatusPill
+import com.openminis.app.ui.components.StatusBadge
 import com.openminis.app.ui.settings.SettingsRow
 import com.openminis.app.ui.settings.SettingsSection
 import com.openminis.app.ui.settings.SettingsSegmented
@@ -234,7 +234,7 @@ private fun ApiKeyStep(
                     title = selectedType.displayName,
                     showDivider = false,
                     trailing = {
-                        if (saved) StatusPill(stringResource(R.string.onboarding_saved), ChatColors.ok)
+                        if (saved) StatusBadge(stringResource(R.string.onboarding_saved), ChatColors.ok)
                     },
                 )
             }

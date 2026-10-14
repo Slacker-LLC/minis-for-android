@@ -96,7 +96,7 @@ class AgentTaskContextE2ETest {
             AgentStateStore.goalSet(sid, "$marker 当前目标：只核验已有成果", app, 2,
                 acceptanceCriteria = "$marker 约束：保留源数据、不能重放未知写入")
             AgentStateStore.planSet(sid, "plan", "$marker 下一步：读文件、核对来源、再验收", app)
-            val task = checkNotNull(app.botTaskRepository.sessionGoal(sid))
+            val task = checkNotNull(app.agentTaskRepository.sessionGoal(sid))
             val waiting = JSONObject().put("task_id", task.id).put("revision", task.revision)
                 .put("stop_generation", task.stopGeneration).put("status", "waiting").put("progress", "$marker 进度：已有文件，未知写入待核验")
             assertTrue(GoalTools.execute("update_goal", waiting.toString(), sid, app).success)
@@ -160,7 +160,7 @@ class AgentTaskContextE2ETest {
             assertEquals(listOf(intent), ToolCheckpointStore.drainPending(app, sid).map { it.intentId })
             passed("stale compaction summary does not replace current task or acknowledge an unknown side effect")
             checkFileUnchanged()
-            assertEquals("WAITING", app.botTaskRepository.sessionGoal(sid)!!.status)
+            assertEquals("WAITING", app.agentTaskRepository.sessionGoal(sid)!!.status)
             passed("context inspection preserves actual file fingerprint and does not falsely complete the waiting task")
             AgentSessionStore.closeAndAwait(sid)
             withContext(Dispatchers.Main) { ChatViewModelStore.release(sid) }
@@ -174,7 +174,7 @@ class AgentTaskContextE2ETest {
             val beforeCalls = transport.calls
             assertTrue(AgentRunner.prompt(app, sid, "只回答这次请求，不恢复暂停任务", wait = true, timeoutMs = 25_000).completed)
             assertEquals(beforeCalls + 1, transport.calls)
-            assertEquals("PAUSED", app.botTaskRepository.sessionGoal(sid)!!.status)
+            assertEquals("PAUSED", app.agentTaskRepository.sessionGoal(sid)!!.status)
             checkFileUnchanged()
             passed("explicit request on a paused task does not resume autonomous work or rewrite the artifact")
             File(app.filesDir, "agent-task-context-delivery.json").writeText(JSONObject().put("marker", marker)

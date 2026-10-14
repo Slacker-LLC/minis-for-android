@@ -5,7 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.MinisApp
 import com.openminis.app.agent.*
-import com.openminis.app.data.db.BotTaskEntity
+import com.openminis.app.data.db.AgentTaskEntity
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.repository.awaitConfigLoaded
 import com.openminis.app.runtime.files.WorkspaceFileClient
@@ -49,11 +49,11 @@ class AgentCheckpointIntegrityE2ETest {
             WorkspaceFileClient.writeBytes(sid, "/workspace/proof.txt", body)
             val fingerprint = WorkspaceFileClient.fingerprint(sid, "/workspace/proof.txt")
             AgentStateStore.goalSet(sid, "$marker verify existing proof", app, 3)
-            val active = checkNotNull(app.botTaskRepository.sessionGoal(sid))
+            val active = checkNotNull(app.agentTaskRepository.sessionGoal(sid))
             assertTrue(GoalTools.execute("update_goal", JSONObject().put("task_id", active.id)
                 .put("revision", active.revision).put("stop_generation", active.stopGeneration)
                 .put("status", "waiting").put("progress", "preserve unknown effects").toString(), sid, app).success)
-            val task = checkNotNull(app.botTaskRepository.sessionGoal(sid))
+            val task = checkNotNull(app.agentTaskRepository.sessionGoal(sid))
             val completeArgs = JSONObject().put("task_id", task.id).put("revision", task.revision)
                 .put("stop_generation", task.stopGeneration).put("status", "completed").put("progress", "verified file")
                 .put("evidence", JSONArray().put(JSONObject().put("type", "file").put("path", "/workspace/proof.txt")))
@@ -64,11 +64,11 @@ class AgentCheckpointIntegrityE2ETest {
             backing.writeText("{\"callId\":\"interrupted-write\",\"state\":\"pending\"\n")
             val originalDamage = backing.readBytes()
             val result = AgentRunner.prompt(app, sid, "核验已有成果，不能重放未知动作", wait = true, timeoutMs = 20_000)
-            report.put("initialResult", result.toString()).put("initialTaskStatus", app.botTaskRepository.sessionGoal(sid)!!.status)
+            report.put("initialResult", result.toString()).put("initialTaskStatus", app.agentTaskRepository.sessionGoal(sid)!!.status)
             assertFalse(result.toString(), result.completed)
             assertEquals(0, provider.calls)
-            assertEquals(BotTaskEntity.STATUS_WAITING, app.botTaskRepository.sessionGoal(sid)!!.status)
-            assertNull(app.botTaskRepository.sessionGoal(sid)!!.completionEvidence)
+            assertEquals(AgentTaskEntity.STATUS_WAITING, app.agentTaskRepository.sessionGoal(sid)!!.status)
+            assertNull(app.agentTaskRepository.sessionGoal(sid)!!.completionEvidence)
             assertArrayEquals(originalDamage, backing.readBytes())
             assertArrayEquals(body, WorkspaceFileClient.readAll(sid, "/workspace/proof.txt"))
             passed("damaged checkpoint blocks the actual model before it can complete a Room task with otherwise valid file evidence")
@@ -190,7 +190,7 @@ class AgentCheckpointIntegrityE2ETest {
 
             val autoSid = session()
             AgentStateStore.goalSet(autoSid, "$marker preserve automatic continuation budget", app, 3)
-            val autoTask = checkNotNull(app.botTaskRepository.sessionGoal(autoSid))
+            val autoTask = checkNotNull(app.agentTaskRepository.sessionGoal(autoSid))
             val autoBacking = File(app.filesDir, "checkpoints/$autoSid.jsonl")
             val interrupted = ScriptedProvider { _, _, _ ->
                 autoBacking.writeText("{broken during actual model response\n")
@@ -200,8 +200,8 @@ class AgentCheckpointIntegrityE2ETest {
             val autoResult = AgentRunner.prompt(app, autoSid, "不能在坏记录下自动接续", wait = true, timeoutMs = 20_000)
             assertFalse(autoResult.toString(), autoResult.completed); assertFalse(autoResult.timedOut)
             assertEquals(1, interrupted.calls)
-            val afterAuto = checkNotNull(app.botTaskRepository.sessionGoal(autoSid))
-            assertEquals(BotTaskEntity.STATUS_ACTIVE, afterAuto.status); assertNull(afterAuto.completionEvidence)
+            val afterAuto = checkNotNull(app.agentTaskRepository.sessionGoal(autoSid))
+            assertEquals(AgentTaskEntity.STATUS_ACTIVE, afterAuto.status); assertNull(afterAuto.completionEvidence)
             assertEquals(autoTask.autoRunsUsed, afterAuto.autoRunsUsed)
             assertEquals("{broken during actual model response\n", autoBacking.readText())
             passed("damage introduced during an actual model response stops automatic continuation without consuming goal budget or completing the task")
@@ -218,8 +218,8 @@ class AgentCheckpointIntegrityE2ETest {
             assertTrue(AgentRunner.prompt(app, sid, "重建后只检查实际未知记录", wait = true, timeoutMs = 20_000).completed)
             assertEquals(execution, ToolCheckpointStore.drainPending(app, sid).single().intentId)
             assertArrayEquals(body, WorkspaceFileClient.readAll(sid, "/workspace/proof.txt"))
-            val current = checkNotNull(app.botTaskRepository.sessionGoal(sid))
-            assertEquals(BotTaskEntity.STATUS_WAITING, current.status); assertNull(current.completionEvidence)
+            val current = checkNotNull(app.agentTaskRepository.sessionGoal(sid))
+            assertEquals(AgentTaskEntity.STATUS_WAITING, current.status); assertNull(current.completionEvidence)
             assertEquals(task.autoRunsUsed, current.autoRunsUsed)
             passed("owner rebuild after fixture restoration preserves the precise unknown execution, waiting task, budget and existing file")
 

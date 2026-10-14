@@ -135,7 +135,7 @@ u0_a425 ... libproot.so ... /data/user/0/com.openminis.app/files/alpine-rootfs
 | Root shell crash / proxy crash | 未完成；已测 Guest shell 自杀，未主动杀 Root helper |
 | VPN、DNS、TUN、BPF、Fake-IP、guest `curl`/`apt` | 未完成 |
 | HyperOS instrumentation 真机执行 | 未完成；系统拒绝安装测试 APK |
-| Bot、Pi、Remote、Android tools、文件上传、语音、Web/App 同步的完整矩阵 | 未完成或只有局部证据，不能统一宣称通过 |
+| Pi、Remote、Android tools、文件上传、语音、Web/App 同步的完整矩阵 | 未完成或只有局部证据，不能统一宣称通过；Bot 当时的测试对象已从现役版本移除 |
 
 `adb shell su` 返回 `su: inaccessible or not found` 只说明 ADB shell 入口不可用，不能反推应用内部 KernelSU-mediated Direct Root 路径失败。
 

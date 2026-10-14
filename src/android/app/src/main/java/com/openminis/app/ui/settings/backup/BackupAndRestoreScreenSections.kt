@@ -659,13 +659,12 @@ internal fun RestoreReport(
         }
     }
 
-    // What came back besides the category records (settings, prompt, characters, bots, scheduled tasks).
+    // What came back besides the category records (settings, prompt, characters and scheduled tasks).
     val extraLines = buildList {
         val e = report.extras
         e["settings"]?.let { add(stringResource(R.string.backup_report_extra_settings, it)) }
         e["prompt"]?.let { add(stringResource(R.string.backup_report_extra_prompt, it)) }
         e["characters"]?.let { add(stringResource(R.string.backup_report_extra_characters, it)) }
-        e["bots"]?.let { add(stringResource(R.string.backup_report_extra_bots, it)) }
         e["scheduled_tasks"]?.let { add(stringResource(R.string.backup_report_extra_tasks, it)) }
     }
     val extraNotes = buildList {

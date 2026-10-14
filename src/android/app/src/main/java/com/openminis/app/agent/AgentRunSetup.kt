@@ -9,21 +9,17 @@ import com.openminis.app.scheduled.ScheduledRunPromptPolicy
 /** What an agent run is prepared with before its first model request; pure, so it can be tested alone. */
 internal object AgentRunSetup {
     /**
-     * The system prompt for a run: the caller's prompt and the bot's identity joined, then the
-     * session's own instructions in a labelled block, then the safety note for scheduled/unattended
+     * The system prompt for a run: caller instructions, then the session's own instructions in a
+     * labelled block, then the safety note for scheduled/unattended
      * runs. Blank parts are left out; null when nothing remains.
      */
     fun systemPrompt(
         callerPrompt: String?,
-        botPrompt: String?,
         sessionPrompt: String?,
         sessionSource: String?,
         unattended: Boolean,
     ): String? {
-        val base = listOf(callerPrompt, botPrompt)
-            .filterNot { it.isNullOrBlank() }
-            .joinToString("\n\n")
-            .ifBlank { null }
+        val base = callerPrompt?.takeIf { it.isNotBlank() }
         val withSession = sessionPrompt?.let { sessionText ->
             buildString {
                 if (!base.isNullOrBlank()) {

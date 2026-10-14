@@ -53,6 +53,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -99,16 +100,27 @@ fun SessionDrawerContent(
     viewModel: SessionListViewModel,
     chatRepository: ChatRepository,
     selectedSessionId: String?,
+    isVisible: Boolean,
     onSelectSession: (String) -> Unit,
     onNewChat: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenScheduledTasks: () -> Unit,
     onOpenTerminal: () -> Unit,
     onOpenStorage: () -> Unit,
-    onOpenBots: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val sessions by viewModel.displayedSessions.collectAsState()
+    // ModalNavigationDrawer keeps its content composed while closed. Stop
+    // collecting the full session list in that state: live chat previews can
+    // update Room while the drawer is hidden, and recomposing/grouping the
+    // hidden list steals frames from the chat surface.
+    val sessionsState = remember(viewModel) {
+        mutableStateOf(emptyList<ChatSessionEntity>())
+    }
+    LaunchedEffect(viewModel, isVisible) {
+        if (!isVisible) return@LaunchedEffect
+        viewModel.displayedSessions.collect { sessionsState.value = it }
+    }
+    val sessions by sessionsState
     val folders by viewModel.folders.collectAsState()
     val collapsedFolderIds by viewModel.collapsedFolderIds.collectAsState()
     val folderMemberCounts by viewModel.folderMemberCounts.collectAsState()
@@ -190,12 +202,6 @@ fun SessionDrawerContent(
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
-                DrawerGridEntry(
-                    icon = com.openminis.app.ui.components.MinisIcons.Users,
-                    title = stringResource(R.string.bots_team),
-                    onClick = onOpenBots,
-                    modifier = Modifier.weight(1f),
-                )
                 DrawerGridEntry(
                     icon = com.openminis.app.ui.components.MinisIcons.Clock,
                     title = stringResource(R.string.scheduled_tasks_title),

@@ -125,7 +125,7 @@
     <string name="system_prompt_reset_all_confirm_body">カスタムした文言とスイッチはすべて消去され、各モジュールはアプリ同梱の既定文に戻ります。</string>
     <string name="system_prompt_custom_section">カスタムシステムプロンプト</string>
     <string name="system_prompt_custom_hint">ここにシステムプロンプトを書きます…</string>
-    <string name="system_prompt_custom_footer">保存した内容は毎回の会話の先頭に、優先順位を明示したうえで注入されます。人格（Soul）、応答スタイル、プリセット、Bot の指示、セッション Soul と衝突する場合はこの内容が優先されます。空欄なら何も注入されません。</string>
+    <string name="system_prompt_custom_footer">保存した内容は毎回の会話の先頭に、優先順位を明示したうえで注入されます。人格（Soul）、応答スタイル、プリセット、セッション Soul と衝突する場合はこの内容が優先されます。空欄なら何も注入されません。</string>
     <string name="system_prompt_custom_clear">消去</string>
     <string name="system_prompt_custom_clear_confirm_title">カスタムシステムプロンプトを消去しますか？</string>
     <string name="system_prompt_custom_clear_confirm_body">入力欄が空になり、この内容は注入されなくなります。他の設定は変わりません。</string>
@@ -1206,7 +1206,6 @@
     <string name="backup_report_extra_settings">設定：%1$d 件</string>
     <string name="backup_report_extra_prompt">システムプロンプト：%1$d 件</string>
     <string name="backup_report_extra_characters">キャラクター：%1$d 件</string>
-    <string name="backup_report_extra_bots">ボット：%1$d 件</string>
     <string name="backup_report_extra_tasks">スケジュールタスク：%1$d 件</string>
     <string name="backup_report_tasks_disabled">フルアクセスのスケジュールタスク %1$d 件は、オフの状態で復元されました。スケジュールタスクで確認してから有効にしてください。</string>
     <string name="backup_report_settings_restart">設定はアプリを再起動すると反映されます。</string>
@@ -1742,7 +1741,6 @@
     <string name="drawer_recent">最近</string>
     <string name="drawer_no_search_match">一致する会話がありません</string>
     <string name="drawer_search_results">%1$d 件の結果</string>
-    <string name="settings_agent_section_team">チームとルーティン</string>
     <string name="settings_agent_team_sub">メンバーと役割、モデル、ルーティン</string>
     <string name="settings_agent_tasks_sub">定期実行、履歴、実行者</string>
     <string name="chat_quick_battery_title">バッテリーを確認</string>
@@ -1884,31 +1882,11 @@
         <item quantity="one">予備モデル +%1$d 個</item>
         <item quantity="other">予備モデル +%1$d 個</item>
     </plurals>
-    <string name="bots_task_budget_summary">自動レビュー %1$d/%2$d · 修正 %3$d/%4$d · 委任 %5$d/%6$d</string>
-    <string name="bots_task_pause">一時停止</string>
-    <string name="bots_task_cancel">キャンセル</string>
-    <string name="bots_task_notification_title">Bot タスク：%1$s</string>
-    <string name="bots_task_notification_needs_user">担当 Bot があなたの対応を必要としています。</string>
-    <string name="bots_task_notification_completed">担当 Bot が結果のレビューを完了しました。</string>
-    <string name="bots_task_notification_budget">自動レビューの予算を使い切りました。</string>
 
-    <!-- B2: Bot-owned scheduled routines -->
-    <string name="scheduled_task_executor">実行者</string>
-    <string name="scheduled_task_executor_regular">通常のチャット（Botなし）</string>
-    <string name="scheduled_task_executor_loading">読み込み中…</string>
-    <string name="scheduled_task_model_bot_default">このBotのデフォルトモデルを使用</string>
-    <string name="scheduled_task_bot_disabled">Botは無効です</string>
-    <string name="scheduled_task_bot_label">Bot：%1$s</string>
-    <string name="bots_routines">ルーティン</string>
-    <string name="bots_routines_disabled">このBotは無効です。ルーティンは有効のままですが、Botが再有効化されるまで実行をスキップします。</string>
-    <string name="bots_new_routine">新しいルーティン</string>
-    <string name="bots_routine_no_next">次回の実行予定はありません</string>
+    <!-- Scheduled task strings -->
 
     <!-- B2: capacity/save errors -->
-    <string name="scheduled_task_bot_routine_limit">このBotにはすでに%1$d件のルーティンがあります。追加する前に1件削除してください。</string>
     <string name="scheduled_task_save_failed">定期タスクを保存できませんでした。</string>
-    <string name="bots_routine_vscreen_busy">仮想ディスプレイは別のセッションが使用中です。</string>
-    <string name="bots_routine_vscreen_unavailable">仮想ディスプレイが無効、または端末チェックに失敗しています。</string>
     <string name="scheduled_vscreen_unattended_hint">無人実行の UI 操作は仮想画面のみを使用します。</string>
     <string name="scheduled_vscreen_unavailable_warning">仮想画面が有効でないか、端末チェックに失敗しています。保存はできますが UI 操作が失敗する可能性があります。</string>
     <string name="settings_vscreen_entry">仮想ディスプレイ（実験的）</string>
@@ -1998,9 +1976,6 @@
     <string name="scheduled_task_next_run">次回実行 %1$s</string>
     <string name="scheduled_task_no_next_run">次回の実行は未設定</string>
     <string name="scheduled_tasks_footer">トリガーのたびに新しいチャットを作成し、完了すると通知します。通知をタップすると結果を確認できます。</string>
-    <string name="bots_progress_running">委任された作業 %1$d 件が進行中</string>
-    <string name="bots_progress_none">進行中の作業はありません</string>
-    <string name="bots_members_header">メンバー</string>
     <string name="browser_desktop_site">PC 版サイト</string>
     <string name="browser_tab_count_title">%1$d 個のタブ</string>
     <string name="browser_share">共有</string>
@@ -2306,7 +2281,6 @@
     <string name="outcome_pending_title">確認が必要な操作</string>
     <string name="outcome_inspect_action">%1$s を確認</string>
     <string name="outcome_kept_unknown">操作の結果はまだ不明です。記録を保持しています。</string>
-    <string name="bots_reception">既定の受付メンバー</string>
     <string name="voice_cancel_recording">今回の録音をキャンセル</string>
     <string name="voice_stop_playback">読み上げを停止</string>
     <string name="voice_stop_owned_turn">今回の音声リクエストを停止</string>

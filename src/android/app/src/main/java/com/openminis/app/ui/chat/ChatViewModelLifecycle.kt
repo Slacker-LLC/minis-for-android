@@ -20,7 +20,7 @@ fun ChatViewModel.cleanupIfEmptyOnExit() {
     if (sid.isEmpty() || isStreaming.value || attachments.value.isNotEmpty()) return
     viewModelScope.launch(Dispatchers.IO) {
         val session = chatRepository.getSession(sid) ?: return@launch
-        if (session.botId != null || session.source != null || chatRepository.messageCount(sid) > 0) return@launch
+        if (session.legacyProfileId != null || session.source != null || chatRepository.messageCount(sid) > 0) return@launch
         // Selection and execution start share Main with the page lifecycle.
         // An outgoing projection cannot delete its already-mounted replacement.
         withContext(Dispatchers.Main) {

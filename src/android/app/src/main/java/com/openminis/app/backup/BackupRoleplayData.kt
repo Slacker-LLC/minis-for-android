@@ -1,6 +1,5 @@
 package com.openminis.app.backup
 
-import com.openminis.app.data.db.BotEntity
 import com.openminis.app.data.db.CharacterEntity
 import com.openminis.app.roleplay.CharacterCardCodec
 import com.openminis.app.roleplay.CharacterStoragePolicy
@@ -8,10 +7,8 @@ import kotlinx.serialization.Serializable
 import java.util.Base64
 
 /**
- * A character (card, artwork, story memory) in `data/characters.jsonl` and a bot in `data/bots.jsonl`, carried
- * inside the CHATS category: a conversation can be bound to either, and a restored chat is of little use
- * without the character it was written with. Timestamps are epoch milliseconds; these two files exist only
- * for this app, a reader that does not know them ignores them.
+ * A character (card, artwork, story memory) in `data/characters.jsonl`, carried inside the CHATS category.
+ * Timestamps are epoch milliseconds; this file exists only for this app, a reader that does not know it ignores it.
  */
 @Serializable
 data class BackupCharacterRecord(
@@ -27,22 +24,9 @@ data class BackupCharacterRecord(
     val updatedAt: Long,
 )
 
-@Serializable
-data class BackupBotRecord(
-    val id: String,
-    val name: String,
-    val systemPrompt: String? = null,
-    val modelBinding: String? = null,
-    val enabled: Boolean = true,
-    val createdAt: Long,
-    val updatedAt: Long,
-)
-
 internal object BackupRoleplayMapping {
     const val CHARACTER_FILE = "characters"
     const val CHARACTER_TYPE = "CharacterV1"
-    const val BOT_FILE = "bots"
-    const val BOT_TYPE = "BotV1"
 
     /** Same shape the character memory store accepts; anything else could name a path outside its folder. */
     private val idPattern = Regex("[A-Za-z0-9_-]{1,128}")
@@ -62,16 +46,6 @@ internal object BackupRoleplayMapping {
             createdAt = entity.createdAt,
             updatedAt = entity.updatedAt,
         )
-
-    fun botRecord(bot: BotEntity): BackupBotRecord = BackupBotRecord(
-        id = bot.id,
-        name = bot.name,
-        systemPrompt = bot.systemPrompt,
-        modelBinding = bot.modelBinding,
-        enabled = bot.enabled,
-        createdAt = bot.createdAt,
-        updatedAt = bot.updatedAt,
-    )
 
     /** A character that is safe to store, with its decoded artwork (null when absent or not acceptable). */
     class RestorableCharacter(val entity: CharacterEntity, val avatar: ByteArray?, val memory: String?)
@@ -97,19 +71,6 @@ internal object BackupRoleplayMapping {
             ),
             avatar = avatar,
             memory = memory,
-        )
-    }
-
-    fun restorableBot(record: BackupBotRecord): BotEntity? {
-        if (!validId(record.id) || record.name.isBlank()) return null
-        return BotEntity(
-            id = record.id,
-            name = record.name,
-            systemPrompt = record.systemPrompt,
-            modelBinding = record.modelBinding,
-            enabled = record.enabled,
-            createdAt = record.createdAt,
-            updatedAt = record.updatedAt,
         )
     }
 

@@ -1,5 +1,7 @@
 # 08 — Bot 协调合同
 
+> **历史合同，已废止。** 当前版本已移除 Bot 成员、委派、收件箱与对应运行时；本文只记录旧版实现边界，不是现役合同或开发要求。现役任务归属见 `docs/contracts/01-ARCHITECTURE.md` 与 `docs/contracts/03-STORAGE-CONTRACT.md`。
+
 本文定义 Bot 协调第一版的持久边界和失败行为。Bot 不引入第二套 Agent Runtime、Tool Runtime 或 Root/runtime 边界。
 
 ## 第一版主链

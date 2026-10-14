@@ -133,7 +133,6 @@
     <string name="backup_report_extra_settings">设置：%1$d 项</string>
     <string name="backup_report_extra_prompt">系统提示词：%1$d 项</string>
     <string name="backup_report_extra_characters">角色：%1$d 个</string>
-    <string name="backup_report_extra_bots">机器人：%1$d 个</string>
     <string name="backup_report_extra_tasks">定时任务：%1$d 个</string>
     <string name="backup_report_tasks_disabled">有 %1$d 个定时任务拥有完整权限，已按关闭状态还原。请在“定时任务”里确认后再开启。</string>
     <string name="backup_report_settings_restart">设置需要重启应用后生效。</string>

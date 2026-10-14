@@ -41,7 +41,7 @@ class AgentOutcomeVerificationE2ETest {
             val sid = app.chatRepository.createSession("scripted-model", title = "M2 independent verification", memoryEnabled = false).id
             sessions.add(sid)
             AgentStateStore.goalSet(sid, "$marker 核验后保留任务控制状态", app, 3)
-            val task = checkNotNull(app.botTaskRepository.sessionGoal(sid))
+            val task = checkNotNull(app.agentTaskRepository.sessionGoal(sid))
             assertTrue(GoalTools.execute("update_goal", JSONObject().put("task_id", task.id).put("revision", task.revision)
                 .put("stop_generation", task.stopGeneration).put("status", status).put("progress", "仍有后续工作，不等于完成")
                 .toString(), sid, app).success)
@@ -50,7 +50,7 @@ class AgentOutcomeVerificationE2ETest {
         fun result(history: List<com.openminis.app.data.model.LLMMessage>, id: String) = history.flatMap { it.contentParts }
             .filterIsInstance<AgentContentPart.ToolResult>().single { it.id == id }
         suspend fun intent(sid: String, body: String, run: String, name: String = "file_write", args: JSONObject? = null): String {
-            val task = checkNotNull(app.botTaskRepository.sessionGoal(sid))
+            val task = checkNotNull(app.agentTaskRepository.sessionGoal(sid))
             return checkNotNull(ToolCheckpointStore.recordIntent(app, sid, "reused-call", name,
                 (args ?: JSONObject().put("path", "/workspace/proof.txt").put("content", body)).toString(),
                 run, task.id, task.revision, task.stopGeneration))
@@ -61,7 +61,7 @@ class AgentOutcomeVerificationE2ETest {
             var providerFailure: Throwable? = null
             val getCall = "verify-get-${UUID.randomUUID()}"
             val verifyCall = "verify-exact-${UUID.randomUUID()}"
-            val task = checkNotNull(app.botTaskRepository.sessionGoal(sid))
+            val task = checkNotNull(app.agentTaskRepository.sessionGoal(sid))
             val args = JSONObject().put("task_id", task.id).put("revision", task.revision).put("stop_generation", task.stopGeneration)
                 .put("outcome", JSONObject().put("execution_id", execution).put("run_id", run)).also(changeArgs)
             val provider = ScriptedProvider { call, history, tools -> try { when (call) {
@@ -94,7 +94,7 @@ class AgentOutcomeVerificationE2ETest {
             prepare(sid, provider)
             assertTrue(AgentRunner.prompt(app, sid, "核验一个未知动作，保留等待或用户决定状态", wait = true, timeoutMs = 25_000).completed)
             providerFailure?.let { throw it }
-            val after = checkNotNull(app.botTaskRepository.sessionGoal(sid))
+            val after = checkNotNull(app.agentTaskRepository.sessionGoal(sid))
             assertEquals(expectedStatus, after.status); assertNull(after.completionEvidence)
             assertEquals(task.autoRunsUsed, after.autoRunsUsed); assertEquals(task.stopGeneration, after.stopGeneration)
             return proof
@@ -153,7 +153,7 @@ class AgentOutcomeVerificationE2ETest {
             val foreign = session()
             verify(foreign, exact, "bound-run", "WAITING", "unknown_execution_not_found")
             assertTrue(ToolCheckpointStore.drainPending(app, sid).any { it.intentId == exact })
-            val task = checkNotNull(app.botTaskRepository.sessionGoal(sid))
+            val task = checkNotNull(app.agentTaskRepository.sessionGoal(sid))
             val unowned = ToolExecutor.execute("verify_outcome", JSONObject().put("tool_title", "拒绝伪造核验")
                 .put("task_id", task.id).put("revision", task.revision).put("stop_generation", task.stopGeneration)
                 .put("outcome", JSONObject().put("execution_id", exact).put("run_id", "bound-run")).toString(), sid, app)

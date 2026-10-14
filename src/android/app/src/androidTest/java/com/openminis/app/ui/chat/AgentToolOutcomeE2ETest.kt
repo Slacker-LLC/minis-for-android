@@ -132,7 +132,7 @@ class AgentToolOutcomeE2ETest {
                 toolCall("goal-unknown", "todo_write", JSONObject().put("todos", JSONArray())) else text("先核实实际文件，不能重放。") }
             prepare(goalSid, goalProvider)
             assertFalse(AgentRunner.prompt(app, goalSid, "执行并核验任务", wait = true, timeoutMs = 20_000).completed)
-            val stoppedGoal = app.botTaskRepository.sessionGoal(goalSid)!!
+            val stoppedGoal = app.agentTaskRepository.sessionGoal(goalSid)!!
             assertEquals("WAITING", stoppedGoal.status); assertEquals(0, stoppedGoal.autoRunsUsed)
             assertEquals(2, goalProvider.calls); assertEquals(1, actualGoalEffects)
             assertEquals("goal-unknown", ToolCheckpointStore.drainPending(app, goalSid).single().callId)

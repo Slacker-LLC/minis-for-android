@@ -33,7 +33,6 @@ import com.openminis.app.ui.settings.AboutScreen
 import com.openminis.app.ui.settings.AddAgentLoopModelsScreen
 import com.openminis.app.ui.settings.AddCustomModelScreen
 import com.openminis.app.ui.settings.BackgroundSettingsScreen
-import com.openminis.app.ui.bots.BotsScreen
 import com.openminis.app.ui.settings.ShadowVoiceDetailScreen
 import com.openminis.app.ui.settings.AddProviderScreen
 import com.openminis.app.ui.settings.ModelEntryDetailScreen
@@ -91,7 +90,6 @@ fun AppNavigation(
     envVarRepository: EnvVarRepository? = null,
     skillRepository: SkillRepository? = null,
     mcpRepository: com.openminis.app.data.repository.MCPRepository? = null,
-    botRepository: com.openminis.app.data.repository.BotRepository? = null,
     memoryRepository: MemoryRepository? = null,
     navController: NavHostController = rememberNavController(),
     initialDeepLink: DeepLinkAction? = null,
@@ -199,7 +197,7 @@ fun AppNavigation(
                 catch (error: Exception) {
                     DeepLinkCoordinator.consumePendingChatAction()
                     android.widget.Toast.makeText(context, error.message ?: context.getString(com.openminis.app.R.string.voice_call_model), android.widget.Toast.LENGTH_LONG).show()
-                    navController.navigate(Routes.BOTS) { launchSingleTop = true }
+                    navController.safeNavigate(Routes.SESSION_LIST) { launchSingleTop = true }
                 }
             }
             is DeepLinkAction.NewChat,
@@ -467,7 +465,6 @@ fun AppNavigation(
                 memoryRepository = memoryRepository,
                 skillRepository = skillRepository,
                 mcpRepository = mcpRepository,
-                botRepository = botRepository,
             )
         }
 
@@ -484,7 +481,6 @@ fun AppNavigation(
                 memoryRepository = memoryRepository,
                 skillRepository = skillRepository,
                 mcpRepository = mcpRepository,
-                botRepository = botRepository,
             )
         }
 
@@ -560,59 +556,7 @@ fun AppNavigation(
                     onBackgroundClick = { navController.safeNavigate(Routes.BACKGROUND) },
                     onLogsClick = { navController.safeNavigate(Routes.LOGS) },
                     onAboutClick = { navController.safeNavigate(Routes.ABOUT) },
-                    onTeamClick = { navController.safeNavigate(Routes.BOTS) },
                     onScheduledTasksClick = { navController.safeNavigate(Routes.SCHEDULED_TASKS) },
-                )
-            }
-        }
-
-        listOf(Routes.BOTS, Routes.BOTS_ADD, Routes.BOTS_PROGRESS).forEach { botRoute ->
-            composable(botRoute) {
-                val bots = botRepository
-                if (bots == null) {
-                    navController.safePopBackStack()
-                } else {
-                    BotsScreen(
-                        botRepository = bots,
-                        chatRepository = chatRepository,
-                        providerRepository = providerRepository,
-                        initialEditing = botRoute == Routes.BOTS_ADD,
-                        initialProgress = botRoute == Routes.BOTS_PROGRESS,
-                        onBack = { navController.safePopBackStack() },
-                        onOpenSession = { sessionId ->
-                            navController.safeNavigate(Routes.chat(sessionId)) {
-                                popUpTo(Routes.SESSION_LIST) { inclusive = false }
-                                launchSingleTop = true
-                            }
-                        },
-                        onOpenRoutineEditor = { taskId, botId ->
-                            navController.safeNavigate(Routes.scheduledTaskEdit(taskId, botId))
-                        },
-                    )
-                }
-            }
-        }
-
-        composable(
-            route = Routes.BOT_DETAILS,
-            arguments = listOf(navArgument("botId") { type = NavType.StringType }),
-        ) { backStackEntry ->
-            botRepository?.let { bots ->
-                BotsScreen(
-                    botRepository = bots,
-                    chatRepository = chatRepository,
-                    providerRepository = providerRepository,
-                    initialBotId = backStackEntry.arguments?.getString("botId"),
-                    onBack = { navController.safePopBackStack() },
-                    onOpenSession = { sessionId ->
-                        navController.safeNavigate(Routes.chat(sessionId)) {
-                            popUpTo(Routes.SESSION_LIST) { inclusive = false }
-                            launchSingleTop = true
-                        }
-                    },
-                    onOpenRoutineEditor = { taskId, botId ->
-                        navController.safeNavigate(Routes.scheduledTaskEdit(taskId, botId))
-                    },
                 )
             }
         }
@@ -1389,18 +1333,11 @@ fun AppNavigation(
                     nullable = true
                     defaultValue = null
                 },
-                navArgument("botId") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
             ),
         ) { backStackEntry ->
             val taskId = backStackEntry.arguments?.getString("taskId")
-            val botId = backStackEntry.arguments?.getString("botId")
             com.openminis.app.ui.scheduled.ScheduledTaskEditScreen(
                 taskId = taskId,
-                initialBotId = botId,
                 onBack = { navController.safePopBackStack() },
                 onOpenSession = { sessionId ->
                     navController.safeNavigate(Routes.chat(sessionId))

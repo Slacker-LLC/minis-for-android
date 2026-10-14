@@ -125,7 +125,7 @@
     <string name="system_prompt_reset_all_confirm_body">Alle eigenen Texte und Schalter werden gelöscht; jedes Modul kehrt zum mit der App ausgelieferten Text zurück.</string>
     <string name="system_prompt_custom_section">Eigener System-Prompt</string>
     <string name="system_prompt_custom_hint">System-Prompt hier schreiben ...</string>
-    <string name="system_prompt_custom_footer">Der gespeicherte Text wird oben in jede Unterhaltung eingefuegt, mit einer ausdruecklichen Vorrang-Erklaerung: Bei Konflikten mit Persoenlichkeit (Soul), Antwortstil, Presets, Bot-Anweisungen oder einem Sitzungs-Soul gilt dieser Text. Leer lassen, um nichts einzufuegen.</string>
+    <string name="system_prompt_custom_footer">Der gespeicherte Text wird oben in jede Unterhaltung eingefuegt, mit einer ausdruecklichen Vorrang-Erklaerung: Bei Konflikten mit Persoenlichkeit (Soul), Antwortstil, Presets oder einem Sitzungs-Soul gilt dieser Text. Leer lassen, um nichts einzufuegen.</string>
     <string name="system_prompt_custom_clear">Leeren</string>
     <string name="system_prompt_custom_clear_confirm_title">Eigenen System-Prompt leeren?</string>
     <string name="system_prompt_custom_clear_confirm_body">Das Feld wird geleert und nichts daraus eingefuegt. Andere Einstellungen bleiben unveraendert.</string>
@@ -1199,7 +1199,6 @@
     <string name="backup_report_extra_settings">Einstellungen: %1$d</string>
     <string name="backup_report_extra_prompt">Systemprompt: %1$d</string>
     <string name="backup_report_extra_characters">Charaktere: %1$d</string>
-    <string name="backup_report_extra_bots">Bots: %1$d</string>
     <string name="backup_report_extra_tasks">Geplante Aufgaben: %1$d</string>
     <string name="backup_report_tasks_disabled">%1$d geplante Aufgabe(n) haben Vollzugriff und wurden deaktiviert wiederhergestellt. Prüfen Sie sie unter „Geplante Aufgaben“ und aktivieren Sie sie dort.</string>
     <string name="backup_report_settings_restart">Einstellungen gelten nach einem Neustart der App.</string>
@@ -1745,7 +1744,6 @@
     <string name="drawer_recent">Zuletzt</string>
     <string name="drawer_no_search_match">Keine passenden Unterhaltungen</string>
     <string name="drawer_search_results">%1$d Ergebnisse</string>
-    <string name="settings_agent_section_team">Team &amp; Routinen</string>
     <string name="settings_agent_team_sub">Mitglieder, Rollen, Modelle und Routinen</string>
     <string name="settings_agent_tasks_sub">Wiederkehrende Läufe, Verlauf und Ausführende</string>
     <string name="chat_quick_battery_title">Akku prüfen</string>
@@ -1887,31 +1885,11 @@
         <item quantity="one">+%1$d Ersatzmodell</item>
         <item quantity="other">+%1$d Ersatzmodelle</item>
     </plurals>
-    <string name="bots_task_budget_summary">Automatische Prüfungen %1$d/%2$d · Überarbeitungen %3$d/%4$d · Delegationen %5$d/%6$d</string>
-    <string name="bots_task_pause">Pausieren</string>
-    <string name="bots_task_cancel">Abbrechen</string>
-    <string name="bots_task_notification_title">Bot-Aufgabe: %1$s</string>
-    <string name="bots_task_notification_needs_user">Der zuständige Bot benötigt deine Eingabe.</string>
-    <string name="bots_task_notification_completed">Der zuständige Bot hat die Ergebnisse geprüft.</string>
-    <string name="bots_task_notification_budget">Das Budget für automatische Prüfungen ist ausgeschöpft.</string>
 
-    <!-- B2: Bot-owned scheduled routines -->
-    <string name="scheduled_task_executor">Ausführung durch</string>
-    <string name="scheduled_task_executor_regular">Normaler Chat (ohne Bot)</string>
-    <string name="scheduled_task_executor_loading">Wird geladen…</string>
-    <string name="scheduled_task_model_bot_default">Standardmodell dieses Bots verwenden</string>
-    <string name="scheduled_task_bot_disabled">Bot ist deaktiviert</string>
-    <string name="scheduled_task_bot_label">Bot: %1$s</string>
-    <string name="bots_routines">Routinen</string>
-    <string name="bots_routines_disabled">Dieser Bot ist deaktiviert. Seine Routinen bleiben aktiviert, werden aber bis zur Reaktivierung übersprungen.</string>
-    <string name="bots_new_routine">Neue Routine</string>
-    <string name="bots_routine_no_next">Kein nächster Lauf geplant</string>
+    <!-- Scheduled task strings -->
 
     <!-- B2: capacity/save errors -->
-    <string name="scheduled_task_bot_routine_limit">Dieser Bot hat bereits %1$d Routinen. Lösche eine, bevor du eine weitere hinzufügst.</string>
     <string name="scheduled_task_save_failed">Die geplante Aufgabe konnte nicht gespeichert werden.</string>
-    <string name="bots_routine_vscreen_busy">Das virtuelle Display wird von einer anderen Sitzung verwendet.</string>
-    <string name="bots_routine_vscreen_unavailable">Virtuelles Display ist deaktiviert oder die Geräteprüfung war nicht erfolgreich.</string>
     <string name="scheduled_vscreen_unattended_hint">Hintergrundläufe verwenden für UI-Aktionen nur das virtuelle Display.</string>
     <string name="scheduled_vscreen_unavailable_warning">Virtuelles Display ist nicht aktiviert oder die Prüfung ist fehlgeschlagen. Speichern ist möglich, UI-Aktionen können jedoch scheitern.</string>
     <string name="settings_vscreen_entry">Virtuelles Display (experimentell)</string>
@@ -2001,9 +1979,6 @@
     <string name="scheduled_task_next_run">Nächster Lauf %1$s</string>
     <string name="scheduled_task_no_next_run">Kein nächster Lauf geplant</string>
     <string name="scheduled_tasks_footer">Jede Auslösung erstellt einen neuen Chat und sendet nach dem Ende eine Benachrichtigung. Tippe darauf, um das Ergebnis zu sehen.</string>
-    <string name="bots_progress_running">%1$d delegierte Aufgaben laufen</string>
-    <string name="bots_progress_none">Nichts in Arbeit</string>
-    <string name="bots_members_header">Mitglieder</string>
     <string name="browser_desktop_site">Desktop-Version</string>
     <string name="browser_tab_count_title">%1$d Tabs</string>
     <string name="browser_share">Teilen</string>
@@ -2310,7 +2285,6 @@
     <string name="outcome_pending_title">Zu prüfende Aktionen</string>
     <string name="outcome_inspect_action">%1$s prüfen</string>
     <string name="outcome_kept_unknown">Das Ergebnis ist weiterhin unklar. Der Eintrag bleibt erhalten.</string>
-    <string name="bots_reception">Standardmitglied für Anfragen</string>
     <string name="voice_cancel_recording">Aufnahme abbrechen</string>
     <string name="voice_stop_playback">Sprachausgabe stoppen</string>
     <string name="voice_stop_owned_turn">Diese Sprachanfrage stoppen</string>

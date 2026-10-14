@@ -39,7 +39,6 @@ import kotlinx.coroutines.launch
 internal fun VoiceConversationHost(
     viewModel: ChatViewModel,
     ensureMicPermission: suspend () -> Boolean,
-    bot: com.openminis.app.data.db.BotEntity? = null,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -135,12 +134,6 @@ internal fun VoiceConversationHost(
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     Text(stringResource(R.string.voice_call_title), style = MaterialTheme.typography.headlineMedium)
-                    if (bot != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            com.openminis.app.ui.bots.BotAvatar(bot, size = 32.dp)
-                            Text(bot.name, style = MaterialTheme.typography.titleLarge)
-                        }
-                    }
                     Text(modelName.ifBlank { context.getString(R.string.voice_call_model) })
                     com.openminis.app.ui.chat.TaskWorkSummary(viewModel.agentSession.activeSessionId)
                     BloubAvatar(controller.state.effectiveBloubState, BloubSize.LARGE)

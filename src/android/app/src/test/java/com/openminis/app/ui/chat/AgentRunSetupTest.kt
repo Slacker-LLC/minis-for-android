@@ -11,20 +11,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgentRunSetupTest {
-    private fun prompt(caller: String? = null, bot: String? = null, session: String? = null, source: String? = null, unattended: Boolean = false) =
-        AgentRunSetup.systemPrompt(caller, bot, session, source, unattended)
+    private fun prompt(caller: String? = null, session: String? = null, source: String? = null, unattended: Boolean = false) =
+        AgentRunSetup.systemPrompt(caller, session, source, unattended)
 
     @Test
     fun `nothing in gives nothing out`() {
         assertNull(prompt())
-        assertNull(prompt(caller = " ", bot = ""))
+        assertNull(prompt(caller = " "))
     }
 
     @Test
-    fun `the caller prompt and the bot identity are joined, blanks dropped`() {
-        assertEquals("base\n\nbot", prompt(caller = "base", bot = "bot"))
-        assertEquals("base", prompt(caller = "base", bot = "  "))
-        assertEquals("bot", prompt(caller = null, bot = "bot"))
+    fun `the caller prompt is preserved and blanks are dropped`() {
+        assertEquals("base", prompt(caller = "base"))
+        assertNull(prompt(caller = "  "))
     }
 
     @Test

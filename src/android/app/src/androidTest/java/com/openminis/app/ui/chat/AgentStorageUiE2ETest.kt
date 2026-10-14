@@ -140,7 +140,7 @@ class AgentStorageUiE2ETest {
             throw error
         } finally {
             activity?.close(); AgentSessionStore.release(sid); runCatching { app.chatRepository.deleteSession(sid) }
-            taskId?.let { app.database.openHelper.writableDatabase.execSQL("DELETE FROM bot_tasks WHERE id = ?",arrayOf(it)) }
+            taskId?.let { app.database.openHelper.writableDatabase.execSQL("DELETE FROM agent_tasks WHERE id = ?",arrayOf(it)) }
             report.put("cleanupComplete",!File(UbuntuPaths.hostSessions,sid).exists())
             File(app.filesDir,"agent-storage-ui-e2e.json").writeText(report.toString(2))
         }

@@ -44,9 +44,6 @@ class ScheduledTaskManager(private val context: Context) {
             ScheduledTaskTierMutationPolicy.FULL_CONFIRMATION_REQUIRED
         }
         return synchronized(MUTATION_LOCK) {
-            require(ScheduledTaskPolicy.withinBotRoutineLimit(store.all(), task)) {
-                "Bot routine limit reached (${ScheduledTask.MAX_ROUTINES_PER_BOT} routines per Bot)"
-            }
             ScheduledTaskPolicy.schedulingProblem(task)?.let { throw IllegalArgumentException(it) }
             store.upsert(task)
             if (task.enabled) registerAlarm(task)
@@ -71,9 +68,6 @@ class ScheduledTaskManager(private val context: Context) {
             ) {
                 ScheduledTaskTierMutationPolicy.FULL_CONFIRMATION_REQUIRED
             }
-            require(ScheduledTaskPolicy.withinBotRoutineLimit(store.all(), task, excludingTaskId = task.id)) {
-                "Bot routine limit reached (${ScheduledTask.MAX_ROUTINES_PER_BOT} routines per Bot)"
-            }
             ScheduledTaskPolicy.schedulingProblem(task)?.let { throw IllegalArgumentException(it) }
             cancelAlarm(task.id)
             store.upsert(task)
@@ -94,21 +88,6 @@ class ScheduledTaskManager(private val context: Context) {
             cancelAlarm(taskId)
             store.delete(taskId)
         }
-    }
-
-    /** Remove only the selected Bot's routines and cancel every associated alarm. */
-    fun deleteAllForBot(botId: String): Int = synchronized(MUTATION_LOCK) {
-        val owned = ScheduledTaskPolicy.tasksForBot(store.all(), botId)
-        owned.forEach { task ->
-            cancelAlarm(task.id)
-            store.delete(task.id)
-        }
-        owned.size
-    }
-
-    /** Re-arm enabled routines after a disabled Bot is restored. */
-    fun rescheduleBotTasks(botId: String) {
-        store.all().filter { it.botId == botId && it.enabled }.forEach(::registerAlarm)
     }
 
     /**

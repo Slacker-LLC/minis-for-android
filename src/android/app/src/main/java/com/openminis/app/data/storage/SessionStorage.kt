@@ -3,7 +3,7 @@ package com.openminis.app.data.storage
 import android.content.Context
 import com.openminis.app.agent.AgentSessionStore
 import com.openminis.app.data.db.AppDatabase
-import com.openminis.app.data.db.BotTaskEntity
+import com.openminis.app.data.db.AgentTaskEntity
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.runtime.ubuntu.UbuntuPaths
 import com.openminis.app.tools.AgentStateStore
@@ -58,7 +58,7 @@ internal object SessionStorage {
                     return@withLock Result(current, current, selected)
                 }
                 val goal = AgentStateStore.goalGet(sessionId, context)
-                if (goal.id.isNotEmpty() && goal.status !in BotTaskEntity.TERMINAL_STATUSES && goal.status != BotTaskEntity.STATUS_PAUSED) {
+                if (goal.id.isNotEmpty() && goal.status !in AgentTaskEntity.TERMINAL_STATUSES && goal.status != AgentTaskEntity.STATUS_PAUSED) {
                     AgentStateStore.goalSetActive(sessionId, false, context)
                 }
                 // Terminal/CLI background jobs can exist without a live chat owner.

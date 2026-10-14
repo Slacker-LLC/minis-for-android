@@ -69,14 +69,13 @@ data class ChatSessionEntity(
      * in its old section.
      */
     @ColumnInfo(name = "folder_id") val folderId: String? = null,
-    @ColumnInfo(name = "bot_id") val botId: String? = null,
+    // Retained for existing SQLite files. New sessions never set this legacy profile link.
+    @ColumnInfo(name = "bot_id") val legacyProfileId: String? = null,
 ) {
     companion object {
-        const val SOURCE_BOT_DELEGATION = "bot_delegation"
         /** A child session started by a sub agent delegation (`subagent`). */
         const val SOURCE_SUB_AGENT = "sub_agent"
         const val LEGACY_SOURCE_SUB_AGENT = "subagent"
         fun isSubAgentSource(source: String?): Boolean = source == SOURCE_SUB_AGENT || source == LEGACY_SOURCE_SUB_AGENT
-        const val LEGACY_SOURCE_BOT_DELEGATION = "bot-delegation"
     }
 }

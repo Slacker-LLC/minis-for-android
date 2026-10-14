@@ -1354,7 +1354,6 @@
     <string name="backup_report_extra_settings">Настройки: %1$d</string>
     <string name="backup_report_extra_prompt">Системный промпт: %1$d</string>
     <string name="backup_report_extra_characters">Персонажи: %1$d</string>
-    <string name="backup_report_extra_bots">Боты: %1$d</string>
     <string name="backup_report_extra_tasks">Запланированные задачи: %1$d</string>
     <string name="backup_report_tasks_disabled">Запланированных задач с полным доступом: %1$d — они восстановлены выключенными. Проверьте их в «Запланированных задачах» и включите.</string>
     <string name="backup_report_settings_restart">Настройки применятся после перезапуска приложения.</string>
@@ -1919,7 +1918,6 @@
     <string name="drawer_recent">Недавние</string>
     <string name="drawer_no_search_match">Совпадений не найдено</string>
     <string name="drawer_search_results">Результатов: %1$d</string>
-    <string name="settings_agent_section_team">Команда и рутины</string>
     <string name="settings_agent_team_sub">Участники, роли, модели и рутины</string>
     <string name="settings_agent_tasks_sub">Регулярные запуски, история и исполнители</string>
     <string name="chat_quick_battery_title">Проверить батарею</string>
@@ -2063,31 +2061,11 @@
         <item quantity="many">Запасных моделей: +%1$d</item>
         <item quantity="other">Запасных моделей: +%1$d</item>
     </plurals>
-    <string name="bots_task_budget_summary">Автопроверки %1$d/%2$d · доработки %3$d/%4$d · делегирования %5$d/%6$d</string>
-    <string name="bots_task_pause">Приостановить</string>
-    <string name="bots_task_cancel">Отменить</string>
-    <string name="bots_task_notification_title">Задача Bot: %1$s</string>
-    <string name="bots_task_notification_needs_user">Ответственному Bot нужно ваше участие.</string>
-    <string name="bots_task_notification_completed">Ответственный Bot завершил проверку результатов.</string>
-    <string name="bots_task_notification_budget">Бюджет автоматических проверок исчерпан.</string>
 
-    <!-- B2: Bot-owned scheduled routines -->
-    <string name="scheduled_task_executor">Исполнитель</string>
-    <string name="scheduled_task_executor_regular">Обычный чат (без Bot)</string>
-    <string name="scheduled_task_executor_loading">Загрузка…</string>
-    <string name="scheduled_task_model_bot_default">Использовать модель Bot по умолчанию</string>
-    <string name="scheduled_task_bot_disabled">Bot отключён</string>
-    <string name="scheduled_task_bot_label">Bot: %1$s</string>
-    <string name="bots_routines">Сценарии</string>
-    <string name="bots_routines_disabled">Этот Bot отключён. Его сценарии остаются включёнными, но пропускаются до повторного включения Bot.</string>
-    <string name="bots_new_routine">Новый сценарий</string>
-    <string name="bots_routine_no_next">Следующий запуск не запланирован</string>
+    <!-- Scheduled task strings -->
 
     <!-- B2: capacity/save errors -->
-    <string name="scheduled_task_bot_routine_limit">У этого Bot уже есть сценарии: %1$d. Удалите один, прежде чем добавлять новый.</string>
     <string name="scheduled_task_save_failed">Не удалось сохранить задачу.</string>
-    <string name="bots_routine_vscreen_busy">Виртуальный экран занят другой сессией.</string>
-    <string name="bots_routine_vscreen_unavailable">Виртуальный экран выключен или проверка устройства не пройдена.</string>
     <string name="scheduled_vscreen_unattended_hint">В фоновом режиме UI-действия используют только виртуальный экран.</string>
     <string name="scheduled_vscreen_unavailable_warning">Виртуальный экран не включён с успешно пройденной проверкой. Сценарий можно сохранить, но UI-действия могут завершиться ошибкой.</string>
     <string name="settings_vscreen_entry">Виртуальный экран (экспериментально)</string>
@@ -2177,9 +2155,6 @@
     <string name="scheduled_task_next_run">Следующий запуск: %1$s</string>
     <string name="scheduled_task_no_next_run">Следующий запуск не запланирован</string>
     <string name="scheduled_tasks_footer">Каждый запуск создаёт новый чат и присылает уведомление по завершении. Нажмите на него, чтобы увидеть результат.</string>
-    <string name="bots_progress_running">Делегированных задач в работе: %1$d</string>
-    <string name="bots_progress_none">Ничего не выполняется</string>
-    <string name="bots_members_header">Участники</string>
     <string name="browser_desktop_site">Версия для ПК</string>
     <string name="browser_tab_count_title">Вкладок: %1$d</string>
     <string name="browser_share">Поделиться</string>
@@ -2488,7 +2463,6 @@
     <string name="outcome_pending_title">Действия, требующие проверки</string>
     <string name="outcome_inspect_action">Проверить %1$s</string>
     <string name="outcome_kept_unknown">Результат действия всё ещё неизвестен. Запись сохранена.</string>
-    <string name="bots_reception">Участник для приёма запросов по умолчанию</string>
     <string name="voice_cancel_recording">Отменить эту запись</string>
     <string name="voice_stop_playback">Остановить озвучивание</string>
     <string name="voice_stop_owned_turn">Остановить этот голосовой запрос</string>

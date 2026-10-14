@@ -103,7 +103,7 @@ class AgentToolPipelineE2ETest {
             }
             prepare(sid, provider)
             assertTrue(AgentRunner.prompt(app, sid, "写入、编辑并核验交付", wait = true, timeoutMs = 20_000).completed)
-            assertEquals("COMPLETED", app.botTaskRepository.sessionGoal(sid)!!.status)
+            assertEquals("COMPLETED", app.agentTaskRepository.sessionGoal(sid)!!.status)
             val bytes = WorkspaceFileClient.readAll(sid, "/workspace/pipeline.txt")
             assertEquals("verified delivery\n", bytes.decodeToString())
             File(app.filesDir, "agent-tool-pipeline-delivery.txt").writeBytes(bytes)
@@ -112,12 +112,12 @@ class AgentToolPipelineE2ETest {
 
             val target = session()
             AgentStateStore.goalSet(target, "动作身份不能被别名参数替换", app)
-            val task = app.botTaskRepository.sessionGoal(target)!!
+            val task = app.agentTaskRepository.sessionGoal(target)!!
             val mismatch = ToolExecutor.execute("get_goal", "{\"action\":\"update_goal\",\"goal\":\"unauthorized replacement\"}", target, app)
             assertFalse(mismatch.success); assertTrue(mismatch.output.contains("action_alias_mismatch"))
-            assertEquals(task, app.botTaskRepository.sessionGoal(target))
+            assertEquals(task, app.agentTaskRepository.sessionGoal(target))
             assertFalse(ToolExecutor.execute("get_goal", "not JSON", target, app).success)
-            assertEquals(task, app.botTaskRepository.sessionGoal(target))
+            assertEquals(task, app.agentTaskRepository.sessionGoal(target))
             passed("contradictory action aliases and malformed JSON are rejected without changing the durable task")
             val invalid = ToolExecutor.execute("file_write", "{\"path\":\"/workspace/invalid.txt\",\"content\":{}}", target, app)
             assertFalse(invalid.success); assertTrue(invalid.output.contains("invalid_arguments"))

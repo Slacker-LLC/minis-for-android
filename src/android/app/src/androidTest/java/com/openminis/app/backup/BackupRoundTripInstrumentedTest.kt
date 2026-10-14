@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.data.db.AppDatabase
-import com.openminis.app.data.db.BotEntity
 import com.openminis.app.data.db.CharacterEntity
 import com.openminis.app.prompt.CustomPromptStore
 import com.openminis.app.roleplay.CharacterMemoryRepository
@@ -37,7 +36,6 @@ class BackupRoundTripInstrumentedTest {
     private val db = AppDatabase.getInstance(context)
     private val tag = "rt-${System.nanoTime()}"
     private val characterId = "char-$tag"
-    private val botId = "bot-$tag"
     private val readOnlyTaskId = "task-ro-$tag"
     private val fullTaskId = "task-full-$tag"
     private val workDirs = mutableListOf<File>()
@@ -69,7 +67,6 @@ class BackupRoundTripInstrumentedTest {
         db.characterDao().deleteCharacter(characterId)
         File(context.filesDir, CharacterStoragePolicy.avatarRelativePath(characterId)).delete()
         CharacterMemoryRepository.discard(context, characterId)
-        db.botDao().getBot(botId)?.let { db.botDao().deleteBot(it) }
         ScheduledTaskManager(context).apply { delete(readOnlyTaskId); delete(fullTaskId) }
         if (originalTheme == null) appearance.edit().remove("theme_mode").apply()
         else appearance.edit().putInt("theme_mode", originalTheme!!).apply()
@@ -83,7 +80,6 @@ class BackupRoundTripInstrumentedTest {
         db.characterDao().upsertCharacter(CharacterEntity(characterId, "Round Trip Ada", card, null, 100, 200))
         File(context.filesDir, CharacterStoragePolicy.avatarRelativePath(characterId)).apply { parentFile?.mkdirs(); writeBytes(avatar) }
         CharacterMemoryRepository.file(context, characterId).apply { parentFile?.mkdirs(); writeText("remembers $tag") }
-        db.botDao().insertBot(BotEntity(botId, "Bot $tag", "be brief", null, true, 100, 200))
         val store = ScheduledTaskStore(context)
         store.upsert(task(readOnlyTaskId, ScheduledTaskPermissionTier.READ_ONLY), synchronous = true)
         store.upsert(task(fullTaskId, ScheduledTaskPermissionTier.FULL), synchronous = true)
@@ -96,7 +92,6 @@ class BackupRoundTripInstrumentedTest {
         db.characterDao().deleteCharacter(characterId)
         File(context.filesDir, CharacterStoragePolicy.avatarRelativePath(characterId)).delete()
         CharacterMemoryRepository.discard(context, characterId)
-        db.botDao().getBot(botId)?.let { db.botDao().deleteBot(it) }
         ScheduledTaskManager(context).apply { delete(readOnlyTaskId); delete(fullTaskId) }
     }
 
@@ -142,8 +137,6 @@ class BackupRoundTripInstrumentedTest {
         assertEquals(avatarFile.absolutePath, character.avatarPath)
         assertEquals("character memory", "remembers $tag", CharacterMemoryRepository.file(context, characterId).readText())
 
-        assertEquals("bot", "Bot $tag", db.botDao().getBot(botId)?.name)
-
         val store = ScheduledTaskStore(context)
         assertTrue("read-only task is back and on", store.get(readOnlyTaskId)?.enabled == true)
         val full = store.get(fullTaskId)
@@ -152,7 +145,6 @@ class BackupRoundTripInstrumentedTest {
         assertEquals(ScheduledTaskPermissionTier.FULL, full.permissionTier)
 
         assertTrue("report names the restored extras", (report.extras["characters"] ?: 0) >= 1)
-        assertTrue((report.extras["bots"] ?: 0) >= 1)
         assertTrue((report.extras["scheduled_tasks"] ?: 0) >= 2)
         assertTrue((report.extras["scheduled_tasks_disabled"] ?: 0) >= 1)
         assertTrue((report.extras["settings"] ?: 0) >= 1)

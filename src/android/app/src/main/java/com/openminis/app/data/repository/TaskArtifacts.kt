@@ -34,7 +34,7 @@ internal object TaskArtifacts {
 
     /** Task pagination preserves old completed evidence even after the active Goal is cleared. */
     suspend fun page(context: Context, sessionId: String? = null, offset: Int = 0): Page = withContext(Dispatchers.IO) {
-        val dao = AppDatabase.getInstance(context).botTaskDao()
+        val dao = AppDatabase.getInstance(context).agentTaskDao()
         var cursor = offset.coerceAtLeast(0)
         val pageSize = 10
         while (true) {
@@ -121,7 +121,7 @@ internal object TaskArtifacts {
     private suspend fun appendDelivery(context: Context, reference: Reference, delivery: JSONObject) {
         val db = AppDatabase.getInstance(context)
         db.withTransaction {
-            val task = checkNotNull(db.botTaskDao().get(reference.taskId)) { "task_not_found" }
+            val task = checkNotNull(db.agentTaskDao().get(reference.taskId)) { "task_not_found" }
             val saved = checkNotNull(task.completionEvidence) { "artifact_proof_missing" }
             val evidence = JSONObject(saved)
             val references = evidence.getJSONArray("references")
@@ -133,7 +133,7 @@ internal object TaskArtifacts {
             check(deliveries.length() < 16) { "task_delivery_reference_limit" }
             deliveries.put(delivery.put("delivered_at", System.currentTimeMillis()).put("source_reference_index", reference.referenceIndex))
             evidence.put("deliveries", deliveries)
-            check(db.botTaskDao().appendDelivery(task.id, saved, evidence.toString()) == 1) { "completed_task_changed" }
+            check(db.agentTaskDao().appendDelivery(task.id, saved, evidence.toString()) == 1) { "completed_task_changed" }
         }
     }
 

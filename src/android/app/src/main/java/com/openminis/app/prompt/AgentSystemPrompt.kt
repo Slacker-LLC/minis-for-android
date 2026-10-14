@@ -13,7 +13,7 @@ import com.openminis.app.agent.SystemPromptBuilder
  *     Authored in Settings -> Soul (SOUL.md), not in this package.
  *  2. **User system prompt** — [CustomPromptStore]: the device owner's own text
  *     from Settings -> System prompt. Injected here and declared to outrank every
- *     other authored section (personality, style, presets, bots, sessions).
+ *     other authored section (personality, style, presets, sessions).
  *  3. **Editable modules** — [PromptModuleRegistry], each resolvable to a shipped
  *     default and an optional user override ([PromptModuleStore]).
  *  4. **Per-turn runtime fragments** — skills, MCP disclosure, GLOBAL.md, recent
@@ -52,7 +52,7 @@ object AgentSystemPrompt {
 
     private const val CUSTOM_PROMPT_HEADER =
         "User system prompt (highest priority - written by the device owner). " +
-            "Where the personality, response style, preset, bot or session guidance below conflicts with it, follow it."
+            "Where the personality, response style, preset or session guidance below conflicts with it, follow it."
 
     /** The editable modules only (no identity layer, no runtime fragments). */
     fun modulesSection(context: Context, memoryOn: Boolean): String =

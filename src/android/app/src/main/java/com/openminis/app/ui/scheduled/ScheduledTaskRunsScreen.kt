@@ -1,7 +1,7 @@
 package com.openminis.app.ui.scheduled
 
 import com.openminis.app.ui.theme.ChatColors
-import com.openminis.app.ui.bots.StatusPill
+import com.openminis.app.ui.components.StatusBadge
 import com.openminis.app.ui.components.MinisEmptyState
 import com.openminis.app.ui.settings.SettingsRow
 import com.openminis.app.ui.settings.SettingsSection
@@ -113,7 +113,7 @@ private fun RunRow(run: ScheduledRun, onOpenSession: (String) -> Unit, showDivid
         onClick = if (tappable) ({ onOpenSession(run.sessionId!!) }) else null,
         showDivider = showDivider,
         trailing = {
-            StatusPill(
+            StatusBadge(
                 stringResource(if (run.ok) R.string.scheduled_run_ok else R.string.scheduled_run_failed),
                 if (run.ok) ChatColors.ok else ChatColors.bad,
             )

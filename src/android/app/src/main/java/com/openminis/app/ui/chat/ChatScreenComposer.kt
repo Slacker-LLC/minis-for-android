@@ -129,7 +129,6 @@ internal fun ChatComposer(
     viewModel: com.openminis.app.ui.chat.ChatViewModel,
     messagesState: androidx.compose.runtime.State<kotlin.collections.List<com.openminis.app.ui.chat.ChatMessage>>,
     isStreamingState: androidx.compose.runtime.State<kotlin.Boolean>,
-    currentBot: com.openminis.app.data.db.BotEntity?,
     modelNameState: androidx.compose.runtime.State<kotlin.String>,
     attachmentsState: androidx.compose.runtime.State<kotlin.collections.List<com.openminis.app.ui.chat.InputAttachment>>,
     pastedTextsState: androidx.compose.runtime.State<kotlin.collections.List<com.openminis.app.ui.chat.PastedText>>,
@@ -960,7 +959,7 @@ internal fun ChatComposer(
                                 label = "composerPlaceholder",
                             ) { idx ->
                                 Text(
-                                    composerPlaceholderText(idx, currentBot?.name ?: soulName.name),
+                                    composerPlaceholderText(idx, soulName.name),
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
                                     fontSize = 16.5.sp * chatInputFontScale,
                                     maxLines = 1,
@@ -1132,7 +1131,6 @@ internal fun ChatComposer(
                 ) {
                     // One chip for what answers and how hard it thinks: "model · level". Tap opens a
                     // small menu — the model (full picker) and the thinking levels.
-                    if (currentBot == null) {
                         val chipModelRaw = modelName.ifEmpty { stringResource(R.string.model_slot_main) }
                         val chipModel = if (chipModelRaw.contains("/")) chipModelRaw.substringAfterLast("/") else chipModelRaw
                         val composerThinking by viewModel.thinkingLevel.collectAsState()
@@ -1218,7 +1216,6 @@ internal fun ChatComposer(
                                 }
                             }
                         }
-                    }
                 }
 
             // T187: Exit Edit Mode pill, only while editingMessageId

@@ -3,8 +3,8 @@ package com.openminis.app.tools
 import android.content.Context
 import com.openminis.app.agent.AgentSessionStore
 import com.openminis.app.data.db.AppDatabase
-import com.openminis.app.data.db.BotTaskEntity
-import com.openminis.app.data.repository.BotTaskRepository
+import com.openminis.app.data.db.AgentTaskEntity
+import com.openminis.app.data.repository.AgentTaskRepository
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import androidx.room.withTransaction
 import kotlinx.coroutines.NonCancellable
@@ -14,8 +14,8 @@ import org.json.JSONObject
 
 /** Model, commands, Debug and the page share the same durable session Goal. */
 object GoalTools {
-    internal suspend fun currentTask(context: Context, sessionId: String): BotTaskEntity? {
-        val repository = BotTaskRepository(AppDatabase.getInstance(context).botTaskDao())
+    internal suspend fun currentTask(context: Context, sessionId: String): AgentTaskEntity? {
+        val repository = AgentTaskRepository(AppDatabase.getInstance(context).agentTaskDao())
         return AgentSessionStore.activeRunTask(sessionId)?.id?.let { repository.get(it) }
             ?: com.openminis.app.data.model.SessionOverrides.fromJson(AppDatabase.getInstance(context).chatDao().getSession(sessionId)?.sessionOverrides)
                 .taskId?.let { id -> repository.get(id)?.takeIf { task -> task.originSessionId == sessionId || task.currentOwnerSessionId == sessionId || task.goalSessionId == sessionId } }
@@ -30,7 +30,7 @@ object GoalTools {
             return ToolExecutionResult("goal: unknown action $name", false)
         }
         return try {
-            val repository = BotTaskRepository(AppDatabase.getInstance(context).botTaskDao())
+            val repository = AgentTaskRepository(AppDatabase.getInstance(context).agentTaskDao())
             val current = currentTask(context, sid)
             if (name == "get_goal" && current != null) {
                 val ownId = kotlin.coroutines.coroutineContext[com.openminis.app.tools.runtime.ToolExecutor.ExecutionIdentity]?.intentId
@@ -47,19 +47,19 @@ object GoalTools {
                 require(args.optString("task_id") == task.id && args.optInt("revision", -1) == task.revision &&
                     args.optInt("stop_generation", -1) == task.stopGeneration) { "task_changed_or_missing_identity" }
                 val status = when (args.getString("status")) {
-                    "completed" -> BotTaskEntity.STATUS_COMPLETED
-                    "paused" -> BotTaskEntity.STATUS_PAUSED
-                    "waiting" -> BotTaskEntity.STATUS_WAITING
-                    "needs_user" -> BotTaskEntity.STATUS_NEEDS_USER
+                    "completed" -> AgentTaskEntity.STATUS_COMPLETED
+                    "paused" -> AgentTaskEntity.STATUS_PAUSED
+                    "waiting" -> AgentTaskEntity.STATUS_WAITING
+                    "needs_user" -> AgentTaskEntity.STATUS_NEEDS_USER
                     else -> throw IllegalArgumentException("invalid_task_status")
                 }
                 val progress = args.optString("progress").trim()
                 require(progress.isNotEmpty() && progress.length <= 2_000) { "progress explanation required, at most 2000 characters" }
-                if (status == BotTaskEntity.STATUS_COMPLETED) {
+                if (status == AgentTaskEntity.STATUS_COMPLETED) {
                     check(!com.openminis.app.agent.subagents.SubAgents.activeForTask(task.id, sid)) { "unsettled_subagents_require_review" }
                     check(JobRegistry.list().none { it.taskId == task.id && it.status == JobRegistry.JobStatus.RUNNING }) { "unsettled_jobs_require_review" }
                 }
-                val proof = if (status == BotTaskEntity.STATUS_COMPLETED) verifyEvidence(context, sid, task, args, toolId) else null
+                val proof = if (status == AgentTaskEntity.STATUS_COMPLETED) verifyEvidence(context, sid, task, args, toolId) else null
                 val settled = withContext(NonCancellable) {
                     AppDatabase.getInstance(context).withTransaction {
                         repository.settleVerified(task.id, task.revision, task.stopGeneration, status, progress, proof)
@@ -75,7 +75,7 @@ object GoalTools {
                 val rounds = args.optInt("max_goal_rounds").takeIf { args.has("max_goal_rounds") }
                 require(rounds == null || rounds in 1..100) { "max_goal_rounds must be between 1 and 100" }
                 if (args.getString("goal").isBlank()) {
-                    BotDelegationCoordinator.current()?.cancelRootTask(current.id, cancelOwner = false)
+                    repository.cancel(current.id, stopOwner = false)
                 } else {
                     repository.updateOwnedGoal(current, args.getString("goal"), rounds,
                         args.optString("acceptance_criteria").takeIf { args.has("acceptance_criteria") })
@@ -114,14 +114,14 @@ object GoalTools {
         }
     }
 
-    private fun describe(task: BotTaskEntity) = JSONObject().put("task_id", task.id).put("goal", task.goal)
+    private fun describe(task: AgentTaskEntity) = JSONObject().put("task_id", task.id).put("goal", task.goal)
         .put("status", task.status).put("revision", task.revision).put("stop_generation", task.stopGeneration)
         .put("max_goal_rounds", task.maxAutoRuns).put("rounds_used", task.autoRunsUsed)
         .put("acceptance_criteria", task.acceptanceCriteria ?: JSONObject.NULL).put("progress", task.progress)
         .put("completion_evidence", task.completionEvidence?.let(::JSONObject) ?: JSONObject.NULL)
 
     /** References are verified against the workspace and durable tool receipts, never model assertions. */
-    private suspend fun verifyEvidence(context: Context, sid: String, task: BotTaskEntity, args: JSONObject, toolId: String): String {
+    private suspend fun verifyEvidence(context: Context, sid: String, task: AgentTaskEntity, args: JSONObject, toolId: String): String {
         val ownId = ToolOutcomeVerification.requireOwner(context, sid, task, toolId)
         check(task.completionEvidence?.let { JSONObject(it).optJSONObject("restoration")?.optBoolean("requires_review") } != true) { "restored_task_requires_user_review" }
         val run = checkNotNull(AgentSessionStore.activeRun(sid))

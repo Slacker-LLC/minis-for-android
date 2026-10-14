@@ -61,8 +61,6 @@ object ScheduledAgentRunner {
     const val ERROR_SUBSYSTEMS_NOT_READY = "subsystems_not_ready"
     const val ERROR_NO_PROVIDER = "no_provider"
     const val ERROR_TARGET_SESSION_GONE = "target_session_gone"
-    const val ERROR_BOT_NOT_FOUND = "bot_not_found"
-    const val ERROR_BOT_DISABLED = "bot_disabled"
 
     /**
      * App-scoped scope for fire-and-forget completion work when a caller asks
@@ -116,32 +114,13 @@ object ScheduledAgentRunner {
             )
         }
 
-        val ownerBot = task.botId?.let { app.botRepository.getBot(it) }
-        when (ScheduledTaskPolicy.botOwnerState(task.botId, ownerBot)) {
-            BotOwnerState.MISSING -> {
-                val message = "Bot 已删除"
-                val manager = ScheduledTaskManager(app)
-                manager.markFired(task.id, null, message, ok = false)
-                manager.setEnabled(task.id, false)
-                postCompletionNotification(app, task, null, message)
-                return RunOutcome(errorCode = ERROR_BOT_NOT_FOUND, message = message)
-            }
-            BotOwnerState.DISABLED -> {
-                val message = "Bot 已停用"
-                ScheduledTaskManager(app).markFired(task.id, null, message, ok = false)
-                postCompletionNotification(app, task, null, message)
-                return RunOutcome(errorCode = ERROR_BOT_DISABLED, message = message)
-            }
-            BotOwnerState.UNOWNED, BotOwnerState.ENABLED -> Unit
-        }
-
         // Do not pre-start AgentForegroundService here. A scheduled task may
         // fail before it resolves a target session/provider, and Android FGS
         // background-start rules depend on the actual launch context. The
         // existing ChatViewModel execution path marks the session active only
         // when a real agent turn begins; that transition is the single owner of
         // the Agent FGS lifecycle.
-        val resolved = withContext(Dispatchers.IO) { resolveSessionId(app, task, ownerBot) }
+        val resolved = withContext(Dispatchers.IO) { resolveSessionId(app, task) }
         val sessionId = resolved.sessionId ?: return resolved
 
         AppLogger.info(
@@ -273,7 +252,6 @@ object ScheduledAgentRunner {
     private suspend fun resolveSessionId(
         app: MinisApp,
         task: ScheduledTask,
-        ownerBot: com.openminis.app.data.db.BotEntity?,
     ): RunOutcome {
         return when (val mode = task.targetMode) {
             is ScheduledTargetMode.AppendToSession -> {
@@ -301,25 +279,19 @@ object ScheduledAgentRunner {
             ScheduledTargetMode.NewSession -> {
                 val explicitBinding = task.modelBinding
                 val pinnedModelId = task.modelId
-                val desiredBinding = ScheduledTaskPolicy.effectiveModelBinding(
-                    taskBinding = explicitBinding,
-                    legacyModelId = pinnedModelId,
-                    botBinding = ownerBot?.modelBinding,
-                )
+                val desiredBinding = explicitBinding
                 val boundEntry = if (pinnedModelId == null || desiredBinding != null) {
-                    com.openminis.app.agent.BotModelResolver.resolve(app.providerRepository, desiredBinding)
+                    com.openminis.app.agent.AgentModelResolver.resolve(app.providerRepository, desiredBinding)
                 } else null
                 if (desiredBinding != null && boundEntry == null) {
-                    val ownerName = ownerBot?.name?.let { "Bot '$it'" } ?: "This routine"
                     return RunOutcome(
                         errorCode = ERROR_NO_PROVIDER,
-                        message = "$ownerName's selected model is unavailable. Choose a usable model and try again.",
+                        message = "This routine's selected model is unavailable. Choose a usable model and try again.",
                     )
                 }
                 val seedModelId: String = when {
                     explicitBinding != null -> boundEntry?.model?.id
                     pinnedModelId != null -> pinnedModelId
-                    ownerBot?.modelBinding != null -> boundEntry?.model?.id
                     else -> boundEntry?.model?.id
                         ?: app.providerRepository.allVisibleEntries().firstOrNull()?.baseModel?.id
                 } ?: run {
@@ -339,7 +311,6 @@ object ScheduledAgentRunner {
                     modelId = seedModelId,
                     title = title,
                     memoryEnabled = memoryOn,
-                    botId = ownerBot?.id,
                     source = "scheduled",
                     modelBinding = bindingToWrite,
                 )

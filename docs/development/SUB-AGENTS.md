@@ -66,8 +66,7 @@ also take whatever the user has attached there.
   legacy `prompt` input is still accepted by the roster parser. Both `sub_agent` and legacy `subagent` session
   sources are recognized as children and cannot delegate again. Children use their configured memory scope;
   isolation of the parent transcript does not imply that global memory is disabled.
-- **Bot delegation** (`delegate_bot`, `docs/contracts/08-BOT-COORDINATION.md`) is a separate, persistent
-  mechanism between named Bots and is untouched. Sub agents are ephemeral workers of one conversation.
+- Bot 委派已从现役版本移除；历史边界见已废止的 `docs/contracts/08-BOT-COORDINATION.md`。子代理仍是单个会话的短期工作者。
 - The upstream app pins a sub agent to a model *group*; this app has fixed model slots instead, so the pin is a
   model entry.
 

@@ -1,5 +1,7 @@
 # Agent 执行核心：M1 实现与端到端证据
 
+> Bot 作为当时的共享调用方只属于历史验收范围；当前版本已移除 Bot 入口与运行时。本文保留冻结的 M1 实现证据。
+
 ## M1 当前实现（2026-10-12 工作树）
 
 唯一执行所有者为 `agent/AgentSessionStore` 中的 `AgentSession`。`AgentRunner` 直接获取核心，不构造 ViewModel；聊天页面工厂只获取同一个核心的投影。`ChatViewModelStore` 只保存页面投影，清掉 ViewModelStore 不会取消回合、重建历史或创建第二个循环。删除会话显式关闭核心，等待所有模型、媒体、压缩与持久化子任务退出后再执行 Room cascade；关闭未退出的所有者暂留在 store，拒绝迟到提交。

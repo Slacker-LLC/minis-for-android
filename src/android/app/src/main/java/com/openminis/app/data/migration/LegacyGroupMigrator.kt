@@ -43,7 +43,6 @@ internal data class LegacyState(
     val availableEntryIds: Set<String>,
     val sessionBindings: List<LegacyBindingRecord> = emptyList(),
     val scheduledBindings: List<LegacyBindingRecord> = emptyList(),
-    val botBindings: List<LegacyBindingRecord> = emptyList(),
 )
 
 internal data class MigratedBinding(
@@ -57,7 +56,6 @@ internal data class MigrationResult(
     val config: ProviderConfig,
     val sessionBindings: List<MigratedBinding>,
     val scheduledBindings: List<MigratedBinding>,
-    val botBindings: List<MigratedBinding>,
     val warnings: List<String>,
 )
 
@@ -141,27 +139,23 @@ internal object LegacyGroupMigrator {
             config = migratedConfig,
             sessionBindings = legacy.sessionBindings.map { migrateBinding(it, byId, legacy, ::canonical, entriesById) },
             scheduledBindings = legacy.scheduledBindings.map {
-                migrateBotBinding(it, byId, legacy, ::canonical, entriesById, warnings, "ScheduledTask")
-            },
-            botBindings = legacy.botBindings.map {
-                migrateBotBinding(it, byId, legacy, ::canonical, entriesById, warnings)
+                migrateScheduledBinding(it, byId, legacy, ::canonical, entriesById, warnings)
             },
             warnings = warnings,
         )
     }
 
-    private fun migrateBotBinding(
+    private fun migrateScheduledBinding(
         record: LegacyBindingRecord,
         groups: Map<String, LegacyModelGroup>,
         legacy: LegacyState,
         canonical: (String) -> String,
         entriesById: Map<String, ModelEntry>,
         warnings: MutableList<String>,
-        sourceName: String = "Bot",
     ): MigratedBinding {
         val raw = record.binding ?: return MigratedBinding(record.id, null, record.modelId)
         if (raw.isBlank()) {
-            warnings += "$sourceName ${record.id} has a blank model binding; cleared during slot migration"
+            warnings += "Scheduled task ${record.id} has a blank model binding; cleared during slot migration"
             return MigratedBinding(record.id, null)
         }
         when (val parsed = ModelBinding.parse(raw)) {
@@ -176,14 +170,14 @@ internal object LegacyGroupMigrator {
                 return MigratedBinding(record.id, entryBinding(selected), modelId)
             }
             null -> {
-                // The shipped Bot editor historically persisted a bare entry id,
+                // An older scheduled-task editor persisted a bare entry id,
                 // despite the JSON-only format described by the migration spec.
                 // Preserve a known selection by upgrading it to the new JSON form.
                 val legacyEntryId = raw.trim()
                 if (entriesById.containsKey(canonical(legacyEntryId))) {
                     return MigratedBinding(record.id, entryBinding(canonical(legacyEntryId)))
                 }
-                warnings += "$sourceName ${record.id} has a malformed model binding; cleared during slot migration"
+                warnings += "Scheduled task ${record.id} has a malformed model binding; cleared during slot migration"
                 return MigratedBinding(record.id, null, record.modelId)
             }
         }
