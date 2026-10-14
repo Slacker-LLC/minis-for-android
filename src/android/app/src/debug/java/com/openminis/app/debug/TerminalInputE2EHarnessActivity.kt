@@ -30,7 +30,7 @@ class TerminalInputE2EHarnessActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(1, 1)
             isFocusable = true
             isFocusableInTouchMode = true
-            bind(::receiveBytes) { false }
+            bind(::receiveBytes, {}) { false }
         }
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
