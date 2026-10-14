@@ -13,6 +13,10 @@ fun ChatViewModel.appendToInputText(snippet: String) = agentSession.appendToInpu
 
 fun ChatViewModel.quoteIntoInput(selection: String) = agentSession.quoteIntoInput(selection)
 
+fun ChatViewModel.quoteAttachmentFile(file: java.io.File, name: String) = agentSession.quoteAttachmentFile(file, name)
+
+fun ChatViewModel.quoteMessage(message: ChatMessage) = agentSession.quoteMessage(message)
+
 fun ChatViewModel.removeQuote(index: Int) = agentSession.removeQuote(index)
 
 fun ChatViewModel.stashPastedText(text: String) = agentSession.stashPastedText(text)

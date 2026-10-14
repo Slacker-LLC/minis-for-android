@@ -148,7 +148,7 @@ internal fun AgentSession.handleUserCancelledCleanup() {
     val hadInflightTools = cancelledIds.isNotEmpty()
     val pending = pendingAssistantTurn?.takeIf { it.assistantId == last.id }
     if (pending != null && pending.committed == null) {
-        msgs[lastIdx] = last.copy(toolBlocks = updatedBlocks, isStreaming = false)
+        msgs[lastIdx] = last.copy(toolBlocks = updatedBlocks, isStreaming = false, updatedAtMs = System.currentTimeMillis())
         _messages.value = msgs
         persistInterruptedMediaTurn(pending, updatedBlocks, cancelledIds)
         _canResume.value = true

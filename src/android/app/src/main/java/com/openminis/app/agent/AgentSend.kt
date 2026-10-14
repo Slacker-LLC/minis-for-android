@@ -336,6 +336,13 @@ internal fun AgentSession.sendMessage(
             sessionEventEmitter.messageCreated(bubble)
         }
         if (!programmatic) _attachments.value = _attachments.value.filterNot { it in currentAttachments }
+
+        // The provider this chat talks to, for the agent's provider_quota tool.
+        com.openminis.app.provider.quota.ActiveChatProvider.set(
+            activeSessionId,
+            _activeEntryId.value?.let { id -> providerRepository.config.value.modelEntries.find { it.id == id }?.providerInstanceId },
+        )
+
         check(persistedUser.requestState == "PENDING" && persistedUser.requestRunId == null) { "request_already_claimed" }
         requestPayload(persistedUser)
 
@@ -483,6 +490,7 @@ internal fun AgentSession.setInlineError(errorText: String) {
             error = safeError,
             isStreaming = false,
             isAwaitingModelResponse = false,
+            updatedAtMs = System.currentTimeMillis(),
         )
         _messages.value = msgs
         // [T-error-persist-android] Persist the terminal error onto the

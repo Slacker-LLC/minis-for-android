@@ -108,6 +108,37 @@ fun AgentSession.quoteIntoInput(selection: String) {
     _quotedTexts.value = (_quotedTexts.value + text).takeLast(MAX_QUOTES)
 }
 
+/**
+ * Quotes a file the chat already holds (one the user sent, or one the agent produced) by attaching it to the next
+ * message. The same file is not attached twice.
+ */
+fun AgentSession.quoteAttachmentFile(file: java.io.File, name: String) {
+    if (!file.isFile) return
+    val uri = android.net.Uri.fromFile(file)
+    if (_attachments.value.any { it.uri == uri }) return
+    val mime = guessMimeType(name, fallback = "application/octet-stream")
+    addAttachment(
+        InputAttachment(
+            fileName = name,
+            uri = uri,
+            mimeType = mime,
+            kind = if (mime.startsWith("image/")) InputAttachment.Kind.IMAGE else InputAttachment.Kind.DOCUMENT,
+        ),
+    )
+}
+
+/** Quotes a sent message: its text (without the quotes it carried itself) as a card, its files as attachments. */
+fun AgentSession.quoteMessage(message: ChatMessage) {
+    quoteIntoInput(splitLeadingQuotes(message.content).second)
+    message.imageUris.forEachIndexed { i, uri ->
+        uri.path?.let { quoteAttachmentFile(java.io.File(it), message.attachmentNames.getOrNull(i) ?: java.io.File(it).name) }
+    }
+    val fileNames = message.attachmentNames.drop(message.imageUris.size)
+    message.attachmentUris.forEachIndexed { i, uri ->
+        uri.path?.let { quoteAttachmentFile(java.io.File(it), fileNames.getOrNull(i) ?: java.io.File(it).name) }
+    }
+}
+
 fun AgentSession.removeQuote(index: Int) {
     _quotedTexts.value = _quotedTexts.value.filterIndexed { i, _ -> i != index }
 }
@@ -162,7 +193,10 @@ fun AgentSession.stashPastedTextAsFile(text: String): InputAttachment? {
     val dir = java.io.File(context.cacheDir, "pasted_text").apply { mkdirs() }
     val stamp = java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US)
         .format(java.util.Date())
-    val name = "Pasted_$stamp-${java.util.UUID.randomUUID().toString().take(8)}.txt"
+    // "Pasted_<time>.txt"; a second paste in the same second gets a counter.
+    var name = "Pasted_$stamp.txt"
+    var n = 2
+    while (java.io.File(dir, name).exists()) name = "Pasted_${stamp}_${n++}.txt"
     val file = java.io.File(dir, name)
     return try {
         file.writeText(text)
