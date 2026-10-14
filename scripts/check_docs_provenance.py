@@ -35,7 +35,6 @@ CONTRACT_FILES = (
     "docs/contracts/05-ENGINEERING.md",
     "docs/contracts/06-CURRENT-GAPS.md",
     "docs/contracts/07-OWNERSHIP-MIGRATION.md",
-    "docs/contracts/08-BOT-COORDINATION.md",
 )
 BANNED_PATTERNS = {
     "OpenMinis product framing": re.compile(r"\bOpenMinis(?:Pet)?\b"),
@@ -192,6 +191,11 @@ def check_tree(root: Path) -> list[str]:
     errors: list[str] = []
     if (root / "UPSTREAM.md").exists():
         errors.append("UPSTREAM.md must not remain an active synchronization-policy document")
+    if (root / "docs/contracts/08-BOT-COORDINATION.md").exists():
+        errors.append(
+            "docs/contracts/08-BOT-COORDINATION.md must not return: "
+            "the Bot runtime it governed was removed from this product",
+        )
 
     for path in active_markdown_files(root):
         rel = path.relative_to(root).as_posix()
