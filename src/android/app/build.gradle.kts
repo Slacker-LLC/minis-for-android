@@ -527,6 +527,9 @@ tasks.matching { it.name.contains("Debug") && it.name.contains("lint", ignoreCas
     .configureEach { dependsOn(stageDebugSkillAssets) }
 
 dependencies {
+    // [T-android-voice-grokbot] Voice-call character engine, imported from Mr-XiaoLiang/GrokBot (MIT).
+    implementation(project(":grokbot"))
+
     // Compose BOM
     val composeBom = platform("androidx.compose:compose-bom:2025.09.00")
     implementation(composeBom)

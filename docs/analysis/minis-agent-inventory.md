@@ -311,7 +311,7 @@ flowchart TD
 - **实际完成判断**：负责人回合 Completed 不再直接完成根任务；GoalTools 核验当前任务的实际文件/持久回执，无证据回复进入 NEEDS_USER，新派工继续等待结果。
 - **保存与恢复**：成员/根任务/委派/inbox 在 Room。进程死亡的 RUNNING 委派保留未知结果语义，不自动重放；待派发任务仅在明确初始化恢复条件下扫描。备份包含成员定义，不包含任务/委派/inbox 流水。
 - **尚未接通的产品关系**：Bot 专属工作记忆、Bot 专属技能/资料配置、显式共享工程与成果、多成员群聊/转交语义未形成完整产品。目前复用全局 Memory、技能和 runtime；每 Bot 没有独立 Ubuntu/Root runtime。
-- **源码**：[BotRepository.kt](../../src/android/app/src/main/java/com/openminis/app/data/repository/BotRepository.kt)、[BotDelegationCoordinator.kt](../../src/android/app/src/main/java/com/openminis/app/tools/BotDelegationCoordinator.kt)、[BotWakeDispatcher.kt](../../src/android/app/src/main/java/com/openminis/app/tools/BotWakeDispatcher.kt)、`data/db/Bot*`、`ui/bots/BotsScreen.kt`；边界见 [Bot 合同](../contracts/08-BOT-COORDINATION.md)。
+- **源码（已移除）**：`BotRepository.kt`、`BotDelegationCoordinator.kt`、`BotWakeDispatcher.kt`、`data/db/Bot*`、`ui/bots/BotsScreen.kt` 与 Bot 合同已随功能删除；需要旧文本时查私有存档仓库 `Slacker-LLC/minis-for-android-pre-bot-removal`。
 
 <a id="feature-subagent"></a>
 

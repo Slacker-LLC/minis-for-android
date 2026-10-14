@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
@@ -114,7 +113,6 @@ fun SessionListScreen(
     onRootfsClick: () -> Unit = {},
    // [T-android-scheduled-tasks-design] Entry to the scheduled-tasks list.
    onScheduledTasksClick: () -> Unit = {},
-    onBotsClick: () -> Unit = {},
     // [T-android-assistant-home] Top-of-list entry into the assistant home page.
     // Kept as a parameter (with a no-op default) so every existing call site
     // compiles unchanged and a surface without the home page simply omits it.
@@ -395,9 +393,6 @@ fun SessionListScreen(
                         // [T-android-scheduled-tasks-full] Badge shows the count of
                         // scheduled tasks so the user can see at a glance how many
                         // are configured without opening the list.
-                        IconButton(onClick = onBotsClick) {
-                            Icon(Icons.Outlined.Group, contentDescription = stringResource(R.string.sub_agents_title))
-                        }
                         IconButton(onClick = onScheduledTasksClick) {
                             if (scheduledTaskCount > 0) {
                                 BadgedBox(badge = { Badge { Text("$scheduledTaskCount") } }) {

@@ -1,6 +1,8 @@
 package com.openminis.app.ui.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -82,6 +84,9 @@ import com.openminis.app.ui.onboarding.OnboardingModelSelectionScreen
 
 
 
+
+private fun String?.isPrimarySurface(): Boolean =
+    this == Routes.SESSION_LIST || this == Routes.ASSISTANT_HOME || this == Routes.CHAT
 
 @Composable
 fun AppNavigation(
@@ -188,8 +193,13 @@ fun AppNavigation(
             is DeepLinkAction.NewVoiceChat -> {
                 try {
                     val restored = com.openminis.app.data.AssistantHomePrefs.resolveVoiceSession(context)
-                    DeepLinkCoordinator.setPendingChatAction(DeepLinkCoordinator.ChatAction.START_VOICE)
-                    navController.navigate(Routes.chat(restored ?: "__new__${java.util.UUID.randomUUID()}")) {
+                    val target = restored ?: "__new__${java.util.UUID.randomUUID()}"
+                    DeepLinkCoordinator.setPendingChatAction(
+                        DeepLinkCoordinator.ChatAction.START_VOICE,
+                        sessionId = target,
+                        chatRouteOnly = true,
+                    )
+                    navController.navigate(Routes.chat(target)) {
                         popUpTo(Routes.SESSION_LIST) { inclusive = false }
                         launchSingleTop = true
                     }
@@ -337,10 +347,13 @@ fun AppNavigation(
         val quickActionStart: String? = when (initialDeepLink) {
             is DeepLinkAction.NewVoiceChat -> Routes.SESSION_LIST
             is DeepLinkAction.NewCameraChat -> {
+                val draftId = "__new__${java.util.UUID.randomUUID()}"
                 DeepLinkCoordinator.setPendingChatAction(
                     DeepLinkCoordinator.ChatAction.OPEN_CAMERA,
+                    sessionId = draftId,
+                    chatRouteOnly = true,
                 )
-                Routes.chat("__new__${java.util.UUID.randomUUID()}")
+                Routes.chat(draftId)
             }
             is DeepLinkAction.NewChat -> Routes.chat("__new__${java.util.UUID.randomUUID()}")
             else -> null
@@ -400,28 +413,44 @@ fun AppNavigation(
         // flashes; the slightly longer enter spec (300ms vs 220ms) is
         // covered by the same guard.
         enterTransition = {
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = tween(300, easing = EmphasizedDecelerate),
-            ) + fadeIn(animationSpec = tween(300, easing = EmphasizedDecelerate))
+            if (initialState.destination.route.isPrimarySurface() || targetState.destination.route.isPrimarySurface()) {
+                EnterTransition.None
+            } else {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(300, easing = EmphasizedDecelerate),
+                ) + fadeIn(animationSpec = tween(300, easing = EmphasizedDecelerate))
+            }
         },
         exitTransition = {
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = tween(200, easing = EmphasizedAccelerate),
-            ) + fadeOut(animationSpec = tween(200, easing = EmphasizedAccelerate))
+            if (initialState.destination.route.isPrimarySurface() || targetState.destination.route.isPrimarySurface()) {
+                ExitTransition.None
+            } else {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(200, easing = EmphasizedAccelerate),
+                ) + fadeOut(animationSpec = tween(200, easing = EmphasizedAccelerate))
+            }
         },
         popEnterTransition = {
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = tween(300, easing = EmphasizedDecelerate),
-            ) + fadeIn(animationSpec = tween(300, easing = EmphasizedDecelerate))
+            if (initialState.destination.route.isPrimarySurface() || targetState.destination.route.isPrimarySurface()) {
+                EnterTransition.None
+            } else {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(300, easing = EmphasizedDecelerate),
+                ) + fadeIn(animationSpec = tween(300, easing = EmphasizedDecelerate))
+            }
         },
         popExitTransition = {
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = tween(200, easing = EmphasizedAccelerate),
-            ) + fadeOut(animationSpec = tween(200, easing = EmphasizedAccelerate))
+            if (initialState.destination.route.isPrimarySurface() || targetState.destination.route.isPrimarySurface()) {
+                ExitTransition.None
+            } else {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(200, easing = EmphasizedAccelerate),
+                ) + fadeOut(animationSpec = tween(200, easing = EmphasizedAccelerate))
+            }
         },
     ) {
         // [T-android-assistant-home] Greeting + 2×2 quick actions. Reached from
@@ -459,6 +488,7 @@ fun AppNavigation(
        composable(Routes.SESSION_LIST) {
             ChatSplitScaffoldRoute(
                 initialSessionId = null,
+                isChatDestination = false,
                 navController = navController,
                 chatRepository = chatRepository,
                 providerRepository = providerRepository,
@@ -475,6 +505,7 @@ fun AppNavigation(
             val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
             ChatSplitScaffoldRoute(
                 initialSessionId = sessionId,
+                isChatDestination = true,
                 navController = navController,
                 chatRepository = chatRepository,
                 providerRepository = providerRepository,

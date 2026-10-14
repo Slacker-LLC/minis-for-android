@@ -52,7 +52,6 @@ def valid_fixture(root: Path) -> None:
     write(root, "docs/contracts/05-ENGINEERING.md", "engineering\n")
     write(root, "docs/contracts/06-CURRENT-GAPS.md", "historical minisd /data/adb/minis/workspace baseline\n")
     write(root, "docs/contracts/07-OWNERSHIP-MIGRATION.md", "legacy migration\n")
-    write(root, "docs/contracts/08-BOT-COORDINATION.md", "bot coordination\n")
 
 
 class ProvenanceGuardTests(unittest.TestCase):
@@ -178,11 +177,11 @@ class ProvenanceGuardTests(unittest.TestCase):
             write(root, "PROVENANCE.md", "GPL-3.0\n")
             self.assertTrue(any("OpenMinis/OpenMinis" in error for error in guard.check_tree(root)))
 
-    def test_missing_new_contract_file_is_rejected(self):
+    def test_removed_bot_contract_must_not_return(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             valid_fixture(root)
-            (root / "docs/contracts/08-BOT-COORDINATION.md").unlink()
+            write(root, "docs/contracts/08-BOT-COORDINATION.md", "bot coordination\n")
             errors = guard.check_tree(root)
             self.assertTrue(any("08-BOT-COORDINATION.md" in error for error in errors))
 

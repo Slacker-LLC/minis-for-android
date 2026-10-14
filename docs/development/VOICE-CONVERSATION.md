@@ -20,6 +20,12 @@
 
 第一版范围：ASR → 完整 Agent → TTS 的轮流对话，自动结束一段录音并在播报后继续听。用户可提前提交、静音、补充指令、点击打断、返回聊天处理权限。静音只停录音/播报；挂断结束音频与等待，已接受的 Agent 任务继续执行；“打断并说话”只取消该通话发起的当前回合。
 
+通话界面（`voicecall/VoiceConversationHost.kt`）是单屏结构：顶部是标题、当前会话模型与通话计时；中部是角色、状态词与实时字幕；底部是一个主操作、一行可换行的次要操作和始终存在的「查看聊天 / 结束语音」。角色由 `:grokbot` 模块（Mr-XiaoLiang/GrokBot，MIT）绘制，`voicecall/grok/VoiceBotAvatar.kt` 是唯一的“状态 → 表情”映射点；字幕只取 Runtime 回调的真实文本，界面不再内置演示文案，也不再用 `assets/moods` 的 SVG 素材。
+
+进入通话的 pending 动作绑定目标会话（`DeepLinkCoordinator.setPendingChatAction(action, sessionId)` / `pendingChatActionFor(sessionId)`）：deep link 先写入动作、再导航到自己的会话，若动作不带会话 id，正在被替换的那个 ChatScreen 会先消费它并连同刚打开的通话一起销毁，表现为“按了语音键却没有语音界面”。消费还要等 `Lifecycle.State.RESUMED`（`VoiceConversationHost` 用 `lifecycle.currentStateAsState()` 把 pending 动作挂到前台状态上）：冷启动时组合早于 `onResume`，而开麦入口只在 RESUMED 下工作，提前消费会静默停在 Ready 让用户再点一次。运行时可见文案（聆听提示、识别失败、任务未完成）改由 UI 层注入资源字符串，Runtime 里不再写死中文。
+
+2026-10-15 在 `emulator-5556`（API 36）用 `-PminisDevBuild=true` 的 debug 包验证上述 deep link 修复，两条路径都直接进入 Listening：冷启动 `am force-stop llc.slacker.minis.dev; am start -a android.intent.action.VIEW -d "minis://action/voice_chat" llc.slacker.minis.dev` 后计时 00:29 → 00:36 连续推进；应用已在前台时重复同一 intent，系统回 "intent has been delivered to currently running top-most instance"，界面同样进入 Listening（00:03）。验证借用 `settings put global overlay_display_devices "1080x2400/420"` 造出的虚拟屏，避免与同机其它测试抢前台，验证后已清空该设置。这条证据只覆盖“deep link 能打开通话并进入聆听”，实际音质、OEM 麦克风/电源键与锁屏行为仍未验。
+
 端到端验收应覆盖真实 ChatViewModel / Room / 工具分发以及连续两轮、重复回调、静音、挂断、打断、识别失败。脚本化 ASR/TTS 端口只验证编排；实际音质、麦克风、OEM 电源键与锁屏行为需真机另验，不能用模拟器结果代替。验收输出 JSON 工件并记录运行命令。
 
 早期 Bot 融合方案见已停止的历史记录 [Bot 与语音融合](BOT-VOICE-INTEGRATION.md)。当前语音补充沿现有 STEER 队列，不发送文字输入框的待发附件。STEER 目前仍为进程内队列，不能声称崩溃可恢复。

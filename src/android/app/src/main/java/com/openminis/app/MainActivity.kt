@@ -817,12 +817,24 @@ class MainActivity : ComponentActivity() {
                     try {
                         val restored = if (action is DeepLinkAction.NewVoiceChat)
                             com.openminis.app.data.AssistantHomePrefs.resolveVoiceSession(this@MainActivity) else null
+                        // Scoped to the session we are about to show: the screen
+                        // being replaced also collects this flow and used to
+                        // consume the action before it was disposed.
+                        val target = restored ?: "__new__${java.util.UUID.randomUUID()}"
                         when (action) {
-                            is DeepLinkAction.NewVoiceChat -> DeepLinkCoordinator.setPendingChatAction(DeepLinkCoordinator.ChatAction.START_VOICE)
-                            is DeepLinkAction.NewCameraChat -> DeepLinkCoordinator.setPendingChatAction(DeepLinkCoordinator.ChatAction.OPEN_CAMERA)
+                            is DeepLinkAction.NewVoiceChat -> DeepLinkCoordinator.setPendingChatAction(
+                                DeepLinkCoordinator.ChatAction.START_VOICE,
+                                sessionId = target,
+                                chatRouteOnly = true,
+                            )
+                            is DeepLinkAction.NewCameraChat -> DeepLinkCoordinator.setPendingChatAction(
+                                DeepLinkCoordinator.ChatAction.OPEN_CAMERA,
+                                sessionId = target,
+                                chatRouteOnly = true,
+                            )
                             else -> {}
                         }
-                        nav.navigate(Routes.chat(restored ?: "__new__${java.util.UUID.randomUUID()}")) {
+                        nav.navigate(Routes.chat(target)) {
                             popUpTo(Routes.SESSION_LIST) { inclusive = false }
                             launchSingleTop = true
                         }

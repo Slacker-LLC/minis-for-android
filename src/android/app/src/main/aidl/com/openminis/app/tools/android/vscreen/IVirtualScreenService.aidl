@@ -5,7 +5,7 @@ import com.openminis.app.tools.android.vscreen.IVirtualScreenFrameSink;
 
 interface IVirtualScreenService {
     String probe() = 1;
-    int createDisplay(int width, int height, int dpi) = 2;
+    int createDisplay(float scale) = 2;
     void releaseDisplay() = 3;
     boolean launch(String packageName, @nullable String activityOrNull, int displayId) = 4;
     String dump(int displayId, String mode) = 5;

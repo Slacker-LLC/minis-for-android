@@ -1,19 +1,18 @@
 package com.openminis.app.tools.android.vscreen
 
-/** User-selectable virtual display dimensions; kept in SharedPreferences rather than Room. */
+/** User-selectable scale relative to the device's physical display; kept outside Room. */
 data class VirtualScreenDisplaySettings(
-    val width: Int = DEFAULT_WIDTH,
-    val height: Int = DEFAULT_HEIGHT,
-    val dpi: Int = DEFAULT_DPI,
+    val scale: Float = DEFAULT_SCALE,
 ) {
     companion object {
-        const val DEFAULT_WIDTH = 720
-        const val DEFAULT_HEIGHT = 1600
-        const val DEFAULT_DPI = 320
+        const val MIN_SCALE = 0.5f
+        const val MAX_SCALE = 1.0f
+        const val DEFAULT_SCALE = 1.0f
     }
 }
 
 object VirtualScreenDisplaySettingsPolicy {
     fun isValid(settings: VirtualScreenDisplaySettings): Boolean =
-        settings.width in 320..1920 && settings.height in 480..2560 && settings.dpi in 120..640
+        settings.scale.isFinite() && settings.scale in
+            VirtualScreenDisplaySettings.MIN_SCALE..VirtualScreenDisplaySettings.MAX_SCALE
 }

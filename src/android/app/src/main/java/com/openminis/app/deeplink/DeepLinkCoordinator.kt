@@ -81,13 +81,52 @@ object DeepLinkCoordinator {
     private val _pendingChatAction = MutableStateFlow<ChatAction?>(null)
     val pendingChatAction: StateFlow<ChatAction?> = _pendingChatAction.asStateFlow()
 
-    fun setPendingChatAction(action: ChatAction) {
+    /**
+     * Session the pending action was minted for, or null for "whoever holds
+     * the composer". Deep links seed the action and *then* navigate to their
+     * own chat, so the ChatScreen that is about to be replaced observes the
+     * new value one frame before it is disposed and used to swallow it (the
+     * voice dialog opened and died with that screen). Scoping the action to
+     * the target session keeps it for the ChatScreen that is arriving.
+     */
+    private val _pendingChatActionSessionId = MutableStateFlow<String?>(null)
+
+    /**
+     * True when only the ChatScreen rendered by a `chat/<sessionId>`
+     * destination may consume the action. Deep links always navigate to that
+     * destination, and both `sessions` and `chat/<id>` render a ChatScreen, so
+     * without this the screen being navigated away from consumes the action
+     * and the voice dialog dies with it.
+     */
+    private val _pendingChatActionChatRouteOnly = MutableStateFlow(false)
+
+    fun setPendingChatAction(
+        action: ChatAction,
+        sessionId: String? = null,
+        chatRouteOnly: Boolean = false,
+    ) {
+        _pendingChatActionSessionId.value = sessionId
+        _pendingChatActionChatRouteOnly.value = chatRouteOnly
         _pendingChatAction.value = action
+    }
+
+    /**
+     * The pending action as seen by the ChatScreen for [sessionId]. Unscoped
+     * actions match every session; [fromChatRoute] must be true for actions
+     * minted by a deep link.
+     */
+    fun pendingChatActionFor(sessionId: String?, fromChatRoute: Boolean = false): ChatAction? {
+        val action = _pendingChatAction.value ?: return null
+        if (_pendingChatActionChatRouteOnly.value && !fromChatRoute) return null
+        val target = _pendingChatActionSessionId.value ?: return action
+        return if (target == sessionId) action else null
     }
 
     fun consumePendingChatAction(): ChatAction? {
         val current = _pendingChatAction.value
         _pendingChatAction.value = null
+        _pendingChatActionSessionId.value = null
+        _pendingChatActionChatRouteOnly.value = false
         return current
     }
 }

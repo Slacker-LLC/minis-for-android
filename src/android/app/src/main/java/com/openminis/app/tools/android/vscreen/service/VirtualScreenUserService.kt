@@ -13,6 +13,7 @@ import androidx.annotation.Keep
 import com.openminis.app.tools.android.vscreen.IVirtualScreenFrameSink
 import com.openminis.app.tools.android.vscreen.IVirtualScreenService
 import com.openminis.app.tools.android.vscreen.VirtualScreenPolicy
+import com.openminis.app.tools.android.vscreen.VirtualScreenDisplaySettings
 import com.openminis.app.tools.android.vscreen.VirtualScreenProbeFailure
 import com.openminis.app.tools.android.vscreen.VirtualScreenProbeRecorder
 import com.openminis.app.tools.android.vscreen.SettleTracker
@@ -28,8 +29,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.math.min
-import kotlin.math.sqrt
 
 /**
  * The virtual-screen service. It runs as root inside the process libsu starts for
@@ -170,14 +169,15 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         }
     }
 
-    override fun createDisplay(width: Int, height: Int, dpi: Int): Int = synchronized(lock) {
+    override fun createDisplay(scale: Float): Int = synchronized(lock) {
         checkNotDestroyed()
         requireShellIdentity()
         val existing = session
         if (existing != null) return@synchronized existing.displayId
         if (contextError != null) fail("shell_context_unavailable", contextError)
         val created = try {
-            VirtualDisplaySession.create(width, height, dpi)
+            val spec = DisplaySpec.current().scaledForVirtualDisplay(scale)
+            VirtualDisplaySession.create(spec.width, spec.height, spec.dpi)
         } catch (error: Throwable) {
             fail("virtual_display_create_failed", error.message ?: error.javaClass.simpleName)
         }
@@ -438,13 +438,7 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
     }
 
     private fun probeDisplaySpec(): DisplaySpec {
-        val raw = DisplaySpec.current()
-        val areaScale = min(1f, sqrt(MAX_PROBE_PIXELS.toFloat() / (raw.width.toLong() * raw.height).toFloat()))
-        val maxScale = min(1f, MAX_PROBE_DIM.toFloat() / maxOf(raw.width, raw.height))
-        val scale = min(areaScale, maxScale)
-        val width = ((raw.width * scale).toInt() / 2 * 2).coerceAtLeast(320)
-        val height = ((raw.height * scale).toInt() / 2 * 2).coerceAtLeast(320)
-        return DisplaySpec(width, height, raw.dpi.coerceIn(80, 800))
+        return DisplaySpec.current().scaledForVirtualDisplay(VirtualScreenDisplaySettings.MAX_SCALE)
     }
 
     private fun isXiaomi(): Boolean = listOf(Build.MANUFACTURER, Build.BRAND, Build.MODEL)
@@ -464,8 +458,6 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         private const val DEFAULT_JPEG_QUALITY = 85
         private const val MAX_TEXT_LENGTH = 4096
         private const val MAX_ACT_REQUEST_CHARS = 16_384
-        private const val MAX_PROBE_DIM = 2400
-        private const val MAX_PROBE_PIXELS = 4_194_304L
         private const val PROBE_LAUNCH_WAIT_MS = 4_000L
         private const val LAUNCH_TIMEOUT_SECONDS = 8L
         // The desktop is a single task: raising it again must not pile up copies.

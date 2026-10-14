@@ -43,6 +43,7 @@ class SessionListViewModel(
     private val chatRepository: ChatRepository,
     private val providerRepository: ProviderRepository,
     private val context: Context,
+    private val observeSessionListOnStart: Boolean = true,
 ) : ViewModel() {
 
     companion object {
@@ -132,6 +133,7 @@ class SessionListViewModel(
             chatRepository: ChatRepository,
             providerRepository: ProviderRepository,
             appContext: Context,
+            observeSessionListOnStart: Boolean = true,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -139,6 +141,7 @@ class SessionListViewModel(
                     chatRepository = chatRepository,
                     providerRepository = providerRepository,
                     context = appContext,
+                    observeSessionListOnStart = observeSessionListOnStart,
                 ) as T
             }
         }
@@ -287,45 +290,11 @@ class SessionListViewModel(
     // in this set that lands at index 0 is a genuinely-new session.
     private var knownSessionIds: Set<String> = emptySet()
     private var newTopBaselineSeeded = false
+    private var sessionObserver: Job? = null
+    private var folderObserver: Job? = null
 
     init {
-        // T-android-crash-safe-mode-v2: gate the cold-start session list
-        // observer behind the safe-mode flag. The Room observable issues a
-        // full SELECT on first collect; if a malformed row was contributing
-        // to the crash burst, we don't want to re-deserialize it before the
-        // user has acknowledged the share-logs dialog.
-        viewModelScope.launch {
-            if (com.openminis.app.crash.CrashFrequencyDetector.isSafeMode()) {
-                android.util.Log.w(
-                    TAG,
-                    "SessionListVM init: safe-mode active, deferring observeSessions",
-                )
-                // Mark initial-load complete so the empty-state UI surfaces
-                // immediately (rather than an indefinite progress spinner).
-                _isInitialLoadComplete.value = true
-                // Subscribe for the safe-mode-cleared signal and then begin
-                // observing. registerSafeModeClearedListener fires exactly
-                // once on ON → OFF; after that we start the Flow collector
-                // for the rest of the VM's life.
-                val started = kotlinx.coroutines.CompletableDeferred<Unit>()
-                val unsub = com.openminis.app.crash.CrashFrequencyDetector
-                    .registerSafeModeClearedListener {
-                        if (!started.isCompleted) started.complete(Unit)
-                    }
-                started.await()
-                runCatching { unsub() }
-            }
-            chatRepository.observeSessions().collect {
-                _allSessions.value = it
-                if (!_isInitialLoadComplete.value) _isInitialLoadComplete.value = true
-                detectNewTopSession(it)
-            }
-        }
-        // [T-android-session-grouping] Started alongside the session collector,
-        // not after it — see `folders` for why ordering matters on first paint.
-        viewModelScope.launch {
-            chatRepository.observeFolders().collect { folders.value = it }
-        }
+        setSessionListObservationActive(observeSessionListOnStart)
         viewModelScope.launch {
             // The list of sessions is part of the key: a search result is a snapshot, and a
             // delete, rename or new message must re-run it. Only a changed query/activation
@@ -335,10 +304,7 @@ class SessionListViewModel(
                 .onEach { key ->
                     if (key != shownKey) {
                         shownKey = key
-                        // Flip [isSearching] true the moment a meaningful query
-                        // arrives, BEFORE debounce. The trailing CircularProgress
-                        // shows up immediately when the user types, hiding the
-                        // small gap until the debounced search runs.
+                        // Flip [isSearching] true as soon as a meaningful query arrives.
                         isSearching.value = key.second && key.first.isNotBlank()
                     }
                 }
@@ -346,10 +312,6 @@ class SessionListViewModel(
                 .collectLatest { (q, active) ->
                     if (active && q.isNotBlank()) {
                         val results = chatRepository.searchSessions(q)
-                        // Compute per-session content snippets off the main
-                        // thread. Sessions whose title already matches don't
-                        // need a snippet — we only walk messages when the
-                        // title doesn't contain the query.
                         val snips = withContext(Dispatchers.IO) {
                             buildContentSnippets(results, q)
                         }
@@ -361,6 +323,46 @@ class SessionListViewModel(
                     }
                     isSearching.value = false
                 }
+        }
+    }
+
+    /** Keep the phone drawer's Room observers stopped while its modal content is closed. */
+    fun setSessionListObservationActive(active: Boolean) {
+        if (!active) {
+            sessionObserver?.cancel()
+            sessionObserver = null
+            folderObserver?.cancel()
+            folderObserver = null
+            return
+        }
+        if (sessionObserver?.isActive == true && folderObserver?.isActive == true) return
+
+        sessionObserver?.cancel()
+        folderObserver?.cancel()
+        sessionObserver = viewModelScope.launch {
+            // T-android-crash-safe-mode-v2: gate the cold-start session list observer. Room's
+            // first emission reads every row, so safe mode waits for user acknowledgement.
+            if (com.openminis.app.crash.CrashFrequencyDetector.isSafeMode()) {
+                android.util.Log.w(TAG, "SessionListVM: safe-mode active, deferring observeSessions")
+                _isInitialLoadComplete.value = true
+                val started = kotlinx.coroutines.CompletableDeferred<Unit>()
+                val unsubscribe = com.openminis.app.crash.CrashFrequencyDetector
+                    .registerSafeModeClearedListener { if (!started.isCompleted) started.complete(Unit) }
+                try {
+                    started.await()
+                } finally {
+                    runCatching { unsubscribe() }
+                }
+            }
+            chatRepository.observeSessions().collect {
+                _allSessions.value = it
+                if (!_isInitialLoadComplete.value) _isInitialLoadComplete.value = true
+                detectNewTopSession(it)
+            }
+        }
+        // Keep session and folder snapshots in sync, but only while the drawer is in use.
+        folderObserver = viewModelScope.launch {
+            chatRepository.observeFolders().collect { folders.value = it }
         }
     }
 

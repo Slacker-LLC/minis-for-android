@@ -15,6 +15,7 @@ This file is a project-level inventory, not a substitute for license files shipp
 | [Mangi-11/Eta](https://github.com/Mangi-11/Eta) | PolyForm Noncommercial 1.0.0 | Ported capability modules (see below); those modules stay under the noncommercial terms |
 | [android-notes/ShadowAuto](https://github.com/android-notes/ShadowAuto) | Apache-2.0 | Adapted virtual-screen support code |
 | [termux/termux-app](https://github.com/termux/termux-app) (`terminal-emulator`, `terminal-view`) | Apache-2.0 | Character width tables; terminal behaviour (resize, wrapping, escape sequences) used as the reference for the emulator |
+| [Mr-XiaoLiang/GrokBot](https://github.com/Mr-XiaoLiang/GrokBot) | MIT (source code only; the character likeness is not covered) | Vendored Compose character module drawn in the voice-conversation screen |
 
 Everything else below is a library, runtime component or asset the application uses or ships.
 
@@ -179,6 +180,23 @@ Only these source files are adapted; the upstream automation entry point, socket
 | `tools/android/vscreen/service/internal/UiNodeUtils.kt` | `android-shell/src/main/java/com/silentauto/shell/UiNodeUtils.java` |
 | `tools/android/vscreen/service/internal/ScreenCapture.kt` | `android-shell/src/main/java/com/silentauto/shell/ScreenCapture.java` (bounded JPEG path only) |
 
+
+## Vendored source: GrokBot
+
+| Component | Source | License | Current use |
+|---|---|---|---|
+| `src/android/grokbot/` (Android Library module) | [Mr-XiaoLiang/GrokBot](https://github.com/Mr-XiaoLiang/GrokBot) @ `2cd2e82f31cddcec7b825877830362b3ec364e33` | MIT | The Compose character drawn by the voice-conversation screen |
+
+License text: [third_party/grokbot/LICENSE](third_party/grokbot/LICENSE). All 20 upstream Kotlin files
+(`grokBot/src/main/kotlin/com/lollipop/grokbot/`) are copied verbatim; only the Gradle module configuration was
+rewritten for this project's toolchain, and the module keeps the upstream namespace and package name
+`com.lollipop.grokbot`. This repository does not modify the vendored sources.
+
+Upstream states that the GrokBot likeness, name and trademark belong to xAI / Grok, that the project is
+unaffiliated fan art, and that its MIT grant covers only the author's own implementation code. Content that
+carries the likeness therefore must not be used commercially without authorisation: a commercial distribution
+has to replace the character artwork or obtain a licence. The engine itself is MIT and can drive a different
+likeness. See [PROVENANCE.md](PROVENANCE.md).
 
 ## Active native/runtime components
 

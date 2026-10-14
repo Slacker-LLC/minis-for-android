@@ -25,3 +25,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Minis"
 include(":app")
+// [T-android-voice-grokbot] Voice-call character engine, imported from Mr-XiaoLiang/GrokBot (MIT).
+include(":grokbot")

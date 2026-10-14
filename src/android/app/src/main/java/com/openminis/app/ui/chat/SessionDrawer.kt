@@ -117,10 +117,12 @@ fun SessionDrawerContent(
         mutableStateOf(emptyList<ChatSessionEntity>())
     }
     LaunchedEffect(viewModel, isVisible) {
+        viewModel.setSessionListObservationActive(isVisible)
         if (!isVisible) return@LaunchedEffect
         viewModel.displayedSessions.collect { sessionsState.value = it }
     }
     val sessions by sessionsState
+    val isInitialLoadComplete by viewModel.isInitialLoadComplete.collectAsState()
     val folders by viewModel.folders.collectAsState()
     val collapsedFolderIds by viewModel.collapsedFolderIds.collectAsState()
     val folderMemberCounts by viewModel.folderMemberCounts.collectAsState()
@@ -307,7 +309,11 @@ fun SessionDrawerContent(
             if (filteredSessions.isEmpty()) {
                 item(key = "empty") {
                     Text(
-                        text = if (searchActive) stringResource(R.string.drawer_no_search_match) else stringResource(R.string.drawer_no_history),
+                        text = when {
+                            !isInitialLoadComplete -> stringResource(R.string.common_loading)
+                            searchActive -> stringResource(R.string.drawer_no_search_match)
+                            else -> stringResource(R.string.drawer_no_history)
+                        },
                         fontSize = 13.5.sp,
                         color = ChatColors.secondaryText,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),

@@ -20,7 +20,7 @@
 
 ## 语音接入后的未验证边界（2026-10-14 工作树）
 
-连续语音已接通当前 AgentSession 的完整回合。原生音频全双工、自动说话打断、OEM Root 手机/锁屏唤醒、音频品质仍未完成真机验收。语音 STEER 已复用持久消息输入；任务阶段、等待原因、成果及音频控制已接线，受控语音场景已通过，实际音频/OEM 仍待验收。早期 Bot 语音接入记录见已标为历史的 [Bot 与语音融合](../development/BOT-VOICE-INTEGRATION.md)。
+连续语音已接通当前 AgentSession 的完整回合。原生音频全双工、自动说话打断、OEM Root 手机/锁屏唤醒、音频品质仍未完成真机验收。语音 STEER 已复用持久消息输入；任务阶段、等待原因、成果及音频控制已接线，受控语音场景已通过，实际音频/OEM 仍待验收。通话界面由 `voicecall/VoiceConversationHost.kt` 承载，角色改用 `:grokbot` 模块绘制（Mr-XiaoLiang/GrokBot，MIT，来源与形象权利声明见 [PROVENANCE.md](../../PROVENANCE.md)），角色动画与真机帧率同样未在真机验收。早期 Bot 语音接入记录见已标为历史的 [Bot 与语音融合](../development/BOT-VOICE-INTEGRATION.md)。
 
 ## 已完成的 Direct Ubuntu 迁移边界
 

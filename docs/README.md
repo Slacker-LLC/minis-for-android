@@ -70,7 +70,7 @@
 | [`contracts/06-CURRENT-GAPS.md`](contracts/06-CURRENT-GAPS.md) | 当前缺口、开放 Issue 与真机验收边界 |
 | [`contracts/07-OWNERSHIP-MIGRATION.md`](contracts/07-OWNERSHIP-MIGRATION.md) | 旧 Root-owned 用户数据一次性迁移 |
 
-历史合同：[08-BOT-COORDINATION.md](contracts/08-BOT-COORDINATION.md) 已废止，不属于现役合同。
+原 `08-BOT-COORDINATION.md` 随 Bot 运行时一并移除；移除前的合同文本保留在私有存档仓库 `Slacker-LLC/minis-for-android-pre-bot-removal`，本仓库不再维护该合同。
 
 ## 当前说明
 
