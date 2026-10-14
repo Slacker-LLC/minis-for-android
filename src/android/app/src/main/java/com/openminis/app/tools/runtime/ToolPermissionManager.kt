@@ -32,6 +32,7 @@ object ToolPermissionManager {
     // callers is unchanged.
     private val table: Map<String, ToolPolicy> = mapOf(
         "system.info" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
+        "agent.tools" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
         "system.jobs.list" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
         "system.jobs.kill" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "system.memory.read" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),

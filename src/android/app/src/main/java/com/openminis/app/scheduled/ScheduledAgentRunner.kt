@@ -49,6 +49,10 @@ object ScheduledAgentRunner {
         val sessionId: String? = null,
         val errorCode: String? = null,
         val message: String? = null,
+        val completed: Boolean? = null,
+        val status: String? = null,
+        val failureKind: com.openminis.app.tools.ToolFailureKind? = null,
+        val executionStarted: Boolean? = null,
     ) {
         val started: Boolean get() = sessionId != null
     }
@@ -147,10 +151,11 @@ object ScheduledAgentRunner {
         )
 
         if (waitForCompletion) {
+            var accepted = false
             var tierDenials = emptyList<OffloadPermissionManager.ScheduledTierDenial>()
             val result = OffloadPermissionManager.withUnattendedSession(sessionId, task.permissionTier) {
                 try {
-                    dispatch(app, task, sessionId, wait = true)
+                    dispatch(app, task, sessionId, wait = true, onAccepted = { accepted = true })
                 } finally {
                     tierDenials = OffloadPermissionManager.consumeScheduledTierDenials(sessionId)
                 }
@@ -161,30 +166,39 @@ object ScheduledAgentRunner {
             val ok = result.completed
             ScheduledTaskManager(app).markFired(task.id, sessionId, preview, ok = ok)
             postCompletionNotification(app, task, sessionId, preview)
-            return RunOutcome(sessionId = sessionId)
+            return RunOutcome(sessionId = sessionId.takeIf { accepted }, completed = result.completed, status = result.status,
+                errorCode = if (result.completed) null else "execution_${result.status.lowercase()}", message = result.responseText,
+                executionStarted = accepted, failureKind = when {
+                    result.completed -> null
+                    result.timedOut -> com.openminis.app.tools.ToolFailureKind.TOOL_TIMEOUT
+                    !accepted -> com.openminis.app.tools.ToolFailureKind.UNAVAILABLE
+                    else -> com.openminis.app.tools.ToolFailureKind.OUTCOME_UNKNOWN
+                })
         }
 
-        // Fire-and-forget: the session is resolved and the prompt will claim
-        // its own active-turn lifecycle through ChatViewModel. Run the actual
-        // dispatch + completion off the app scope and return the session id
-        // immediately so the UI can show "task started" without blocking.
-        bgScope.launch {
+        // The background owner retains the scheduled tier through completion. The caller receives
+        // acceptance only after Room committed the input (or the explicitly requested retry started).
+        val accepted = kotlinx.coroutines.CompletableDeferred<String?>()
+        val running = bgScope.launch {
             var tierDenials = emptyList<OffloadPermissionManager.ScheduledTierDenial>()
-            val result = OffloadPermissionManager.withUnattendedSession(sessionId, task.permissionTier) {
-                try {
-                    dispatch(app, task, sessionId, wait = true)
-                } finally {
-                    tierDenials = OffloadPermissionManager.consumeScheduledTierDenials(sessionId)
+            try {
+                val result = OffloadPermissionManager.withUnattendedSession(sessionId, task.permissionTier) {
+                    try { dispatch(app, task, sessionId, wait = true, onAccepted = { accepted.complete(it) }) }
+                    finally { tierDenials = OffloadPermissionManager.consumeScheduledTierDenials(sessionId) }
                 }
-            }
-            val preview = runPreview(app, result.responseText, tierDenials)
-            // Only a run that actually completed is a success: Busy (the session was mid-turn), Dropped,
-            // Cancelled and NeedsAttention did not do the task.
-            val ok = result.completed
-            ScheduledTaskManager(app).markFired(task.id, sessionId, preview, ok = ok)
-            postCompletionNotification(app, task, sessionId, preview)
+                accepted.complete(null)
+                val preview = runPreview(app, result.responseText, tierDenials)
+                ScheduledTaskManager(app).markFired(task.id, sessionId, preview, ok = result.completed)
+                postCompletionNotification(app, task, sessionId, preview)
+            } finally { accepted.complete(null) }
         }
-        return RunOutcome(sessionId = sessionId)
+        val messageId = kotlinx.coroutines.withTimeoutOrNull(7_000L) { accepted.await() }
+        if (messageId == null) {
+            running.cancel()
+            return RunOutcome(errorCode = "request_not_accepted", message = "请求尚未确认接收，请查看例程运行记录。")
+        }
+        return RunOutcome(sessionId = sessionId, status = "Accepted", executionStarted = false)
+
     }
 
     private fun runPreview(
@@ -222,7 +236,8 @@ object ScheduledAgentRunner {
         task: ScheduledTask,
         sessionId: String,
         wait: Boolean,
-    ): AgentRunner.PromptResult = runCatching {
+        onAccepted: ((String) -> Unit)? = null,
+    ): AgentRunner.PromptResult = try {
         val mode = task.targetMode
         if (mode is ScheduledTargetMode.RerunMessage) {
             AgentRunner.retry(
@@ -231,6 +246,7 @@ object ScheduledAgentRunner {
                 messageId = mode.messageId,
                 wait = wait,
                 timeoutMs = RUN_TIMEOUT_MS,
+                onAccepted = onAccepted,
             )
         } else {
             AgentRunner.prompt(
@@ -241,9 +257,11 @@ object ScheduledAgentRunner {
                 thinkingLevel = null,
                 wait = wait,
                 timeoutMs = RUN_TIMEOUT_MS,
+                onAccepted = onAccepted,
             )
         }
-    }.getOrElse { t ->
+    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+    catch (t: Exception) {
         AppLogger.error(TAG, "task ${task.id} dispatch failed: ${t.message}")
         AgentRunner.PromptResult(
             status = "Error",

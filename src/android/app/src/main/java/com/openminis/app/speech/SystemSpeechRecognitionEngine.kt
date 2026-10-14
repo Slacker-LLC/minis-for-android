@@ -144,6 +144,8 @@ class SystemSpeechRecognitionEngine(private val appContext: Context) : SpeechRec
         ).distinctBy { it.toLanguageTag() }
     }
 
+    var conversationMode: Boolean = false
+
     override fun start(locale: Locale, listener: SpeechRecognitionEngine.Listener) {
         this.listener = listener
         bufferedPartial = null
@@ -356,7 +358,7 @@ class SystemSpeechRecognitionEngine(private val appContext: Context) : SpeechRec
                     // pause, "send it" (0.9 s) — cancelled on the first burst
                     // and could never be dictated.
                     heldSpokenSeconds += spokenSeconds
-                    if (heldSpokenSeconds < MIN_SEGMENT_SECONDS) {
+                    if (heldSpokenSeconds < if (conversationMode) 0.2f else MIN_SEGMENT_SECONDS) {
                         Log.i(
                             TAG,
                             "[vad] silence close, spoken=${"%.2f".format(spokenSeconds)}s " +
@@ -404,6 +406,7 @@ class SystemSpeechRecognitionEngine(private val appContext: Context) : SpeechRec
                     stopVad()
                 }
             },
+            conversationMode = conversationMode,
         )
         // ONE capture serves both: the VAD judges these samples and the very
         // same frames go down the pipe to the recogniser.

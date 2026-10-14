@@ -104,7 +104,7 @@ internal class BotWakeDispatcher(
                     current.id,
                     BotTaskEntity.STATUS_NEEDS_USER,
                     BotTaskEntity.PHASE_REVIEWING,
-                    current.currentOwnerSessionId ?: current.originSessionId,
+                    current.currentOwnerSessionId ?: current.originSessionId, current.revision, current.stopGeneration,
                 )
                 if (updated) {
                     notifyTask(current, current.currentOwnerSessionId ?: current.originSessionId,
@@ -145,13 +145,15 @@ internal class BotWakeDispatcher(
             BotWakePolicy.RecipientFailure.DELETED -> {
                 for (event in pending) inboxRepository.markDead(event.id)
                 taskRepository.updateStateIfWakeable(currentTask.id, BotTaskEntity.STATUS_CANCELLED,
-                    BotTaskEntity.PHASE_REVIEWING, currentTask.currentOwnerSessionId ?: currentTask.originSessionId)
+                    BotTaskEntity.PHASE_REVIEWING, currentTask.currentOwnerSessionId ?: currentTask.originSessionId,
+                    currentTask.revision, currentTask.stopGeneration)
                 return
             }
             BotWakePolicy.RecipientFailure.DISABLED -> {
                 for (event in pending) inboxRepository.markDead(event.id)
                 val updated = taskRepository.updateStateIfWakeable(currentTask.id, BotTaskEntity.STATUS_NEEDS_USER,
-                    BotTaskEntity.PHASE_REVIEWING, currentTask.currentOwnerSessionId ?: currentTask.originSessionId)
+                    BotTaskEntity.PHASE_REVIEWING, currentTask.currentOwnerSessionId ?: currentTask.originSessionId,
+                    currentTask.revision, currentTask.stopGeneration)
                 if (updated) notifyTask(currentTask, currentTask.currentOwnerSessionId ?: currentTask.originSessionId,
                     application.getString(R.string.bots_task_notification_needs_user))
                 return
@@ -159,7 +161,8 @@ internal class BotWakeDispatcher(
             BotWakePolicy.RecipientFailure.NO_SESSION -> {
                 for (event in pending) inboxRepository.markDead(event.id)
                 val updated = taskRepository.updateStateIfWakeable(currentTask.id, BotTaskEntity.STATUS_NEEDS_USER,
-                    BotTaskEntity.PHASE_REVIEWING, currentTask.currentOwnerSessionId ?: currentTask.originSessionId)
+                    BotTaskEntity.PHASE_REVIEWING, currentTask.currentOwnerSessionId ?: currentTask.originSessionId,
+                    currentTask.revision, currentTask.stopGeneration)
                 if (updated) notifyTask(currentTask, currentTask.currentOwnerSessionId ?: currentTask.originSessionId,
                     application.getString(R.string.bots_task_notification_needs_user))
                 return
@@ -180,7 +183,7 @@ internal class BotWakeDispatcher(
             }
             BotWakePolicy.BudgetFailure.DEADLINE_EXPIRED,
             BotWakePolicy.BudgetFailure.AUTO_WAKE_LIMIT -> {
-                val exhausted = taskRepository.exhaustBudget(taskId)
+                val exhausted = taskRepository.exhaustBudget(taskId, currentTask.revision, currentTask.stopGeneration)
                 for (event in pending) inboxRepository.markDead(event.id)
                 if (exhausted) notifyTask(currentTask, usableSession.id,
                     application.getString(R.string.bots_task_notification_budget))
@@ -190,13 +193,13 @@ internal class BotWakeDispatcher(
         }
 
         val stopGeneration = currentTask.stopGeneration
-        if (!taskRepository.recordAutoRun(taskId, BotWakePolicy.MAX_AUTO_WAKES)) {
+        if (!taskRepository.recordAutoRun(taskId, currentTask.maxAutoRuns, currentTask.revision, currentTask.stopGeneration)) {
             for (event in pending) inboxRepository.markDead(event.id)
             val latest = taskRepository.get(taskId)
-            if (latest != null && (latest.autoRunsUsed >= BotWakePolicy.MAX_AUTO_WAKES ||
+            if (latest != null && (latest.autoRunsUsed >= latest.maxAutoRuns ||
                     latest.deadlineAt?.let { it <= now } == true)
             ) {
-                if (taskRepository.exhaustBudget(taskId)) {
+                if (taskRepository.exhaustBudget(taskId, latest.revision, latest.stopGeneration)) {
                     notifyTask(latest, usableSession.id, application.getString(R.string.bots_task_notification_budget))
                 }
             }
@@ -236,14 +239,14 @@ internal class BotWakeDispatcher(
             BotWakePolicy.RecipientFailure.DELETED -> {
                 for (event in claimed) inboxRepository.markDead(event.id)
                 taskRepository.updateStateIfWakeable(taskId, BotTaskEntity.STATUS_CANCELLED,
-                    BotTaskEntity.PHASE_REVIEWING, usableSession.id)
+                    BotTaskEntity.PHASE_REVIEWING, usableSession.id, afterClaim.revision, afterClaim.stopGeneration)
                 return
             }
             BotWakePolicy.RecipientFailure.DISABLED,
             BotWakePolicy.RecipientFailure.NO_SESSION -> {
                 for (event in claimed) inboxRepository.markDead(event.id)
                 val updated = taskRepository.updateStateIfWakeable(taskId, BotTaskEntity.STATUS_NEEDS_USER,
-                    BotTaskEntity.PHASE_REVIEWING, usableSession.id)
+                    BotTaskEntity.PHASE_REVIEWING, usableSession.id, afterClaim.revision, afterClaim.stopGeneration)
                 if (updated) notifyTask(afterClaim, usableSession.id,
                     application.getString(R.string.bots_task_notification_needs_user))
                 return
@@ -268,6 +271,7 @@ internal class BotWakeDispatcher(
                     text = prompt,
                     wait = true,
                     timeoutMs = WAKE_TIMEOUT_MS,
+                    taskId = taskId,
                 )
             }
             turnCompleted = result.status.equals("Completed", ignoreCase = true)
@@ -300,27 +304,33 @@ internal class BotWakeDispatcher(
 
         withContext(NonCancellable) {
             val afterTurn = taskRepository.get(taskId) ?: return@withContext
+            if (afterTurn.stopGeneration == stopGeneration && afterTurn.status == BotTaskEntity.STATUS_COMPLETED &&
+                !afterTurn.completionEvidence.isNullOrBlank()) {
+                notifyTask(afterTurn, usableSession.id, application.getString(R.string.bots_task_notification_completed))
+                schedulePendingGroups(botId)
+                return@withContext
+            }
             if (afterTurn.stopGeneration != stopGeneration || !BotWakePolicy.isWakeable(afterTurn.status)) {
                 markRemainingPendingDead(botId, taskId)
                 return@withContext
             }
 
             val hasNewDelegations = turnCompleted && delegationRepository.countNonTerminalForRootTask(taskId) > 0
-            val transition = BotWakePolicy.transition(turnCompleted, hasNewDelegations)
-            if (transition.status == BotTaskEntity.STATUS_COMPLETED) {
-                if (taskRepository.complete(taskId)) {
-                    notifyTask(afterTurn, usableSession.id,
-                        application.getString(R.string.bots_task_notification_completed))
-                }
+            val transition = BotWakePolicy.transition(turnCompleted, hasNewDelegations,
+                verifiedCompletion = afterTurn.status == BotTaskEntity.STATUS_COMPLETED && !afterTurn.completionEvidence.isNullOrBlank())
+            if (transition.status != BotTaskEntity.STATUS_ACTIVE) {
+                // A clean reply is not delivery. Only update_goal with verified evidence can complete.
+                runCatching { taskRepository.settleVerified(taskId, afterTurn.revision, stopGeneration,
+                    BotTaskEntity.STATUS_NEEDS_USER, afterTurn.progress.ifBlank {
+                        if (turnCompleted) "负责人回复已结束，但尚未提交可核验的验收证据。"
+                        else runFailure ?: "负责人执行未能完成，需要用户决定。"
+                    }, null) }
+                    .onSuccess { notifyTask(it, usableSession.id, application.getString(R.string.bots_task_notification_needs_user)) }
             } else {
-                val updated = taskRepository.updateStateIfWakeable(taskId, transition.status,
-                    transition.phase, usableSession.id)
-                if (!turnCompleted) {
-                    if (updated) notifyTask(afterTurn, usableSession.id,
-                        application.getString(R.string.bots_task_notification_needs_user))
-                    android.util.Log.w(TAG, "owner wake failed task=$taskId: ${runFailure.orEmpty()}")
-                }
+                taskRepository.updateStateIfWakeable(taskId, transition.status,
+                    transition.phase, usableSession.id, afterTurn.revision, stopGeneration)
             }
+            if (!turnCompleted) android.util.Log.w(TAG, "owner wake failed task=$taskId: ${runFailure.orEmpty()}")
 
             schedulePendingGroups(botId)
         }
@@ -398,7 +408,7 @@ internal class BotWakeDispatcher(
         val sessionId = preferredSessionId?.takeIf { runCatching { chatRepository.getSession(it) != null }.getOrDefault(false) }
             ?: task.originSessionId.takeIf { runCatching { chatRepository.getSession(it) != null }.getOrDefault(false) }
             ?: runCatching {
-                botRepository.getBot(task.ownerBotId)?.takeIf { it.enabled }
+                task.ownerBotId?.let { botRepository.getBot(it) }?.takeIf { it.enabled }
                     ?.let { botRepository.openConversation(it.id, chatRepository, providerRepository, newTopic = true)?.id }
             }.getOrNull()
         val title = application.getString(R.string.bots_task_notification_title, task.goal.take(80))

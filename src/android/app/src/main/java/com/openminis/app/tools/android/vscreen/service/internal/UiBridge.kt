@@ -179,6 +179,8 @@ internal class UiBridge(private val settle: SettleTracker) {
             val entry = JSONObject().put("windowIndex", windowIndex)
                 .put("windowId", runCatching { window.id }.getOrDefault(-1))
                 .put("type", type)
+                .put("focused", runCatching { window.isFocused }.getOrDefault(false))
+                .put("active", runCatching { window.isActive }.getOrDefault(false))
                 .put("title", runCatching { window.title?.toString().orEmpty().take(128) }.getOrDefault(""))
                 .put("package", collected.rootPackage)
                 .put("bounds", "${bounds.left},${bounds.top},${bounds.right},${bounds.bottom}")

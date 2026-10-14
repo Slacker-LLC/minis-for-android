@@ -17,20 +17,22 @@ internal object AgentStateRpcMethods {
         }
 
     // ── Goal ────────────────────────────────────────────────────────────────
-    fun goalGet(context: Context, params: JSONObject): JSONObject {
-        val g = AgentStateStore.goalGet(requireSession(params))
+    suspend fun goalGet(context: Context, params: JSONObject): JSONObject {
+        val g = AgentStateStore.goalGet(requireSession(params), context)
         return goalJson(g)
     }
 
-    fun goalSet(context: Context, params: JSONObject): JSONObject {
+    suspend fun goalSet(context: Context, params: JSONObject): JSONObject {
         val sid = requireSession(params)
-        val g = AgentStateStore.goalSet(sid, params.optString("text", ""))
+        val g = AgentStateStore.goalSet(sid, params.optString("text", ""), context,
+            params.optInt("maxGoalRounds").takeIf { params.has("maxGoalRounds") },
+            params.optString("acceptanceCriteria").takeIf { params.has("acceptanceCriteria") })
         return goalJson(g)
     }
 
-    fun goalSetActive(context: Context, params: JSONObject): JSONObject {
+    suspend fun goalSetActive(context: Context, params: JSONObject): JSONObject {
         val sid = requireSession(params)
-        val g = AgentStateStore.goalSetActive(sid, params.optBoolean("active", true))
+        val g = AgentStateStore.goalSetActive(sid, params.optBoolean("active", true), context)
         return goalJson(g)
     }
 
@@ -41,6 +43,10 @@ internal object AgentStateRpcMethods {
         put("active", g.active)
         put("phase", g.phase)
         put("maxGoalRounds", g.maxGoalRounds)
+        put("roundsUsed", g.roundsUsed)
+        put("status", g.status)
+        put("acceptanceCriteria", g.acceptanceCriteria ?: JSONObject.NULL)
+        put("stopGeneration", g.stopGeneration)
         put("createdAt", g.createdAt)
         put("updatedAt", g.updatedAt)
     }
@@ -83,14 +89,14 @@ internal object AgentStateRpcMethods {
     }
 
     // ── Plan mode (soft) ────────────────────────────────────────────────────
-    fun planGet(context: Context, params: JSONObject): JSONObject {
-        val p = AgentStateStore.planGet(requireSession(params))
+    suspend fun planGet(context: Context, params: JSONObject): JSONObject {
+        val p = AgentStateStore.planGet(requireSession(params), context)
         return planJson(p)
     }
 
-    fun planSet(context: Context, params: JSONObject): JSONObject {
+    suspend fun planSet(context: Context, params: JSONObject): JSONObject {
         val sid = requireSession(params)
-        val p = AgentStateStore.planSet(sid, params.optString("mode", "off"), params.optString("plan", ""))
+        val p = AgentStateStore.planSet(sid, params.optString("mode", "off"), params.optString("plan", ""), context)
         return planJson(p)
     }
 

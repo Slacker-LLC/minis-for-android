@@ -18,13 +18,14 @@ data class SessionOverrides(
     val temperature: Double? = null,
     val maxTokens: Int? = null,
     val enabledTools: Set<String>? = null,
+    val taskId: String? = null,
 ) {
     /** True when this object is semantically identical to inheriting globals. */
     fun isEmpty(): Boolean =
         systemPrompt == null &&
             temperature == null &&
             maxTokens == null &&
-            enabledTools == null
+            enabledTools == null && taskId == null
 
     /**
      * User-editable session Soul text.
@@ -46,6 +47,7 @@ data class SessionOverrides(
     fun toJsonOrNull(): String? {
         if (isEmpty()) return null
         val json = JSONObject()
+        taskId?.let { json.put("taskId", it) }
         editableSystemPrompt()?.let { json.put(KEY_SYSTEM_PROMPT, it) }
         temperature?.let { json.put(KEY_TEMPERATURE, it) }
         maxTokens?.let { json.put(KEY_MAX_TOKENS, it) }
@@ -143,6 +145,7 @@ This conversation has an explicit session Soul. It REPLACES the global SOUL.md i
                 temperature = temperature,
                 maxTokens = maxTokens,
                 enabledTools = enabledTools,
+                taskId = json.optString("taskId").takeIf { !json.isNull("taskId") && it.isNotBlank() && it.length <= 200 },
             )
         }
     }

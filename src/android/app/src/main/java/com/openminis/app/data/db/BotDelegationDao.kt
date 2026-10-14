@@ -72,6 +72,9 @@ interface BotDelegationDao {
     @Query("SELECT * FROM bot_delegations WHERE root_task_id = :rootTaskId AND status IN ('QUEUED', 'WAITING_TARGET', 'RUNNING') ORDER BY created_at ASC")
     suspend fun listNonTerminalForRootTask(rootTaskId: String): List<BotDelegationEntity>
 
+    @Query("SELECT * FROM bot_delegations WHERE root_task_id = :rootTaskId ORDER BY created_at")
+    suspend fun backupForRootTask(rootTaskId: String): List<BotDelegationEntity>
+
     @Query("UPDATE bot_delegations SET status = 'CANCELLED', error_text = 'source process stopped before turn settled', finished_at = :now, updated_at = :now WHERE source_turn_settled = 0 AND status IN ('QUEUED', 'WAITING_TARGET')")
     suspend fun cancelUnsettledAfterProcessStart(now: Long): Int
 
@@ -92,7 +95,7 @@ interface BotDelegationDao {
     @Query("UPDATE bot_delegations SET status = 'CANCELLED', error_text = :reason, finished_at = :now, updated_at = :now WHERE source_session_id = :sessionId AND source_run_id = :runId AND status IN ('QUEUED', 'WAITING_TARGET')")
     suspend fun cancelQueuedForSourceRun(sessionId: String, runId: String, reason: String?, now: Long): Int
 
-    @Query("UPDATE bot_delegations SET status = 'CANCELLED', error_text = :reason, finished_at = :now, updated_at = :now WHERE id = :id AND status IN ('QUEUED', 'WAITING_TARGET', 'RUNNING')")
+    @Query("UPDATE bot_delegations SET outcome_unknown = CASE WHEN status = 'RUNNING' THEN 1 ELSE outcome_unknown END, status = 'CANCELLED', error_text = :reason, finished_at = :now, updated_at = :now WHERE id = :id AND status IN ('QUEUED', 'WAITING_TARGET', 'RUNNING')")
     suspend fun cancel(id: String, reason: String?, now: Long): Int
 
     @Query("UPDATE bot_delegations SET delivered_at = :now, updated_at = :now WHERE id = :id AND delivered_at IS NULL")

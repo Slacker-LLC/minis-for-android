@@ -139,7 +139,7 @@ internal fun TypingIndicator() {
 
 @Composable
 internal fun CompactProgressIndicator(
-    progress: ChatViewModel.CompactProgress,
+    progress: com.openminis.app.agent.AgentSession.CompactProgress,
     onCancel: () -> Unit,
 ) {
     // Re-reads the clock every second; the changing value is what makes the

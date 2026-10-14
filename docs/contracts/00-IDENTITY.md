@@ -12,6 +12,8 @@
 
 ## 当前 Android 身份
 
+以下是正式包身份。用户显式要求的本机并存开发包使用 `llc.slacker.minis.dev`，显示为 `Minis Dev`，由 `-PminisDevBuild=true` 仅对 Debug 构建启用；Kotlin namespace 不改变。正式包与开发包的数据及 Root runtime 分开，见存储合同和发版说明。
+
 | 项 | 当前值 |
 |---|---|
 | `applicationId` | `llc.slacker.minis` |

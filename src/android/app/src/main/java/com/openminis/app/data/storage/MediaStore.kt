@@ -8,6 +8,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import com.openminis.app.runtime.files.SafeFileTree
+import java.io.IOException
+import java.nio.file.FileVisitResult
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
 
 class MediaStore internal constructor(val mediaBaseDir: File) {
     constructor(context: Context) : this(File(context.filesDir, "media"))
@@ -87,12 +94,43 @@ class MediaStore internal constructor(val mediaBaseDir: File) {
         return if (file.exists()) file.readBytes() else null
     }
 
-    fun deleteSessionMedia(sessionId: String) {
-        mediaBaseDir.walkTopDown().forEach { dir ->
-            if (dir.isDirectory && dir.name == sessionId) {
-                dir.deleteRecursively()
+    /** The dated media layout is yyyy/MM/dd/sessionId; never follow links into another data tree. */
+    private fun sessionDirectories(sessionIds: Set<String>): List<File> {
+        if (!SafeFileTree.existsNoFollow(mediaBaseDir)) return emptyList()
+        val root = mediaBaseDir.toPath()
+        val result = mutableListOf<File>()
+        Files.walkFileTree(root, object : SimpleFileVisitor<Path>() {
+            override fun preVisitDirectory(path: Path, attrs: BasicFileAttributes): FileVisitResult {
+                if (root.relativize(path).nameCount == 4 && path.fileName.toString() in sessionIds) {
+                    result += path.toFile()
+                    return FileVisitResult.SKIP_SUBTREE
+                }
+                return FileVisitResult.CONTINUE
             }
+            override fun visitFileFailed(path: Path, error: IOException): FileVisitResult = throw error
+        })
+        return result
+    }
+
+    fun sessionSizes(sessionIds: Set<String>): Map<String, Long> {
+        val sizes = mutableMapOf<String, Long>()
+        for (directory in sessionDirectories(sessionIds)) {
+            var bytes = 0L
+            Files.walkFileTree(directory.toPath(), object : SimpleFileVisitor<Path>() {
+                override fun visitFile(path: Path, attrs: BasicFileAttributes): FileVisitResult {
+                    if (attrs.isRegularFile) bytes += attrs.size()
+                    return FileVisitResult.CONTINUE
+                }
+                override fun visitFileFailed(path: Path, error: IOException): FileVisitResult = throw error
+            })
+            sizes[directory.name] = (sizes[directory.name] ?: 0L) + bytes
         }
+        return sizes
+    }
+
+    fun deleteSessionMedia(sessionId: String): Boolean {
+        // Attempt every dated folder even if one removal fails.
+        return sessionDirectories(setOf(sessionId)).map(SafeFileTree::deleteRecursively).all { it }
     }
 
     private fun extensionFor(mimeType: String): String {

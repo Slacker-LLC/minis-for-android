@@ -228,14 +228,14 @@ internal object UbuntuKernel {
      * Disk usage of the Root-owned rootfs, which the app UID cannot walk itself. Runs the fixed
      * read-only `du` probe through [DirectRootRunner]; 0 when root or the probe is unavailable.
      */
-    suspend fun measureRootfsSize(): Long {
-        if (appContext == null) return 0L
+    suspend fun measureRootfsSize(): Long? {
+        if (appContext == null) return null
         val result = DirectRootRunner.runScript(
             RootfsManager.buildSizeProbeCommand(UbuntuPaths.HOST_ROOTFS),
             SIZE_PROBE_TIMEOUT_MS,
         )
-        if (result.error != null || result.timedOut || result.exitCode != 0) return 0L
-        return RootfsManager.parseSizeProbeOutput(result.stdout) ?: 0L
+        if (result.error != null || result.timedOut || result.exitCode != 0) return null
+        return RootfsManager.parseSizeProbeOutput(result.stdout)
     }
 
     suspend fun ensureRootfs(): RootfsHealth = lock.withLock {
@@ -307,7 +307,7 @@ internal object UbuntuKernel {
 
     suspend fun resetRootfs(): Boolean = lock.withLock {
         val rootfs = UbuntuPaths.HOST_ROOTFS
-        if (rootfs != "/data/adb/minis/rootfs") return@withLock false
+        if (rootfs != "${com.openminis.app.BuildConfig.MINIS_ROOT_STATE_BASE}/rootfs") return@withLock false
         val result = DirectRootRunner.runScript(
             "rm -rf -- ${shellQuote(rootfs)}",
             ROOTFS_TIMEOUT_MS,

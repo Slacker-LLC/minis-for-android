@@ -238,7 +238,6 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
             ?: return MCPCodec.errorResponse(req.id, MCPCodec.INVALID_REQUEST, "permission_denied: token no longer valid")
         val params = req.params
         val name = params.optString("name")
-        val arguments = params.optJSONObject("arguments") ?: JSONObject()
         if (name.isEmpty()) {
             return MCPCodec.errorResponse(req.id, MCPCodec.INVALID_PARAMS, "Missing tool name")
         }
@@ -258,6 +257,16 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
             )
         }
 
+        if (params.has("arguments") && params.opt("arguments") !is JSONObject) {
+            return MCPCodec.errorResponse(req.id, MCPCodec.INVALID_PARAMS, "invalid_arguments: expected a JSON object")
+        }
+        val suppliedArguments = params.optJSONObject("arguments") ?: JSONObject()
+        com.openminis.app.tools.runtime.ToolExecutor.validateArguments(name, suppliedArguments)?.let {
+            return MCPCodec.errorResponse(req.id, MCPCodec.INVALID_PARAMS, it)
+        }
+        // Bind approval to the actual operation, including actions supplied by an alias.
+        val arguments = JSONObject(com.openminis.app.tools.runtime.ToolRegistry.argsForCall(name, suppliedArguments.toString()))
+
         // A5: liveness first — a dead Ubuntu runtime answers immediately
         // without burning a user confirmation (ACC-T-02 semantics). One-shot
         // revive: when Direct Ubuntu is already ready this is a cheap status refresh.
@@ -266,8 +275,10 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
                 val err = com.openminis.app.tools.ToolExecutionResult(
                     output = "Error: ubuntu_runtime_unavailable: $canonicalName",
                     success = false,
+                    failureKind = com.openminis.app.tools.ToolFailureKind.UNAVAILABLE,
+                    executionStarted = false,
                 )
-                return MCPCodec.response(req.id, MCPCodec.toolResult(err.output, isError = true))
+                return MCPCodec.response(req.id, MCPCodec.toolResult(err))
             }
         }
 
@@ -339,7 +350,7 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         )
         return MCPCodec.response(
             req.id,
-            MCPCodec.toolResult(result.output, isError = !result.success),
+            MCPCodec.toolResult(result),
         )
     }
 

@@ -47,16 +47,6 @@ internal object ExternalMountAccess {
         return WorkspaceFileClient.list(null, path, limit, offset)
     }
 
-    suspend fun copy(source: String, destination: String) {
-        requireBothExternal(source, destination)
-        WorkspaceFileClient.copy(null, source, destination)
-    }
-
-    suspend fun move(source: String, destination: String) {
-        requireBothExternal(source, destination)
-        WorkspaceFileClient.move(null, source, destination)
-    }
-
     suspend fun delete(path: String) {
         require(isPath(path)) { "not an external mount path: $path" }
         WorkspaceFileClient.delete(null, path)
@@ -100,9 +90,4 @@ internal object ExternalMountAccess {
         return result
     }
 
-    private fun requireBothExternal(source: String, destination: String) {
-        require(isPath(source) && isPath(destination)) {
-            "cross-boundary external mount copy/move is unsupported"
-        }
-    }
 }

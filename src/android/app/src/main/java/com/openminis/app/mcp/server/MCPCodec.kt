@@ -110,6 +110,11 @@ object MCPCodec {
         .put("content", JSONArray().put(JSONObject().put("type", "text").put("text", text)))
         .put("isError", isError)
 
+    /** Preserve text compatibility while exposing facts about this execution, not model identities. */
+    fun toolResult(result: com.openminis.app.tools.ToolExecutionResult): JSONObject =
+        toolResult(result.output, isError = !result.success)
+            .put("structuredContent", result.executionFacts().put("output", result.output))
+
     /** Notification methods (e.g. notifications/initialized) get no response frame. */
     fun isNotification(method: String): Boolean = method.startsWith("notifications/")
 }

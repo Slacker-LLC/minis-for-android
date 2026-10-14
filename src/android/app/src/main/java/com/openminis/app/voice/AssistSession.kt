@@ -10,8 +10,8 @@ import com.openminis.app.MainActivity
 /**
  * Assistant session: invoking the assistant opens the app at a fresh voice
  * chat and immediately finishes the session. Long-press assistant = "talk to
- * Minis" — the deep link carries the voice action so the Composer opens its
- * inline voice panel (START_VOICE) instead of showing the plain text input.
+         * Minis" — the deep link carries the voice action so the Composer opens its
+ * voice conversation (START_VOICE), connected to the current agent session.
  */
 class AssistSession(
     private val appContext: Context,
@@ -23,7 +23,7 @@ class AssistSession(
          *  collapsed into one launch (long-press Home mashing). */
         private const val LAUNCH_DEBOUNCE_MS = 1_500L
         @Volatile private var lastLaunchAt = 0L
-        private const val VOICE_ACTION_URI = "minis://action/voice"
+        private const val VOICE_ACTION_URI = "minis://action/voice_chat"
     }
 
     override fun onShow(args: Bundle?, showFlags: Int) {

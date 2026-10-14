@@ -1,5 +1,9 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.agent.quoteForReply
+import com.openminis.app.agent.splitLeadingQuotes
+import com.openminis.app.agent.withQuotes
+
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

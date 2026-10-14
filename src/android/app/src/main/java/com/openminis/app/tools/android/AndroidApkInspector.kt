@@ -8,11 +8,8 @@ import com.openminis.app.BuildConfig
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.ExternalMountAccess
 import com.openminis.app.util.Sha256
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.FileOutputStream
 import java.io.File
 import java.util.ArrayDeque
 
@@ -182,7 +179,7 @@ object AndroidApkInspector {
     ): ResolvedArtifact? {
         if (!path.startsWith('/')) return null
         if (ExternalMountAccess.isPath(path)) {
-            return stageExternalArtifact(context, path)
+            return stageGuestArtifact(context, sessionId, path)
         }
         if (path == "/var/minis" || path.startsWith("/var/minis/") ||
             path == "/workspace" || path.startsWith("/workspace/")) {
@@ -209,7 +206,7 @@ object AndroidApkInspector {
                 .filter { it.path.substringBeforeLast('/').endsWith("/build/outputs/apk") }
                 .maxWithOrNull(compareBy<ExternalMountAccess.Entry> { it.modified }.thenBy { it.path })
                 ?: throw IllegalArgumentException("no APK under real Gradle build/outputs/apk directories below $root")
-            return stageExternalArtifact(context, file.path)
+            return stageGuestArtifact(context, sessionId, file.path)
         }
         if (root != "/var/minis" && !root.startsWith("/var/minis/") &&
             root != "/workspace" && !root.startsWith("/workspace/")) {
@@ -230,8 +227,8 @@ object AndroidApkInspector {
             throw IllegalArgumentException("APK artifact is not a regular file: $linuxPath")
         }
         val size = info.optLong("size", -1L)
-        if (size < 0L || size > WorkspaceFileClient.MAX_FILE_BYTES) {
-            throw IllegalArgumentException("APK artifact is too large or has no size: $linuxPath")
+        if (size <= 0L) {
+            throw IllegalArgumentException("APK artifact is empty or has no size: $linuxPath (sizeBytes=$size)")
         }
         val modified = info.optLong("modified", 0L)
         val name = linuxPath.substringAfterLast('/').ifBlank { "artifact.apk" }
@@ -239,50 +236,14 @@ object AndroidApkInspector {
         val target = File(context.cacheDir, "android-deploy/guest/$digest-$name")
         target.parentFile?.mkdirs()
         if (!target.isFile || target.length() != size) {
-            withContext(Dispatchers.IO) {
-                FileOutputStream(target).use { output ->
-                    var offset = 0L
-                    while (true) {
-                        val chunk = WorkspaceFileClient.readChunk(sessionId, linuxPath, offset)
-                        output.write(chunk.bytes)
-                        offset += chunk.bytes.size
-                        if (chunk.eof) break
-                        if (chunk.bytes.isEmpty()) {
-                            throw IllegalStateException("workspace.file read made no progress: $linuxPath")
-                        }
-                    }
-                    output.fd.sync()
-                }
+            val available = context.cacheDir.usableSpace
+            if (size > available) {
+                throw IllegalStateException("APK staging needs $size bytes; cache has $available bytes available: $linuxPath")
             }
+            WorkspaceFileClient.readToFile(sessionId, linuxPath, target, size)
         }
         if (!target.isFile || target.length() != size) {
             throw IllegalStateException("staged APK size mismatch: $linuxPath")
-        }
-        target.setReadable(true, false)
-        return ResolvedArtifact(target, linuxPath)
-    }
-
-    private suspend fun stageExternalArtifact(
-        context: Context,
-        linuxPath: String,
-    ): ResolvedArtifact {
-        val info = ExternalMountAccess.info(linuxPath)
-        if (info.optString("type") != "file") {
-            throw IllegalArgumentException("APK artifact is not a regular file: $linuxPath")
-        }
-        val size = info.optLong("size", -1L)
-        if (size < 0L || size > WorkspaceFileClient.MAX_FILE_BYTES) {
-            throw IllegalArgumentException("APK artifact is too large or has no size: $linuxPath")
-        }
-        val modified = info.optLong("modified", 0L)
-        val name = linuxPath.substringAfterLast('/').ifBlank { "artifact.apk" }
-        val digest = Sha256.hex("$linuxPath\u0000$size\u0000$modified")
-        val target = File(context.cacheDir, "android-deploy/external/$digest-$name")
-        if (!target.isFile || target.length() != size) {
-            WorkspaceFileClient.readToFile(null, linuxPath, target, WorkspaceFileClient.MAX_FILE_BYTES)
-        }
-        if (!target.isFile || target.length() != size) {
-            throw IllegalStateException("staged external APK size mismatch: $linuxPath")
         }
         target.setReadable(true, false)
         return ResolvedArtifact(target, linuxPath)

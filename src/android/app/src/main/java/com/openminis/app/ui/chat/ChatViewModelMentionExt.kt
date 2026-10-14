@@ -1,5 +1,7 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.agent.*
+
 // [T-android-split-chat] @-mention picker methods extracted from ChatViewModel
 // as top-level extension functions (call syntax unchanged). The 5 mention
 // state fields they touch were flipped private->internal. Verbatim logic.

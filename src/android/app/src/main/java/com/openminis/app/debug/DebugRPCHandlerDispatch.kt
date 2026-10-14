@@ -286,22 +286,10 @@ internal suspend fun DebugRPCHandler.dispatch(method: String, params: JSONObject
 
 internal suspend fun DebugRPCHandler.handleAppInfo(): JSONObject {
     val filesDir = context.filesDir
-    val sessionRoots = listOf(
-        "/var/minis/workspace",
-        "/var/minis/attachments",
-        "/var/minis/offloads",
-        "/var/minis/browser",
-    )
     val sessionsSize = runCatching {
-        var total = 0L
-        for (session in AppDatabase.getInstance(context).chatDao().listSessions()) {
-            var size = 0L
-            for (root in sessionRoots) {
-                size += WorkspaceFileClient.treeSize(session.id, root)
-            }
-            total += size
+        AppDatabase.getInstance(context).chatDao().listSessions().sumOf {
+            WorkspaceFileClient.sessionTreeSize(it.id)
         }
-        total
     }.getOrDefault(0L)
     val memorySize = runCatching { WorkspaceFileClient.treeSize("", "/var/minis/memory") }.getOrDefault(0L)
     val skillsSize = runCatching { WorkspaceFileClient.treeSize("", "/var/minis/skills") }.getOrDefault(0L)

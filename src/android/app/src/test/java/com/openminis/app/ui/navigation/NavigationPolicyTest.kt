@@ -86,11 +86,11 @@ class NavigationPolicyTest {
 
     @Test
     fun aReplacedChatScreenCannotClearItsSuccessor() {
-        ChatViewModelStore.setActiveSession("A")
-        ChatViewModelStore.setActiveSession("B")
-        ChatViewModelStore.clearActiveSession("A")
+        val firstMount = ChatViewModelStore.setActiveSession("A")
+        val secondMount = ChatViewModelStore.setActiveSession("B")
+        ChatViewModelStore.clearActiveSession("A", firstMount)
         assertEquals("B", ChatViewModelStore.mountedSessionId.value)
-        ChatViewModelStore.clearActiveSession("B")
+        ChatViewModelStore.clearActiveSession("B", secondMount)
         assertNull(ChatViewModelStore.mountedSessionId.value)
     }
 }

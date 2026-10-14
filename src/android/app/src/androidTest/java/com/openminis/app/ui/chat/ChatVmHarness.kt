@@ -32,31 +32,32 @@ internal suspend fun withChatVm(
     chatOnly: Boolean,
     provider: ScriptedProvider,
     sessionTitle: String? = "Characterization",
+    botName: String? = null,
     block: suspend (ChatViewModel, ChatRepository, ScriptedProvider) -> Unit,
 ) {
     val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MinisApp
     app.providerRepository.awaitConfigLoaded()
     val db = Room.inMemoryDatabaseBuilder(app, AppDatabase::class.java).build()
     val repository = ChatRepository(db.chatDao())
-    val session = repository.createSession("scripted-model", title = sessionTitle)
+    val bots = com.openminis.app.data.repository.BotRepository(db.botDao())
+    val bot = botName?.let { bots.createBot(it, systemPrompt = "Voice identity acceptance") }
+    val session = repository.createSession("scripted-model", title = sessionTitle, botId = bot?.id)
     val store = ViewModelStore()
     val vm = withContext(Dispatchers.Main) {
-        ChatViewModel(session.id, repository, app.providerRepository, app).also { store.put("test", it) }
+        ChatViewModel(session.id, repository, app.providerRepository, app, botRepository = bots).also { store.put("test", it) }
     }
     try {
-        @Suppress("UNCHECKED_CAST")
-        val loaded = ChatViewModel::class.java.getDeclaredField("sessionLoaded").apply { isAccessible = true }
-            .get(vm) as StateFlow<Boolean>
-        withTimeout(10_000L) { loaded.first { it } }
+        withTimeout(10_000L) { vm.sessionLoaded.first { it } }
         withContext(Dispatchers.Main) {
-            ChatViewModel::class.java.getDeclaredField("currentProvider").apply { isAccessible = true }.set(vm, provider)
-            ChatViewModel::class.java.getDeclaredField("currentModel").apply { isAccessible = true }.set(vm, provider.model)
+            vm.currentProvider = provider
+            vm.currentModel = provider.model
             vm.chatOnlyForNextTurn = chatOnly
         }
         block(vm, repository, provider)
     } finally {
         withContext(Dispatchers.Main) { store.clear() }
-        vm.awaitStreamExit(5_000L)
+        com.openminis.app.agent.AgentSessionStore.closeAndAwait(session.id)
+        com.openminis.app.agent.AgentSessionStore.release(session.id)
         SessionEventHub.clear(session.id)
         db.close()
     }
@@ -72,6 +73,7 @@ internal class ScriptedProvider(
     @Volatile var requests = listOf<List<LLMMessage>>()
     @Volatile var offeredTools = listOf<String>()
     @Volatile var titleRequests = 0
+    @Volatile var systemPrompts = listOf<String?>()
 
     override suspend fun sendMessageClamped(
         messages: List<LLMMessage>, systemPrompt: String?, maxTokens: Int, temperature: Double?,
@@ -87,6 +89,7 @@ internal class ScriptedProvider(
     ): Flow<LLMStreamChunk> = flow {
         val n = ++calls
         requests = requests + listOf(messages.toList())
+        systemPrompts = systemPrompts + systemPrompt
         offeredTools = tools.map { it.name }
         script(n, messages, tools).forEach { emit(it) }
     }
@@ -99,3 +102,9 @@ internal fun toolCall(id: String, name: String, args: JSONObject = JSONObject())
     LLMStreamChunk.ToolCallComplete(id, name, args),
     LLMStreamChunk.Finished("tool_use"),
 )
+
+internal fun chatProjection(app: MinisApp, id: String): ChatViewModel = androidx.lifecycle.ViewModelProvider(
+    ChatViewModelStore.ownerFor(id),
+    ChatViewModel.factory(id, app.chatRepository, app.providerRepository, app,
+        app.memoryRepository, app.skillRepository, app.mcpRepository, app.botRepository),
+)[ChatViewModel::class.java]

@@ -791,6 +791,8 @@ internal class ChatSessionEventEmitter(
             put("content", message.content)
             put("isStreaming", message.isStreaming)
             put("isAwaitingModelResponse", message.isAwaitingModelResponse)
+            put("isQueued", message.isQueued)
+            if (message.isQueued) put("queuedDelivery", message.queuedDelivery.name)
             if (message.attachmentNames.isNotEmpty()) put("attachments", JSONArray(message.attachmentNames))
             if (message.imageRefs.isNotEmpty()) {
                 // Canonical MediaRefs (MediaStore) so the DSH projection can

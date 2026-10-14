@@ -19,7 +19,7 @@ object ToolConcurrency {
         "android.app.list", "android.app.info",
         "android.wifi.info", "android.settings.get", "android.logs.read",
         "android.calendar.read", "android.contacts.search", "android.location.get",
-        "system.info", "memory_get", "conversation.history", "conversation_history",
+        "system.info", "agent.tools", "memory_get", "conversation.history", "conversation_history",
         "notification.recent", "notification.search",
     )
 

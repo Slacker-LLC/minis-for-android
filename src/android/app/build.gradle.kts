@@ -18,7 +18,8 @@ plugins {
 //   X.Y-dev  <  X.Y-beta.N  <  X.Y  <  X.Y.Z-beta.N  <  X.Y.Z
 // code = major * 1_000_000 + minor * 10_000 + patch * 100 + stage; stage is 0 for -dev, N (1..98) for -beta.N
 // and 99 for a stable release.
-val appVersionName = "0.0.3"
+val appVersionName = "0.0.4-dev"
+val minisDevBuild = providers.gradleProperty("minisDevBuild").orNull == "true"
 val appVersionCode: Int = run {
     val match = Regex(
         """^(0|[1-9]\d{0,2})\.(0|[1-9]\d?)(?:\.(0|[1-9]\d?))?(?:-(dev|beta\.([1-9]\d?)))?$""",
@@ -236,6 +237,10 @@ android {
         targetSdk = 35
         versionCode = appVersionCode
         versionName = appVersionName
+        manifestPlaceholders["minisAppLabel"] = "@string/app_name"
+        buildConfigField("String", "MINIS_ROOT_STATE_BASE", buildConfigString("/data/adb/minis"))
+        buildConfigField("int", "MINIS_ROOT_PROXY_PORT", "18787")
+        buildConfigField("String", "MINIS_ROOT_PROXY_LISTEN", buildConfigString("127.0.0.1:18787"))
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -288,6 +293,15 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            if (minisDevBuild) {
+                applicationIdSuffix = ".dev"
+                manifestPlaceholders["minisAppLabel"] = "Minis Dev"
+                buildConfigField("String", "MINIS_ROOT_STATE_BASE", buildConfigString("/data/adb/minis-dev"))
+                buildConfigField("int", "MINIS_ROOT_PROXY_PORT", "18788")
+                buildConfigField("String", "MINIS_ROOT_PROXY_LISTEN", buildConfigString("127.0.0.1:18788"))
+            }
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(
@@ -357,8 +371,6 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
-// Keep the shared bashism rule table and test vectors as a single source of
-// truth under src/shared/bashism, copied into Android assets at build time.
 // Deterministic, non-secret diagnostic used by CI to exercise public,
 // required-missing, and configured provider-customization build paths. Never
 // print the configured customization value itself.
@@ -373,12 +385,6 @@ tasks.register("printProviderCustomizationCapability") {
     }
 }
 
-val copyBashismRules by tasks.registering(Copy::class) {
-    from(rootProject.file("../shared/bashism")) {
-        include("bashism_rules.json", "bashism_test_vectors.json")
-    }
-    into(layout.projectDirectory.dir("src/main/assets/bashism"))
-}
 val stageRuntimePayload by tasks.registering {
     group = "build"
     description = "Stages an optional verified rootfs-only runtime payload from dist into Android assets."
@@ -455,7 +461,7 @@ val stageRootNetworkProxy by tasks.registering {
 }
 
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(copyBashismRules); dependsOn(stageRuntimePayload) }
+    .configureEach { dependsOn(stageRuntimePayload) }
 tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets" }
     .configureEach {
         // AAPT strips a terminal .gz suffix even when noCompress is set. Keep
@@ -482,7 +488,6 @@ tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders") }
     .configureEach { dependsOn(stageRootNetworkProxy) }
 tasks.named("preBuild") {
-    dependsOn(copyBashismRules)
     dependsOn(stageRuntimePayload)
     dependsOn(stageRootNetworkProxy)
     dependsOn(verifyRcloneAar16k)

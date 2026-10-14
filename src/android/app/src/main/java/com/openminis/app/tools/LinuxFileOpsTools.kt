@@ -135,16 +135,7 @@ object LinuxFileOps {
     suspend fun copy(sessionId: String, source: String, destination: String, context: Context): ToolExecutionResult {
         writable(sessionId, destination, context)?.let { return it }
         return try {
-            val type = if (ExternalMountAccess.isPath(source) || ExternalMountAccess.isPath(destination)) {
-                if (!ExternalMountAccess.isPath(source) || !ExternalMountAccess.isPath(destination)) {
-                    return ToolExecutionResult("Error: cross-boundary external mount copy is unsupported", false)
-                }
-                ExternalMountAccess.copy(source, destination)
-                ExternalMountAccess.info(source).optString("type")
-            } else {
-                WorkspaceFileClient.copy(sessionId, source, destination)
-                WorkspaceFileClient.info(sessionId, source).optString("type")
-            }
+            val type = WorkspaceFileClient.copy(sessionId, source, destination).optString("type")
             if (type == "dir") {
                 ToolExecutionResult("copied directory $source -> $destination", true)
             } else {
@@ -159,14 +150,7 @@ object LinuxFileOps {
         writable(sessionId, source, context)?.let { return it }
         writable(sessionId, destination, context)?.let { return it }
         return try {
-            if (ExternalMountAccess.isPath(source) || ExternalMountAccess.isPath(destination)) {
-                if (!ExternalMountAccess.isPath(source) || !ExternalMountAccess.isPath(destination)) {
-                    return ToolExecutionResult("Error: cross-boundary external mount move is unsupported", false)
-                }
-                ExternalMountAccess.move(source, destination)
-            } else {
-                WorkspaceFileClient.move(sessionId, source, destination)
-            }
+            WorkspaceFileClient.move(sessionId, source, destination)
             ToolExecutionResult("moved $source -> $destination", true)
         } catch (t: Throwable) {
             ToolExecutionResult("Error: move failed: ${t.message}", false)
@@ -427,7 +411,7 @@ class LinuxFileAppendHandler : LinuxFileOpHandler(
 )
 
 class LinuxFileCopyHandler : LinuxFileOpHandler(
-    "linux.file.copy", "Copy a file or directory inside the workspace.",
+    "linux.file.copy", "Copy a file or directory between session workspace, shared storage and authorized external mounts. Files are streamed; read-only destinations are refused.",
     mapOf(
         "source" to AgentToolParam("string", "Source path"),
         "destination" to AgentToolParam("string", "Destination path"),
@@ -437,7 +421,7 @@ class LinuxFileCopyHandler : LinuxFileOpHandler(
 )
 
 class LinuxFileMoveHandler : LinuxFileOpHandler(
-    "linux.file.move", "Move or rename a file or directory inside the workspace.",
+    "linux.file.move", "Move or rename a file or directory between session workspace, shared storage and authorized external mounts. Across filesystems, copy completely before deleting the source; both paths must allow writes.",
     mapOf(
         "source" to AgentToolParam("string", "Source path"),
         "destination" to AgentToolParam("string", "Destination path"),

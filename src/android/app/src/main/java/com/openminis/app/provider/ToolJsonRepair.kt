@@ -15,8 +15,8 @@ import org.json.JSONObject
  *
  * 1. Truncation repair — if [args] is empty but [rawTail] looks like a JSON object
  *    that just got cut, retry parsing with a small set of closure suffixes appended.
- * 2. Type coercion — for each required field present but not a String, coerce via
- *    `toString()` so the downstream blank-string preflight check has something usable.
+ * 2. Type coercion — for required string fields present but not a String, coerce via
+ *    `toString()`. Structured and numeric fields retain their schema-declared types.
  * 3. Fuzzy field-name match — for each missing required field, look for a sibling key
  *    whose Levenshtein distance is exactly 1 and rename it. Catches one-off typos
  *    like `comand` → `command`.
@@ -61,6 +61,7 @@ object ToolJsonRepair {
 
         // Strategy 2: type coercion on required fields.
         for (field in toolDef.required) {
+            if (toolDef.parameters[field]?.type?.lowercase() != "string") continue
             if (!args.has(field)) continue
             val raw = args.opt(field) ?: continue
             if (raw is String) continue

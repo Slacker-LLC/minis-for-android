@@ -23,7 +23,7 @@ data class ChildProgress(val currentTool: String?, val lastText: String?) {
 }
 
 /** What a finished child run reports. */
-data class ChildOutcome(val completed: Boolean, val text: String?, val timedOut: Boolean)
+data class ChildOutcome(val completed: Boolean, val text: String?, val timedOut: Boolean, val outcomeUnknown: Boolean = false)
 
 /**
  * Everything the runtime needs from the app: the roster, model resolution, and driving child
@@ -63,7 +63,7 @@ interface SubAgentPort {
 }
 
 /** The tool's reply: the JSON text the model reads, and whether the call counts as successful. */
-data class SubAgentReply(val text: String, val ok: Boolean)
+data class SubAgentReply(val text: String, val ok: Boolean, val outcomeUnknown: Boolean = false)
 
 /**
  * Runs delegations: validates a `subagent` call, admits it to the registry, drives the child
@@ -81,6 +81,20 @@ class SubAgentRuntime(
     /** Milliseconds between progress reports for a level, or null for none. */
     private val progressIntervalMs: (String) -> Long? = ::defaultProgressInterval,
 ) {
+    /** Trusted caller identity, carried separately from model-authored arguments. */
+    class ParentExecution(val runId: String?, val taskId: String?, val revision: Int?, val generation: Int?, val executionId: String?) :
+        kotlin.coroutines.AbstractCoroutineContextElement(Key) {
+        companion object Key : kotlin.coroutines.CoroutineContext.Key<ParentExecution>
+    }
+    class WorkContext(val job: SubAgentJob, val progress: Boolean = false) :
+        kotlin.coroutines.AbstractCoroutineContextElement(Key) {
+        companion object Key : kotlin.coroutines.CoroutineContext.Key<WorkContext>
+    }
+
+    suspend fun cancelTask(taskId: String) {
+        registry.jobs.value.values.filter { it.parentTaskId == taskId && it.isActive }.forEach { requestCancel(it.id) }
+    }
+
     private val cancelRequested = ConcurrentHashMap.newKeySet<String>()
     private val waiters = ConcurrentHashMap<String, CompletableDeferred<SubAgentJob>>()
 
@@ -148,6 +162,7 @@ class SubAgentRuntime(
                     "or put the long material in a file and refer to it by path.",
             )
         }
+        val identity = kotlin.coroutines.coroutineContext[ParentExecution]
         return when (val admission = registry.submit(
             parentSessionId = parentSessionId,
             agentName = def.name,
@@ -160,18 +175,20 @@ class SubAgentRuntime(
             thinking = def.thinkingLevelOverride,
             brief = brief,
             progress = if (args.wait) "none" else args.progressReport,
+            parentRunId = identity?.runId, parentTaskId = identity?.taskId, parentTaskRevision = identity?.revision,
+            parentStopGeneration = identity?.generation, parentExecutionId = identity?.executionId,
         )) {
             is SubAgentAdmission.Rejected ->
                 fail("queue_full", "Too many sub agents are waiting (${registry.maxQueued}). Try again after some finish.")
             is SubAgentAdmission.Started -> {
                 val waiter = if (args.wait) waiterFor(admission.job.id) else null
                 launch(admission.job)
-                if (waiter != null) awaitFinal(admission.job.id, waiter) else SubAgentReply(SubAgentTask.started(admission.job), true)
+                if (waiter != null) awaitFinal(admission.job.id, waiter) else SubAgentReply(SubAgentTask.started(admission.job), true, outcomeUnknown = true)
             }
             is SubAgentAdmission.Queued -> {
                 val waiter = if (args.wait) waiterFor(admission.job.id) else null
                 if (waiter != null) awaitFinal(admission.job.id, waiter)
-                else SubAgentReply(SubAgentTask.queued(admission.job, admission.position), true)
+                else SubAgentReply(SubAgentTask.queued(admission.job, admission.position), true, outcomeUnknown = true)
             }
         }
     }
@@ -188,11 +205,12 @@ class SubAgentRuntime(
             throw e
         }
         val ok = job.state == SubAgentJobState.DONE
-        return SubAgentReply(SubAgentTask.finalPayload(job, clock()).toString(), ok)
+        return SubAgentReply(SubAgentTask.finalPayload(job, clock()).toString(), ok, outcomeUnknown = job.outcomeUnknown)
     }
 
     private fun launch(job: SubAgentJob) {
-        scope.launch {
+        scope.launch(WorkContext(job)) {
+            var unknown = false
             var state = SubAgentJobState.FAILED
             var text: String? = null
             try {
@@ -222,6 +240,7 @@ class SubAgentRuntime(
                         ticker?.cancel()
                     }
                     text = outcome.text?.trim()
+                    unknown = outcome.outcomeUnknown
                     state = when {
                         job.id in cancelRequested -> SubAgentJobState.CANCELLED
                         outcome.timedOut -> SubAgentJobState.TIMEOUT
@@ -237,13 +256,14 @@ class SubAgentRuntime(
                 }
             } catch (e: CancellationException) {
                 // The scope is going away, but the parent still gets told and the next job still starts.
-                withContext(NonCancellable) { complete(job.id, SubAgentJobState.CANCELLED, text ?: "Stopped.") }
+                withContext(NonCancellable) { complete(job.id, SubAgentJobState.CANCELLED, text ?: "Stopped.", outcomeUnknown = true) }
                 throw e
             } catch (t: Throwable) {
                 state = SubAgentJobState.FAILED
+                unknown = registry.get(job.id)?.childSessionId != null
                 text = "Sub agent failed: ${t.message ?: t.javaClass.simpleName}"
             }
-            complete(job.id, state, text)
+            complete(job.id, state, text, unknown)
         }
     }
 
@@ -259,7 +279,7 @@ class SubAgentRuntime(
                 val progress = runCatching { port.describeChild(childId) }.getOrNull() ?: continue
                 if (progress.signature == last) continue
                 last = progress.signature
-                runCatching { port.deliverToParent(job.parentSessionId, SubAgentTask.progressText(job, progress, clock())) }
+                runCatching { withContext(WorkContext(job, progress = true)) { port.deliverToParent(job.parentSessionId, SubAgentTask.progressText(job, progress, clock())) } }
             }
         }
     }
@@ -270,21 +290,26 @@ class SubAgentRuntime(
      * settle, and the parent's turn may be the very call that is cancelling this job, so completion and
      * the queue must not wait for it.
      */
-    private suspend fun complete(jobId: String, state: SubAgentJobState, text: String?) {
-        val done = registry.finish(jobId, state, text) ?: return
+    private suspend fun complete(jobId: String, state: SubAgentJobState, text: String?, outcomeUnknown: Boolean = false) {
+        val done = try { registry.finish(jobId, state, text, outcomeUnknown) }
+        catch (error: SubAgentJobRegistry.StorageUnavailable) {
+            waiters.remove(jobId)?.completeExceptionally(error)
+            return
+        } ?: return
         cancelRequested.remove(jobId)
         waiters.remove(jobId)?.complete(done)
         registry.promoteNext()?.let { launch(it) }
-        if (!done.wait) deliverInOrder(done.parentSessionId, SubAgentTask.callbackText(done, clock()))
+        if (!done.wait) deliverInOrder(done, SubAgentTask.callbackText(done, clock()))
     }
 
     /** One delivery queue per parent, so callbacks reach a conversation in the order the jobs finished. */
     private val deliveryLocks = ConcurrentHashMap<String, Mutex>()
 
-    private fun deliverInOrder(parentSessionId: String, text: String) {
+    private fun deliverInOrder(job: SubAgentJob, text: String) {
+        val parentSessionId = job.parentSessionId
         val lock = deliveryLocks.getOrPut(parentSessionId) { Mutex() }
         scope.launch {
-            lock.withLock { runCatching { port.deliverToParent(parentSessionId, text) } }
+            lock.withLock { runCatching { withContext(WorkContext(job)) { port.deliverToParent(parentSessionId, text) } } }
         }
     }
 
@@ -329,7 +354,7 @@ class SubAgentRuntime(
             SubAgentJobState.QUEUED -> complete(jobId, SubAgentJobState.CANCELLED, "Cancelled before it started.")
             SubAgentJobState.RUNNING -> {
                 cancelRequested.add(jobId)
-                job.childSessionId?.let { runCatching { port.cancelChild(it) } }
+                job.childSessionId?.let { runCatching { withContext(WorkContext(job)) { port.cancelChild(it) } } }
             }
             else -> Unit
         }

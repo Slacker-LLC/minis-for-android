@@ -72,7 +72,7 @@ jobs:
                 ;;
             esac
             case "$path" in
-              src/android/*|src/shared/bashism/*|scripts/build-ubuntu-rootfs.sh|scripts/build-root-network-proxy-android.sh|scripts/build-runtime-payload.sh|scripts/gen_debug_skill_android.sh|scripts/verify-runtime-payload.sh|scripts/verify-root-network-proxy.sh|scripts/verify-android-release.sh)
+              src/android/*|scripts/build-ubuntu-rootfs.sh|scripts/build-root-network-proxy-android.sh|scripts/build-runtime-payload.sh|scripts/gen_debug_skill_android.sh|scripts/verify-runtime-payload.sh|scripts/verify-root-network-proxy.sh|scripts/verify-android-release.sh)
                 android=true
                 ;;
             esac

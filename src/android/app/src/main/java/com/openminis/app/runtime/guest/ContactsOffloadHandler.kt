@@ -16,6 +16,7 @@ import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
+import com.openminis.app.tools.ToolFailureKind
 import org.json.JSONObject
 
 /**
@@ -36,7 +37,7 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
     override fun handle(request: NativeOffloadRequest): NativeOffloadResult {
         val rawArgs = request.argv.drop(1)
         if (rawArgs.isEmpty() || rawArgs[0] == "-h" || rawArgs[0] == "--help") {
-            return NativeOffloadResult(0, HELP_TEXT)
+            return NativeOffloadResult(0, HELP_TEXT, executionStarted = false)
         }
         // T54: parse for shared --compact / -q / --quiet handling. Subcommand
         // dispatch still uses the raw `rawArgs` because Contacts encodes
@@ -60,7 +61,7 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
                 "create" -> doCreate(parsedArgs)
                 "update" -> doUpdate(parsedArgs)
                 "delete" -> doDelete(rawArgs.drop(1), parsedArgs)
-                else -> NativeOffloadResult(2, "android-contacts: unknown subcommand '$sub'\n$HELP_TEXT")
+                else -> NativeOffloadResult.invalidArguments("android-contacts: unknown subcommand '$sub'\n$HELP_TEXT")
             }
         } catch (e: SecurityException) {
             AppLogger.warning(TAG, "SecurityException from ContactsProvider2: ${e.message}")
@@ -68,14 +69,18 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
                 .put("error", "contacts_blocked_by_oem")
                 .put("message", "READ_CONTACTS is granted but the contacts provider refused the query. On MIUI/HyperOS this usually means the user needs to enable Contacts access in the per-app 'Other Permissions' / 'Privacy' panel; on ColorOS/OxygenOS check Phone Manager → Privacy Permissions. Underlying: ${e.message}")
                 .toString()
-            NativeOffloadResult(77, OffloadOutput.formatBody(body, parsedArgs) + "\n")
+            NativeOffloadResult(77, OffloadOutput.formatBody(body, parsedArgs) + "\n",
+                failureKind = if (needsWrite) ToolFailureKind.OUTCOME_UNKNOWN else ToolFailureKind.PERMISSION_DENIED,
+                executionStarted = true)
         } catch (e: Throwable) {
             AppLogger.warning(TAG, "uncaught: ${e.message}")
             val body = org.json.JSONObject()
                 .put("error", "contacts_provider_error")
                 .put("message", e.message ?: "unknown contacts provider error")
                 .toString()
-            NativeOffloadResult(1, OffloadOutput.formatBody(body, parsedArgs) + "\n")
+            NativeOffloadResult(1, OffloadOutput.formatBody(body, parsedArgs) + "\n",
+                failureKind = if (needsWrite) ToolFailureKind.OUTCOME_UNKNOWN else ToolFailureKind.EXECUTION_FAILED,
+                executionStarted = true)
         }
     }
 
@@ -122,7 +127,7 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
             )
         }
         OffloadPermissionManager.permissionFailure("android-contacts", perms, result)?.let { body ->
-            return NativeOffloadResult(77, OffloadOutput.formatBody(body.toString(), args) + "\n")
+            return NativeOffloadResult.permissionDenied(OffloadOutput.formatBody(body.toString(), args) + "\n")
         }
         return null
     }
@@ -152,7 +157,7 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
 
     private fun doSearch(args: List<String>, parsedArgs: OffloadArgs): NativeOffloadResult {
         val query = args.firstOrNull { !it.startsWith("-") }
-            ?: return NativeOffloadResult(2, "android-contacts search: missing <query>\n")
+            ?: return NativeOffloadResult.invalidArguments("android-contacts search: missing <query>\n")
         val max = parseMax(args, default = 20).coerceIn(1, 100)
         val ids = linkedSetOf<Long>()
 
@@ -178,7 +183,7 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
                 while (cursor.moveToNext()) ids += cursor.getLong(0)
             }
         } catch (e: SecurityException) {
-            return NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).toString(), parsedArgs) + "\n")
+            return NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).toString(), parsedArgs) + "\n", failureKind = ToolFailureKind.PERMISSION_DENIED, executionStarted = true)
         } catch (e: Throwable) {
             return NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "contacts_provider_error").put("message", e.message).toString(), parsedArgs) + "\n")
         }
@@ -191,7 +196,7 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
 
     private fun doGet(args: List<String>, parsedArgs: OffloadArgs): NativeOffloadResult {
         val id = args.firstOrNull()?.toLongOrNull()
-            ?: return NativeOffloadResult(2, "android-contacts get: missing or invalid <id>\n")
+            ?: return NativeOffloadResult.invalidArguments("android-contacts get: missing or invalid <id>\n")
 
         val projection = arrayOf(
             ContactsContract.Contacts._ID,
@@ -217,7 +222,7 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
 
     private fun doCreate(args: OffloadArgs): NativeOffloadResult {
         val name = args.get("name")?.trim().orEmpty()
-        if (name.isEmpty()) return NativeOffloadResult(2, "android-contacts create: --name is required\n")
+        if (name.isEmpty()) return NativeOffloadResult.invalidArguments("android-contacts create: --name is required\n")
         val phone = args.get("phone")?.trim().orEmpty()
         val email = args.get("email")?.trim().orEmpty()
         return try {
@@ -248,7 +253,8 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
             }
             val results = context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
             val rawId = results.firstOrNull()?.uri?.let(ContentUris::parseId)
-                ?: return NativeOffloadResult(1, "android-contacts create: provider did not return an id\n")
+                ?: return NativeOffloadResult(1, "android-contacts create: provider did not return an id\n",
+                    failureKind = ToolFailureKind.OBSERVATION_FAILED, executionStarted = true)
             // The raw-contact row id and the aggregated contact id are different id spaces; using the
             // raw one as a contact id would point later get/update/delete at some other contact.
             val contactId = contactIdForRaw(rawId)
@@ -259,25 +265,28 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
                 body.put("contact_id_unconfirmed", true)
                     .put("note", "the contact was created, but its aggregated id could not be read yet; search for it by name")
             }
-            NativeOffloadResult(0, OffloadOutput.formatBody(body.toString(2), args) + "\n")
+            NativeOffloadResult(0, OffloadOutput.formatBody(body.toString(2), args) + "\n",
+                failureKind = if (contactId == null) ToolFailureKind.OBSERVATION_FAILED else null,
+                executionStarted = true)
         } catch (e: SecurityException) {
-            NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).toString(), args) + "\n")
+            NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).toString(), args) + "\n", failureKind = ToolFailureKind.OUTCOME_UNKNOWN, executionStarted = true)
         } catch (e: Throwable) {
-            NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "contacts_provider_error").put("message", e.message).toString(), args) + "\n")
+            NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "contacts_provider_error").put("message", e.message).toString(), args) + "\n", failureKind = ToolFailureKind.OUTCOME_UNKNOWN, executionStarted = true)
         }
     }
 
     private fun doUpdate(args: OffloadArgs): NativeOffloadResult {
         val id = args.getLong("id")
-            ?: return NativeOffloadResult(2, "android-contacts update: --id is required\n")
+            ?: return NativeOffloadResult.invalidArguments("android-contacts update: --id is required\n")
         val name = args.get("name")
         val phone = args.get("phone")
         val email = args.get("email")
         if (name == null && phone == null && email == null) {
-            return NativeOffloadResult(2, "android-contacts update: supply --name, --phone, or --email\n")
+            return NativeOffloadResult.invalidArguments("android-contacts update: supply --name, --phone, or --email\n")
         }
         val rawId = firstRawContactId(id)
-            ?: return NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "not_found").put("contact_id", id).toString(), args) + "\n")
+            ?: return NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "not_found").put("contact_id", id).toString(), args) + "\n",
+                failureKind = ToolFailureKind.EXECUTION_FAILED, executionStarted = false)
         // One provider batch: Contacts applies the operations of a batch in a single transaction, so an
         // exception rolls all of them back instead of leaving the first fields changed. Everything is
         // looked up and validated before anything is written.
@@ -314,10 +323,10 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
             }
             NativeOffloadResult(0, OffloadOutput.formatBody(JSONObject().put("contact_id", id).put("updated", true).toString(2), args) + "\n")
         } catch (e: SecurityException) {
-            NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).put("applied", JSONArray()).toString(), args) + "\n")
+            NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).put("applied", JSONArray()).toString(), args) + "\n", failureKind = ToolFailureKind.OUTCOME_UNKNOWN, executionStarted = true)
         } catch (e: Throwable) {
-            // The batch is one transaction: nothing was written.
-            NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "contacts_provider_error").put("message", e.message).put("applied", JSONArray()).toString(), args) + "\n")
+            // The provider request threw without a definitive completion receipt.
+            NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "contacts_provider_error").put("message", e.message).put("applied", JSONArray()).toString(), args) + "\n", failureKind = ToolFailureKind.OUTCOME_UNKNOWN, executionStarted = true)
         }
     }
 
@@ -385,7 +394,7 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
      */
     private fun doDelete(args: List<String>, parsedArgs: OffloadArgs): NativeOffloadResult {
         val id = args.firstOrNull()?.toLongOrNull()
-            ?: return NativeOffloadResult(2, "android-contacts delete: missing or invalid <id>\n")
+            ?: return NativeOffloadResult.invalidArguments("android-contacts delete: missing or invalid <id>\n")
 
         var deleted = context.contentResolver.delete(
             ContactsContract.Contacts.CONTENT_URI,
@@ -468,6 +477,9 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
     companion object {
         private const val TAG = "ContactsOffload"
         private const val HELP_TEXT = """android-contacts — manage device contacts (requires READ_CONTACTS; mutations also need WRITE_CONTACTS)
+
+For execution facts: android-contacts --execution-json <subcommand> [arguments].
+The bridge returns {exit_code, output, execution}; default output is unchanged.
 
 Usage:
   android-contacts list [--max N]                         List contacts (default 50)

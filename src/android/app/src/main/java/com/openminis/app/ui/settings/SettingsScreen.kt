@@ -73,7 +73,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.openminis.app.tools.SubagentLimits
+import com.openminis.app.tools.RalphLimits
 import com.openminis.app.ui.components.MinisTextButton
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -176,13 +176,11 @@ internal fun FeedbackSheetItem(
 }
 
 @Composable
-internal fun SubagentLimitsDialog(
-    initialDepth: Int,
+internal fun RalphLimitsDialog(
     initialTimeoutMinutes: Long,
-    onSave: (Int, Long) -> Unit,
+    onSave: (Long) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var depth by remember { mutableStateOf(initialDepth.toString()) }
     var timeout by remember { mutableStateOf(initialTimeoutMinutes.toString()) }
     Dialog(
         onDismissRequest = onDismiss,
@@ -199,24 +197,15 @@ internal fun SubagentLimitsDialog(
                     .padding(24.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.settings_subagent_limits),
+                    text = stringResource(R.string.settings_ralph_limit),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
-                    value = depth,
-                    onValueChange = { depth = it.filter(Char::isDigit).take(1) },
-                    label = { Text(stringResource(R.string.settings_subagent_depth)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
                     value = timeout,
                     onValueChange = { timeout = it.filter(Char::isDigit).take(2) },
-                    label = { Text(stringResource(R.string.settings_subagent_timeout)) },
+                    label = { Text(stringResource(R.string.settings_ralph_timeout)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
@@ -229,11 +218,9 @@ internal fun SubagentLimitsDialog(
                     MinisTextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
                     MinisTextButton(
                         onClick = {
-                            val d = depth.toIntOrNull() ?: SubagentLimits.DEFAULT_MAX_DEPTH
-                            val t = timeout.toLongOrNull() ?: SubagentLimits.DEFAULT_TIMEOUT_MINUTES
+                            val t = timeout.toLongOrNull() ?: RalphLimits.DEFAULT_TIMEOUT_MINUTES
                             onSave(
-                                d.coerceIn(SubagentLimits.MAX_DEPTH_RANGE.first, SubagentLimits.MAX_DEPTH_RANGE.last),
-                                t.coerceIn(SubagentLimits.TIMEOUT_MINUTES_RANGE.first, SubagentLimits.TIMEOUT_MINUTES_RANGE.last),
+                                t.coerceIn(RalphLimits.TIMEOUT_MINUTES_RANGE.first, RalphLimits.TIMEOUT_MINUTES_RANGE.last),
                             )
                         },
                     ) { Text(stringResource(R.string.save)) }

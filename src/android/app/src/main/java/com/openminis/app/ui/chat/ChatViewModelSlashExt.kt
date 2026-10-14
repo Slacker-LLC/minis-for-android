@@ -1,5 +1,7 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.agent.*
+
 // [T-android-split-chat] Slash-menu STATE methods (filter / open / dismiss /
 // menu-state) extracted from ChatViewModel as extension functions. The action
 // dispatcher executeSlashCommand stays in the class (entangled with compact/
@@ -134,8 +136,10 @@ internal fun ChatViewModel.filteredSlashCommands(): List<SlashCommand> {
         }
     }
     val sid = activeSessionId
-    val skillRows: List<SlashCommand> = skillRepository?.skills?.value
-        ?.filter { skillRepository.isEnabledForSession(it.id, sid) }
+    val skills = skillRepository
+    val mcps = mcpRepository
+    val skillRows: List<SlashCommand> = skills?.skills?.value
+        ?.filter { skills.isEnabledForSession(it.id, sid) }
         ?.sortedBy { it.name.lowercase() }
         ?.map { skill ->
             val trimmed = skill.description.trim()
@@ -153,8 +157,8 @@ internal fun ChatViewModel.filteredSlashCommands(): List<SlashCommand> {
     // All servers enabled for this session are shown (not just the Top-20
     // disclosed in the system prompt). Tapping fills the composer with the
     // server name; discovery/call happens model-side via minis-mcp-cli.
-    val mcpRows: List<SlashCommand> = mcpRepository?.servers?.value
-        ?.filter { mcpRepository.isEnabledForSession(it.id, sid) }
+    val mcpRows: List<SlashCommand> = mcps?.servers?.value
+        ?.filter { mcps.isEnabledForSession(it.id, sid) }
         ?.sortedBy { it.id.lowercase() }
         ?.map { server ->
             val note = server.note?.trim().orEmpty()

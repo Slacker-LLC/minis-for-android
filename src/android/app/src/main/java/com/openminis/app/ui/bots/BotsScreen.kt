@@ -143,12 +143,15 @@ fun BotsScreen(
     }
     BackHandler(enabled = editing || selectedTaskId != null || showProgress || (selectedBotId != null && initialBotId == null)) { goBack() }
 
-    fun openConversation(bot: BotEntity, newTopic: Boolean = false) {
+    fun openConversation(bot: BotEntity, newTopic: Boolean = false, voice: Boolean = false) {
         if (openingId != null) return
         openingId = bot.id
         scope.launch {
             try {
                 val session = botRepository.openConversation(bot.id, chatRepository, providerRepository, newTopic)
+                if (voice) com.openminis.app.deeplink.DeepLinkCoordinator.setPendingChatAction(
+                    com.openminis.app.deeplink.DeepLinkCoordinator.ChatAction.START_VOICE,
+                )
                 onOpenSession(session.id)
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -220,6 +223,7 @@ fun BotsScreen(
             opening = openingId != null,
             onBack = ::goBack,
             onOpen = { openConversation(selectedBot) },
+            onVoice = { openConversation(selectedBot, voice = true) },
             onNewTopic = { openConversation(selectedBot, newTopic = true) },
             onEdit = { editorBotId = selectedBot.id; editing = true },
             onToggle = {
@@ -538,11 +542,14 @@ private fun ColumnScope.BotEmptyState(title: Int, body: Int, action: @Composable
 private fun BotDetails(
     bot: BotEntity, modelName: String?, sessions: List<ChatSessionEntity>, work: List<BotDelegationEntity>,
     routines: List<ScheduledTask>, bots: List<BotEntity>,
-    opening: Boolean, onBack: () -> Unit, onOpen: () -> Unit, onNewTopic: () -> Unit, onEdit: () -> Unit,
+    opening: Boolean, onBack: () -> Unit, onOpen: () -> Unit, onVoice: () -> Unit, onNewTopic: () -> Unit, onEdit: () -> Unit,
     onToggle: () -> Unit, onDelete: () -> Unit, onOpenSession: (String) -> Unit, onOpenWork: (String) -> Unit,
     onOpenRoutineEditor: (taskId: String?, botId: String?) -> Unit,
     onToggleRoutine: (taskId: String, enabled: Boolean) -> Unit,
 ) {
+    val receptionContext = LocalContext.current
+    val reception by com.openminis.app.data.AssistantHomePrefs.receptionBot.collectAsState()
+    LaunchedEffect(Unit) { com.openminis.app.data.AssistantHomePrefs.prime(receptionContext) }
     var menu by remember { mutableStateOf(false) }
     var expanded by rememberSaveable(bot.id) { mutableStateOf(false) }
     SettingsScaffold(
@@ -557,6 +564,9 @@ private fun BotDetails(
                         onClick = onOpen,
                         enabled = !opening && (bot.enabled || sessions.isNotEmpty()),
                     ) { Text(stringResource(R.string.bots_continue), fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+                    MinisTextButton(onClick = onVoice, enabled = bot.enabled && !opening) {
+                        Text(stringResource(R.string.voice_call_title), fontSize = 17.sp)
+                    }
                     MinisTextButton(
                         onClick = onNewTopic,
                         enabled = bot.enabled && !opening,
@@ -609,6 +619,12 @@ private fun BotDetails(
                     }
                 }
             }
+        }
+        SettingsSection(header = stringResource(R.string.bots_reception)) {
+            SettingsRow(title = stringResource(R.string.bots_reception), showDivider = false,
+                trailing = { MinisSwitch(checked = reception == bot.id, onCheckedChange = { selected ->
+                    com.openminis.app.data.AssistantHomePrefs.setReceptionBot(receptionContext, if (selected) bot.id else null)
+                }) })
         }
         SettingsSection(header = stringResource(R.string.bots_model), footer = stringResource(R.string.bots_model_footer)) {
             SettingsRow(title = if (bot.modelBinding == null) stringResource(R.string.bots_follow_default)

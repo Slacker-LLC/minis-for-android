@@ -18,6 +18,7 @@ import java.nio.file.attribute.BasicFileAttributeView
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.PosixFileAttributeView
 import java.util.UUID
+import org.json.JSONObject
 
 /**
  * File operations rooted at directory handles. No operation below a trusted
@@ -70,6 +71,36 @@ internal object SecureFileAccess {
         }
     }
 
+    /** Hash an already-open regular file with bounded memory and detect concurrent replacement. */
+    fun fingerprint(path: UbuntuPaths.SecureFilePath, checkActive: () -> Unit): JSONObject = withParent(path) { parent ->
+        val before = requireRegularFile(parent, path)
+        val leaf = parent.leaf ?: throw WorkspaceFileClient.Failure("NOT_FILE", "expected regular file")
+        val view = parent.stream.getFileAttributeView(leaf, BasicFileAttributeView::class.java, *NOFOLLOW)
+            ?: throw WorkspaceFileClient.Failure("IO_ERROR", "file attributes unavailable")
+        val identity = view.readAttributes().fileKey()
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        var total = 0L
+        openRead(parent).use { input ->
+            val buffer = java.nio.ByteBuffer.allocate(64 * 1024)
+            while (true) {
+                checkActive()
+                buffer.clear()
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (count == 0) continue
+                total += count
+                digest.update(buffer.array(), 0, count)
+            }
+            if (input.size() != total) throw WorkspaceFileClient.Failure("FILE_CHANGED", "file changed while verifying")
+        }
+        val after = requireRegularFile(parent, path)
+        if (before != after || before.size != total || view.readAttributes().fileKey() != identity) {
+            throw WorkspaceFileClient.Failure("FILE_CHANGED", "file changed while verifying")
+        }
+        JSONObject().put("size", total)
+            .put("sha256", digest.digest().joinToString("") { "%02x".format(it) })
+    }
+
     fun readAll(path: UbuntuPaths.SecureFilePath, maxBytes: Long): ByteArray = withParent(path) { parent ->
         val attributes = requireRegularFile(parent, path)
         if (attributes.size > maxBytes) {
@@ -101,7 +132,10 @@ internal object SecureFileAccess {
             try {
                 openRead(parent).use { input ->
                     java.io.FileOutputStream(temporary).use { output ->
-                        copyChannel(input, output.channel, maxBytes)
+                        val copied = copyChannel(input, output.channel, maxBytes)
+                        if (copied != attributes.size) {
+                            throw WorkspaceFileClient.Failure("IO_ERROR", "source size changed during staging")
+                        }
                         output.fd.sync()
                     }
                 }
@@ -209,6 +243,9 @@ internal object SecureFileAccess {
 
     fun move(source: UbuntuPaths.SecureFilePath, destination: UbuntuPaths.SecureFilePath): String {
         if (samePath(source, destination)) return info(source).type
+        if (source.components.isEmpty() || destination.components.isEmpty()) {
+            throw WorkspaceFileClient.Failure("BAD_PARAMS", "cannot move or replace a trusted root")
+        }
         if (isDescendant(destination, source)) {
             throw WorkspaceFileClient.Failure("BAD_PARAMS", "cannot move a directory into itself")
         }
@@ -237,7 +274,9 @@ internal object SecureFileAccess {
         }.getOrDefault(false)
         if (!moved) {
             copy(source, destination)
-            delete(source)
+            if (!delete(source)) {
+                throw WorkspaceFileClient.Failure("IO_ERROR", "destination copied, but source removal was not confirmed")
+            }
         }
         return info(destination).type
     }
@@ -261,12 +300,21 @@ internal object SecureFileAccess {
     }
 
     fun info(path: UbuntuPaths.SecureFilePath): Attributes = withParent(path) { parent ->
-        attributesOrNull(parent, path)
-            ?: throw WorkspaceFileClient.Failure("NOT_FOUND", "path does not exist")
+        try {
+            readAttributes(parent, path)
+        } catch (_: NoSuchFileException) {
+            throw WorkspaceFileClient.Failure("NOT_FOUND", "path does not exist")
+        }
     }
 
-    fun infoOrNull(path: UbuntuPaths.SecureFilePath): Attributes? = runCatching { info(path) }
-        .getOrNull()
+    fun infoOrNull(path: UbuntuPaths.SecureFilePath): Attributes? = try {
+        info(path)
+    } catch (error: WorkspaceFileClient.Failure) {
+        if (error.code == "NOT_FOUND") null else throw error
+    } catch (_: NoSuchFileException) {
+        // The trusted session root may not have been created for an unused draft yet.
+        null
+    }
 
     /** Probe a directory without reopening a name through the global path. */
     fun probeWritable(root: File): Boolean {
@@ -318,9 +366,6 @@ internal object SecureFileAccess {
         destination: UbuntuPaths.SecureFilePath,
         size: Long,
     ) {
-        if (size > WorkspaceFileClient.MAX_FILE_BYTES) {
-            throw WorkspaceFileClient.Failure("BAD_PARAMS", "file exceeds ${WorkspaceFileClient.MAX_FILE_BYTES} bytes")
-        }
         ensureParent(destination)
         withParent(source) { sourceParent ->
             withParent(destination) { destinationParent ->
@@ -335,7 +380,11 @@ internal object SecureFileAccess {
                         destinationParent.stream.newByteChannel(
                             temporary,
                             setOf(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS),
-                        ).use { output -> copyChannel(input, output, size) }
+                        ).use { output ->
+                            if (copyChannel(input, output, size) != size) {
+                                throw WorkspaceFileClient.Failure("IO_ERROR", "source size changed during copy")
+                            }
+                        }
                     }
                     commitReplacing(destinationParent.stream, temporary, destinationParent.stream, destinationLeaf)
                     committed = true
@@ -535,8 +584,8 @@ internal object SecureFileAccess {
     /**
      * Puts [source] in place of [target]. A directory is never a valid thing to replace: a write or a
      * move that lands on one used to delete the whole tree first. A file or link is replaced by the
-     * rename itself, which is atomic, so a failure keeps the old content; only a provider whose rename
-     * refuses an existing target falls back to delete-then-rename.
+     * rename itself, which is atomic, so a failure keeps the old content. Providers that cannot
+     * replace atomically must fail rather than deleting the old destination before retrying.
      */
     private fun commitReplacing(
         sourceParent: SecureDirectoryStream<Path>,
@@ -555,13 +604,9 @@ internal object SecureFileAccess {
             throw WorkspaceFileClient.Failure("BAD_PARAMS", "destination is a directory: ${target.fileName}")
         }
         if (existing != null && existing.isRegularFile) inheritPermissions(targetParent, target, sourceParent, source)
-        try {
-            sourceParent.move(source, targetParent, target)
-        } catch (error: java.nio.file.FileSystemException) {
-            if (existing == null) throw error
-            deleteEntryIfPresent(targetParent, target)
-            sourceParent.move(source, targetParent, target)
-        }
+        // Android's renameat replaces files atomically. On EXDEV or any provider error,
+        // preserve the old destination; move() can stream to a temporary sibling instead.
+        sourceParent.move(source, targetParent, target)
     }
 
     /**
@@ -630,7 +675,7 @@ internal object SecureFileAccess {
         }
     }
 
-    private fun copyChannel(input: SeekableByteChannel, output: SeekableByteChannel, maxBytes: Long) {
+    private fun copyChannel(input: SeekableByteChannel, output: SeekableByteChannel, maxBytes: Long): Long {
         val buffer = ByteBuffer.allocate(WorkspaceFileClient.MAX_WRITE_CHUNK)
         var total = 0L
         while (true) {
@@ -641,8 +686,11 @@ internal object SecureFileAccess {
             total += count
             if (total > maxBytes) throw WorkspaceFileClient.Failure("BAD_PARAMS", "file exceeds $maxBytes bytes")
             buffer.flip()
-            while (buffer.hasRemaining()) output.write(buffer)
+            while (buffer.hasRemaining()) {
+                if (output.write(buffer) <= 0) throw WorkspaceFileClient.Failure("IO_ERROR", "short file write")
+            }
         }
+        return total
     }
 
     internal fun samePath(left: UbuntuPaths.SecureFilePath, right: UbuntuPaths.SecureFilePath): Boolean =

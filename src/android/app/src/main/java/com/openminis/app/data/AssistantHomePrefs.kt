@@ -31,6 +31,33 @@ internal object AssistantHomePrefs {
     private val _actions = MutableStateFlow(AssistantQuickAction.DEFAULT_ORDER)
     val actions: StateFlow<List<AssistantQuickAction>> = _actions.asStateFlow()
 
+    private val _receptionBot = MutableStateFlow<String?>(null)
+    val receptionBot = _receptionBot.asStateFlow()
+
+    fun setReceptionBot(context: Context, botId: String?) {
+        check(prefs(context).edit().putString("reception_bot", botId).commit()) { "preference_commit_failed" }
+        _receptionBot.value = botId
+    }
+
+    suspend fun rememberVoiceSession(context: Context, sessionId: String) {
+        val app = context.applicationContext as com.openminis.app.MinisApp
+        val session = checkNotNull(app.chatRepository.getSession(sessionId)) { "session_deleted" }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            check(prefs(context).edit().putString("voice_session", sessionId)
+                .putString("voice_bot", session.botId.orEmpty()).commit()) { "preference_commit_failed" }
+        }
+    }
+
+    suspend fun resolveVoiceSession(context: Context): String? {
+        val app = context.applicationContext as com.openminis.app.MinisApp
+        val store = prefs(context)
+        val recent = store.getString("voice_session", null)?.let { app.chatRepository.getSession(it) }
+        if (recent != null && store.contains("voice_bot") && store.getString("voice_bot", null) == recent.botId.orEmpty() &&
+            (recent.botId == null || app.botRepository.getBot(recent.botId)?.enabled == true)) return recent.id
+        val bot = store.getString("reception_bot", null)?.let { app.botRepository.getBot(it) }?.takeIf { it.enabled }
+        return bot?.let { app.botRepository.openConversation(it.id, app.chatRepository, app.providerRepository).id }
+    }
+
     private val _startPage = MutableStateFlow(false)
     val startPage: StateFlow<Boolean> = _startPage.asStateFlow()
 
@@ -39,6 +66,7 @@ internal object AssistantHomePrefs {
 
     fun prime(context: Context) {
         val store = prefs(context)
+        _receptionBot.value = store.getString("reception_bot", null)
         _actions.value = AssistantQuickAction.parseSelection(store.getString(KEY_ACTIONS, null))
         _startPage.value = store.getBoolean(KEY_START_PAGE, false)
     }

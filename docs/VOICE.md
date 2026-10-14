@@ -1,6 +1,6 @@
 # 语音运行链
 
-中文摘要：语音输入经系统或 Provider ASR 转成文字，复用现有 Chat/Pet 模型链，再由系统或 Provider TTS 播放；不另建 Runtime。2026-09-12 小米实测分别取得 MiMo 文本、独立 MiMo TTS 请求与 Xiaomi 系统朗读证据，三者不能混写为同一个出口。完整 ASR、打断、通话与 Pi 语音矩阵仍待验收，见[实测报告](REAL-DEVICE-TEST-REPORT.md)。下文保留组件/API 明细。
+中文摘要：语音输入经系统或 Provider ASR 转成文字，复用现有 Chat/Pet 模型链，再由系统或 Provider TTS 播放；不另建 Runtime。2026-10-12 工作树已接入语音对话：聊天页声波按钮、语音快捷方式和系统助理入口共用 VoiceConversationHost，直接提交当前会话完整 Agent 回合。2026-09-12 小米实测分别取得 MiMo 文本、独立 MiMo TTS 请求与 Xiaomi 系统朗读证据，三者不能混写为同一个出口。完整 ASR、打断、通话与 Pi 语音矩阵仍待验收，见[实测报告](REAL-DEVICE-TEST-REPORT.md)。下文保留组件/API 明细。
 
 This document describes the current speech-recognition, model, TTS, and voice-entry paths inside the Android application. It is not a separate APK or a second agent runtime.
 
@@ -115,7 +115,24 @@ The pet path and the full chat Agent Loop intentionally remain separate interact
 
 Do not create a second voice-specific source of truth for providers, models, sessions, or permissions. Voice code should consume the same `ProviderRepository` and runtime state used by the rest of the app.
 
-For testable call-style state machines, wrap existing production classes behind narrow interfaces for speech input, model requests, and speech output; unit tests can then use fakes without real microphone/network/audio devices.
+Call-style state machines wrap existing production classes behind the existing speech/model/output ports. End-to-end verification exercises the real Agent Loop, Room and tool dispatch with scripted acoustic boundaries; device microphone and wake behavior require separate physical-device evidence.
+
+## 连续语音对话（2026-10-12 工作树）
+
+`VoiceConversationHost → CallController → MinisCallRuntimeAdapter → AgentCallGateway → 当前 ChatViewModel.submitPrompt`。
+
+- 聊天页新增声波按钮；Bot 资料页也可直接进入自己的语音直聊并显示成员身份；原麦克风按钮保留听写编辑用途。`minis://action/voice_chat`、旧 `minis://action/voice`、`ACTION_ASSIST` 与 `ACTION_VOICE_ASSIST` 进入同一对话页面。AssistSession 使用可解析的 `voice_chat` URI。
+- 自动提交一段最终识别结果，Agent 可调用当前会话全部可用工具；Bot 会话继续使用原 Bot 身份和模型。成功回复经 `ReadAloudPlayer.speakConversation` 播放，然后再次聆听。用该请求的 AgentTurnHandle 判断回合终态，并按消息持久 Run 提取回复；任务短简报读取真实 Task 状态，不把回合结束当目标完成。
+- 对话采用轮流录音/播报，播放时点击“打断并说话”停止该通话拥有的回合并再次聆听；尚不是原生音频模型的全双工、说话自动打断。
+- 使用现有 Voice Input/Output 配置。VAD 在对话模式下采用约 1.8 秒尾部静音与 0.2 秒语音下限；普通听写保持原参数。实际端点时延依赖设备/识别服务，未视为真机验收。
+- “补充指令”保留任务并重新聆听；当前会话忙时语音进入 STEER 队列，保留文字草稿附件。输入先保存正文后确认接收；STEER 的任务/停止代次失效时保留待审。Bot 在其它会话工作时沿原 Bot 锁等待，不新建语音执行循环。
+- 静音不取消工具任务；挂断/查看聊天仅停止音频和结果等待，已接受的任务在原会话继续。后台/锁屏立即静音，回到页面需明确恢复。此版不提供后台常驻录音，也不绕过锁屏或系统麦克风授权。
+- 原有工具权限/危险操作/问用户确认 Dialog 仍保留在 ChatScreen，语音不获得额外权限。识别配置、权限或网络错误暂停等待显式重试。
+- 通话期间停用该会话的普通自动朗读，防止同一回复重复播放；不修改用户保存的自动朗读偏好。
+
+当前唤醒优先恢复最近语音会话并重新核对原成员身份；失效时使用明确选择的默认接待成员或普通草稿。任务选择/解除、负责人/阶段/等待原因与成果入口共用聊天的 Task 记录；取消录音、停止播报与停止本次语音请求分别控制。上述接线已通过本轮受控语音/对象路由验收，实际音频及 OEM 唤醒仍待验证，详见 [整体说明](development/M-SERIES-INTEGRATION.md)。
+
+可重复验收与失败方式见 [开发记录](development/VOICE-CONVERSATION.md)，进一步融合见 [Bot 与语音方向](development/BOT-VOICE-INTEGRATION.md)。
 
 ## Validation focus
 

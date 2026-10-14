@@ -75,7 +75,7 @@ internal object OffloadGate {
                 "Agent is not allowed to use $displayName. Open Settings → Permissions to change."
             })
             .toString()
-        return NativeOffloadResult(126, OffloadOutput.formatBody(body, args) + "\n")
+        return NativeOffloadResult.permissionDenied(OffloadOutput.formatBody(body, args) + "\n", exitCode = 126)
     }
 
     internal fun denialCode(decision: OffloadPermissionManager.PermissionCheckResult): String =

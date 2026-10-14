@@ -1467,7 +1467,9 @@ fun ChatScreen(
     // Model Picker bottom sheet
     ChatModelPickerHost(providerRepository = providerRepository, viewModel = viewModel, showModelPickerState = showModelPicker_st)
 
-    // Offload permission dialog
+    com.openminis.app.voicecall.VoiceConversationHost(viewModel, ensureMicPermissionFlow, currentBot)
+
+    // Offload permission dialog (also visible over the voice conversation).
     OffloadPermissionDialog()
 
     // Pending ask_user_question card (same QuestionCenter as the Web Remote)

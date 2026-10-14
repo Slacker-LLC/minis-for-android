@@ -75,7 +75,7 @@ internal object ChatMutationMethods {
         val app = app(context)
         val existingId = params.optString("sessionId", "").ifEmpty { null }
         val isNew = existingId == null
-        val sessionId = existingId ?: AgentRunner.ensureSession(context)
+        val sessionId = existingId ?: AgentRunner.ensureSession(context, source = "debug")
 
         // Resolve model override (mutually exclusive with sessionId binding).
         val modelEntryId = if (params.has("modelEntryId") && !params.isNull("modelEntryId")) params.optString("modelEntryId").ifEmpty { null } else null
@@ -99,6 +99,7 @@ internal object ChatMutationMethods {
             chatOnly = chatOnly,
             wait = wait,
             timeoutMs = timeoutSec * 1000L,
+            requestId = params.optString("requestId").takeIf { it.isNotBlank() } ?: java.util.UUID.randomUUID().toString(),
         )
 
         // Re-read DB to pick up the latest message metadata after the run.
@@ -112,7 +113,7 @@ internal object ChatMutationMethods {
             put("status", result.status)
             put("prompt", text)
             put("responseText", result.responseText ?: JSONObject.NULL)
-            put("userMessageId", userMsg?.id ?: JSONObject.NULL)
+            put("userMessageId", result.requestMessageId ?: JSONObject.NULL)
             if (result.timedOut) put("timedOut", true)
         }
     }
@@ -192,26 +193,8 @@ internal object ChatMutationMethods {
         }
     }
 
-    suspend fun status(context: Context, params: JSONObject): JSONObject {
-        val sessionId = params.optString("sessionId", "").ifEmpty {
-            throw RPCException(-32602, "Missing 'sessionId' param")
-        }
-        val app = app(context)
-        val s = app.chatRepository.dao.getSession(sessionId)
-            ?: throw RPCException(-32602, "Session not found")
-        val msgs = app.chatRepository.dao.loadMessages(sessionId)
-        val lastMsg = msgs.lastOrNull()
-        return JSONObject().apply {
-            put("sessionId", sessionId)
-            put("title", ChatTitleNormalizer.normalize(s.title))
-            put("modelName", resolveDisplay(context, s.modelId))
-            put("isRunning", com.openminis.app.service.SessionActivityTracker.isActive(sessionId))
-            put("messageCount", msgs.size)
-            put("lastMessageRole", lastMsg?.role ?: JSONObject.NULL)
-            put("updatedAt", s.updatedAt)
-            put("thinkingLevel", s.thinkingOverride?.lowercase() ?: "off")
-        }
-    }
+    suspend fun status(context: Context, params: JSONObject): JSONObject =
+        com.openminis.app.remote.ChatReadMethods.status(context, params)
 
     suspend fun cancel(context: Context, params: JSONObject): JSONObject {
         val sessionId = params.optString("sessionId", "").ifEmpty {

@@ -11,7 +11,7 @@ sealed interface CallEvent {
 }
 
 /**
- * 通话事件源接口。当前用 [FakeCallRuntime] 模拟；生产实现为
+ * 通话事件源接口。生产实现为
  * [com.openminis.app.voicecall.runtime.MinisCallRuntimeAdapter]，
  * UI / CallController / 状态模型都不需要改动。
  */
@@ -26,6 +26,9 @@ interface CallRuntime {
     /** 打断当前轮（TTS/模型任务），取消后立即回到聆听。 */
     fun interrupt()
 
-    /** 用户发送文字消息（演示/调试用，触发一轮 AI 对话）。 */
+    /** 保留任务并聆听补充；未实现此能力的 runtime 默认仅暂停音频。 */
+    fun listenForFollowUp() { setMuted(true) }
+
+    /** 用户发送文字消息（与语音识别最终文本使用同一路径）。 */
     fun sendText(text: String)
 }

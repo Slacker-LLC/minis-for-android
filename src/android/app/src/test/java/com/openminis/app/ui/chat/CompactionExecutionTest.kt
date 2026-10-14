@@ -1,5 +1,11 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.agent.CompactRejectedSummary
+
+import com.openminis.app.agent.CompactionPlanner
+import com.openminis.app.agent.CompactionSummarizer
+import com.openminis.app.agent.CompactionExecution
+
 import com.openminis.app.agent.AgentContextCompactor
 import com.openminis.app.data.db.CompactMarkerEntity
 import com.openminis.app.data.model.AgentToolDefinition

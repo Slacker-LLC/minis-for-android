@@ -217,6 +217,8 @@ fun SkillRepository.skillPromptFragment(sessionId: String): String? {
         val picked = linkedMapOf<String, Skill>() // preserves insertion order + id dedupe
         // Priority 1: bundled
         enabled.filter { it.importSource == ImportSource.BUNDLED }
+            .sortedByDescending { it.updatedAt }
+            .take(MAX_SKILLS_IN_PROMPT)
             .forEach { picked.putIfAbsent(it.id, it) }
         // Priority 2: recently updated (within 7 days), up to RECENT_SLOTS more
         val cutoff = System.currentTimeMillis() - RECENT_WINDOW_MS
@@ -329,13 +331,13 @@ fun SkillRepository.usageFrequency(skillId: String): UsageFrequency {
  * under `scripts/` etc. don't count toward usage.
  */
 fun SkillRepository.skillIdFromPath(path: String): String? {
-    val prefix = "/var/minis/skills/"
-    if (!path.startsWith(prefix)) return null
+    val prefix = listOf("/var/minis/skills/", "/skills/").firstOrNull(path::startsWith) ?: return null
     if (!path.endsWith("/SKILL.md")) return null
     val rest = path.substring(prefix.length)
     val slash = rest.indexOf('/')
     if (slash <= 0) return null
     val candidate = rest.substring(0, slash)
+    if (rest != "$candidate/SKILL.md") return null
     return if (_skills.value.any { it.id == candidate }) candidate else null
 }
 

@@ -8,7 +8,7 @@ Adapted from the upstream app's 1.14 release (see `PROVENANCE.md`). This page re
 
 ## Tool
 
-`subagent` — one tool, `action` = `delegate` (default) | `status` | `steer` | `cancel`. It keeps the name of the
+`subagent` — one tool, `action` = `delegate` (default) | `status` | `steer` | `cancel` | `resume`. It keeps the name of the
 earlier single-shot tool (the upstream app renamed its tool to `subagent_task`; here the existing name stays so
 recorded transcripts, the permission policy, the UI grouping and the prompts keep working).
 
@@ -61,9 +61,11 @@ also take whatever the user has attached there.
 
 ## Relation to the other delegation mechanisms
 
-- The older single-shot `subagent` behaviour is what the tool does with the Settings switch **off**; with it on
-  (the default) the same tool name carries the roster schema above. A call shaped for the old schema (`prompt`
-  instead of `task`) is still accepted. A sub agent's own session is offered no delegation tool in either mode.
+- With the Settings switch **off**, delegation is withheld from model/local discovery and stale calls are rejected.
+  Only the roster runtime remains; the older synchronous implementation has been removed. With the switch on,
+  legacy `prompt` input is still accepted by the roster parser. Both `sub_agent` and legacy `subagent` session
+  sources are recognized as children and cannot delegate again. Children use their configured memory scope;
+  isolation of the parent transcript does not imply that global memory is disabled.
 - **Bot delegation** (`delegate_bot`, `docs/contracts/08-BOT-COORDINATION.md`) is a separate, persistent
   mechanism between named Bots and is untouched. Sub agents are ephemeral workers of one conversation.
 - The upstream app pins a sub agent to a model *group*; this app has fixed model slots instead, so the pin is a

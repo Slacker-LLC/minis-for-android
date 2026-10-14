@@ -24,10 +24,8 @@ internal data class ToolArgumentRejection(val code: String, val message: String)
  *
  * Deliberate limits:
  *
- * - It is coercion-aware. `ToolJsonRepair` stringifies non-string required
- *   values before preflight runs, so `30` reaches a call as `"30"`. Accepting
- *   the string form of an integer, number or boolean keeps that repair path
- *   working instead of turning it into a rejection.
+ * - It is coercion-aware. Numeric/boolean strings from providers remain accepted;
+ *   `ToolJsonRepair` only coerces fields whose schema declares a string.
  * - It does not reject undeclared keys. Tool helpers read their own optional
  *   fields, and `tool_title` is injected uniformly across tools, so key
  *   strictness would reject calls that work today.
@@ -37,6 +35,74 @@ internal data class ToolArgumentRejection(val code: String, val message: String)
  * Pure function: no I/O, no mutation of [args], no permission decisions.
  */
 internal object ToolCallValidator {
+
+    val NON_BLOCKING_FIELDS = setOf("tool_title")
+    val EMPTY_STRING_ALLOWED_FIELDS = mapOf(
+        "file_edit" to setOf("new_string"),
+        "linux.file.edit" to setOf("new_string"),
+        "update_goal" to setOf("goal"),
+        "agent.goal" to setOf("goal"),
+    )
+    fun preflightEmptyStringAllowed(tool: String, field: String): Boolean =
+        EMPTY_STRING_ALLOWED_FIELDS[tool]?.contains(field) == true
+
+        fun preflight(
+            name: String,
+            args: JSONObject,
+            tools: List<AgentToolDefinition>,
+        ): String? {
+            // Unknown tool names go through to the existing `else` branch in
+            // executeTool() which returns "Unknown tool: …". Preflight stays
+            // silent so we don't double-fail.
+            val toolDef = tools.firstOrNull { it.matchesName(name) } ?: return null
+            // Required fields that actually gate execution (everything except the
+            // non-blocking ones like tool_title — see NON_BLOCKING_FIELDS).
+            val legacyEdit = toolDef.name in setOf("file_edit", "linux.file.edit") && !args.has("edits") &&
+                args.has("old_string") && !args.isNull("old_string") && args.has("new_string") && !args.isNull("new_string")
+            val enforced = toolDef.required.filter { it !in NON_BLOCKING_FIELDS && !(legacyEdit && it == "edits") }
+            // Empty args on a tool that requires anything → block. Gate on
+            // `enforced` so a tool whose only required field is non-blocking isn't
+            // rejected for empty args, and the message lists only real blockers.
+            if (args.length() == 0 && enforced.isNotEmpty()) {
+                return "Tool '$name' was called with empty arguments {} but requires: ${enforced.joinToString(", ")}."
+            }
+            val missing = mutableListOf<String>()
+            for (field in enforced) {
+                // Absent — or present as an explicit JSON null. org.json reports
+                // has() == true for `{"x": null}` and opt() hands back
+                // JSONObject.NULL, which is not a String, so a null previously
+                // slipped through BOTH checks and reached the tool as a non-String
+                // value. Both spellings are genuinely missing.
+                if (!args.has(field) || args.isNull(field)) {
+                    missing.add(field)
+                    continue
+                }
+                val raw = args.opt(field)
+                // Only the truly-empty literal "" is rejected — NOT whitespace.
+                // The earlier `.trim().isEmpty()` over-rejected legitimate payloads,
+                // most notably file_edit with `new_string: "\n"` (replace a block
+                // with a newline) or `old_string: "  "` (match consecutive spaces).
+                // Both are valid edits, neither is stream corruption.
+                //
+                // And even "" is legal for whitelisted (tool, field) pairs:
+                // file_edit.new_string == "" is the documented "delete old_string"
+                // form, not a missing value. [T-preflight-empty-string-allowed]
+                if (raw is String && raw.isEmpty() &&
+                    !preflightEmptyStringAllowed(name, field)
+                ) {
+                    missing.add(field)
+                }
+            }
+            if (missing.isNotEmpty()) {
+                return "Tool '$name' is missing required parameter(s): ${missing.joinToString(", ")}."
+            }
+            // [T-android-tool-arg-schema] Presence is not conformance: check the
+            // declared types, enums and nested structure too. Runs last so the
+            // missing/empty messages above stay byte-for-byte what they were.
+            // Returns a model-facing reason; the caller still synthesizes the
+            // paired tool_result, so a rejected call never reaches a helper.
+            return validate(toolDef, args)?.message
+        }
 
     /** Serialized-argument budget. A tool call larger than this is refused
      *  before any helper sees it. */
@@ -61,7 +127,16 @@ internal object ToolCallValidator {
             val param = tool.parameters[key] ?: continue
             // Absent / explicit null is preflight's decision, not this one.
             if (args.isNull(key)) continue
-            val rejection = checkValue(tool.name, key, param, args.opt(key), depth = 0)
+            // browser_use documents both JSON arrays and string forms for these inputs.
+            // Preserve the existing BrowserActionInput/guest CLI contract when validating it.
+            val actualParam = if (tool.name == "browser_use" && args.opt(key) is JSONArray) {
+                when (key) {
+                    "cookies" -> param.copy(type = "array", items = AgentToolParam("object", "Cookie"))
+                    "keywords" -> param.copy(type = "array", items = AgentToolParam("string", "Cookie name"))
+                    else -> param
+                }
+            } else param
+            val rejection = checkValue(tool.name, key, actualParam, args.opt(key), depth = 0)
             if (rejection != null) return rejection
         }
         return null

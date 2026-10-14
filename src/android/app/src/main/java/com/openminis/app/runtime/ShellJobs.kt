@@ -70,6 +70,9 @@ object ShellJobs {
         sessionId: String,
         command: String,
         timeoutMs: Long = DEFAULT_TIMEOUT_MS,
+        runId: String? = null,
+        taskId: String? = null,
+        executionIntentId: String? = null,
         newProcess: () -> JobProcess,
     ): String {
         val deadline = timeoutMs.coerceIn(1_000L, MAX_TIMEOUT_MS)
@@ -84,7 +87,7 @@ object ShellJobs {
             if (running(null) >= MAX_RUNNING_TOTAL) {
                 throw LimitExceeded("the app already runs $MAX_RUNNING_TOTAL background jobs; wait for or kill one first")
             }
-            id = JobRegistry.start(KIND, command.lineSequence().first().take(120))
+            id = JobRegistry.start(KIND, command.lineSequence().first().take(120), sessionId, runId, taskId, executionIntentId)
             entry = Entry(sessionId, newProcess())
             entries[id] = entry
         }
@@ -97,7 +100,7 @@ object ShellJobs {
             try {
                 val result = entry.process.run(command, deadline) { line -> JobRegistry.appendOutput(id, line + "\n") }
                 when {
-                    result.timedOut -> JobRegistry.finish(id, JobRegistry.JobStatus.FAILED, "timed out after ${deadline / 1000}s")
+                    result.timedOut -> JobRegistry.finish(id, JobRegistry.JobStatus.FAILED, "timed out after ${deadline / 1000}s", com.openminis.app.tools.ToolFailureKind.TOOL_TIMEOUT)
                     result.exitCode == 0 -> JobRegistry.finish(id, JobRegistry.JobStatus.COMPLETED, "exit code 0")
                     else -> JobRegistry.finish(id, JobRegistry.JobStatus.FAILED, "exit code ${result.exitCode}")
                 }
@@ -107,7 +110,7 @@ object ShellJobs {
                 throw cancelled
             } catch (error: Exception) {
                 JobRegistry.appendOutput(id, "[job failed to run: ${error.message ?: error::class.java.simpleName}]\n")
-                JobRegistry.finish(id, JobRegistry.JobStatus.FAILED, "could not run")
+                JobRegistry.finish(id, JobRegistry.JobStatus.FAILED, "could not run", com.openminis.app.tools.ToolFailureKind.OUTCOME_UNKNOWN)
             } finally {
                 runCatching { entry.process.stop() }
                 entries.remove(id)

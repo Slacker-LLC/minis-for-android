@@ -1,5 +1,7 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.agent.*
+
 import android.net.Uri
 import android.util.Log
 import com.openminis.app.data.db.MessageEntity
@@ -21,7 +23,7 @@ internal class ChatMessageMapper(
 ) {
 
     fun toChatMessages(rows: List<MessageEntity>, parsedParts: Map<String, Result<org.json.JSONArray>>): List<ChatMessage> =
-        rows.mapToChat(parsedParts)
+        rows.filterNot { it.requestState == "WITHDRAWN" }.mapToChat(parsedParts)
 
     fun toLLMMessage(entity: MessageEntity, parsedParts: Result<org.json.JSONArray>? = null): LLMMessage =
         entity.mapToLlm(parsedParts)
@@ -174,7 +176,7 @@ internal class ChatMessageMapper(
                                 toolStatus = when {
                                     result == null -> ToolBlockStatus.SUCCESS
                                     !result.success && (
-                                        result.output.startsWith(ChatViewModel.CANCELLED_MARKER) ||
+                                        result.output.startsWith(AgentSession.CANCELLED_MARKER) ||
                                             result.output.startsWith(LEGACY_CANCELLED_MARKER)
                                     ) -> ToolBlockStatus.CANCELLED
                                     result.success -> ToolBlockStatus.SUCCESS
@@ -261,6 +263,9 @@ internal class ChatMessageMapper(
                 // Coalesce a blank value to null: the UI gate is `error?.let`, so
                 // a non-null "" would render an empty banner. Defends against any
                 // legacy/other-writer "" row.
+                isQueued = !entity.isConversationMessage && entity.requestState in setOf("PENDING", "NEEDS_REVIEW"),
+                queuedPromptId = entity.id.takeIf { !entity.isConversationMessage && entity.requestState in setOf("PENDING", "NEEDS_REVIEW") },
+                queuedDelivery = PendingDelivery.entries.firstOrNull { it.name == entity.requestDelivery } ?: PendingDelivery.QUEUE,
                 error = entity.errorInfo?.takeIf { it.isNotBlank() },
             )
         }.let { messages ->
@@ -370,6 +375,11 @@ internal class ChatMessageMapper(
                             name = v.optString("name", ""),
                             content = v.optString("output", ""),
                             isError = !v.optBoolean("success", true),
+                            executionIntentId = v.optString("executionIntentId").takeIf { !v.isNull("executionIntentId") && it.isNotBlank() },
+                            executionRunId = v.optString("executionRunId").takeIf { !v.isNull("executionRunId") && it.isNotBlank() },
+                            executionTaskId = v.optString("executionTaskId").takeIf { !v.isNull("executionTaskId") && it.isNotBlank() },
+                            failureKind = com.openminis.app.tools.ToolFailureKind.entries.firstOrNull { it.name == v.optString("failureKind") },
+                            executionStarted = v.opt("executionStarted") as? Boolean,
                         ))
                     }
                     "mediaRef" -> {

@@ -155,6 +155,9 @@ object SubAgentTask {
             job.modelLabel?.let { put("model", it) }
             job.elapsedMs(now)?.let { put("elapsed_s", it / 1000) }
             job.childSessionId?.let { put("child_session_id", it) }
+            job.parentTaskId?.let { put("parent_task_id", it) }
+            job.parentRunId?.let { put("parent_run_id", it) }
+            put("outcome_unknown", job.outcomeUnknown)
             if (job.resumed) put("resumed", true)
             put("result", capResult(job.resultText.orEmpty()))
         }
