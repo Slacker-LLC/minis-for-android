@@ -66,17 +66,27 @@ class SystemPromptRemnantGuardTest {
     }
 
     @Test
-    fun chatViewModelDelegatesTheStaticPromptToTheModuleComposer() {
-        val source = chatViewModelSources()
-
+    fun theExecutionCoreDelegatesTheStaticPromptToTheModuleComposer() {
         assertTrue(
-            "ChatViewModel must assemble the static prompt through AgentSystemPrompt",
-            source.contains("com.openminis.app.prompt.AgentSystemPrompt.base("),
+            "the execution core must assemble the static prompt through AgentSystemPrompt",
+            corePromptSource().contains("com.openminis.app.prompt.AgentSystemPrompt.base("),
         )
         assertFalse(
             "ChatViewModel must not inline prompt wording again",
-            source.contains("Available tools:"),
+            chatViewModelSources().contains("Available tools:"),
         )
+    }
+
+    /** The core file that owns the static prompt after the M-series move. */
+    private fun corePromptSource(): String {
+        val cwd = File(System.getProperty("user.dir")).canonicalFile
+        val file = listOf(
+            File(cwd, "src/main/java/com/openminis/app/agent/AgentPersistence.kt"),
+            File(cwd, "app/src/main/java/com/openminis/app/agent/AgentPersistence.kt"),
+            File(cwd, "src/android/app/src/main/java/com/openminis/app/agent/AgentPersistence.kt"),
+        ).firstOrNull { it.isFile }
+            ?: error("cannot find AgentPersistence.kt from ${cwd.path}")
+        return file.readText(Charsets.UTF_8)
     }
 
     @Test

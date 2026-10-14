@@ -101,6 +101,12 @@ beta 加 `--prerelease`。
 
 ## APK 与签名
 
+### 本机并存开发包
+
+`./gradlew :app:assembleDebug -PminisDevBuild=true` 生成并存开发包，名称为 `Minis Dev`，包名为 `llc.slacker.minis.dev`。它沿用固定开发签名，不覆盖 `llc.slacker.minis` 正式包；App 私有数据和授权分别管理。Root runtime 使用 `/data/adb/minis-dev`，Root 网络代理使用 `127.0.0.1:18788`，不迁移、重置或停止正式包的 runtime。正式包仍使用 `/data/adb/minis` 与 `127.0.0.1:18787`。Provider authorities、VScreen task affinity 随包名派生。
+
+这是显式的本机开发构建开关，不打 tag、不发布 GitHub Release。当前开发版为 `0.0.4-dev`，对应 GitHub 最新正式版 `v0.0.3` 之后的开发阶段。并存包首次运行需单独配置模型与设备授权。
+
 - 只有用项目生产密钥签名的构建才能作为 APK 附在 Release 上。构建需要环境变量 `RELEASE_KEYSTORE`、`RELEASE_STORE_PASSWORD`、`RELEASE_KEY_ALIAS`、`RELEASE_KEY_PASSWORD`，缺任何一个都会失败，而不是回退到 debug 密钥。
 - 没有可用的生产密钥时，可以先发不带 APK 的 Release，之后用 `gh release upload` 补；应用内更新器看到没有 APK 的版本时只会提示"有新版但未附 APK"。
 - 一个 Release 只附一个 `.apk`（更新器取第一个）。

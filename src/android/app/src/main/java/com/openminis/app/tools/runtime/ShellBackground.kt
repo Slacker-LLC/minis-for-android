@@ -16,7 +16,10 @@ internal object ShellBackground {
         val title = args.optString("tool_title", "shell_execute")
         val timeoutMs = if (args.has("timeout")) args.optLong("timeout") * 1_000L else ShellJobs.DEFAULT_TIMEOUT_MS
         val jobId = try {
-            ShellJobs.start(sessionId, command, timeoutMs) { ExecutionCoordinator.newJobProcess(sessionId) }
+            val identity = kotlin.coroutines.coroutineContext[ToolExecutor.ExecutionIdentity]
+            ShellJobs.start(sessionId, command, timeoutMs, identity?.model?.runId, identity?.model?.taskId, identity?.intentId) {
+                ExecutionCoordinator.newJobProcess(sessionId)
+            }
         } catch (limit: ShellJobs.LimitExceeded) {
             return ToolExecutionResult("Error: ${limit.message}", false, toolTitle = title)
         }
@@ -29,8 +32,18 @@ internal object ShellBackground {
         }
         return ToolExecutionResult(
             output = replyFor(jobId),
-            success = true,
+            success = JobRegistry.get(jobId)?.status in setOf(JobRegistry.JobStatus.RUNNING, JobRegistry.JobStatus.COMPLETED),
             toolTitle = title,
+            failureKind = when (val job = JobRegistry.get(jobId)) {
+                null -> com.openminis.app.tools.ToolFailureKind.OUTCOME_UNKNOWN
+                else -> when {
+                    job.failureKind != null -> job.failureKind
+                    job.nativeOutcomeUnknown || job.status in setOf(JobRegistry.JobStatus.RUNNING, JobRegistry.JobStatus.KILLED) ->
+                        com.openminis.app.tools.ToolFailureKind.OUTCOME_UNKNOWN
+                    job.status == JobRegistry.JobStatus.FAILED -> com.openminis.app.tools.ToolFailureKind.EXECUTION_FAILED
+                    else -> null
+                }
+            },
         )
     }
 

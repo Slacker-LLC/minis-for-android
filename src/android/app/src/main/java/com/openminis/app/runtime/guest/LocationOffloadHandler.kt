@@ -17,6 +17,7 @@ import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
+import com.openminis.app.tools.ToolFailureKind
 import org.json.JSONObject
 import java.util.Locale
 import java.util.concurrent.Executors
@@ -54,7 +55,7 @@ class LocationOffloadHandler(private val context: Context) : NativeOffloadHandle
         // `android-location` == `android-location current`, and flags pass
         // through: `android-location --compact` == `current --compact`.
         if (args.hasFlag("h", "help")) {
-            return NativeOffloadResult(0, HELP)
+            return NativeOffloadResult(0, HELP, executionStarted = false)
         }
         // T330: tri-state agent gate before any work.
         OffloadGate.enforce("location", "android-location", args, request)?.let { return it }
@@ -64,11 +65,13 @@ class LocationOffloadHandler(private val context: Context) : NativeOffloadHandle
                 "current" -> current(args.getInt("timeout") ?: 8, args)
                 "geocode" -> handleGeocode(args)
                 "forward" -> handleForward(args)
-                else -> NativeOffloadResult(2, "android-location: unknown subcommand '$sub'\n$HELP")
+                else -> NativeOffloadResult.invalidArguments("android-location: unknown subcommand '$sub'\n$HELP")
             }
         } catch (e: Throwable) {
             AppLogger.warning(TAG, "uncaught: ${e.message}")
-            NativeOffloadResult(1, OffloadOutput.formatBody("android-location: ${e.message ?: "unknown error"}", args) + "\n")
+            NativeOffloadResult(1, OffloadOutput.formatBody("android-location: ${e.message ?: "unknown error"}", args) + "\n",
+                failureKind = if (e is SecurityException) ToolFailureKind.PERMISSION_DENIED else ToolFailureKind.EXECUTION_FAILED,
+                executionStarted = true)
         }
     }
 
@@ -86,9 +89,7 @@ class LocationOffloadHandler(private val context: Context) : NativeOffloadHandle
         val lon = args.getDouble("lon", "lng")
             ?: args.positional.getOrNull(2)?.toDoubleOrNull()
         if (lat == null || lon == null) {
-            return NativeOffloadResult(
-                2,
-                "android-location geocode: --lat <lat> --lon <lon> required (positional <lat> <lon> also accepted)\n",
+            return NativeOffloadResult.invalidArguments("android-location geocode: --lat <lat> --lon <lon> required (positional <lat> <lon> also accepted)\n",
             )
         }
         return geocode(lat, lon, args)
@@ -134,12 +135,13 @@ class LocationOffloadHandler(private val context: Context) : NativeOffloadHandle
                 )
             }
             OffloadPermissionManager.permissionFailure("android-location", permissions, result)?.let { body ->
-                return NativeOffloadResult(77, OffloadOutput.formatBody(body.toString(), args) + "\n")
+                return NativeOffloadResult.permissionDenied(OffloadOutput.formatBody(body.toString(), args) + "\n")
             }
         }
 
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-            ?: return NativeOffloadResult(1, OffloadOutput.formatBody("""{"error":"service_unavailable","message":"LocationManager not available on this device"}""", args) + "\n")
+            ?: return NativeOffloadResult(1, OffloadOutput.formatBody("""{"error":"service_unavailable","message":"LocationManager not available on this device"}""", args) + "\n",
+                failureKind = ToolFailureKind.UNAVAILABLE, executionStarted = false)
 
         val enabled = enabledProviders(lm)
         val locationEnabled = try {
@@ -324,7 +326,7 @@ class LocationOffloadHandler(private val context: Context) : NativeOffloadHandle
     private fun handleForward(args: OffloadArgs): NativeOffloadResult {
         val address = args.get("address")
         if (address.isNullOrBlank()) {
-            return NativeOffloadResult(2, "android-location forward: --address <addr> is required\n")
+            return NativeOffloadResult.invalidArguments("android-location forward: --address <addr> is required\n")
         }
         if (!Geocoder.isPresent()) {
             val body = JSONObject()
@@ -405,6 +407,9 @@ class LocationOffloadHandler(private val context: Context) : NativeOffloadHandle
         // compatibility block) — enough to detect Chinese place names.
         private val CJK_REGEX = Regex("[\\u4E00-\\u9FFF\\u3400-\\u4DBF\\uF900-\\uFAFF]")
         private const val HELP = """android-location — current location, reverse + forward geocoding (mirrors apple-location)
+
+For execution facts: android-location --execution-json <subcommand> [arguments].
+The bridge returns {exit_code, output, execution}; default output is unchanged.
 
 Usage:
   android-location                  Same as `current` (default subcommand)

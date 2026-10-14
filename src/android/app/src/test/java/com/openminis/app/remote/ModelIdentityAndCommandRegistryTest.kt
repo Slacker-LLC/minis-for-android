@@ -75,7 +75,7 @@ class ModelIdentityAndCommandRegistryTest {
     fun `plan projection follows AgentStateStore truthfully`() {
         val config3 = config()
         assertNotNull(config3)
-        val plan = com.openminis.app.tools.AgentStateStore.planGet("s-plan-test")
+        val plan = com.openminis.app.tools.AgentStateStore.Plan()
         assertFalse(plan.mode == "plan") // default off
     }
 

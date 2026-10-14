@@ -30,16 +30,16 @@ object AgentTools {
         memoryEnabled: Boolean = true,
         /**
          * Agent preset's real tool configuration: `CORE` (minimal mode)
-         * exposes only the persistent shell + file triad; `FULL` keeps the
+         * exposes the persistent shell + file triad and task controls; `FULL` keeps the
          * whole capability set.
          */
         presetToolset: com.openminis.app.remote.AgentPresetRegistry.Toolset =
             com.openminis.app.remote.AgentPresetRegistry.Toolset.FULL,
         botEnabled: Boolean = false,
         // Names of the enabled sub agents (the `subagent.agent` enum) while sub agents are allowed
-        // (Settings); null offers the older single-shot `subagent` schema instead. Same tool name
-        // either way, so transcripts and permissions stay valid.
-        subAgentRosterNames: List<String>? = null,
+        // (Settings); null withholds delegation. Existing transcripts keep the same tool name.
+        subAgentRosterNames: List<String>? = if (com.openminis.app.agent.subagents.SubAgents.isEnabled())
+            com.openminis.app.agent.subagents.SubAgentStore.currentRoster().map { it.name } else null,
         // Names the delegating model may pass as `subagent.model` (the user's agent model list); empty
         // leaves that parameter out. Only used with [subAgentRosterNames].
         subAgentModelHandles: List<String> = emptyList(),
@@ -51,6 +51,19 @@ object AgentTools {
         add(FileReadTool.definition())
         add(FileWriteTool.definition())
         add(FileEditTool.definition())
+
+        add(askUserQuestionDefinition())
+        add(getGoalDefinition())
+        add(createGoalDefinition())
+        add(updateGoalDefinition())
+        add(goalDefinition("verify_outcome"))
+        add(goalDefinition("review_restored_task"))
+        add(todoWriteDefinition())
+        add(JobTools.jobOutputDefinition())
+        add(JobTools.jobListDefinition())
+        add(JobTools.jobKillDefinition())
+        add(JobTools.jobInputDefinition())
+        add(catalogDefinition())
 
         if (presetToolset == com.openminis.app.remote.AgentPresetRegistry.Toolset.CORE) {
             // Bot coordination is part of the Bot identity contract, so a
@@ -72,28 +85,12 @@ object AgentTools {
             add(ReadImageTool.definition())
         }
         add(browserUseDefinition())
-        if (subAgentChild) {
-            // no delegation tool
-        } else if (subAgentRosterNames != null) {
-            add(
-                com.openminis.app.agent.subagents.SubAgentToolSchema.definition(
-                    subAgentRosterNames,
-                    modelHandles = subAgentModelHandles,
-                ),
-            )
-        } else {
-            add(subagentDefinition())
+        if (!subAgentChild && subAgentRosterNames != null && com.openminis.app.agent.subagents.SubAgents.isEnabled()) {
+            add(com.openminis.app.agent.subagents.SubAgentToolSchema.definition(
+                subAgentRosterNames, modelHandles = subAgentModelHandles,
+            ))
         }
         add(RalphTool.definition())
-        add(askUserQuestionDefinition())
-        add(getGoalDefinition())
-        add(createGoalDefinition())
-        add(updateGoalDefinition())
-        add(todoWriteDefinition())
-        add(JobTools.jobOutputDefinition())
-        add(JobTools.jobListDefinition())
-        add(JobTools.jobKillDefinition())
-        add(JobTools.jobInputDefinition())
         if (memoryEnabled) {
             add(memoryWriteDefinition())
             add(memoryGetDefinition())
@@ -119,14 +116,28 @@ object AgentTools {
         addAll(
             com.openminis.app.tools.runtime.ToolRegistry.definitions().filter {
                 it.name !in legacyCanonicals && it.name !in withheldImageTool &&
+                    (memoryEnabled || it.name !in setOf("memory_write", "memory_get")) &&
                     (botEnabled || it.name !in BOT_COORDINATION_TOOL_NAMES) &&
                     // The registry's own copy of the delegation tool is never offered directly: the
-                    // definition above (roster or older schema) stands in for it, and a sub agent's
+                    // roster definition above stands in for it, and a sub agent's
                     // child gets none.
-                    !(subAgentChild && it.name == com.openminis.app.agent.subagents.SubAgentToolSchema.HANDLER_NAME)
+                    it.name != com.openminis.app.agent.subagents.SubAgentToolSchema.HANDLER_NAME
             },
         )
     }
+
+    fun catalogDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = "find_tools",
+        description = "Find names, descriptions and parameter schemas of tools exposed by the current session configuration. " +
+            "Query by name or description; use include_schema=true for exact arguments. This does not enable tools or alter the current model batch. " +
+            "Registration is not device availability: check android_capabilities and actual operation results for backend conditions.",
+        parameters = mapOf(
+            "query" to AgentToolParam("string", "Optional words matched against tool names and descriptions"),
+            "include_schema" to AgentToolParam("boolean", "Include the complete parameter schema (default false)"),
+            "offset" to AgentToolParam("integer", "Result offset, default 0"),
+            "limit" to AgentToolParam("integer", "Results per page, default 20, range 1..100"),
+        ),
+    )
 
     // Upstream shell contract adapted to the direct Ubuntu backend. Root only
     // launches the mount namespace/chroot; guest commands are privilege-dropped
@@ -152,7 +163,7 @@ object AgentTools {
     )
 
     // Aligned with iOS AIChatViewModel.swift browser_use definition
-    private fun browserUseDefinition(): AgentToolDefinition = AgentToolDefinition(
+    fun browserUseDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "browser_use",
         description = "Control a web browser with up to 3 tabs. " +
             "Do NOT use this tool for minis:// action URLs (open_terminal, views, settings) — those are app deep links, use Markdown links in chat instead. " +
@@ -204,7 +215,7 @@ object AgentTools {
         propertyOrdering = listOf("tool_title", "action", "tab_id", "url", "selector", "text", "coordinate_x", "coordinate_y", "direction", "amount", "scroll_count", "item_selector", "script", "user_agent", "max_depth", "keywords", "fuzzy", "cookies", "timeout", "viewport_width", "viewport_height", "reset"),
     )
 
-    private fun memoryWriteDefinition(): AgentToolDefinition = AgentToolDefinition(
+    fun memoryWriteDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "memory_write",
         description = "Write a memory entry to today's daily log (YYYY-MM-DD.md). Memories persist across all sessions. " +
             "Each entry is prepended with a timestamp. " +
@@ -214,12 +225,13 @@ object AgentTools {
         parameters = mapOf(
             "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Save user preference for Python', 'Note today's project context'). Use the same language as the user."),
             "content" to AgentToolParam("string", "The memory content to write. Use concise Markdown with a short heading (## Topic) and context about what was done/learned."),
+            "kind" to AgentToolParam("string", "Background record type, defaults to task_fact; neither type is a current instruction.", enumValues = listOf("task_fact", "user_preference")),
         ),
         required = listOf("tool_title", "content"),
-        propertyOrdering = listOf("tool_title", "content"),
+        propertyOrdering = listOf("tool_title", "content", "kind"),
     )
 
-    private fun memoryGetDefinition(): AgentToolDefinition = AgentToolDefinition(
+    fun memoryGetDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "memory_get",
         description = "Retrieve memories from persistent storage. Supports keyword-based fuzzy search across memory files. " +
             "Returns matching lines with surrounding context. Use this to recall previous knowledge, user preferences, or past notes.",
@@ -230,25 +242,6 @@ object AgentTools {
         ),
         required = listOf("tool_title"),
         propertyOrdering = listOf("tool_title", "scope", "keywords"),
-    )
-
-    private fun subagentDefinition(): AgentToolDefinition = AgentToolDefinition(
-        name = "subagent",
-        description = "Delegate a self-contained sub-task to a child agent that runs in its own session with its own context, " +
-            "then return only its final answer. Use this for work that would otherwise flood your own context with " +
-            "intermediate output — searching across many files, reading long logs, exploring an unfamiliar codebase, " +
-            "or any independent investigation whose details you do not need to keep. " +
-            "The child CANNOT see this conversation: write `prompt` as a complete, standalone task including all needed " +
-            "paths, names and constraints, and state exactly what it should report back. " +
-            "The child has the same tools you do (shell, file read/write/edit, browser). " +
-            "Do NOT delegate trivial work you can finish in one step, and do not delegate something that needs your " +
-            "in-flight context. Delegation is capped at 3 levels deep.",
-        parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of the delegated task, shown to the user (e.g. 'Search codebase for auth logic'). Use the same language as the user."),
-            "prompt" to AgentToolParam("string", "The complete, self-contained task for the child agent, including every path/name/constraint it needs and exactly what to report back. It has no access to the current conversation."),
-        ),
-        required = listOf("tool_title", "prompt"),
-        propertyOrdering = listOf("tool_title", "prompt"),
     )
 
     private fun askUserQuestionDefinition(): AgentToolDefinition = AgentToolDefinition(
@@ -282,40 +275,34 @@ object AgentTools {
         propertyOrdering = listOf("tool_title", "question", "options", "multiple", "allowCustom", "timeoutMinutes"),
     )
 
-    private fun getGoalDefinition(): AgentToolDefinition = AgentToolDefinition(
-        name = "get_goal",
-        description = "Return the current session goal (text and active/paused state), or state that none is set.",
-        parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "Short summary of this call, shown to the user."),
-        ),
-        required = listOf("tool_title"),
-        propertyOrdering = listOf("tool_title"),
-        timeoutMs = 10_000L,
-    )
+    /** Legacy model names project the same schema as the canonical handler. */
+    private fun goalDefinition(action: String): AgentToolDefinition {
+        val schema = com.openminis.app.tools.runtime.AgentGoalHandler().definition
+        val params = schema.parameters.filterKeys { key ->
+            key != "action" && when (action) {
+                "get_goal" -> key == "tool_title"
+                "verify_outcome" -> key in setOf("tool_title", "task_id", "revision", "stop_generation", "outcome", "verification")
+                "review_restored_task" -> key in setOf("tool_title", "task_id", "revision", "stop_generation")
+                else -> key !in setOf("outcome", "verification")
+            }
+        }
+        return schema.copy(
+            name = action,
+            parameters = params,
+            required = when (action) {
+                "create_goal" -> listOf("tool_title", "goal")
+                "verify_outcome" -> listOf("tool_title", "task_id", "revision", "stop_generation", "outcome")
+                "review_restored_task" -> listOf("tool_title", "task_id", "revision", "stop_generation")
+                else -> listOf("tool_title")
+            },
+            propertyOrdering = params.keys.toList(),
+            timeoutMs = if (action in setOf("verify_outcome", "review_restored_task")) 605_000L else 10_000L,
+        )
+    }
 
-    private fun createGoalDefinition(): AgentToolDefinition = AgentToolDefinition(
-        name = "create_goal",
-        description = "Set a new goal for this session. Use when the user states a clear target to work toward; " +
-            "the goal stays visible in the web UI until changed or cleared.",
-        parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "Short summary of the goal, shown to the user."),
-            "goal" to AgentToolParam("string", "The goal text, in the user's language."),
-        ),
-        required = listOf("tool_title", "goal"),
-        propertyOrdering = listOf("tool_title", "goal"),
-        timeoutMs = 10_000L,
-    )
-
-    private fun updateGoalDefinition(): AgentToolDefinition = AgentToolDefinition(
-        name = "update_goal",
-        description = "Replace the current session goal with new text. Use when the user refines the target.",
-        parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "Short summary of the change, shown to the user."),
-            "goal" to AgentToolParam("string", "The new goal text, in the user's language."),
-        ),
-        required = listOf("tool_title", "goal"),
-        propertyOrdering = listOf("tool_title", "goal"),
-    )
+    private fun getGoalDefinition() = goalDefinition("get_goal")
+    private fun createGoalDefinition() = goalDefinition("create_goal")
+    private fun updateGoalDefinition() = goalDefinition("update_goal")
 
     private fun todoWriteDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "todo_write",

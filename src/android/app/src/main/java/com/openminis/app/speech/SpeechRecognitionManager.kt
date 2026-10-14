@@ -287,6 +287,7 @@ object SpeechRecognitionManager {
 
     /** Callbacks from the most recent [startRecording] so [selectLocale] can restart with them. */
     private var activeCallbacks: Pair<(String, Boolean) -> Unit, (RecognitionError, String?) -> Unit>? = null
+    private var captureGeneration = 0L
 
     fun availableEngines(): List<SpeechRecognitionEngine> = engines.toList()
 
@@ -315,6 +316,7 @@ object SpeechRecognitionManager {
     fun startRecording(
         onPartialOrFinal: (text: String, isFinal: Boolean) -> Unit,
         onError: (RecognitionError, String?) -> Unit,
+        conversation: Boolean = false,
     ) {
         if (_state.value != RecognitionState.IDLE) {
             Log.d(TAG, "startRecording ignored; state=${_state.value}")
@@ -326,6 +328,11 @@ object SpeechRecognitionManager {
             onError(RecognitionError.OEM_NO_SERVICE, "No recognition engine available")
             return
         }
+        when (engine) {
+            is SystemSpeechRecognitionEngine -> engine.conversationMode = conversation
+            is ProviderSpeechRecognitionEngine -> engine.conversationMode = conversation
+        }
+        val generation = ++captureGeneration
 
         // [T-android-tts-stop-on-capture] Silence read-aloud BEFORE the engine
         // opens the mic. Done here rather than at the UI call sites so every
@@ -343,25 +350,36 @@ object SpeechRecognitionManager {
         resetLevels()
         activeCallbacks = onPartialOrFinal to onError
 
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        fun deliver(block: () -> Unit) {
+            if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) block()
+            else handler.post { block() }
+        }
         val listener = object : SpeechRecognitionEngine.Listener {
-            override fun onReadyForSpeech() {
+            override fun onReadyForSpeech() = deliver {
+                if (generation != captureGeneration) return@deliver
                 setState(RecognitionState.RECORDING)
             }
 
-            override fun onPartial(text: String) {
+            override fun onPartial(text: String) = deliver {
+                if (generation != captureGeneration) return@deliver
                 _recognizedText.value = text
                 onPartialOrFinal(text, false)
             }
 
-            override fun onFinal(text: String) {
+            override fun onFinal(text: String) = deliver {
+                if (generation != captureGeneration) return@deliver
+                captureGeneration++
                 if (text.isNotEmpty()) _recognizedText.value = text
-                onPartialOrFinal(text, true)
                 setState(RecognitionState.IDLE)
                 resetLevels()
                 refreshAvailability()
+                onPartialOrFinal(text, true)
             }
 
-            override fun onError(error: RecognitionError, message: String?) {
+            override fun onError(error: RecognitionError, message: String?) = deliver {
+                if (generation != captureGeneration) return@deliver
+                captureGeneration++
                 _lastError.value = error
                 setState(RecognitionState.IDLE)
                 resetLevels()
@@ -369,12 +387,16 @@ object SpeechRecognitionManager {
                 refreshAvailability()
             }
 
-            override fun onRmsDb(rms: Float) { pushLevel(rms) }
+            override fun onRmsDb(rms: Float) = deliver {
+                if (generation == captureGeneration) pushLevel(rms)
+            }
         }
 
         try {
             engine.start(_locale.value, listener)
         } catch (e: Throwable) {
+            if (generation != captureGeneration) return
+            captureGeneration++
             setState(RecognitionState.IDLE)
             _lastError.value = RecognitionError.UNKNOWN
             onError(RecognitionError.UNKNOWN, e.message)
@@ -388,6 +410,7 @@ object SpeechRecognitionManager {
     }
 
     fun cancelRecording() {
+        captureGeneration++
         currentEngine()?.cancel()
         setState(RecognitionState.IDLE)
         _recognizedText.value = ""

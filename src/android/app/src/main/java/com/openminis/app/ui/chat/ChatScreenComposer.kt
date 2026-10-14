@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
@@ -1267,7 +1268,8 @@ internal fun ChatComposer(
                     .isEnabled.collectAsState()
                 val ttsMuted by com.openminis.app.speech.VoiceOutputState
                     .isMuted.collectAsState()
-                val readReplies = ttsEnabled && !ttsMuted
+                val voiceConversation by viewModel.voiceConversationActive.collectAsState()
+                val readReplies = ttsEnabled && !ttsMuted && !voiceConversation
                 // [T-android-provider-tts-readaloud] Routes each
                 // utterance through the resolved Voice Output
                 // selection (provider TTS, system engine as
@@ -1275,6 +1277,9 @@ internal fun ChatComposer(
                 // engine, and sanitizes Markdown before speaking.
                 val replyTts = remember {
                     com.openminis.app.speech.ReadAloudPlayer(context)
+                }
+                LaunchedEffect(voiceConversation) {
+                    if (voiceConversation) replyTts.stop()
                 }
                 // The previous bare TextToSpeechManager() was never
                 // shut down, leaking an engine binding on every
@@ -1593,34 +1598,16 @@ internal fun ChatComposer(
                 }
             }
 
-            // App-icon quick action: when the user launched via
-            // `minis://action/voice_chat`, auto-fire the mic on
-            // first compose. Consumed exactly once so re-entering
-            // the chat later does NOT re-trigger.
-            //
-            // [T-android-voice-entry-always-available] Gated on the
-            // STRUCTURAL check, not the sttAvailable runtime probe.
-            // The probe is false on ROMs without a system speech
-            // service (ColorOS et al.), which made this shortcut a
-            // silent no-op there — while the mic button itself had
-            // already moved to hasMicrophoneHardware. Entering the
-            // panel without a live engine is fine: the panel owns
-            // the "no engine → here's how to configure one" story.
-            LaunchedEffect(Unit) {
-                if (!com.openminis.app.speech.SpeechRecognitionManager
-                        .hasMicrophoneHardware
-                ) {
-                    return@LaunchedEffect
-                }
-                val pending = com.openminis.app.deeplink.DeepLinkCoordinator
-                    .pendingChatAction.value
-                if (pending == com.openminis.app.deeplink.DeepLinkCoordinator
-                        .ChatAction.START_VOICE
-                ) {
-                    com.openminis.app.deeplink.DeepLinkCoordinator
-                        .consumePendingChatAction()
-                    triggerVoiceInput()
-                }
+            androidx.compose.material3.IconButton(onClick = {
+                com.openminis.app.deeplink.DeepLinkCoordinator.setPendingChatAction(
+                    com.openminis.app.deeplink.DeepLinkCoordinator.ChatAction.START_VOICE,
+                )
+            }) {
+                Icon(
+                    Icons.Filled.GraphicEq,
+                    contentDescription = stringResource(R.string.voice_call_title),
+                    tint = ChatColors.primaryText,
+                )
             }
 
             // [T-android-voice-entry-always-available] The voice /

@@ -19,7 +19,9 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class NavigationPolicyTest {
     @After
-    fun reset() = ChatViewModelStore.setActiveSession(null)
+    fun reset() {
+        ChatViewModelStore.setActiveSession(null)
+    }
 
     private fun registry(state: Lifecycle.State): LifecycleRegistry {
         val owner = object : LifecycleOwner {
@@ -86,11 +88,11 @@ class NavigationPolicyTest {
 
     @Test
     fun aReplacedChatScreenCannotClearItsSuccessor() {
-        ChatViewModelStore.setActiveSession("A")
-        ChatViewModelStore.setActiveSession("B")
-        ChatViewModelStore.clearActiveSession("A")
+        val firstMount = ChatViewModelStore.setActiveSession("A")
+        val secondMount = ChatViewModelStore.setActiveSession("B")
+        ChatViewModelStore.clearActiveSession("A", firstMount)
         assertEquals("B", ChatViewModelStore.mountedSessionId.value)
-        ChatViewModelStore.clearActiveSession("B")
+        ChatViewModelStore.clearActiveSession("B", secondMount)
         assertNull(ChatViewModelStore.mountedSessionId.value)
     }
 }

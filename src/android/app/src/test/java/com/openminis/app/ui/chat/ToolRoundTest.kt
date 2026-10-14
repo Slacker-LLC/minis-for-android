@@ -1,5 +1,10 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.agent.ToolRoundHost
+import com.openminis.app.agent.parseToolParams
+
+import com.openminis.app.agent.ToolRound
+
 import com.openminis.app.agent.ToolLoopDetector
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.model.AgentToolDefinition

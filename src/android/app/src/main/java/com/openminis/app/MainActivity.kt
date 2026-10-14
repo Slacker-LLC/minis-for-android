@@ -508,7 +508,7 @@ class MainActivity : ComponentActivity() {
         // while inside a chat, synthesise an OpenSession deep-link so
         // the navigation stack lands on that chat instead of the
         // sessions list. T166.
-        val explicitDeepLink = DeepLinkHandler.parse(intent?.data)
+        val explicitDeepLink = DeepLinkHandler.parse(voiceEntryUri(intent))
         val launchDeepLink = if (explicitDeepLink !is DeepLinkAction.Unknown) {
             explicitDeepLink
         } else {
@@ -759,7 +759,12 @@ class MainActivity : ComponentActivity() {
         if (intent.getBooleanExtra("shared_content", false)) {
             com.openminis.app.share.ShareCoordinator.processPendingShare(this)
         }
-        handleDeepLink(intent.data)
+        handleDeepLink(voiceEntryUri(intent))
+    }
+
+    private fun voiceEntryUri(intent: Intent?): Uri? = intent?.data ?: when (intent?.action) {
+        Intent.ACTION_ASSIST, "android.intent.action.VOICE_ASSIST" -> Uri.parse("minis://action/voice_chat")
+        else -> null
     }
 
     private fun handleDeepLink(uri: Uri?) {
@@ -809,17 +814,25 @@ class MainActivity : ComponentActivity() {
             is DeepLinkAction.NewChat,
             is DeepLinkAction.NewVoiceChat,
             is DeepLinkAction.NewCameraChat -> {
-                when (action) {
-                    is DeepLinkAction.NewVoiceChat -> DeepLinkCoordinator
-                        .setPendingChatAction(DeepLinkCoordinator.ChatAction.START_VOICE)
-                    is DeepLinkAction.NewCameraChat -> DeepLinkCoordinator
-                        .setPendingChatAction(DeepLinkCoordinator.ChatAction.OPEN_CAMERA)
-                    else -> {}
-                }
-                val newRoute = Routes.chat("__new__${java.util.UUID.randomUUID()}")
-                nav.navigate(newRoute) {
-                    popUpTo(Routes.SESSION_LIST) { inclusive = false }
-                    launchSingleTop = true
+                lifecycleScope.launch {
+                    try {
+                        val restored = if (action is DeepLinkAction.NewVoiceChat)
+                            com.openminis.app.data.AssistantHomePrefs.resolveVoiceSession(this@MainActivity) else null
+                        when (action) {
+                            is DeepLinkAction.NewVoiceChat -> DeepLinkCoordinator.setPendingChatAction(DeepLinkCoordinator.ChatAction.START_VOICE)
+                            is DeepLinkAction.NewCameraChat -> DeepLinkCoordinator.setPendingChatAction(DeepLinkCoordinator.ChatAction.OPEN_CAMERA)
+                            else -> {}
+                        }
+                        nav.navigate(Routes.chat(restored ?: "__new__${java.util.UUID.randomUUID()}")) {
+                            popUpTo(Routes.SESSION_LIST) { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (error: Exception) {
+                        DeepLinkCoordinator.consumePendingChatAction()
+                        android.widget.Toast.makeText(this@MainActivity, error.message ?: getString(R.string.voice_call_model), android.widget.Toast.LENGTH_LONG).show()
+                        nav.navigate(Routes.BOTS) { launchSingleTop = true }
+                    }
                 }
             }
             is DeepLinkAction.OpenAlarmList -> {

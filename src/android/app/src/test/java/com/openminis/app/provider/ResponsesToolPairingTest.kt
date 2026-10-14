@@ -6,7 +6,7 @@ import com.openminis.app.data.model.LLMModel
 import com.openminis.app.agent.ToolBatchRepair
 import com.openminis.app.provider.openai.OpenAIProvider
 import com.openminis.app.provider.openai.buildResponsesAPIBody
-import com.openminis.app.ui.chat.OutgoingHistory
+import com.openminis.app.agent.OutgoingHistory
 import com.openminis.app.provider.openai.ResponsesToolPairing
 import org.json.JSONArray
 import org.json.JSONObject

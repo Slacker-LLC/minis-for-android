@@ -4,6 +4,7 @@ cd "$(git rev-parse --show-toplevel)"
 MAIN='src/android/app/src/main/java/com/openminis/app'
 TEST='src/android/app/src/test/java/com/openminis/app'
 ANDROID_TEST='src/android/app/src/androidTest/java/com/openminis/app'
+BUILD_GRADLE='src/android/app/build.gradle.kts'
 RUNTIME="$MAIN/runtime"
 LEGACY="$MAIN/sandbox"
 
@@ -70,8 +71,22 @@ grep -Fq 'var mountedFoldersStore' "$RUNTIME/RuntimePathRegistry.kt" || fail 'mo
 grep -Fq 'fun isLinuxPathUnderReadOnlyMount' "$RUNTIME/RuntimePathRegistry.kt" || fail 'mounted-folder write boundary missing'
 grep -Fq 'object UbuntuKernel' "$RUNTIME/ubuntu/UbuntuKernel.kt" || fail 'UbuntuKernel declaration missing'
 grep -Fq 'object RootNetworkProxy' "$RUNTIME/ubuntu/RootNetworkProxy.kt" || fail 'Root network proxy boundary missing'
-grep -Fq 'const val PROXY_LISTEN = "127.0.0.1:18787"' "$RUNTIME/ubuntu/RootNetworkProxy.kt" || fail 'Root network proxy loopback contract changed'
-grep -Fq 'const val HOST_MINIS = "/data/adb/minis"' "$RUNTIME/ubuntu/UbuntuPaths.kt" || fail 'legacy/root runtime root changed'
+# The Root runtime contract is a build-config default with exactly one documented
+# coexistence override (docs/contracts/02-CONSTRAINTS.md 网络,
+# docs/contracts/04-SECURITY-CONTRACT.md 网络兼容 helper).
+grep -Fq 'const val PROXY_LISTEN = com.openminis.app.BuildConfig.MINIS_ROOT_PROXY_LISTEN' "$RUNTIME/ubuntu/RootNetworkProxy.kt" || fail 'Root network proxy loopback contract changed'
+grep -Fq 'const val HOST_MINIS = com.openminis.app.BuildConfig.MINIS_ROOT_STATE_BASE' "$RUNTIME/ubuntu/UbuntuPaths.kt" || fail 'legacy/root runtime root changed'
+for contract in \
+  'buildConfigString("/data/adb/minis")|buildConfigString("/data/adb/minis-dev")' \
+  'buildConfigString("127.0.0.1:18787")|buildConfigString("127.0.0.1:18788")' \
+  '"MINIS_ROOT_PROXY_PORT", "18787"|"MINIS_ROOT_PROXY_PORT", "18788"'; do
+  prod="${contract%%|*}"
+  dev="${contract##*|}"
+  prod_line="$(grep -n -m1 -F "$prod" "$BUILD_GRADLE" | cut -d: -f1 || true)"
+  dev_line="$(grep -n -m1 -F "$dev" "$BUILD_GRADLE" | cut -d: -f1 || true)"
+  [[ -n "$prod_line" && -n "$dev_line" && "$prod_line" -lt "$dev_line" ]] || fail "root runtime build-config contract changed: $prod"
+done
+if grep -Eq '0\.0\.0\.0|\[::\]' "$RUNTIME/ubuntu/RootNetworkProxy.kt"; then fail 'Root network proxy must stay loopback-only'; fi
 grep -Fq 'const val HOST_ROOTFS = "$HOST_MINIS/rootfs"' "$RUNTIME/ubuntu/UbuntuPaths.kt" || fail 'rootfs contract changed'
 grep -Fq 'const val LEGACY_WORKSPACE = "$HOST_MINIS/workspace"' "$RUNTIME/ubuntu/UbuntuPaths.kt" || fail 'legacy workspace migration contract changed'
 grep -Fq 'Bind(workspace.absolutePath, "/workspace")' "$RUNTIME/ubuntu/UbuntuKernel.kt" || fail 'guest workspace bind contract changed'

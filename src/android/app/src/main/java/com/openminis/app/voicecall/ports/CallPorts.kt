@@ -1,13 +1,13 @@
 package com.openminis.app.voicecall.ports
 
 /**
- * 语音通话三层端口（阶段 A 契约，见 验收与设计/语音功能子项目总览.md §6）。
+ * 语音对话端口。生产实现复用主工程的识别、Agent 回合与朗读。
  *
  * UI/CallController 不直接访问 Android 音频、网络或 Provider；生产实现包装
- * 主工程现有能力（阶段 B/C），测试使用 Fake：
+ * 主工程现有能力，端到端验收可替换音频边界：
  *
  *  - [CallSpeechInput]  → SpeechRecognitionManager（系统/Provider ASR）
- *  - [CallModelGateway] → PetChatEngine（MVP）/ Agent Gateway（后续）
+ *  - [CallModelGateway] → 当前会话 AgentSession / AgentTurnHandle
  *  - [CallSpeechOutput] → ReadAloudPlayer（在线 VoiceProvider / 系统 TTS 回退）
  */
 
@@ -29,7 +29,7 @@ interface CallModelGateway {
     /** 同步等待回答；返回前不应返回空文本（失败走 Result.failure）。 */
     suspend fun ask(text: String): Result<String>
 
-    /** 取消当前请求；ask 的挂起应尽快以 failure(CancelledException) 返回。 */
+    /** 用户明确打断：只取消该通话拥有的 Agent 回合。结束等待本身不取消任务。 */
     fun cancel()
 }
 

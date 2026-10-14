@@ -39,6 +39,16 @@ object QuestionCenter {
 
     private val questions = ConcurrentHashMap<String, PendingQuestion>()
 
+    suspend fun ask(sessionId: String, prompt: String, options: List<QuestionOption>,
+                    multiple: Boolean = false, allowCustom: Boolean = true, timeoutMs: Long): QuestionAnswer? {
+        val id = UUID.randomUUID().toString()
+        val question = PendingQuestion(id, sessionId, prompt, options, multiple, allowCustom,
+            System.currentTimeMillis(), CompletableDeferred())
+        register(question)
+        return try { kotlinx.coroutines.withTimeoutOrNull(timeoutMs) { question.deferred.await() } }
+        finally { remove(id) }
+    }
+
     fun register(question: PendingQuestion): PendingQuestion {
         questions[question.id] = question
         return question

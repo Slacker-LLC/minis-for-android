@@ -12,6 +12,7 @@ import android.os.ParcelFileDescriptor
 import com.openminis.app.offload.RootProcess
 import com.openminis.app.tools.android.vscreen.service.VirtualScreenRootService
 import com.topjohnwu.superuser.ipc.RootService
+import org.json.JSONObject
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Callable
 import java.util.concurrent.CountDownLatch
@@ -169,7 +170,9 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
     }
 
     fun dump(displayId: Int, mode: String = "SIMPLE"): String =
-        execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).dump(displayId, mode) }
+        execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).dump(displayId, mode) }.also {
+            updateObservedPackage(displayId, JSONObject(it))
+        }
 
     fun hasPackageWindow(displayId: Int, packageName: String): Boolean =
         execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).hasPackageWindow(displayId, packageName) }
@@ -198,7 +201,24 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
      * (settledBy=deadline) instead of surfacing as a client timeout.
      */
     fun act(displayId: Int, requestJson: String): String =
-        execute(ACT_TIMEOUT_MS) { requireRemote(ACT_TIMEOUT_MS).act(displayId, requestJson) }
+        execute(ACT_TIMEOUT_MS) { requireRemote(ACT_TIMEOUT_MS).act(displayId, requestJson) }.also {
+            JSONObject(it).optJSONObject("observation")?.let { observation -> updateObservedPackage(displayId, observation) }
+        }
+
+    private fun updateObservedPackage(displayId: Int, observation: JSONObject) {
+        // An unreadable/truncated window set cannot establish the foreground package.
+        val windows = observation.optJSONArray("windows")
+        val foreground = if (observation.optString("windowError").isBlank() &&
+            !observation.optBoolean("truncated", false) && windows != null
+        ) {
+            (0 until windows.length()).mapNotNull(windows::optJSONObject)
+                .filter { it.optInt("type") == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION }
+                .let { apps -> apps.firstOrNull { it.optBoolean("focused") }
+                    ?: apps.firstOrNull { it.optBoolean("active") } ?: apps.singleOrNull() }
+                ?.optString("package")?.takeIf(String::isNotBlank)
+        } else null
+        synchronized(stateLock) { if (activeDisplayId == displayId) activePackageName = foreground }
+    }
 
     fun back(displayId: Int): Boolean =
         execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).back(displayId) }

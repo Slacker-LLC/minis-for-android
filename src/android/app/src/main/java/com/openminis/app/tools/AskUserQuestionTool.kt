@@ -1,8 +1,6 @@
 package com.openminis.app.tools
 
 import android.content.Context
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -45,26 +43,9 @@ object AskUserQuestionTool {
         val timeoutMinutes = args.optInt("timeoutMinutes", DEFAULT_TIMEOUT_MINUTES)
             .coerceIn(1, MAX_TIMEOUT_MINUTES)
 
-        val questionId = java.util.UUID.randomUUID().toString()
-        val deferred = CompletableDeferred<QuestionAnswer>()
-        QuestionCenter.register(
-            PendingQuestion(
-                id = questionId,
-                sessionId = sessionId ?: "",
-                prompt = prompt,
-                options = options,
-                multiple = multiple,
-                allowCustom = allowCustom,
-                createdAt = System.currentTimeMillis(),
-                deferred = deferred,
-            )
-        )
-
-        val answer = withTimeoutOrNull(timeoutMinutes * 60_000L) { deferred.await() }
+        val answer = QuestionCenter.ask(sessionId ?: "", prompt, options, multiple, allowCustom,
+            timeoutMs = timeoutMinutes * 60_000L)
         if (answer == null) {
-            // The card is no longer pending — drop it so the registry does not
-            // keep a stale question around after the timeout.
-            QuestionCenter.remove(questionId)
             return ToolExecutionResult(
                 "ask_user_question timed out after $timeoutMinutes minute(s) with no answer. " +
                     "Do not ask again; proceed with the most reasonable assumption.",

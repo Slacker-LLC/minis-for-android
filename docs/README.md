@@ -1,7 +1,7 @@
 # 文档索引
 
-本索引对应 `Slacker-LLC/minis-for-android` 的当前主线 **`main`**（2026-10-08 快照）。
-中文为主要阅读入口；历史审计采样日期保留，不能把旧报告当作新一轮验收。
+本索引对应 `Slacker-LLC/minis-for-android` 的 `main` 基线与 **2026-10-13 当前未提交工作树**。
+M1–M5 开发与本轮受控集成验收已完成，最新范围见整体说明；各专题的旧切片仅保留其历史证据。中文为主要阅读入口；历史审计采样日期保留，不能把旧报告当作新一轮验收。
 
 当前事实与长期合同分开判断：
 
@@ -26,6 +26,13 @@
 | [development/BACKUP.md](development/BACKUP.md) | 备份与恢复：包含什么、不包含什么、恢复规则、换签名重装的步骤 |
 | [development/RELEASING.md](development/RELEASING.md) | 版本与发版：版本号与 versionCode 方案、历史版本的 `release/vX.Y` 分支、beta 与 tag、预检脚本、更新通道 |
 | [development/PROGRESS.md](development/PROGRESS.md) | 移植与收敛进度：逐片记录、已完成、待办阶段、排除项、未验证清单 |
+| [analysis/minis-agent-inventory.md](analysis/minis-agent-inventory.md) | 2026-10-11/12 Agent 全景与 35 项功能细解：入口、配置、调用关系、状态归属，含 Bot/子代理 |
+| [development/AGENT-ROADMAP.md](development/AGENT-ROADMAP.md) | Agent 重整路线：四个执行参考与 Grok Bot 产品定位、阶段依赖、开发切片及端到端验收；拟开发项不等于当前功能 |
+| [development/AGENT-CORE-EXECUTION.md](development/AGENT-CORE-EXECUTION.md) | M1 执行核心归属、生命周期与受控端到端验收记录 |
+| [development/AGENT-TASK-EXECUTION.md](development/AGENT-TASK-EXECUTION.md) | M2 持久任务、自动接续、证据核验、强停恢复与协作结算 |
+| [development/AGENT-TOOLS-EXECUTION.md](development/AGENT-TOOLS-EXECUTION.md) | M3 共享校验/时限、能力事实和子代理入口收敛；剩余路径与验证范围 |
+| [development/VOICE-CONVERSATION.md](development/VOICE-CONVERSATION.md) | 语音对话第一版：完整 Agent 接入、音频与任务生命周期、失败方式和端到端验证 |
+| [development/BOT-VOICE-INTEGRATION.md](development/BOT-VOICE-INTEGRATION.md) | OpenBot 设计对照、Bot 语音融合的已实现行为及持久接单、对象恢复、结果简报的开发顺序 |
 | [development/HANDOFF-2026-09-19.md](development/HANDOFF-2026-09-19.md) | 2026-09-19 的交接快照（过去/现在/将来）；查当前状态请回 PROGRESS.md |
 | [I18N.md](I18N.md) | 本地化：语言目录、硬规则、转义与复数坑、审计工具、当前覆盖与剩余 |
 | [REFERENCES.md](REFERENCES.md) | 资料索引：Eta 源码速查、上游链接、许可文本、工具链版本 |
@@ -101,3 +108,7 @@
 
 已删除被合同完全替代的七步计划，以及五份不参与构建的旧 PR patch 副本；它们仍可从 Git 历史恢复。保留
 法律文件、现役合同、实测报告和上游对账，不为了减少文件数删除验收缺口。
+
+Agent 重整当前执行切片：[持久任务与验收](development/AGENT-TASK-EXECUTION.md)、[工具执行整理](development/AGENT-TOOLS-EXECUTION.md)。
+
+当前 Agent 开发接线与集中验收统一见 [M1–M5 整体说明](development/M-SERIES-INTEGRATION.md)；旧切片页面按各自日期保留历史证据。

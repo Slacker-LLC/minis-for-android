@@ -4,6 +4,8 @@ import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.tools.ToolExecutionResult
+import com.openminis.app.tools.ToolFailureKind
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -224,8 +226,11 @@ object AndroidAgentTools {
                     .toString()
             }.getOrNull()
             if (decorated == null) executed else executed.copy(output = decorated)
-        } catch (t: Throwable) {
-            ToolExecutionResult("Error: ${t.message ?: t.javaClass.simpleName}", false, toolTitle = title)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Exception) {
+            ToolExecutionResult("Error: ${t.message ?: t.javaClass.simpleName}", false, toolTitle = title,
+                failureKind = ToolFailureKind.OUTCOME_UNKNOWN)
         }
     }
 
@@ -302,6 +307,11 @@ object AndroidAgentTools {
             imageFilePath = result.imageHostPath,
             imageLinuxPath = result.imageLinuxPath,
             toolTitle = title,
+            failureKind = when (result.json.optString(UiActionEvidenceReport.FIELD_EVIDENCE)) {
+                UiActionEvidence.TIMED_OUT.name -> ToolFailureKind.TOOL_TIMEOUT
+                UiActionEvidence.ACCEPTED_NO_EVIDENCE.name -> ToolFailureKind.OBSERVATION_FAILED
+                else -> null
+            },
         )
     }
 

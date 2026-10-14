@@ -119,7 +119,7 @@ object DeepLinkHandler {
             // QuickActionRouter.swift action ids 1:1.
             "action" -> when (path.removePrefix("/")) {
                 "new_chat" -> DeepLinkAction.NewChat
-                "voice_chat" -> DeepLinkAction.NewVoiceChat
+                "voice", "voice_chat" -> DeepLinkAction.NewVoiceChat
                 "camera_chat" -> DeepLinkAction.NewCameraChat
                 else -> DeepLinkAction.Unknown
             }
@@ -184,6 +184,7 @@ object DeepLinkHandler {
             "system-prompt", "system_prompt", "prompt" ->
                 DeepLinkAction.OpenSettingsScreen(Routes.SYSTEM_PROMPT)
             "memory" -> DeepLinkAction.OpenSettingsScreen(Routes.MEMORY)
+            "files" -> DeepLinkAction.OpenSettingsScreen(Routes.settingsCategory("files"))
             "storage" -> DeepLinkAction.OpenSettingsScreen(Routes.STORAGE)
             "mount-external", "mount_external", "mounts", "mounted-folders", "mounted_folders" ->
                 DeepLinkAction.OpenSettingsScreen(Routes.MOUNTED_FOLDERS)

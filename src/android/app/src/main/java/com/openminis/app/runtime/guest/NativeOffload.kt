@@ -4,6 +4,8 @@ import android.util.Log
 import com.openminis.app.runtime.ubuntu.UbuntuPaths
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import com.openminis.app.tools.ToolExecutionResult
+import com.openminis.app.tools.ToolFailureKind
 
 /**
  * Registry of the Android-side command handlers behind the guest CLIs (`android-*`, `minis-*`).
@@ -36,7 +38,21 @@ data class NativeOffloadRequest(
 data class NativeOffloadResult(
     val exitCode: Int,
     val output: String,
-)
+    val failureKind: ToolFailureKind? = null,
+    val executionStarted: Boolean? = null,
+) {
+    fun toToolExecutionResult(): ToolExecutionResult = ToolExecutionResult(
+        output.trimEnd(), exitCode == 0, failureKind = failureKind, executionStarted = executionStarted,
+    ).classifiedAfterExecution()
+
+    companion object {
+        fun invalidArguments(output: String): NativeOffloadResult =
+            NativeOffloadResult(2, output, ToolFailureKind.INVALID_ARGUMENTS, false)
+
+        fun permissionDenied(output: String, exitCode: Int = 77): NativeOffloadResult =
+            NativeOffloadResult(exitCode, output, ToolFailureKind.PERMISSION_DENIED, false)
+    }
+}
 
 fun interface NativeOffloadHandler {
     fun handle(request: NativeOffloadRequest): NativeOffloadResult
@@ -47,6 +63,31 @@ object NativeOffloadServer {
     private const val LEGACY_REPLY_PREFIX = ".native-offload-"
 
     private val handlers = ConcurrentHashMap<String, NativeOffloadHandler>()
+
+    class ShellOutcome(val executionId: String, val sessionId: String? = null) {
+        @Volatile var unknownKind: ToolFailureKind? = null
+            private set
+        fun observe(result: NativeOffloadResult) {
+            result.failureKind?.takeIf { it.outcomeUnknown }?.let { unknownKind = it }
+        }
+    }
+    private val shellOutcomes = ConcurrentHashMap<String, ShellOutcome>()
+    private class NativeExecution(val sessionId: String?, val count: java.util.concurrent.atomic.AtomicInteger = java.util.concurrent.atomic.AtomicInteger())
+    private val nativeExecutions = ConcurrentHashMap<String, NativeExecution>()
+    fun beginShell(sessionId: String, executionId: String): ShellOutcome = ShellOutcome(executionId, sessionId).also {
+        check(shellOutcomes.putIfAbsent(sessionId, it) == null) { "shell_execution_already_owned" }
+    }
+    fun currentShell(sessionId: String?): ShellOutcome? = sessionId?.let(shellOutcomes::get)
+    fun endShell(sessionId: String, outcome: ShellOutcome) { shellOutcomes.remove(sessionId, outcome) }
+    fun beginNative(outcome: ShellOutcome?) { if (outcome != null) nativeExecutions.compute(outcome.executionId) { _, count ->
+        (count ?: NativeExecution(outcome.sessionId)).also { it.count.incrementAndGet() }
+    } }
+    fun endNative(outcome: ShellOutcome?) { if (outcome != null) nativeExecutions.computeIfPresent(outcome.executionId) { _, count ->
+        if (count.count.decrementAndGet() == 0) null else count
+    } }
+    fun nativeInFlight(executionId: String): Boolean = nativeExecutions[executionId]?.count?.get()?.let { it > 0 } == true
+
+    fun nativeInFlightForSession(sessionId: String): Boolean = nativeExecutions.values.any { it.sessionId == sessionId && it.count.get() > 0 }
 
     val registeredHandlers: Set<String> get() = handlers.keys.toSet()
 

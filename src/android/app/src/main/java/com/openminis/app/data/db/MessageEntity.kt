@@ -16,7 +16,8 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         )
     ],
-    indices = [Index(value = ["session_id", "sort_order"])]
+    indices = [Index(value = ["session_id", "sort_order"]),
+        Index(value = ["session_id", "request_state", "sort_order"], name = "index_messages_session_request_order")]
 )
 data class MessageEntity(
     @PrimaryKey val id: String,
@@ -43,4 +44,12 @@ data class MessageEntity(
     @ColumnInfo(name = "model_display_name") val modelDisplayName: String? = null,
     @ColumnInfo(name = "provider_type") val providerType: String? = null,
     @ColumnInfo(name = "provider_instance_id") val providerInstanceId: String? = null,
-)
+    @ColumnInfo(name = "request_state") val requestState: String? = null,
+    @ColumnInfo(name = "request_delivery") val requestDelivery: String? = null,
+    @ColumnInfo(name = "request_task_id") val requestTaskId: String? = null,
+    @ColumnInfo(name = "request_task_generation") val requestTaskGeneration: Int? = null,
+    @ColumnInfo(name = "request_run_id") val requestRunId: String? = null,
+    @ColumnInfo(name = "request_user_input") val requestUserInput: Boolean? = null,
+) {
+    val isConversationMessage: Boolean get() = requestState == null || requestRunId != null
+}

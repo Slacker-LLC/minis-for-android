@@ -54,7 +54,7 @@ import androidx.compose.ui.unit.dp
 import android.widget.Toast
 import com.openminis.app.R
 import com.openminis.app.pet.PetControlActivity
-import com.openminis.app.tools.SubagentLimits
+import com.openminis.app.tools.RalphLimits
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.components.openExternalUrl
 import com.openminis.app.ui.glass.GlassSheetWindowBlur
@@ -162,7 +162,7 @@ fun SettingsCategoryScreen(
     val context = LocalContext.current
     // The UI language, which follows the in-app language setting: it picks the Chinese or English policy.
     val uiLanguage = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language
-    var showSubagentLimits by remember { mutableStateOf(false) }
+    var showRalphLimits by remember { mutableStateOf(false) }
     var showFeedbackSheet by remember { mutableStateOf(false) }
     var autoCompactState by remember { mutableStateOf(com.openminis.app.data.AutoCompactPrefs.isEnabled()) }
 
@@ -302,13 +302,12 @@ fun SettingsCategoryScreen(
                     SettingsRow(
                         icon = Icons.Outlined.AccountTree,
                         iconColor = Color(0xFFFF3B30),
-                        title = stringResource(R.string.settings_subagent_limits),
+                        title = stringResource(R.string.settings_ralph_limit),
                         subtitle = stringResource(
-                            R.string.settings_subagent_limits_subtitle,
-                            SubagentLimits.maxDepth(context),
-                            SubagentLimits.timeoutMs(context) / 60_000L,
+                            R.string.settings_ralph_limit_subtitle,
+                            RalphLimits.timeoutMs(context) / 60_000L,
                         ),
-                        onClick = { showSubagentLimits = true },
+                        onClick = { showRalphLimits = true },
                         showDivider = false,
                     )
                 }
@@ -443,15 +442,14 @@ fun SettingsCategoryScreen(
         )
     }
 
-    if (showSubagentLimits) {
-        SubagentLimitsDialog(
-            initialDepth = SubagentLimits.maxDepth(context),
-            initialTimeoutMinutes = SubagentLimits.timeoutMs(context) / 60_000L,
-            onSave = { depth, timeoutMinutes ->
-                SubagentLimits.save(context, depth, timeoutMinutes)
-                showSubagentLimits = false
+    if (showRalphLimits) {
+        RalphLimitsDialog(
+            initialTimeoutMinutes = RalphLimits.timeoutMs(context) / 60_000L,
+            onSave = { timeoutMinutes ->
+                RalphLimits.save(context, timeoutMinutes)
+                showRalphLimits = false
             },
-            onDismiss = { showSubagentLimits = false },
+            onDismiss = { showRalphLimits = false },
         )
     }
 }

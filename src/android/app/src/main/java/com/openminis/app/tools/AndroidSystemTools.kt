@@ -50,11 +50,14 @@ object AndroidSystemOps {
                 sessionId = sessionId,
             ),
         )
-        ToolExecutionResult(result.output.trimEnd(), result.exitCode == 0)
+        result.toToolExecutionResult()
     }
 
+    private fun invalidArguments(message: String) =
+        ToolExecutionResult(message, false, failureKind = ToolFailureKind.INVALID_ARGUMENTS, executionStarted = false)
+
     private fun MutableList<String>.option(name: String, value: String?) {
-        if (!value.isNullOrBlank()) {
+        if (value != null) {
             add("--$name")
             add(value)
         }
@@ -151,7 +154,7 @@ object AndroidSystemOps {
         titleFilter: String?,
     ): ToolExecutionResult {
         if ((start == null) != (end == null)) {
-            return ToolExecutionResult("Error: start_date and end_date must be supplied together", false)
+            return invalidArguments("Error: start_date and end_date must be supplied together")
         }
         val argv = mutableListOf("android-calendar", "list")
         argv.option("start", start)
@@ -171,12 +174,18 @@ object AndroidSystemOps {
         description: String?,
         location: String?,
         allDay: Boolean,
+        calendarName: String? = null,
+        calendarId: Long? = null,
+        reminderMinutes: Int? = null,
     ): ToolExecutionResult {
-        if (title.isBlank() || start.isBlank()) return ToolExecutionResult("Error: title and start_time are required", false)
+        if (title.isBlank() || start.isBlank()) return invalidArguments("Error: title and start_time are required")
         val argv = mutableListOf("android-calendar", "create", "--title", title, "--start", start)
         argv.option("end", end)
         argv.option("description", description)
         argv.option("location", location)
+        argv.option("calendar", calendarName)
+        calendarId?.let { argv += listOf("--calendar-id", it.toString()) }
+        reminderMinutes?.let { argv += listOf("--alarm", it.coerceAtLeast(0).toString()) }
         if (allDay) argv += "--all-day"
         return offload(context, sessionId, CalendarOffloadHandler(context), argv)
     }
@@ -191,9 +200,13 @@ object AndroidSystemOps {
         description: String?,
         location: String?,
         reminderMinutes: Int?,
+        calendarName: String? = null,
+        calendarId: Long? = null,
     ): ToolExecutionResult {
-        if (eventId <= 0) return ToolExecutionResult("Error: event_id is required", false)
+        if (eventId <= 0) return invalidArguments("Error: event_id is required")
         val argv = mutableListOf("android-calendar", "update", "--id", eventId.toString())
+        argv.option("calendar", calendarName)
+        calendarId?.let { argv += listOf("--calendar-id", it.toString()) }
         argv.option("title", title)
         argv.option("start", start)
         argv.option("end", end)
@@ -204,7 +217,7 @@ object AndroidSystemOps {
     }
 
     suspend fun calendarDelete(context: Context, sessionId: String, eventId: Long): ToolExecutionResult {
-        if (eventId <= 0) return ToolExecutionResult("Error: event_id is required; read events first", false)
+        if (eventId <= 0) return invalidArguments("Error: event_id is required; read events first")
         return offload(
             context, sessionId, CalendarOffloadHandler(context),
             listOf("android-calendar", "delete", "--id", eventId.toString()),
@@ -212,7 +225,7 @@ object AndroidSystemOps {
     }
 
     suspend fun contactsSearch(context: Context, sessionId: String, query: String, limit: Int): ToolExecutionResult {
-        if (query.isBlank()) return ToolExecutionResult("Error: query is required", false)
+        if (query.isBlank()) return invalidArguments("Error: query is required")
         return offload(
             context, sessionId, ContactsOffloadHandler(context),
             listOf("android-contacts", "search", query, "--max", limit.coerceIn(1, 100).toString()),
@@ -231,24 +244,24 @@ object AndroidSystemOps {
         val argv = mutableListOf("android-contacts", action)
         when (action) {
             "create" -> {
-                if (name.isNullOrBlank()) return ToolExecutionResult("Error: name is required for create", false)
+                if (name.isNullOrBlank()) return invalidArguments("Error: name is required for create")
                 argv.option("name", name)
                 argv.option("phone", phone)
                 argv.option("email", email)
             }
             "update" -> {
-                if (contactId == null || contactId <= 0) return ToolExecutionResult("Error: contact_id is required for update", false)
-                if (name == null && phone == null && email == null) return ToolExecutionResult("Error: supply name, phone, or email", false)
+                if (contactId == null || contactId <= 0) return invalidArguments("Error: contact_id is required for update")
+                if (name == null && phone == null && email == null) return invalidArguments("Error: supply name, phone, or email")
                 argv += listOf("--id", contactId.toString())
                 argv.option("name", name)
                 argv.option("phone", phone)
                 argv.option("email", email)
             }
             "delete" -> {
-                if (contactId == null || contactId <= 0) return ToolExecutionResult("Error: contact_id is required for delete", false)
+                if (contactId == null || contactId <= 0) return invalidArguments("Error: contact_id is required for delete")
                 argv += contactId.toString()
             }
-            else -> return ToolExecutionResult("Error: invalid action: $action", false)
+            else -> return invalidArguments("Error: invalid action: $action")
         }
         return offload(context, sessionId, ContactsOffloadHandler(context), argv)
     }
@@ -264,10 +277,10 @@ object AndroidSystemOps {
             // bounded, so a copied document does not become the model's context.
             "read" -> listOf("android-clipboard", "get", "--json")
             "write" -> {
-                if (content.isNullOrEmpty()) return ToolExecutionResult("Error: content is required for write", false)
+                if (content.isNullOrEmpty()) return invalidArguments("Error: content is required for write")
                 listOf("android-clipboard", "set", "--text", content)
             }
-            else -> return ToolExecutionResult("Error: invalid action: $action", false)
+            else -> return invalidArguments("Error: invalid action: $action")
         }
         return offload(context, sessionId, ClipboardOffloadHandler(context), argv)
     }
@@ -357,6 +370,7 @@ object AndroidSystemOps {
 
 abstract class AndroidSystemHandler : ToolHandler {
     protected fun args(raw: String): JSONObject = runCatching { JSONObject(raw) }.getOrElse { JSONObject() }
+    protected fun JSONObject.optionalString(key: String): String? = if (has(key)) getString(key) else null
 }
 
 class AndroidWebSearchHandler : AndroidSystemHandler() {
@@ -415,11 +429,19 @@ class AndroidCalendarCreateHandler : AndroidSystemHandler() {
             "title" to AgentToolParam("string", "Event title"), "start_time" to AgentToolParam("string", "Start (ISO)"),
             "end_time" to AgentToolParam("string", "Optional end (ISO)"), "description" to AgentToolParam("string", "Optional notes"),
             "location" to AgentToolParam("string", "Optional location"), "all_day" to AgentToolParam("boolean", "All-day event"),
+            "calendar_name" to AgentToolParam("string", "Target writable calendar name"),
+            "calendar_id" to AgentToolParam("integer", "Target writable calendar ID (takes precedence over name)"),
+            "reminder_minutes" to AgentToolParam("integer", "Minutes before event"),
         ), required = listOf("title", "start_time"),
     )
     override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult {
         val a = args(argsJson)
-        return AndroidSystemOps.calendarCreate(context, sessionId, a.optString("title"), a.optString("start_time"), a.optString("end_time").ifBlank { null }, a.optString("description").ifBlank { null }, a.optString("location").ifBlank { null }, a.optBoolean("all_day"))
+        return AndroidSystemOps.calendarCreate(
+            context, sessionId, a.optString("title"), a.optString("start_time"),
+            a.optionalString("end_time"), a.optionalString("description"), a.optionalString("location"), a.optBoolean("all_day"),
+            a.optionalString("calendar_name"), if (a.has("calendar_id")) a.getLong("calendar_id") else null,
+            if (a.has("reminder_minutes")) a.getInt("reminder_minutes") else null,
+        )
     }
 }
 
@@ -429,13 +451,20 @@ class AndroidCalendarUpdateHandler : AndroidSystemHandler() {
         parameters = mapOf(
             "event_id" to AgentToolParam("integer", "Event ID"), "title" to AgentToolParam("string", "New title"),
             "start_time" to AgentToolParam("string", "New start (ISO)"), "end_time" to AgentToolParam("string", "New end (ISO)"),
-            "description" to AgentToolParam("string", "New notes"), "location" to AgentToolParam("string", "New location"),
+            "description" to AgentToolParam("string", "New notes; empty string clears the field"), "location" to AgentToolParam("string", "New location; empty string clears the field"),
+            "calendar_name" to AgentToolParam("string", "Move to writable calendar name"),
+            "calendar_id" to AgentToolParam("integer", "Move to writable calendar ID (takes precedence over name)"),
             "reminder_minutes" to AgentToolParam("integer", "Minutes before event"),
         ), required = listOf("event_id"),
     )
     override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult {
         val a = args(argsJson)
-        return AndroidSystemOps.calendarUpdate(context, sessionId, a.optLong("event_id", -1), a.optString("title").ifBlank { null }, a.optString("start_time").ifBlank { null }, a.optString("end_time").ifBlank { null }, a.optString("description").ifBlank { null }, a.optString("location").ifBlank { null }, if (a.has("reminder_minutes")) a.optInt("reminder_minutes") else null)
+        return AndroidSystemOps.calendarUpdate(
+            context, sessionId, a.optLong("event_id", -1), a.optionalString("title"),
+            a.optionalString("start_time"), a.optionalString("end_time"), a.optionalString("description"), a.optionalString("location"),
+            if (a.has("reminder_minutes")) a.getInt("reminder_minutes") else null,
+            a.optionalString("calendar_name"), if (a.has("calendar_id")) a.getLong("calendar_id") else null,
+        )
     }
 }
 
@@ -470,7 +499,7 @@ class AndroidContactsManageHandler : AndroidSystemHandler() {
     )
     override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult {
         val a = args(argsJson)
-        return AndroidSystemOps.contactsManage(context, sessionId, a.optString("action"), if (a.has("contact_id")) a.optLong("contact_id") else null, a.optString("name").ifBlank { null }, a.optString("phone").ifBlank { null }, a.optString("email").ifBlank { null })
+        return AndroidSystemOps.contactsManage(context, sessionId, a.optString("action"), if (a.has("contact_id")) a.optLong("contact_id") else null, a.optionalString("name"), a.optionalString("phone"), a.optionalString("email"))
     }
 }
 

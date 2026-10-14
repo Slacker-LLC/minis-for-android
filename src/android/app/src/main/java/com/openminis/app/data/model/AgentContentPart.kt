@@ -34,13 +34,20 @@ sealed class AgentContentPart {
          * placeholder when the bytes are elided.
          */
         val imageLinuxPath: String? = null,
+        val executionIntentId: String? = null,
+        val executionRunId: String? = null,
+        val executionTaskId: String? = null,
+        val failureKind: com.openminis.app.tools.ToolFailureKind? = null,
+        val executionStarted: Boolean? = null,
     ) : AgentContentPart() {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (other !is ToolResult) return false
             return id == other.id && name == other.name && content == other.content &&
                 isError == other.isError && imageData.contentEquals(other.imageData) &&
-                imageMimeType == other.imageMimeType && imageLinuxPath == other.imageLinuxPath
+                imageMimeType == other.imageMimeType && imageLinuxPath == other.imageLinuxPath &&
+                executionIntentId == other.executionIntentId && executionRunId == other.executionRunId && executionTaskId == other.executionTaskId &&
+                failureKind == other.failureKind && executionStarted == other.executionStarted
         }
 
         override fun hashCode(): Int {
@@ -51,6 +58,11 @@ sealed class AgentContentPart {
             result = 31 * result + (imageData?.contentHashCode() ?: 0)
             result = 31 * result + (imageMimeType?.hashCode() ?: 0)
             result = 31 * result + (imageLinuxPath?.hashCode() ?: 0)
+            result = 31 * result + (executionIntentId?.hashCode() ?: 0)
+            result = 31 * result + (executionRunId?.hashCode() ?: 0)
+            result = 31 * result + (executionTaskId?.hashCode() ?: 0)
+            result = 31 * result + (failureKind?.hashCode() ?: 0)
+            result = 31 * result + (executionStarted?.hashCode() ?: 0)
             return result
         }
     }

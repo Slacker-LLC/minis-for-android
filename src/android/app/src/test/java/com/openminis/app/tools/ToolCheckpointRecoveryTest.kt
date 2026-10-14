@@ -12,7 +12,7 @@ class ToolCheckpointRecoveryTest {
         val file = temp.newFile("atomic.jsonl")
         file.writeText("old snapshot")
         val content = """{"callId":"1","state":"done"}""" + "\n" +
-            """{"callId":"2","state":"pending","tool":"write"}"""
+            """{"callId":"2","state":"pending","tool":"write","args":"{}","at":1}"""
         ToolCheckpointStore.replaceAtomically(file, content)
         assertEquals(content, file.readText())
         assertEquals(listOf("2"), ToolCheckpointStore.readPending(file).map { it.callId })
@@ -33,7 +33,7 @@ class ToolCheckpointRecoveryTest {
     @Test fun `durable completion is not reported as unknown`() {
         val file = temp.newFile("done.jsonl")
         file.writeText("""{"callId":"1","state":"done"}""" + "\n" +
-            """{"callId":"2","state":"pending","tool":"write"}""")
+            """{"callId":"2","state":"pending","tool":"write","args":"{}","at":1}""")
         assertEquals(listOf("2"), ToolCheckpointStore.readPending(file).map { it.callId })
     }
 
@@ -49,14 +49,24 @@ class ToolCheckpointRecoveryTest {
         assertEquals(listOf("c1", "c2", "c3"), ToolCheckpointStore.readPending(file).map { it.callId })
     }
 
-    @Test fun `settled calls are removed so the file holds only calls in flight`() {
+    @Test fun `a reusable call id cannot clear an identified execution`() {
         val file = temp.newFile("settle.jsonl")
         (1..5).forEach { ToolCheckpointStore.recordIntentTo(file, "c$it", "linux.shell", "{}") }
         file.appendText("""{"callId":"old","state":"done"}""" + "\n")
+        // settle() by call id only touches legacy rows: a provider call id is reusable,
+        // so an identified intent is cleared through acknowledge(intentIds) instead.
         ToolCheckpointStore.settle(file, setOf("c1", "c2", "c4"))
-        assertEquals(listOf("c3", "c5"), ToolCheckpointStore.readPending(file).map { it.callId })
-        assertEquals("old done rows are pruned too", 2, file.readLines().count { it.isNotBlank() })
-        ToolCheckpointStore.settle(file, setOf("c3", "c5"))
-        assertFalse("nothing in flight leaves no file", file.exists())
+        assertEquals((1..5).map { "c$it" }, ToolCheckpointStore.readPending(file).map { it.callId })
+        assertEquals("done rows are pruned", 5, file.readLines().count { it.isNotBlank() })
+
+        val legacy = temp.newFile("legacy.jsonl")
+        legacy.writeText(
+            """{"callId":"l1","state":"pending","tool":"write","args":"{}","at":1}""" + "\n" +
+                """{"callId":"l2","state":"pending","tool":"write","args":"{}","at":1}""",
+        )
+        ToolCheckpointStore.settle(legacy, setOf("l1"))
+        assertEquals(listOf("l2"), ToolCheckpointStore.readPending(legacy).map { it.callId })
+        ToolCheckpointStore.settle(legacy, setOf("l2"))
+        assertFalse("nothing in flight leaves no file", legacy.exists())
     }
 }

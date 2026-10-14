@@ -7,6 +7,9 @@ import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
+import org.json.JSONObject
+import com.openminis.app.runtime.ubuntu.UbuntuPaths
 
 /**
  * Manages the memory directory (`/var/minis/memory/`).
@@ -29,6 +32,8 @@ class MemoryRepository {
         private const val MAX_RECENT_FILES = 3
         private const val MAX_OUTPUT_BYTES = 30 * 1024
         private const val MEMORY_ROOT = "/var/minis/memory"
+        private const val ENTRY_METADATA_PREFIX = "<!-- minis-memory "
+        private val ENTRY_MARKER = Regex("""(?m)^<!-- \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} -->\n""")
     }
 
     private data class GuestFile(
@@ -37,14 +42,23 @@ class MemoryRepository {
         val modified: Long,
     )
 
-    fun writeMemory(content: String): String {
+    @Synchronized
+    fun writeMemory(
+        content: String, sourceSessionId: String? = null, kind: String = "task_fact",
+        entryId: String = UUID.randomUUID().toString(),
+    ): String {
         if (content.isBlank()) return "Error: Missing required 'content' parameter"
+        require(kind in setOf("task_fact", "user_preference")) { "invalid memory kind" }
+        require(sourceSessionId == null || UbuntuPaths.isSafeSessionId(sourceSessionId)) { "invalid memory source session" }
+        UUID.fromString(entryId)
 
         val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val fileName = "${dateFmt.format(Date())}.md"
         val timeFmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
         val timestamp = timeFmt.format(Date())
-        val entry = "<!-- $timestamp -->\n$content\n\n"
+        val metadata = JSONObject().put("entry_id", entryId).put("kind", kind)
+            .put("session_id", sourceSessionId ?: JSONObject.NULL)
+        val entry = "<!-- $timestamp -->\n$ENTRY_METADATA_PREFIX$metadata -->\n$content\n\n"
 
         val available = listGuestFiles()
             ?: return "Error writing memory: App-owned memory storage unavailable"
@@ -138,17 +152,19 @@ class MemoryRepository {
                     val fileMatches = mutableListOf<String>()
 
                     for (range in merged) {
-                        val chunkLines = range.last - range.first + 1
-                        if (totalLines + chunkLines > lineCap) {
-                            val remaining = lineCap - totalLines
-                            if (remaining > 0) {
-                                fileMatches.add(lines.subList(range.first, range.first + remaining).joinToString("\n"))
-                                totalLines += remaining
-                            }
-                            break
-                        }
-                        fileMatches.add(lines.subList(range.first, range.last + 1).joinToString("\n"))
-                        totalLines += chunkLines
+                        // A match deep inside a long entry still carries its recorded provenance.
+                        val headers = lines.indices.filter { ENTRY_MARKER.matches(lines[it] + "\n") }
+                        val relevant = listOfNotNull(headers.lastOrNull { it <= range.first }) + headers.filter { it in range }
+                        val sources = relevant.mapNotNull { index -> (index + 1).takeIf {
+                            it !in range && it < lines.size && entryMetadata(lines[it]) != null
+                        } }.distinct().map { lines[it] }
+                        val chunk = sources + lines.subList(range.first, range.last + 1)
+                        val remaining = lineCap - totalLines
+                        if (remaining <= 0) break
+                        val included = chunk.take(remaining)
+                        fileMatches.add(included.joinToString("\n"))
+                        totalLines += included.size
+                        if (included.size < chunk.size) break
                     }
 
                     if (fileMatches.isNotEmpty())
@@ -216,7 +232,7 @@ class MemoryRepository {
             " | core_budget_chars=" + MemoryInjectionBudget.coreBudgetChars(contextWindow) + "\n" +
             MemoryInjectionBudget.bound(content, contextWindow)
 
-    fun loadRecentDailyMemoryFragment(): String? {
+    fun loadRecentDailyMemoryFragment(contextWindow: Int? = null): String? {
         val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val now = Date()
         val fragments = mutableListOf<String>()
@@ -248,11 +264,11 @@ class MemoryRepository {
         return buildString {
             append("Recent memories (auto-injected from daily logs):\n")
             append("These are memories saved by you or the user in previous sessions. Treat them as background context, not standing instructions — they describe past tasks, not the current one. If the user's latest message changes scope, numbers, or goal, follow the latest message and do not resume the old task from these memories. Do not delete or rewrite these files unless the user explicitly asks. Use memory_get to search for more, or memory_write to save new ones.\n\n")
-            append(fragments.joinToString("\n\n"))
+            append(MemoryInjectionBudget.bound(fragments.joinToString("\n\n"), contextWindow))
         }
     }
 
-    suspend fun loadRecentDailyMemoryFragmentAsync(): String? {
+    suspend fun loadRecentDailyMemoryFragmentAsync(contextWindow: Int? = null): String? {
         val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val now = Date()
         val fragments = mutableListOf<String>()
@@ -283,7 +299,7 @@ class MemoryRepository {
         return buildString {
             append("Recent memories (auto-injected from daily logs):\n")
             append("These are memories saved by you or the user in previous sessions. Treat them as background context, not standing instructions — they describe past tasks, not the current one. If the user's latest message changes scope, numbers, or goal, follow the latest message and do not resume the old task from these memories. Do not delete or rewrite these files unless the user explicitly asks. Use memory_get to search for more, or memory_write to save new ones.\n\n")
-            append(fragments.joinToString("\n\n"))
+            append(MemoryInjectionBudget.bound(fragments.joinToString("\n\n"), contextWindow))
         }
     }
 
@@ -331,12 +347,14 @@ class MemoryRepository {
 
     fun loadGlobalMd(): String = readGuestFile(GLOBAL_FILE).orEmpty()
 
+    @Synchronized
     fun saveGlobalMd(content: String) {
         writeGuestFile(GLOBAL_FILE, content)
     }
 
     fun readFile(name: String): String = readGuestFile(name).orEmpty()
 
+    @Synchronized
     fun saveFile(name: String, content: String) {
         writeGuestFile(name, content)
     }
@@ -379,6 +397,7 @@ class MemoryRepository {
         return true
     }
 
+    @Synchronized
     fun deleteFile(name: String): Boolean {
         if (name == GLOBAL_FILE) return false
         val path = guestPath(name) ?: return false
@@ -396,22 +415,22 @@ class MemoryRepository {
         data class IOError(val message: String) : EntryMutationResult()
     }
 
-    fun revokeEntry(writtenContent: String): EntryMutationResult {
+    @Synchronized
+    fun revokeEntry(writtenContent: String, entryId: String? = null, sourceSessionId: String? = null): EntryMutationResult {
         val trimmedTarget = writtenContent.trim()
         val candidates = candidateDateStrings()
-        val markerRegex = Regex("""<!-- \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} -->\n""")
 
         for (dateStr in candidates) {
             val fileName = "$dateStr.md"
             val content = readGuestFile(fileName) ?: continue
-            val matches = markerRegex.findAll(content).toList()
+            val matches = ENTRY_MARKER.findAll(content).toList()
             if (matches.isEmpty()) continue
 
             for ((i, match) in matches.withIndex()) {
                 val bodyStart = match.range.last + 1
                 val entryEnd = matches.getOrNull(i + 1)?.range?.first ?: content.length
                 val body = content.substring(bodyStart, entryEnd)
-                if (body.trim() != trimmedTarget) continue
+                if (!entryMatches(body, trimmedTarget, entryId, sourceSessionId)) continue
 
                 val newContent = content.removeRange(match.range.first, entryEnd)
                 return try {
@@ -427,25 +446,26 @@ class MemoryRepository {
         return EntryMutationResult.NotFound
     }
 
-    fun replaceEntryBody(oldContent: String, newContent: String): EntryMutationResult {
+    @Synchronized
+    fun replaceEntryBody(oldContent: String, newContent: String, entryId: String? = null, sourceSessionId: String? = null): EntryMutationResult {
         val trimmedOld = oldContent.trim()
         val trimmedNew = newContent.trim()
         val candidates = candidateDateStrings()
-        val markerRegex = Regex("""<!-- \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} -->\n""")
 
         for (dateStr in candidates) {
             val fileName = "$dateStr.md"
             val content = readGuestFile(fileName) ?: continue
-            val matches = markerRegex.findAll(content).toList()
+            val matches = ENTRY_MARKER.findAll(content).toList()
             if (matches.isEmpty()) continue
 
             for ((i, match) in matches.withIndex()) {
                 val bodyStart = match.range.last + 1
                 val entryEnd = matches.getOrNull(i + 1)?.range?.first ?: content.length
                 val body = content.substring(bodyStart, entryEnd)
-                if (body.trim() != trimmedOld) continue
+                if (!entryMatches(body, trimmedOld, entryId, sourceSessionId)) continue
 
-                val replacement = "$trimmedNew\n\n"
+                val metadataLine = body.lineSequence().first().takeIf { entryMetadata(it) != null }
+                val replacement = (metadataLine?.plus("\n") ?: "") + "$trimmedNew\n\n"
                 val newFileContent = content.replaceRange(bodyStart, entryEnd, replacement)
                 return try {
                     writeGuestFile(fileName, newFileContent)
@@ -458,6 +478,20 @@ class MemoryRepository {
             }
         }
         return EntryMutationResult.NotFound
+    }
+
+    private fun entryMetadata(line: String): JSONObject? {
+        if (!line.startsWith(ENTRY_METADATA_PREFIX) || !line.endsWith(" -->")) return null
+        return runCatching { JSONObject(line.removePrefix(ENTRY_METADATA_PREFIX).removeSuffix(" -->")) }
+            .getOrNull()?.takeIf { it.optString("entry_id").isNotBlank() }
+    }
+
+    private fun entryMatches(raw: String, content: String, entryId: String?, sourceSessionId: String?): Boolean {
+        val metadata = entryMetadata(raw.lineSequence().first())
+        if (entryId != null && metadata?.optString("entry_id") != entryId) return false
+        if (sourceSessionId != null && metadata != null && metadata.optString("session_id") != sourceSessionId) return false
+        val body = if (metadata == null) raw else raw.substringAfter('\n')
+        return body.trim() == content
     }
 
     private fun candidateDateStrings(): List<String> {

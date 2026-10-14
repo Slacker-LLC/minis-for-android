@@ -78,7 +78,8 @@ interface ChatDao {
     @Query(
         "SELECT s.id FROM sessions s WHERE s.title IS NULL AND s.folder_id IS NULL AND s.bot_id IS NULL " +
             "AND s.source IS NULL AND s.pinned_at IS NULL AND s.created_at < :olderThan " +
-            "AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id)",
+            "AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id) " +
+            "AND NOT EXISTS (SELECT 1 FROM bot_tasks t WHERE t.goal_session_id = s.id)",
     )
     suspend fun emptyUntitledSessionIds(olderThan: Long): List<String>
 
@@ -90,9 +91,20 @@ interface ChatDao {
     @Query(
         "DELETE FROM sessions WHERE id = :id AND title IS NULL AND folder_id IS NULL AND bot_id IS NULL " +
             "AND source IS NULL AND pinned_at IS NULL " +
-            "AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.session_id = :id)",
+            "AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.session_id = :id) " +
+            "AND NOT EXISTS (SELECT 1 FROM bot_tasks t WHERE t.goal_session_id = :id)",
     )
     suspend fun deleteSessionIfUnusedDraft(id: String): Int
+
+    @Query("SELECT EXISTS (SELECT 1 FROM bot_tasks WHERE goal_session_id = :id)")
+    suspend fun hasSessionGoal(id: String): Boolean
+
+    @androidx.room.Transaction
+    suspend fun clearConversation(id: String) {
+        deleteMessages(id)
+        deleteCompactMarkers(id)
+    }
+
 
     @Query("SELECT * FROM sessions WHERE id = :id")
     suspend fun getSession(id: String): ChatSessionEntity?
@@ -176,7 +188,18 @@ interface ChatDao {
     suspend fun updateSessionBot(id: String, botId: String?, updatedAt: Long = System.currentTimeMillis())
 
     @Query("DELETE FROM sessions WHERE id = :id")
-    suspend fun deleteSession(id: String)
+    suspend fun deleteSessionRow(id: String)
+
+    @Query("UPDATE bot_tasks SET goal_session_id = NULL, status = CASE WHEN status IN ('COMPLETED', 'CANCELLED', 'FAILED', 'BUDGET_EXHAUSTED') " +
+        "THEN status ELSE 'CANCELLED' END, " +
+        "stop_generation = stop_generation + 1, updated_at = :now WHERE goal_session_id = :id")
+    suspend fun detachDeletedSessionGoal(id: String, now: Long)
+
+    @androidx.room.Transaction
+    suspend fun deleteSession(id: String) {
+        detachDeletedSessionGoal(id, System.currentTimeMillis())
+        deleteSessionRow(id)
+    }
 
     // ─── Bounded append-only session event log ────────────────────────────
 
@@ -297,6 +320,37 @@ interface ChatDao {
     @Query("SELECT * FROM messages WHERE id = :id")
     suspend fun getMessageById(id: String): MessageEntity?
 
+    @Query("SELECT * FROM messages WHERE session_id = :sessionId AND request_state IN ('PENDING', 'NEEDS_REVIEW') AND request_run_id IS NULL ORDER BY sort_order")
+    suspend fun pendingRequests(sessionId: String): List<MessageEntity>
+
+    @Query("UPDATE messages SET request_state = 'RUNNING', request_run_id = :runId, request_task_id = :taskId, " +
+        "sort_order = CASE WHEN request_delivery = 'START' THEN sort_order ELSE (SELECT COALESCE(MAX(m.sort_order), -1) + 1 FROM messages m WHERE m.session_id = :sessionId) END " +
+        "WHERE id = :id AND session_id = :sessionId AND request_state = 'PENDING' AND request_run_id IS NULL " +
+        "AND (:taskId IS NULL OR EXISTS (SELECT 1 FROM bot_tasks t WHERE t.id = :taskId AND t.revision = :revision AND t.stop_generation = :generation AND t.current_owner_session_id = :sessionId)) " +
+        "AND (request_delivery != 'STEER' OR (request_task_id IS :taskId AND request_task_generation IS :generation))")
+    suspend fun claimRequest(sessionId: String, id: String, runId: String, taskId: String?, revision: Int?, generation: Int?): Int
+
+    @Query("UPDATE messages SET request_state = :state WHERE session_id = :sessionId AND request_run_id = :runId AND request_state = 'RUNNING'")
+    suspend fun settleRequests(sessionId: String, runId: String, state: String): Int
+
+    @Query("UPDATE messages SET request_state = 'INTERRUPTED' WHERE session_id = :sessionId AND request_state = 'RUNNING'")
+    suspend fun recoverRequests(sessionId: String): Int
+
+    @Query("UPDATE messages SET request_state = :state WHERE id = :id AND session_id = :sessionId AND request_state IN ('PENDING', 'NEEDS_REVIEW') AND request_run_id IS NULL")
+    suspend fun setPendingRequestState(sessionId: String, id: String, state: String): Int
+
+    @Query("SELECT COUNT(*) FROM messages WHERE session_id = :sessionId AND request_state = 'NEEDS_REVIEW' AND request_run_id IS NULL")
+    fun observeRequestsNeedingReview(sessionId: String): Flow<Int>
+
+    @Query("UPDATE messages SET request_state = 'NEEDS_REVIEW' WHERE session_id = :sessionId AND request_state = 'PENDING' AND request_delivery = 'STEER' AND request_run_id IS NULL")
+    suspend fun reviewSteeringRequests(sessionId: String): Int
+
+    @Query("UPDATE messages SET request_state = 'NEEDS_REVIEW' WHERE session_id = :sessionId AND request_state = 'PENDING' AND request_run_id IS NULL AND (request_user_input IS NOT 1 OR request_delivery != 'QUEUE')")
+    suspend fun reviewRecoveredRequests(sessionId: String): Int
+
+    @Query("UPDATE messages SET request_state = 'PENDING', request_user_input = 1, request_delivery = :delivery, request_task_id = :taskId, request_task_generation = :generation WHERE id = :id AND session_id = :sessionId AND request_state IN ('PENDING', 'NEEDS_REVIEW') AND request_run_id IS NULL")
+    suspend fun authorizePendingRequest(sessionId: String, id: String, delivery: String, taskId: String?, generation: Int?): Int
+
     @Query("SELECT * FROM messages WHERE session_id = :sessionId ORDER BY sort_order ASC")
     fun observeMessages(sessionId: String): Flow<List<MessageEntity>>
 
@@ -339,7 +393,7 @@ interface ChatDao {
     @Query("DELETE FROM messages WHERE id = :id")
     suspend fun deleteMessage(id: String): Int
 
-    @Query("DELETE FROM messages WHERE session_id = :sessionId AND sort_order >= :keepCount")
+    @Query("DELETE FROM messages WHERE session_id = :sessionId AND sort_order >= :keepCount AND (request_state IS NULL OR request_run_id IS NOT NULL OR request_state NOT IN ('PENDING', 'NEEDS_REVIEW'))")
     suspend fun deleteMessagesAfter(sessionId: String, keepCount: Int)
 
     @Query("SELECT COUNT(*) FROM messages")

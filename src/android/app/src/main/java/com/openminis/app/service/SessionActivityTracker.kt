@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Singleton that tracks two independent kinds of "session is alive":
  *
- *  - `activeSessions`: at least one [com.openminis.app.ui.chat.ChatViewModel.streamJob]
+ *  - `activeSessions`: at least one [com.openminis.app.agent.AgentExecution.currentJob]
  *    is in flight (LLM call, tool execution).
  *  - `presentSessions` (T166): the user is sitting on a chat screen
  *    with the composer mounted, regardless of whether a stream is

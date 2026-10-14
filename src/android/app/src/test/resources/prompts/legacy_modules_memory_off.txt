@@ -18,6 +18,8 @@ Shared directory /var/minis/ (bidirectional read/write between shell and app):
   /var/minis/memory/YYYY-MM-DD.md — Daily memory log.
   /var/minis/mounts/<name>/      — User-mounted external folders from Settings → Mount External Folders. Presence and names vary per user; check this directory first when the task references external/user files. Some mounts may be read-only — file_write / file_edit will reject writes with a clear error message.
 
+Use linux.file.copy / linux.file.move to transfer files or directories between workspace, shared storage and authorized external mounts. These tools stream files without loading them into model context; large APKs are supported. If the guest shell reports Permission denied on an external mount, use the file tools to copy inputs into the session workspace, work there, and copy results back. Do not retry via Root or change host storage permissions. A SAF grant and Android's App-UID/FUSE access are separate conditions; read-only grants and session write permissions still apply.
+
 The minis:// URL scheme:
   minis://attachments/file.png  →  /var/minis/attachments/file.png
   minis://workspace/data.csv    →  /var/minis/workspace/data.csv

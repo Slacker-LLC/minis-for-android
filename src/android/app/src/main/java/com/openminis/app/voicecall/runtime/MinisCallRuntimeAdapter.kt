@@ -5,138 +5,163 @@ import com.openminis.app.voicecall.ports.CallModelGateway
 import com.openminis.app.voicecall.ports.CallSpeechInput
 import com.openminis.app.voicecall.ports.CallSpeechOutput
 import com.openminis.app.voicecall.ports.RecognitionError
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 
-/**
- * 生产通话 Runtime：把三个端口（ASR / 模型 / TTS）编排成
- * LISTENING → THINKING → SPEAKING → LISTENING 半双工循环。
- *
- * 阶段 A 只依赖端口接口，测试用 Fake 端口补齐闭环；阶段 B/C 注入
- * SpeechRecognitionManager / PetChatEngine / ReadAloudPlayer 的生产实现。
- * 所有回调都带 generation 校验：挂断/打断后，晚到的 ASR/模型/TTS 回调
- * 不得再修改状态（文档「生命周期：旧回调不能修改新通话的 UI 状态」）。
- */
+/** ASR → 完整 Agent → TTS。每次聆听独立代数，重复/晚到回调不能再提交任务。 */
 class MinisCallRuntimeAdapter(
     private val input: CallSpeechInput,
     private val model: CallModelGateway,
     private val output: CallSpeechOutput,
     private val scope: CoroutineScope,
 ) : CallRuntime {
-
     private val _events = MutableSharedFlow<CallEvent>(extraBufferCapacity = 16)
     override val events: SharedFlow<CallEvent> = _events
-
-    /** 代数：start/stop/interrupt 递增，旧回调以此失效。 */
     private var generation = 0
+    private var active = false
     private var muted = false
+    private var listening = false
+    private var responseJob: Job? = null
 
     override fun start() {
+        stop()
+        active = true
         muted = false
+        _events.tryEmit(CallEvent.MuteChanged(false))
         startListening()
     }
 
+    /** 挂断只结束音频和结果等待；已接受的任务留在原会话执行。 */
     override fun stop() {
+        active = false
         generation++
+        listening = false
         input.cancel()
-        model.cancel()
         output.stop()
-        _events.tryEmit(CallEvent.BloubStateChanged(BloubState.IDLE))
+        responseJob?.cancel()
+        responseJob = null
+        state(BloubState.IDLE)
     }
 
     override fun setMuted(muted: Boolean) {
+        if (!active || this.muted == muted) return
         this.muted = muted
         _events.tryEmit(CallEvent.MuteChanged(muted))
         if (muted) {
-            generation++
-            input.cancel()
+            if (listening) {
+                generation++
+                listening = false
+                input.cancel()
+            }
             output.stop()
-        } else {
+        } else if (responseJob?.isActive != true) {
             startListening()
         }
     }
 
+    /** 用户明确打断：只取消该通话当前发起的回合。 */
     override fun interrupt() {
+        if (!active) return
         generation++
+        listening = false
         input.cancel()
-        model.cancel()
         output.stop()
-        startListening()
+        model.cancel()
+        responseJob?.cancel()
+        responseJob = null
+        if (!muted) startListening()
     }
 
-    /** 文字入口：跳过 ASR，直接跑一轮模型+TTS（调试/演示）。 */
     override fun sendText(text: String) {
-        val gen = generation
-        scope.launch {
-            if (gen != generation) return@launch
-            _events.emit(CallEvent.BloubStateChanged(BloubState.THINKING))
-            _events.emit(CallEvent.SubtitleChanged(text))
-            respond(text, gen)
-        }
+        if (!active || muted || !listening || text.isBlank()) return
+        acceptText(text, generation)
+    }
+
+    override fun listenForFollowUp() {
+        if (!active) return
+        generation++
+        listening = false
+        input.cancel()
+        output.stop()
+        responseJob?.cancel()
+        responseJob = null
+        if (!muted) startListening()
+    }
+
+    private fun state(state: BloubState) {
+        _events.tryEmit(CallEvent.BloubStateChanged(state))
+    }
+
+    private fun subtitle(text: String) {
+        _events.tryEmit(CallEvent.SubtitleChanged(text))
     }
 
     private fun startListening() {
-        val gen = generation
-        _events.tryEmit(CallEvent.BloubStateChanged(BloubState.LISTENING))
-        _events.tryEmit(CallEvent.SubtitleChanged("我在听…"))
+        if (!active || muted) return
+        val gen = ++generation
+        listening = true
+        state(BloubState.LISTENING)
+        subtitle("我在听…")
         input.start(
-            onPartial = { partial ->
-                if (gen == generation) _events.tryEmit(CallEvent.SubtitleChanged(partial))
-            },
-            onFinal = { finalText ->
-                if (gen == generation && !muted) onFinalText(finalText, gen)
-            },
-            onError = { error, message ->
-                if (gen == generation) onError(error, message, gen)
-            },
-        )
-    }
-
-    private fun onFinalText(text: String, gen: Int) {
-        scope.launch {
-            if (gen != generation) return@launch
-            _events.emit(CallEvent.BloubStateChanged(BloubState.THINKING))
-            _events.emit(CallEvent.SubtitleChanged(text))
-            respond(text, gen)
-        }
-    }
-
-    private suspend fun respond(text: String, gen: Int) {
-        val result = model.ask(text)
-        if (gen != generation) return
-        result.fold(
-            onSuccess = { reply ->
-                _events.emit(CallEvent.BloubStateChanged(BloubState.SPEAKING))
-                _events.emit(CallEvent.SubtitleChanged(reply))
-                output.speak(reply)
-                if (gen == generation && !muted) startListening()
-            },
-            onFailure = { e ->
-                _events.emit(CallEvent.BloubStateChanged(BloubState.ERROR))
-                _events.emit(CallEvent.SubtitleChanged("出错了：${e.message ?: "未知错误"}"))
-                delay(900)
-                if (gen == generation) startListening()
-            },
-        )
-    }
-
-    private fun onError(error: RecognitionError, message: String?, gen: Int) {
-        scope.launch {
-            when (error) {
-                RecognitionError.NO_MATCH -> {
-                    _events.emit(CallEvent.BloubStateChanged(BloubState.CONFUSED))
-                    _events.emit(CallEvent.SubtitleChanged("没听清，请再说一遍"))
-                    delay(900)
-                    if (gen == generation && !muted) startListening()
+            onPartial = { partial -> scope.launch {
+                if (valid(gen) && listening) subtitle(partial)
+            } },
+            onFinal = { text -> scope.launch {
+                if (valid(gen) && listening) {
+                    if (text.isBlank()) retryListening(gen) else acceptText(text, gen)
                 }
-                else -> {
-                    _events.emit(CallEvent.BloubStateChanged(BloubState.ERROR))
-                    _events.emit(CallEvent.SubtitleChanged("识别失败：${message ?: error.name}"))
-                    delay(900)
-                    if (gen == generation && !muted) startListening()
+            } },
+            onError = { error, message -> scope.launch {
+                if (!valid(gen) || !listening) return@launch
+                listening = false
+                input.cancel()
+                if (error == RecognitionError.NO_MATCH) {
+                    retryListening(gen)
+                } else {
+                    // 配置/权限/网络错误留在界面，显式重试，避免持续耗电/请求。
+                    state(BloubState.ERROR)
+                    subtitle("识别失败：${message ?: error.name}。请检查语音服务后重试。")
+                }
+            } },
+        )
+    }
+
+    private fun valid(gen: Int) = active && gen == generation
+
+    private suspend fun retryListening(gen: Int) {
+        listening = false
+        input.cancel()
+        delay(400)
+        if (valid(gen) && !muted) startListening()
+    }
+
+    private fun acceptText(text: String, gen: Int) {
+        listening = false
+        input.cancel()
+        responseJob = scope.launch {
+            state(BloubState.THINKING)
+            subtitle(text)
+            try {
+                val result = model.ask(text)
+                if (!valid(gen)) return@launch
+                val reply = result.getOrThrow()
+                subtitle(reply)
+                if (!muted) {
+                    state(BloubState.SPEAKING)
+                    output.speak(reply)
+                }
+                if (valid(gen) && !muted) startListening()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (valid(gen)) {
+                    state(BloubState.ERROR)
+                    subtitle("任务未完成：${error.message ?: "请返回聊天查看"}")
                 }
             }
         }

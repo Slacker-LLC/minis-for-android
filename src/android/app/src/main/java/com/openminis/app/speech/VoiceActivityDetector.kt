@@ -117,6 +117,7 @@ enum class SessionLimit {
 class VoiceActivityDetector(
     private val context: Context,
     private val listener: VoiceActivityListener,
+    private val conversationMode: Boolean = false,
 ) {
 
     companion object {
@@ -345,7 +346,7 @@ class VoiceActivityDetector(
             START_TRUE_RATIO,
             END_FALSE_RATIO,
             START_FRAMES,
-            END_FRAMES,
+            if (conversationMode) 57 else END_FRAMES,
         )
     }
 

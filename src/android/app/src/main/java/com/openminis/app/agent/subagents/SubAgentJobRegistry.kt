@@ -67,6 +67,12 @@ data class SubAgentJob(
     val resumed: Boolean = false,
     /** none | frequent | moderate: how often a background run posts progress into its conversation. */
     val progress: String = "none",
+    val parentRunId: String? = null,
+    val parentTaskId: String? = null,
+    val parentTaskRevision: Int? = null,
+    val parentStopGeneration: Int? = null,
+    val parentExecutionId: String? = null,
+    val outcomeUnknown: Boolean = false,
 ) {
     val isActive: Boolean get() = !state.isTerminal
     fun elapsedMs(now: Long): Long? = startedAtMs?.let { (finishedAtMs ?: now) - it }
@@ -117,6 +123,7 @@ class SubAgentJobRegistry(
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
     private val store: SubAgentJobStore? = null,
 ) {
+    class StorageUnavailable(cause: Exception) : IllegalStateException("subagent_checkpoint_unavailable", cause)
     private val lock = Any()
     private val _jobs = MutableStateFlow<Map<String, SubAgentJob>>(loadStored())
     val jobs: StateFlow<Map<String, SubAgentJob>> = _jobs.asStateFlow()
@@ -136,6 +143,11 @@ class SubAgentJobRegistry(
         thinking: ThinkingLevel? = null,
         brief: String? = null,
         progress: String = "none",
+        parentRunId: String? = null,
+        parentTaskId: String? = null,
+        parentTaskRevision: Int? = null,
+        parentStopGeneration: Int? = null,
+        parentExecutionId: String? = null,
     ): SubAgentAdmission = synchronized(lock) {
         val running = _jobs.value.values.count { it.state == SubAgentJobState.RUNNING }
         val now = clock()
@@ -153,6 +165,8 @@ class SubAgentJobRegistry(
             thinking = thinking,
             brief = brief,
             progress = progress,
+            parentRunId = parentRunId, parentTaskId = parentTaskId, parentTaskRevision = parentTaskRevision,
+            parentStopGeneration = parentStopGeneration, parentExecutionId = parentExecutionId,
             createdAtMs = now,
         )
         when {
@@ -181,12 +195,12 @@ class SubAgentJobRegistry(
      * already finished (the first terminal state wins — a cancelled run that later reports "done"
      * must not flip back).
      */
-    fun finish(jobId: String, state: SubAgentJobState, resultText: String?): SubAgentJob? = synchronized(lock) {
+    fun finish(jobId: String, state: SubAgentJobState, resultText: String?, outcomeUnknown: Boolean = false): SubAgentJob? = synchronized(lock) {
         require(state.isTerminal) { "finish needs a terminal state" }
         val job = _jobs.value[jobId] ?: return@synchronized null
         if (job.state.isTerminal) return@synchronized null
         queue.remove(jobId)
-        val done = job.copy(state = state, finishedAtMs = clock(), resultText = resultText, brief = null)
+        val done = job.copy(state = state, finishedAtMs = clock(), resultText = resultText, brief = null, outcomeUnknown = outcomeUnknown)
         put(done)
         done
     }
@@ -272,8 +286,9 @@ class SubAgentJobRegistry(
                 .take(next.size - MAX_KEPT).map { it.id }.toSet()
             next = next - drop
         }
+        try { store?.save(next.values.sortedBy { j -> j.createdAtMs }) }
+        catch (error: Exception) { throw StorageUnavailable(error) }
         _jobs.value = next
-        store?.let { runCatching { it.save(next.values.sortedBy { j -> j.createdAtMs }) } }
     }
 
     /**
@@ -284,7 +299,7 @@ class SubAgentJobRegistry(
         val stored = runCatching { store?.load() }.getOrNull().orEmpty()
         return stored.associate { job ->
             val loaded = if (job.state == SubAgentJobState.QUEUED || job.state == SubAgentJobState.RUNNING) {
-                job.copy(state = SubAgentJobState.INTERRUPTED, finishedAtMs = clock())
+                job.copy(state = SubAgentJobState.INTERRUPTED, finishedAtMs = clock(), outcomeUnknown = true)
             } else job
             loaded.id to loaded
         }

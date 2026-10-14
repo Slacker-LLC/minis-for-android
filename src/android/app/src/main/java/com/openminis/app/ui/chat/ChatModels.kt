@@ -218,7 +218,7 @@ data class ChatMessage(
 enum class PendingDelivery { STEER, QUEUE }
 
 /** The waiting prompts the agent must see at its next step boundary: only those meant to steer, in send order. */
-internal fun List<QueuedPrompt>.dueAtStepBoundary(): List<QueuedPrompt> = filter { it.delivery == PendingDelivery.STEER }
+internal fun List<QueuedPrompt>.dueAtStepBoundary(): List<QueuedPrompt> = filter { it.delivery == PendingDelivery.STEER && !it.needsReview }
 
 /** A user prompt waiting for the agent loop that is still running. Mirrors iOS QueuedPrompt. */
 data class QueuedPrompt(
@@ -226,6 +226,7 @@ data class QueuedPrompt(
     val text: String,
     val attachments: List<InputAttachment> = emptyList(),
     val delivery: PendingDelivery = PendingDelivery.STEER,
+    val needsReview: Boolean = false,
 )
 
 /**

@@ -9,6 +9,7 @@ import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
 import org.json.JSONArray
+import com.openminis.app.tools.ToolFailureKind
 import org.json.JSONObject
 
 /**
@@ -42,7 +43,7 @@ class ClipboardOffloadHandler(private val context: Context) : NativeOffloadHandl
         // [T-offload-defaults-batch-android] Help only on explicit
         // --help/-h; no subcommand defaults to `get`.
         if (args.hasFlag("h", "help")) {
-            return NativeOffloadResult(0, HELP)
+            return NativeOffloadResult(0, HELP, executionStarted = false)
         }
         // T330: tri-state agent gate before any work.
         OffloadGate.enforce("clipboard", "android-clipboard", args, request)?.let { return it }
@@ -54,27 +55,33 @@ class ClipboardOffloadHandler(private val context: Context) : NativeOffloadHandl
                 val body = JSONObject().put("error", "service_unavailable")
                     .put("message", "ClipboardManager not available on this device.")
                     .toString()
-                return NativeOffloadResult(1, OffloadOutput.formatBody(body, args) + "\n")
+                return NativeOffloadResult(1, OffloadOutput.formatBody(body, args) + "\n",
+                    failureKind = ToolFailureKind.UNAVAILABLE, executionStarted = false)
             }
 
+        val sub = args.positional.firstOrNull() ?: "get"
         return try {
-            when (val sub = args.positional.firstOrNull() ?: "get") {
+            when (sub) {
                 "get" -> doGet(cm, args)
                 "set" -> doSet(cm, args)
                 "clear" -> doClear(cm, args)
                 "status" -> doStatus(cm, args)
-                else -> NativeOffloadResult(2, "android-clipboard: unknown subcommand '$sub'\n$HELP")
+                else -> NativeOffloadResult.invalidArguments("android-clipboard: unknown subcommand '$sub'\n$HELP")
             }
         } catch (e: SecurityException) {
             Log.w(TAG, "SecurityException: ${e.message}")
             val body = JSONObject().put("error", "clipboard_denied")
                 .put("message", "Clipboard access was denied by the system. On MIUI/HyperOS the user may have revoked clipboard permission in the privacy panel.")
                 .toString()
-            NativeOffloadResult(1, OffloadOutput.formatBody(body, args) + "\n")
+            NativeOffloadResult(1, OffloadOutput.formatBody(body, args) + "\n",
+                failureKind = if (sub in setOf("set", "clear")) ToolFailureKind.OUTCOME_UNKNOWN else ToolFailureKind.PERMISSION_DENIED,
+                executionStarted = true)
         } catch (e: Throwable) {
             Log.w(TAG, "uncaught: ${e.message}", e)
             val body = JSONObject().put("error", "internal").put("message", e.message ?: "unknown").toString()
-            NativeOffloadResult(1, OffloadOutput.formatBody(body, args) + "\n")
+            NativeOffloadResult(1, OffloadOutput.formatBody(body, args) + "\n",
+                failureKind = if (sub in setOf("set", "clear")) ToolFailureKind.OUTCOME_UNKNOWN else ToolFailureKind.EXECUTION_FAILED,
+                executionStarted = true)
         }
     }
 
@@ -116,15 +123,13 @@ class ClipboardOffloadHandler(private val context: Context) : NativeOffloadHandl
         // non-blank text wins.
         val text = args.get("text") ?: args.positional.drop(1).joinToString(" ")
         if (text.isBlank()) {
-            return NativeOffloadResult(
-                2,
-                "android-clipboard set: missing <text> (use --text \"...\" or pass positional args)\n",
+            return NativeOffloadResult.invalidArguments("android-clipboard set: missing <text> (use --text \"...\" or pass positional args)\n",
             )
         }
         // [T-eta-clipboard-bounds] Refused before the clipboard changes; a truncated write would be
         // a silent lie about what the user asked to copy.
         ClipboardBoundsPolicy.writeRefusal(text)?.let { refusal ->
-            return NativeOffloadResult(2, "android-clipboard set: $refusal\n")
+            return NativeOffloadResult.invalidArguments("android-clipboard set: $refusal\n")
         }
         if (!isAppForeground() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             return backgroundError(args)
@@ -214,6 +219,7 @@ class ClipboardOffloadHandler(private val context: Context) : NativeOffloadHandl
                 .toString(),
             args,
         ) + "\n",
+        failureKind = ToolFailureKind.UNAVAILABLE, executionStarted = false,
     )
 
     companion object {
@@ -223,6 +229,9 @@ class ClipboardOffloadHandler(private val context: Context) : NativeOffloadHandl
         private const val ClipDescription_MIMETYPE_TEXT_PLAIN = "text/plain"
         private const val ClipDescription_MIMETYPE_TEXT_URILIST = "text/uri-list"
         private const val HELP = """android-clipboard — access the device clipboard
+
+For execution facts: android-clipboard --execution-json <subcommand> [arguments].
+The bridge returns {exit_code, output, execution}; default output is unchanged.
 
 Usage:
   android-clipboard <command> [options]

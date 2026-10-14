@@ -196,6 +196,8 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
         val out = JSONObject()
             .put("id", id)
             .put("ran", outcome.started)
+            .put("completed", outcome.completed ?: JSONObject.NULL)
+            .put("status", outcome.status ?: JSONObject.NULL)
             .apply {
                 outcome.sessionId?.let { put("sessionId", it) }
                 // `ran: false` alone made every failure look alike; the code
@@ -204,7 +206,9 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
                 outcome.errorCode?.let { put("error", it) }
                 outcome.message?.let { put("message", it) }
             }
-        return NativeOffloadResult(if (outcome.started) 0 else 1, out.toString(2))
+        return NativeOffloadResult(if (outcome.completed == true) 0 else 1, out.toString(2),
+            outcome.failureKind ?: if (outcome.started) null else com.openminis.app.tools.ToolFailureKind.UNAVAILABLE,
+            outcome.executionStarted ?: false)
     }
 
     // ── parsing helpers ──

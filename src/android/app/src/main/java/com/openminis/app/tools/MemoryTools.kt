@@ -3,6 +3,7 @@ package com.openminis.app.tools
 import com.openminis.app.data.repository.MemoryRepository
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.UUID
 
 /**
  * Tool definitions and execution for memory_write and memory_get.
@@ -22,6 +23,9 @@ object MemoryTools {
                 put("type", "string")
                 put("description", "The memory content to write. Use concise Markdown with a short heading (## Topic) and context about what was done/learned.")
             })
+            put("kind", JSONObject().put("type", "string")
+                .put("enum", JSONArray(listOf("task_fact", "user_preference")))
+                .put("description", "Background record type; defaults to task_fact. Neither type is a current instruction."))
         }
 
         return JSONObject().apply {
@@ -101,9 +105,10 @@ object MemoryTools {
         val output: String,
         val success: Boolean,
         val toolTitle: String = "",
+        val entryId: String? = null,
     )
 
-    fun executeMemoryWrite(inputJson: String, repository: MemoryRepository): ToolResult {
+    fun executeMemoryWrite(inputJson: String, repository: MemoryRepository, sourceSessionId: String? = null): ToolResult {
         return try {
             val obj = JSONObject(inputJson)
             val content = obj.optString("content", "")
@@ -112,9 +117,10 @@ object MemoryTools {
             if (content.isBlank()) {
                 ToolResult("Error: Missing required 'content' parameter", false, toolTitle)
             } else {
-                val result = repository.writeMemory(content)
+                val entryId = UUID.randomUUID().toString()
+                val result = repository.writeMemory(content, sourceSessionId, obj.optString("kind", "task_fact"), entryId)
                 val success = result.startsWith("Memory saved")
-                ToolResult(result, success, toolTitle)
+                ToolResult(result, success, toolTitle, entryId.takeIf { success })
             }
         } catch (e: Exception) {
             ToolResult("Error: ${e.message}", false)

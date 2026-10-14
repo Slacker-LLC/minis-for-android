@@ -77,8 +77,17 @@ class MinisCallRuntimeAdapterTest {
         adapter.start()
         assertEquals(1, input.started)
         input.fireFinal("今天天气如何")
-        // THINKING → SPEAKING → speak completes → startListening again
-        assertEquals(listOf(BloubState.LISTENING, BloubState.THINKING, BloubState.SPEAKING, BloubState.LISTENING), states)
+        // start() resets through IDLE first, then THINKING → SPEAKING → startListening again
+        assertEquals(
+            listOf(
+                BloubState.IDLE,
+                BloubState.LISTENING,
+                BloubState.THINKING,
+                BloubState.SPEAKING,
+                BloubState.LISTENING,
+            ),
+            states,
+        )
         job.cancel()
     }
 
@@ -111,16 +120,18 @@ class MinisCallRuntimeAdapterTest {
     }
 
     @Test
-    fun `model failure goes error then listening`() {
+    fun `model failure stays on error until the user retries`() {
         val (adapter, input, _) = harness({ Result.failure(RuntimeException("网络断了")) })
         val states = mutableListOf<BloubState>()
         val job = CoroutineScope(Dispatchers.Unconfined).launch { adapter.events.collect { if (it is CallEvent.BloubStateChanged) states += it.state } }
         adapter.start()
         input.fireFinal("你好")
         assertTrue("must show ERROR", states.contains(BloubState.ERROR))
-        // 失败后 delay(900) 再回听：等待以便断言闭环
+        // 失败后留在 ERROR 等用户显式重试，不自动发起新一轮请求。
         kotlinx.coroutines.runBlocking { kotlinx.coroutines.delay(1200) }
-        assertTrue("must resume LISTENING", states.lastOrNull() == BloubState.LISTENING)
+        assertEquals("must wait for an explicit retry", BloubState.ERROR, states.lastOrNull())
+        adapter.interrupt()
+        assertEquals("retry resumes LISTENING", BloubState.LISTENING, states.lastOrNull())
         job.cancel()
     }
 

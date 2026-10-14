@@ -71,7 +71,7 @@ internal fun ShareBufferEffect(sessionId: kotlin.String, context: android.conten
 internal fun SessionDisposableEffect(sessionId: kotlin.String, context: android.content.Context, viewModel: com.openminis.app.ui.chat.ChatViewModel, attachmentsState: androidx.compose.runtime.State<kotlin.collections.List<com.openminis.app.ui.chat.InputAttachment>>, tHangDiagAppContext: android.content.Context) {
     val attachments by attachmentsState
     androidx.compose.runtime.DisposableEffect(sessionId) {
-        ChatViewModelStore.setActiveSession(sessionId)
+        val mountGeneration = ChatViewModelStore.setActiveSession(sessionId)
         // [T-HANG-DIAG] enter / dispose markers around the ChatScreen lifetime
         // so we can correlate "user tapped session X" → loadSession timings
         // and any subsequent hang record. Removable by grepping out
@@ -83,7 +83,7 @@ internal fun SessionDisposableEffect(sessionId: kotlin.String, context: android.
         com.openminis.app.diagnostics.PerfLongCtx.step(sessionId, "chatScreen.mount")
         onDispose {
             println("[T-HANG-DIAG] ChatScreen UNMOUNT session=$sessionId")
-            ChatViewModelStore.clearActiveSession(sessionId)
+            ChatViewModelStore.clearActiveSession(sessionId, mountGeneration)
             // T-android-new-chat-empty-residue: drop sessions materialised by
             // a settings toggle (ensureSession via /memory, /thinking, etc.)
             // but never sent a real message. VM guards on streaming + DB count

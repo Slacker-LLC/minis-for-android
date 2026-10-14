@@ -51,6 +51,12 @@ object JobRegistry {
         val startedAt: Long,
         val finishedAt: Long? = null,
         val output: StringBuilder = StringBuilder(),
+        val sessionId: String? = null,
+        val runId: String? = null,
+        val taskId: String? = null,
+        val executionIntentId: String? = null,
+        val nativeOutcomeUnknown: Boolean = false,
+        val failureKind: ToolFailureKind? = null,
     )
 
     /** Upper bound on retained jobs; oldest entries are evicted beyond this. */
@@ -84,7 +90,8 @@ object JobRegistry {
      * oldest jobs are evicted first.
      */
     @Synchronized
-    fun start(kind: String, label: String): String {
+    fun start(kind: String, label: String, sessionId: String? = null, runId: String? = null,
+              taskId: String? = null, executionIntentId: String? = null): String {
         val id = UUID.randomUUID().toString()
         jobs[id] = Job(
             id = id,
@@ -92,9 +99,15 @@ object JobRegistry {
             label = label,
             status = JobStatus.RUNNING,
             startedAt = System.currentTimeMillis(),
+            sessionId = sessionId, runId = runId, taskId = taskId, executionIntentId = executionIntentId,
         )
         trimOldest()
         return id
+    }
+
+    @Synchronized
+    fun markNativeOutcomeUnknown(id: String) {
+        jobs[id]?.let { jobs[id] = it.copy(nativeOutcomeUnknown = true) }
     }
 
     /**
@@ -132,10 +145,10 @@ object JobRegistry {
      * Jobs that are already terminal are left untouched.
      */
     @Synchronized
-    fun finish(id: String, status: JobStatus, detail: String = "") {
+    fun finish(id: String, status: JobStatus, detail: String = "", failureKind: ToolFailureKind? = null) {
         val job = jobs[id] ?: return
         if (job.status != JobStatus.RUNNING) return
-        jobs[id] = job.copy(status = status, detail = detail, finishedAt = System.currentTimeMillis())
+        jobs[id] = job.copy(status = status, detail = detail, finishedAt = System.currentTimeMillis(), failureKind = failureKind)
         cancellers.remove(id)
     }
 

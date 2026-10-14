@@ -3,6 +3,7 @@ package com.openminis.app.tools
 import android.app.Application
 import android.content.Context
 import com.openminis.app.data.db.BotDelegationEntity
+import com.openminis.app.data.db.BotTaskEntity
 import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.data.repository.BotDelegationRepository
 import com.openminis.app.data.repository.BotInboxRepository
@@ -73,6 +74,8 @@ class BotDelegationCoordinator private constructor(
             wakeDispatcher.recoverAfterProcessStart()
         }
     }
+
+    internal fun isOwnerWake(taskId: String, sessionId: String) = wakingTasks.isWaking(taskId, sessionId)
 
     suspend fun onSourceTurnSettled(sourceSessionId: String, succeeded: Boolean, sourceRunId: String? = null) = withContext(NonCancellable) {
         if (!succeeded) {
@@ -164,7 +167,8 @@ class BotDelegationCoordinator private constructor(
             return ToolExecutionResult("Error: delegation_fanout_limit_reached", false)
         }
         val existingDelegation = delegationRepository.findBySourceTool(sourceSessionId, sourceToolId)
-        val wakingRootTaskId = wakingTasks.rootForSession(sourceSessionId)
+        val wakingRootTaskId = com.openminis.app.agent.AgentSessionStore.activeRunTask(sourceSessionId)?.id
+            ?.takeIf { wakingTasks.isWaking(it, sourceSessionId) }
         val rootTask = if (wakingRootTaskId != null) {
             taskRepository.get(wakingRootTaskId)
                 ?: return ToolExecutionResult("Error: root_task_not_found", false)
@@ -180,6 +184,11 @@ class BotDelegationCoordinator private constructor(
         if (!BotWakePolicy.isWakeable(rootTask.status)) {
             return ToolExecutionResult("Error: task_not_continuable", false)
         }
+        val owned = com.openminis.app.agent.AgentSessionStore.activeRunTask(sourceSessionId)
+        if (owned != null && (owned.id != rootTask.id || owned.revision != rootTask.revision || owned.stopGeneration != rootTask.stopGeneration)) {
+            return ToolExecutionResult("Error: owner_run_task_changed", false)
+        }
+        var expectedRevision = rootTask.revision
         if (existingDelegation == null) {
             if (!BotWakePolicy.canDelegate(rootTask.delegationsUsed)) {
                 return ToolExecutionResult("Error: delegation_budget_exhausted", false)
@@ -189,10 +198,11 @@ class BotDelegationCoordinator private constructor(
                 wakingTasks.rollbackRevision(rootTask.id)
                 return ToolExecutionResult("Error: revision_budget_exhausted", false)
             }
-            if (beginsRevision && !taskRepository.requestRevision(rootTask.id, BotWakePolicy.MAX_REVISION_ROUNDS)) {
+            if (beginsRevision && !taskRepository.requestRevision(rootTask.id, BotWakePolicy.MAX_REVISION_ROUNDS, rootTask.revision, rootTask.stopGeneration)) {
                 wakingTasks.rollbackRevision(rootTask.id)
                 return ToolExecutionResult("Error: revision_budget_exhausted", false)
             }
+            if (beginsRevision) expectedRevision++
         }
         val delegation = existingDelegation ?: delegationRepository.enqueue(
             sourceBotId = sourceBotId,
@@ -205,7 +215,7 @@ class BotDelegationCoordinator private constructor(
             depth = 1,
         )
         if (existingDelegation == null) {
-            if (!taskRepository.recordDelegation(rootTask.id, BotWakePolicy.MAX_DELEGATIONS_PER_TASK)) {
+            if (!taskRepository.recordDelegation(rootTask.id, BotWakePolicy.MAX_DELEGATIONS_PER_TASK, expectedRevision, rootTask.stopGeneration)) {
                 delegationRepository.cancel(delegation.id, "task delegation budget exhausted")
                 deliverReceipt(delegationRepository.get(delegation.id))
                 return ToolExecutionResult("Error: delegation_budget_exhausted", false)
@@ -217,6 +227,8 @@ class BotDelegationCoordinator private constructor(
                 status = com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE,
                 phase = com.openminis.app.data.db.BotTaskEntity.PHASE_EXECUTING,
                 ownerSessionId = sourceSessionId,
+                revision = expectedRevision,
+                generation = rootTask.stopGeneration,
             )
             if (!stillRunning) {
                 delegationRepository.cancel(delegation.id, "task was stopped")
@@ -224,6 +236,7 @@ class BotDelegationCoordinator private constructor(
                 return ToolExecutionResult("Error: task_not_continuable", false)
             }
         }
+        taskRepository.get(rootTask.id)?.let { com.openminis.app.agent.AgentSessionStore.updateRunGoal(sourceSessionId, it) }
         return ToolExecutionResult(
             output = JSONObject().apply {
                 put("delegation_id", delegation.id)
@@ -318,16 +331,38 @@ class BotDelegationCoordinator private constructor(
      * is told to stop, which ends its worker through the normal cancelled path. Returns whether the task
      * was cancelled. Pausing is different on purpose: it does not interrupt work already under way.
      */
-    suspend fun cancelRootTask(rootTaskId: String): Boolean {
-        if (!taskRepository.cancel(rootTaskId)) return false
-        delegationRepository.listNonTerminalForRootTask(rootTaskId).forEach { delegation ->
-            if (delegation.status == BotDelegationEntity.STATUS_RUNNING) {
-                delegation.targetSessionId?.let { AgentRunner.cancel(application, it) }
-            } else if (delegationRepository.cancel(delegation.id, "task was cancelled")) {
-                deliverReceipt(delegationRepository.get(delegation.id))
-            }
+    suspend fun cancelRootTask(rootTaskId: String, cancelOwner: Boolean = true): Boolean = withContext(NonCancellable) {
+        if (!taskRepository.cancel(rootTaskId, stopOwner = cancelOwner) &&
+            taskRepository.get(rootTaskId)?.status != BotTaskEntity.STATUS_CANCELLED) return@withContext false
+        if (cancelOwner) taskRepository.get(rootTaskId)?.let { stopped ->
+            com.openminis.app.agent.AgentSessionStore.stopObsoleteGoalRun(
+                stopped.currentOwnerSessionId ?: stopped.originSessionId, stopped,
+            )
         }
-        return true
+        taskRepository.get(rootTaskId)?.let { com.openminis.app.agent.AgentSessionStore.stopTaskWork(it, cancelOwner) }
+        cancelDelegations(delegationRepository.listNonTerminalForRootTask(rootTaskId), "task was cancelled")
+        true
+    }
+
+    /** Deleting a source closes its work before removing its workspace; terminal task facts survive. */
+    suspend fun cancelSourceSession(sessionId: String) = withContext(NonCancellable) {
+        val rows = delegationRepository.listForSourceSession(sessionId)
+        taskRepository.taskIdsForSession(sessionId).forEach { cancelRootTask(it) }
+        cancelDelegations(rows.filter { it.status !in BotDelegationEntity.TERMINAL_STATUSES }, "source session was deleted")
+    }
+
+    private suspend fun cancelDelegations(rows: List<BotDelegationEntity>, reason: String) {
+        for (delegation in rows) {
+            // Commit cancellation before signalling the worker: a late result cannot win the race.
+            val cancelled = delegationRepository.cancel(delegation.id, reason)
+            if (delegation.status == BotDelegationEntity.STATUS_RUNNING) {
+                delegation.targetSessionId?.let { target ->
+                    AgentRunner.cancel(application, target)
+                    withTimeoutOrNull(5_000L) { AgentRunner.awaitStreamExit(application, target) }
+                }
+            }
+            if (cancelled) deliverReceipt(delegationRepository.get(delegation.id))
+        }
     }
 
     private suspend fun dispatchForSource(sourceSessionId: String, sourceRunId: String?) {

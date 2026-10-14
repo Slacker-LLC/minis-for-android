@@ -1,5 +1,7 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.agent.SessionHistoryLoader
+
 import com.openminis.app.data.db.ChatDao
 import com.openminis.app.data.db.MessageEntity
 import com.openminis.app.data.repository.ChatRepository

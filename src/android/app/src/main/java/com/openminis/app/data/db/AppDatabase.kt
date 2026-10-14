@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-const val APP_DATABASE_VERSION = 23
+const val APP_DATABASE_VERSION = 26
 
 @Database(
     entities = [
@@ -511,7 +511,77 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** Preserve every v23 Bot lifecycle field while admitting a real session owner. */
+        val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE bot_tasks_v24 (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        origin_session_id TEXT NOT NULL,
+                        origin_message_id TEXT,
+                        owner_bot_id TEXT,
+                        goal_session_id TEXT,
+                        goal TEXT NOT NULL,
+                        acceptance_criteria TEXT,
+                        status TEXT NOT NULL,
+                        phase TEXT NOT NULL,
+                        revision INTEGER NOT NULL,
+                        current_owner_session_id TEXT,
+                        auto_runs_used INTEGER NOT NULL,
+                        delegations_used INTEGER NOT NULL,
+                        revision_rounds_used INTEGER NOT NULL,
+                        stop_generation INTEGER NOT NULL,
+                        deadline_at INTEGER,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL,
+                        completed_at INTEGER,
+                        max_auto_runs INTEGER NOT NULL DEFAULT 3,
+                        plan_mode TEXT NOT NULL DEFAULT 'off',
+                        task_plan TEXT NOT NULL DEFAULT ''
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO bot_tasks_v24 (
+                        id, origin_session_id, origin_message_id, owner_bot_id,
+                        goal, acceptance_criteria, status, phase, revision,
+                        current_owner_session_id, auto_runs_used, delegations_used,
+                        revision_rounds_used, stop_generation, deadline_at,
+                        created_at, updated_at, completed_at
+                    ) SELECT id, origin_session_id, origin_message_id, owner_bot_id,
+                        goal, acceptance_criteria, status, phase, revision,
+                        current_owner_session_id, auto_runs_used, delegations_used,
+                        revision_rounds_used, stop_generation, deadline_at,
+                        created_at, updated_at, completed_at FROM bot_tasks
+                """.trimIndent())
+                db.execSQL("DROP TABLE bot_tasks")
+                db.execSQL("ALTER TABLE bot_tasks_v24 RENAME TO bot_tasks")
+                db.execSQL("CREATE INDEX index_bot_tasks_origin ON bot_tasks(origin_session_id, origin_message_id)")
+                db.execSQL("CREATE INDEX index_bot_tasks_owner_status ON bot_tasks(owner_bot_id, status, updated_at)")
+                db.execSQL("CREATE INDEX index_bot_tasks_status_updated ON bot_tasks(status, updated_at)")
+                db.execSQL("CREATE UNIQUE INDEX index_bot_tasks_goal_session ON bot_tasks(goal_session_id)")
+            }
+        }
+
+        val MIGRATION_24_25 = object : Migration(24, 25) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE bot_tasks ADD COLUMN progress TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE bot_tasks ADD COLUMN completion_evidence TEXT")
+            }
+        }
+
         /** Return the already-open singleton used by the app repositories. */
+        val MIGRATION_25_26 = object : Migration(25, 26) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN request_state TEXT")
+                db.execSQL("ALTER TABLE messages ADD COLUMN request_delivery TEXT")
+                db.execSQL("ALTER TABLE messages ADD COLUMN request_task_id TEXT")
+                db.execSQL("ALTER TABLE messages ADD COLUMN request_task_generation INTEGER")
+                db.execSQL("ALTER TABLE messages ADD COLUMN request_run_id TEXT")
+                db.execSQL("ALTER TABLE messages ADD COLUMN request_user_input INTEGER")
+                db.execSQL("CREATE INDEX index_messages_session_request_order ON messages(session_id, request_state, sort_order)")
+            }
+        }
+
         internal fun getInitializedInstance(): AppDatabase =
             checkNotNull(INSTANCE) { "AppDatabase is not initialized" }
 
@@ -545,6 +615,9 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_20_21,
                         MIGRATION_21_22,
                         MIGRATION_22_23,
+                        MIGRATION_23_24,
+                        MIGRATION_24_25,
+                        MIGRATION_25_26,
                         MIGRATION_14_13,
                     )
                     .build()

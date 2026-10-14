@@ -186,7 +186,8 @@ internal object VirtualScreenUiBackend {
         generationBefore: Long?,
         targetPackage: String,
     ): AndroidUiController.UiToolResult {
-        val packageName = client.foregroundPackageName?.takeIf(String::isNotBlank) ?: targetPackage.takeIf(String::isNotBlank).orEmpty()
+        // A launch is historical intent. Only the selected live ref identifies an action's package.
+        val packageName = targetPackage.takeIf(String::isNotBlank).orEmpty()
         if (packageName.isNotEmpty()) request.put("package", packageName)
         val binderStart = SystemClock.elapsedRealtime()
         val response = JSONObject(client.act(displayId, request.toString()))
@@ -218,13 +219,8 @@ internal object VirtualScreenUiBackend {
             return AndroidUiController.UiToolResult(result, false)
         }
 
-        if (response.has("packagePresent")) {
-            val denial = VirtualScreenAppPresencePolicy.denialCode(packageName, response.optBoolean("packagePresent", true))
-            if (denial != null) {
-                VirtualScreenObservationRegistry.clearSession(sessionId)
-                return error(denial, "$packageName no longer has a window on display $displayId; do not fall back to the physical screen")
-            }
-        }
+        // Package presence after an accepted action is evidence of a transition, not a rejection.
+        // The service already resolved the node on this exact display before acting.
         val changed = response.optBoolean("semanticSignal", false) || run {
             val before = generationBefore?.let(VirtualScreenObservationRegistry::observedFingerprint)
             val after = observed?.optLong("generation")?.let(VirtualScreenObservationRegistry::observedFingerprint)
@@ -240,6 +236,12 @@ internal object VirtualScreenUiBackend {
             result.put("hint", "no visible change yet; use wait/wait_for_package if a page transition is expected")
         }
         if (observed != null) result.put("observation", observed)
+        if (response.has("packagePresent")) {
+            result.put("targetPackagePresent", response.optBoolean("packagePresent"))
+            if (!response.optBoolean("packagePresent")) {
+                result.put("hint", "The action was accepted and the target package left this virtual display. Use the attached observation's fresh refs, or observe/wait on the same displayId; never fall back to the physical screen.")
+            }
+        }
         attachTiming(result, timing, observed)
         return AndroidUiController.UiToolResult(result, true)
     }

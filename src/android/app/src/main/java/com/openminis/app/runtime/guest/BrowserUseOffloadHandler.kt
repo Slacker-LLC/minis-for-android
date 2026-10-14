@@ -2,17 +2,19 @@ package com.openminis.app.runtime.guest
 
 import android.util.Log
 import com.openminis.app.MinisApp
+import com.openminis.app.tools.BrowserTools
+import com.openminis.app.tools.ToolExecutionResult
+import com.openminis.app.tools.runtime.ToolExecutor
+import com.openminis.app.runtime.files.WorkspaceFileClient
+import com.openminis.app.tools.ExternalMountAccess
 import com.openminis.app.browser.BrowserAction
 import com.openminis.app.browser.BrowserActionInput
 import com.openminis.app.browser.BrowserActionResult
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
-import com.openminis.app.runtime.files.WorkspaceFileClient
-import com.openminis.app.tools.ExternalMountAccess
-import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -32,7 +34,7 @@ import java.util.TimeZone
  * `image_path` + `minis_url` — raw base64 is only included when the caller
  * explicitly passes `--with-base64`, matching iOS.
  *
- * Hard 90-second timeout via `withTimeout` so a hanging navigation can't lock
+ * Shared 90-second execution deadline so a hanging navigation can't lock
  * the shell indefinitely. Exits 0 for success, 1 for runtime errors, 2 for
  * bad arguments. Bare invocation prints help and exits 0 (matches iOS).
  */
@@ -83,41 +85,43 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
             statusForBrowserAction(actionName, inputJson),
         )
 
-        // Execute under a 90s hard timeout. A hanging navigation in a tab
-        // pool shouldn't be able to block the entire shell forever.
-        val result: BrowserActionResult = try {
+        // Keep the CLI's single-tab binding while sharing validation, permissions and deadline.
+        var browserResult: BrowserActionResult? = null
+        val executed = try {
             runBlocking {
-                withTimeout(EXECUTE_TIMEOUT_MS) {
-                    // [T-browser-readaction-follow-tab-and-yolo-android] The CLI
-                    // (`minis-browser-use`) is a serial human/script driver:
-                    // navigate → execute_js / get_text / … all expect the page
-                    // just navigated to, not a fanned-out grace tab. Drive in
-                    // YOLO single-tab mode so every tab-less action sticks to the
-                    // selected tab. Explicit --tab-id still routes normally.
-                    // Mirrors iOS BrowserUseOffloadBridge passing singleTab=true.
-                    app.sharedBrowserTabPool.execute(input, singleTab = true)
-                }
+                ToolExecutor.execute(
+                    name = "browser_use", argsJson = inputJson.toString(), sessionId = request.sessionId.orEmpty(), context = app,
+                    boundOutput = false,
+                    localExecution = {
+                        app.sharedBrowserTabPool.execute(input, singleTab = true).also { browserResult = it }.let {
+                            ToolExecutionResult(it.text, it.success)
+                        }
+                    },
+                )
             }
-        } catch (_: TimeoutCancellationException) {
-            return emitError(action = actionName, code = ERR_INTERNAL,
-                message = "browser action timed out after ${EXECUTE_TIMEOUT_MS / 1000}s",
-                compact = compact, quiet = quiet, exit = 1)
-        } catch (e: Throwable) {
-            Log.w(TAG, "execute failed: ${e.message}", e)
-            return emitError(action = actionName, code = ERR_INTERNAL,
-                message = e.message ?: "browser action failed",
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            return emitError(action = actionName, code = ERR_INTERNAL, message = error.message ?: "browser action failed",
                 compact = compact, quiet = quiet, exit = 1)
         }
-
-        if (!result.success) {
-            return emitError(action = actionName, code = ERR_INTERNAL,
-                message = result.text.ifEmpty { "browser action failed" },
-                compact = compact, quiet = quiet, exit = 1)
+        if (!executed.success) {
+            return emitError(action = actionName, code = ERR_INTERNAL, message = executed.output,
+                compact = compact, quiet = quiet, exit = 1, execution = executed)
         }
-
-        val data = encodeData(result, withBase64 = withBase64, sessionId = request.sessionId)
+        val result = checkNotNull(browserResult)
+        val data = try {
+            encodeData(result, withBase64 = withBase64, sessionId = request.sessionId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            return emitError(action = actionName, code = ERR_INTERNAL, message = error.message ?: "browser result delivery failed",
+                compact = compact, quiet = quiet, exit = 1,
+                execution = executed.copy(success = false, failureKind = com.openminis.app.tools.ToolFailureKind.OBSERVATION_FAILED))
+        }
+        data.put("execution", executed.executionFacts())
         val envelope = envelope(actionName, data)
-        return NativeOffloadResult(0, emit(envelope, data, compact = compact, quiet = quiet))
+        return NativeOffloadResult(0, emit(envelope, data, compact = compact, quiet = quiet), executed.failureKind, executed.executionStarted)
     }
 
     // ── Input parsing ────────────────────────────────────────────────────
@@ -252,11 +256,11 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
                 catch (_: Exception) { null }
             if (bytes != null) {
                 val filename = safeGuestName("screenshot_${System.currentTimeMillis()}.jpg")
-                val linuxPath = persistGuestBytes(sessionId, VAR_MINIS_BROWSER, filename, bytes)
+                val linuxPath = persistGuestBytes(sessionId, filename, bytes)
                 if (linuxPath != null) {
                     persistedImagePath = linuxPath
                     out.put("image_path", linuxPath)
-                    out.put("minis_url", "minis://browser/${linuxPath.substringAfterLast('/')}")
+                    out.put("minis_url", BrowserTools.linuxPathToMinisURL(linuxPath))
                 } else {
                     Log.w(TAG, "Failed to persist screenshot through guest storage")
                 }
@@ -279,10 +283,10 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
             val data = r.fetchedFileData
             if (data != null) {
                 out.put("fetched_bytes", data.size)
-                val path = persistGuestBytes(sessionId, VAR_MINIS_BROWSER, safeGuestName(fname), data)
+                val path = persistGuestBytes(sessionId, safeGuestName(fname), data)
                 if (path != null) {
                     out.put("fetched_path", path)
-                    out.put("fetched_minis_url", "minis://browser/${path.substringAfterLast('/')}")
+                    out.put("fetched_minis_url", BrowserTools.linuxPathToMinisURL(path))
                 }
             }
         }
@@ -290,23 +294,10 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
         return out
     }
 
-    private fun safeGuestName(name: String): String =
-        name.substringAfterLast('/').substringAfterLast('\\')
-            .replace(Regex("[^A-Za-z0-9._-]"), "_")
-            .ifBlank { "browser-artifact.bin" }
+    private fun safeGuestName(name: String): String = BrowserTools.safeName(name)
 
-    private fun persistGuestBytes(
-        sessionId: String?,
-        directory: String,
-        filename: String,
-        bytes: ByteArray,
-    ): String? = runCatching {
-        runBlocking {
-            val path = WorkspaceFileClient.uniqueChildPath(sessionId.orEmpty(), directory, filename)
-            WorkspaceFileClient.writeBytes(sessionId.orEmpty(), path, bytes)
-            path
-        }
-    }.getOrNull()
+    private fun persistGuestBytes(sessionId: String?, filename: String, bytes: ByteArray): String? =
+        runBlocking { BrowserTools.persistArtifact(sessionId, filename, bytes) }
 
     private fun readGuestText(path: String, sessionId: String?): String? = runCatching {
         val guestPath = path.removePrefix("file://")
@@ -348,11 +339,17 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
         compact: Boolean,
         quiet: Boolean,
         exit: Int,
+        execution: ToolExecutionResult? = null,
     ): NativeOffloadResult {
         val env = errorEnvelope(action, code, message)
+        val facts = execution ?: ToolExecutionResult(message, false,
+            failureKind = if (code == ERR_INVALID_ARGS) com.openminis.app.tools.ToolFailureKind.INVALID_ARGUMENTS
+                else com.openminis.app.tools.ToolFailureKind.OUTCOME_UNKNOWN,
+            executionStarted = if (code == ERR_INVALID_ARGS) false else null)
+        env.getJSONObject("error").put("execution", facts.executionFacts())
         // In quiet mode, error emits just the `error` sub-object.
         val payload = if (quiet) env.optJSONObject("error") ?: env else env
-        return NativeOffloadResult(exit, serialize(payload, compact) + "\n")
+        return NativeOffloadResult(exit, serialize(payload, compact) + "\n", facts.failureKind, facts.executionStarted)
     }
 
     private fun emit(envelope: JSONObject, data: JSONObject, compact: Boolean, quiet: Boolean): String {
@@ -408,8 +405,6 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
     companion object {
         private const val TAG = "BrowserUseOffload"
         private const val TOOL_NAME = "minis-browser-use"
-        private const val VAR_MINIS_BROWSER = "/var/minis/browser"
-        private const val EXECUTE_TIMEOUT_MS = 90_000L
 
         /**
          * Long-option flags this handler treats as booleans (no value expected).

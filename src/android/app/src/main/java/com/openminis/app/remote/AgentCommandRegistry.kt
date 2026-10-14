@@ -12,9 +12,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import com.openminis.app.ui.chat.clearChat
-import com.openminis.app.ui.chat.toggleMemoryForCommand
-import com.openminis.app.ui.chat.toggleThinkingForCommand
+import com.openminis.app.agent.ensureSessionForSettings
+import com.openminis.app.agent.clearChat
+import com.openminis.app.agent.toggleMemoryForCommand
+import com.openminis.app.agent.toggleThinkingForCommand
 import com.openminis.app.data.repository.isEnabledForSession
 
 /**
@@ -223,27 +224,29 @@ object AgentCommandRegistry {
         }
     }
 
-    private fun commandGoal(context: Context, sessionId: String, arg: String): Outcome {
-        val current = AgentStateStore.goalGet(sessionId)
+    private suspend fun commandGoal(context: Context, sessionId: String, arg: String): Outcome {
+        val current = AgentStateStore.goalGet(sessionId, context)
         if (arg.isEmpty()) {
             if (current.text.isBlank()) return Outcome(true, "当前会话未设置 Goal")
             return Outcome(true, "Goal (${current.phase}): ${current.text} (rounds ${current.maxGoalRounds})")
         }
-        val goal = AgentStateStore.goalSet(sessionId, arg)
-        appendGoalChange(sessionId, "create", goal)
+        val sid = withContext(Dispatchers.Main) { AgentRunner.sessionForCommand(context, sessionId) }.ensureSessionForSettings()
+        val goal = AgentStateStore.goalSet(sid, arg, context)
+        appendGoalChange(sid, "create", goal)
         return Outcome(true, "Goal 已设置: ${goal.text}")
     }
 
     /** `/plan` — real Android plan-mode state, folded for the Web plan chip. */
-    private fun commandPlan(context: Context, sessionId: String, arg: String): Outcome {
+    private suspend fun commandPlan(context: Context, sessionId: String, arg: String): Outcome {
         val mode = if (arg.trim().equals("off", ignoreCase = true)) "off" else "plan"
-        val plan = AgentStateStore.planSet(sessionId, mode, arg.trim().takeIf { mode == "plan" && arg.isNotBlank() } ?: "")
+        val sid = withContext(Dispatchers.Main) { AgentRunner.sessionForCommand(context, sessionId) }.ensureSessionForSettings()
+        val plan = AgentStateStore.planSet(sid, mode, arg.trim().takeIf { mode == "plan" && arg.isNotBlank() } ?: "", context)
         val active = plan.mode == "plan"
         // The DSH client folds /plan state from (command/run + plan/mode)
         // events; emitting both keeps the browser chip and the Android
         // runtime on one state. commands/execute already appends command/run
         // and command/done around this handler.
-        SessionEventHub.append(sessionId, "plan/mode", JSONObject().put("active", active))
+        SessionEventHub.append(sid, "plan/mode", JSONObject().put("active", active))
         return Outcome(
             true,
             if (active) "已进入计划模式${if (plan.plan.isNotBlank()) "；计划: ${plan.plan}" else ""}" else "已退出计划模式",
@@ -255,24 +258,23 @@ object AgentCommandRegistry {
             context, sessionId, wait = false, timeoutMs = 900_000L,
         )
         return when (result.status) {
-            "Complete", "Compacted" -> Outcome(true, "会话已压缩")
+            "Complete", "Completed", "Compacted" -> Outcome(true, "会话已压缩")
+            "Running" -> Outcome(true, "正在压缩会话")
             else -> Outcome(false, "压缩失败: ${result.error ?: result.status}")
         }
     }
 
     private suspend fun commandClear(context: Context, sessionId: String): Outcome = withContext(Dispatchers.Main) {
-        val vm = AgentRunner.viewModelForCommand(context, sessionId)
-        if (vm != null) {
-            vm.clearChat()
-            Outcome(true, "会话已清空（工作区文件已保留）")
-        } else {
-            Outcome(false, "会话未加载，无法清空")
-        }
+        val session = AgentRunner.sessionForCommand(context, sessionId)
+        val reset = session.clearChat() ?: return@withContext Outcome(false, "会话正在更新或已关闭")
+        reset.join()
+        if (reset.isCancelled || session.error.value != null) Outcome(false, "会话清空失败")
+        else Outcome(true, "会话已清空（工作区文件已保留）")
     }
 
     private suspend fun commandMemory(context: Context, sessionId: String): Outcome =
         withContext(Dispatchers.Main) {
-            val vm = AgentRunner.viewModelForCommand(context, sessionId)
+            val vm = AgentRunner.sessionForCommand(context, sessionId)
             if (vm != null) {
                 val enabled = vm.toggleMemoryForCommand()
                 Outcome(true, if (enabled) "记忆写入已开启" else "记忆写入已关闭")
@@ -283,7 +285,7 @@ object AgentCommandRegistry {
 
     private suspend fun commandThinking(context: Context, sessionId: String): Outcome =
         withContext(Dispatchers.Main) {
-            val vm = AgentRunner.viewModelForCommand(context, sessionId)
+            val vm = AgentRunner.sessionForCommand(context, sessionId)
             if (vm != null) {
                 vm.toggleThinkingForCommand()
                 Outcome(true, "思考强度已切换")

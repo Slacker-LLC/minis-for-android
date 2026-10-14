@@ -3,6 +3,8 @@ package com.openminis.app.tools
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
+import com.openminis.app.data.repository.recordSkillUse
+import com.openminis.app.data.repository.skillIdFromPath
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import org.json.JSONObject
 
@@ -110,6 +112,11 @@ object FileReadTool {
                 direction = direction,
                 maxLength = maxLength,
             )
+            if (maxLength > 0 && selectedLines.isNotEmpty()) {
+                (context.applicationContext as? com.openminis.app.MinisApp)?.skillRepository?.let { repository ->
+                    repository.skillIdFromPath(path)?.let(repository::recordSkillUse)
+                }
+            }
             ToolExecutionResult(output, true, toolTitle = toolTitle)
         } catch (e: Exception) {
             ToolExecutionResult("Error reading file: ${e.message}", false)

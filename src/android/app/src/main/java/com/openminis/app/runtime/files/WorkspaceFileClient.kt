@@ -5,6 +5,7 @@ import com.openminis.app.runtime.ubuntu.UbuntuPaths
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -21,6 +22,11 @@ internal object WorkspaceFileClient {
     const val MAX_READ_CHUNK = 512 * 1024
     const val MAX_WRITE_CHUNK = 32 * 1024
     const val MAX_FILE_BYTES = 50L * 1024 * 1024
+
+    suspend fun fingerprint(sessionId: String?, path: String): JSONObject = withContext(Dispatchers.IO) {
+        val jobContext = kotlin.coroutines.coroutineContext
+        SecureFileAccess.fingerprint(requirePath(sessionId, path)) { jobContext.ensureActive() }.put("path", path)
+    }
 
     data class ReadChunk(
         val bytes: ByteArray,
@@ -100,20 +106,14 @@ internal object WorkspaceFileClient {
         require(filename.isNotEmpty() && !filename.contains('/') && !filename.contains('\\')) {
             "filename must be a single path component"
         }
-        val used = runCatching {
-            val array = list(sessionId, directory, 500, 0).optJSONArray("entries") ?: JSONArray()
-            buildSet {
-                for (i in 0 until array.length()) array.optJSONObject(i)?.optString("name")?.let(::add)
-            }
-        }.getOrDefault(emptySet<String>())
-        if (filename !in used) return childPath(directory, filename)
+        if (!info(sessionId, childPath(directory, filename)).optBoolean("exists")) return childPath(directory, filename)
         val dot = filename.lastIndexOf('.')
         val base = if (dot > 0) filename.substring(0, dot) else filename
         val ext = if (dot > 0) filename.substring(dot) else ""
         var index = 1
         while (true) {
             val candidate = "$base-$index$ext"
-            if (candidate !in used) return childPath(directory, candidate)
+            if (!info(sessionId, childPath(directory, candidate)).optBoolean("exists")) return childPath(directory, candidate)
             index++
         }
     }
@@ -210,6 +210,35 @@ internal object WorkspaceFileClient {
             val next = page.optInt("next_offset", -1)
             if (next < 0) return entries
             offset = next
+        }
+    }
+
+    /** Workspace aliases expose these three session roots; count their backing data only once. */
+    suspend fun sessionTreeSize(sessionId: String): Long {
+        return sessionWorkspaceSize(sessionId) + listOf("attachments", "offloads", "browser")
+            .sumOf { treeSize(sessionId, "/var/minis/$it") }
+    }
+
+    suspend fun sessionWorkspaceSize(sessionId: String): Long {
+        val workspace = "/var/minis/workspace"
+        val aliasedRoots = setOf("attachments", "offloads", "browser")
+        var total = 0L
+        if (info(sessionId, workspace).optBoolean("exists")) {
+            for (entry in listAll(sessionId, workspace)) {
+                val name = entry.getString("name")
+                if (name !in aliasedRoots) total += treeSize(sessionId, childPath(workspace, name))
+            }
+        }
+        return total
+    }
+
+    /** These top-level names are aliases, not work products; never delete their backing roots here. */
+    suspend fun deleteSessionWorkspaceChildren(sessionId: String) {
+        val root = "/var/minis/workspace"
+        if (!info(sessionId, root).optBoolean("exists")) return
+        for (entry in listAll(sessionId, root)) {
+            val name = entry.getString("name")
+            if (name !in setOf("attachments", "offloads", "browser")) delete(sessionId, childPath(root, name))
         }
     }
 
