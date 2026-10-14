@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-const val APP_DATABASE_VERSION = 26
+const val APP_DATABASE_VERSION = 27
 
 @Database(
     entities = [
@@ -17,10 +17,7 @@ const val APP_DATABASE_VERSION = 26
         WebAppShortcutEntity::class,
         FolderEntity::class,
         SessionEventEntity::class,
-        BotEntity::class,
-        BotDelegationEntity::class,
-        BotTaskEntity::class,
-        BotInboxEventEntity::class,
+        AgentTaskEntity::class,
         CharacterEntity::class,
     ],
     version = APP_DATABASE_VERSION,
@@ -31,10 +28,7 @@ const val APP_DATABASE_VERSION = 26
 abstract class AppDatabase : RoomDatabase() {
     abstract fun chatDao(): ChatDao
     abstract fun webAppShortcutDao(): WebAppShortcutDao
-    abstract fun botDao(): BotDao
-    abstract fun botDelegationDao(): BotDelegationDao
-    abstract fun botTaskDao(): BotTaskDao
-    abstract fun botInboxEventDao(): BotInboxEventDao
+    abstract fun agentTaskDao(): AgentTaskDao
     abstract fun characterDao(): CharacterDao
 
     companion object {
@@ -582,6 +576,89 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Remove Bot ownership from the active app schema while keeping the old Bot tables intact
+         * as an on-device recovery copy. Goal rows move to the Agent table; work that depended on a
+         * Bot or an unfinished delegation is paused for user review.
+         */
+        val MIGRATION_26_27 = object : Migration(26, 27) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS agent_tasks (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        origin_session_id TEXT NOT NULL,
+                        origin_message_id TEXT,
+                        goal_session_id TEXT,
+                        goal TEXT NOT NULL,
+                        acceptance_criteria TEXT,
+                        status TEXT NOT NULL,
+                        phase TEXT NOT NULL,
+                        revision INTEGER NOT NULL,
+                        current_owner_session_id TEXT,
+                        auto_runs_used INTEGER NOT NULL,
+                        stop_generation INTEGER NOT NULL,
+                        deadline_at INTEGER,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL,
+                        completed_at INTEGER,
+                        max_auto_runs INTEGER NOT NULL DEFAULT 3,
+                        plan_mode TEXT NOT NULL DEFAULT 'off',
+                        task_plan TEXT NOT NULL DEFAULT '',
+                        progress TEXT NOT NULL DEFAULT '',
+                        completion_evidence TEXT
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO agent_tasks (
+                        id, origin_session_id, origin_message_id, goal_session_id, goal,
+                        acceptance_criteria, status, phase, revision, current_owner_session_id,
+                        auto_runs_used, stop_generation, deadline_at, created_at, updated_at,
+                        completed_at, max_auto_runs, plan_mode, task_plan, progress, completion_evidence
+                    )
+                    SELECT id, origin_session_id, origin_message_id, goal_session_id, goal,
+                        acceptance_criteria,
+                        CASE WHEN status NOT IN ('COMPLETED', 'CANCELLED', 'FAILED', 'BUDGET_EXHAUSTED')
+                                  AND (owner_bot_id IS NOT NULL OR EXISTS (
+                                      SELECT 1 FROM bot_delegations d
+                                      WHERE d.root_task_id = bot_tasks.id
+                                        AND d.status IN ('QUEUED', 'WAITING_TARGET', 'RUNNING')
+                                  ))
+                             THEN 'NEEDS_USER' ELSE status END,
+                        CASE WHEN status NOT IN ('COMPLETED', 'CANCELLED', 'FAILED', 'BUDGET_EXHAUSTED')
+                                  AND (owner_bot_id IS NOT NULL OR EXISTS (
+                                      SELECT 1 FROM bot_delegations d
+                                      WHERE d.root_task_id = bot_tasks.id
+                                        AND d.status IN ('QUEUED', 'WAITING_TARGET', 'RUNNING')
+                                  ))
+                             THEN 'REVIEWING' ELSE phase END,
+                        revision,
+                        CASE WHEN status NOT IN ('COMPLETED', 'CANCELLED', 'FAILED', 'BUDGET_EXHAUSTED')
+                                  AND owner_bot_id IS NOT NULL
+                             THEN origin_session_id ELSE current_owner_session_id END,
+                        auto_runs_used, stop_generation, deadline_at, created_at, updated_at,
+                        completed_at, max_auto_runs, plan_mode, task_plan,
+                        CASE WHEN status NOT IN ('COMPLETED', 'CANCELLED', 'FAILED', 'BUDGET_EXHAUSTED')
+                                  AND (owner_bot_id IS NOT NULL OR EXISTS (
+                                      SELECT 1 FROM bot_delegations d
+                                      WHERE d.root_task_id = bot_tasks.id
+                                        AND d.status IN ('QUEUED', 'WAITING_TARGET', 'RUNNING')
+                                  ))
+                             THEN 'Bot 协作功能已移除，请检查原会话后再继续。' ELSE progress END,
+                        completion_evidence
+                    FROM bot_tasks
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX index_agent_tasks_origin ON agent_tasks(origin_session_id, origin_message_id)")
+                db.execSQL("CREATE INDEX index_agent_tasks_status_updated ON agent_tasks(status, updated_at)")
+                db.execSQL("CREATE UNIQUE INDEX index_agent_tasks_goal_session ON agent_tasks(goal_session_id)")
+                // Existing Bot conversations retain their messages and become ordinary chats.
+                db.execSQL("UPDATE sessions SET bot_id = NULL WHERE bot_id IS NOT NULL")
+            }
+        }
+
         internal fun getInitializedInstance(): AppDatabase =
             checkNotNull(INSTANCE) { "AppDatabase is not initialized" }
 
@@ -618,6 +695,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_23_24,
                         MIGRATION_24_25,
                         MIGRATION_25_26,
+                        MIGRATION_26_27,
                         MIGRATION_14_13,
                     )
                     .build()

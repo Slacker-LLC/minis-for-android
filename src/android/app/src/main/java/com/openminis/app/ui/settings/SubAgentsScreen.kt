@@ -38,8 +38,8 @@ import com.openminis.app.data.repository.allVisibleEntries
 /**
  * Settings › Agent › Sub Agents: the master switch and the roster the assistant can delegate to.
  *
- * Adapted from OpenMinis 1.14's Sub Agents screen. The model pin is a model entry (the same picker
- * and `{"type":"entry"}` binding a Bot uses) because this app has fixed model slots, not groups.
+ * Adapted from OpenMinis 1.14's Sub Agents screen. The model pin is a single model entry because
+ * this app has fixed model slots, not groups.
  * Everything saved goes through [SubAgentStore], which normalizes the roster (built-in kept, names
  * unique, fields clamped), so a bad entry can never reach the prompt or the tool schema.
  */
@@ -295,7 +295,7 @@ private fun SubAgentEditor(
     if (nonTextError) MinisAlertDialog(
         onDismissRequest = { nonTextError = false },
         title = stringResource(R.string.sub_agent_model),
-        text = stringResource(R.string.bots_text_model_required),
+        text = stringResource(R.string.sub_agent_text_model_required),
         confirmText = stringResource(android.R.string.ok),
         onConfirm = { nonTextError = false },
     )

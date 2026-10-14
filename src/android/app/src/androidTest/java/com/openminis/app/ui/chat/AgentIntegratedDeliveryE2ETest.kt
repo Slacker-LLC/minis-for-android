@@ -31,14 +31,14 @@ class AgentIntegratedDeliveryE2ETest {
     @Test fun sharedArtifactsChildOwnershipAndVoiceRouting(): Unit = runBlocking {
         val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MinisApp
         app.providerRepository.awaitConfigLoaded(); UbuntuPaths.initialize(app)
-        val ids = mutableListOf<String>(); val bots = mutableListOf<String>(); val tasks = mutableListOf<String>()
+        val ids = mutableListOf<String>(); val tasks = mutableListOf<String>()
         val sharedPaths = mutableListOf<String>()
         val prefs = app.getSharedPreferences("minis_assistant_home_prefs", Context.MODE_PRIVATE)
         val savedPrefs = prefs.all.toMap()
         val report = JSONObject().put("device", android.os.Build.FINGERPRINT).put("scenarios", JSONArray())
         fun passed(name: String) { report.getJSONArray("scenarios").put(JSONObject().put("name", name).put("passed", true)) }
         suspend fun until(check: suspend () -> Boolean) = withTimeout(20_000) { while (!check()) delay(20) }
-        suspend fun session(botId: String? = null): String = app.chatRepository.createSession("scripted-model", memoryEnabled = false, botId = botId).id.also(ids::add)
+        suspend fun session(): String = app.chatRepository.createSession("scripted-model", memoryEnabled = false).id.also(ids::add)
         suspend fun prepare(sid: String, provider: LLMProvider): AgentSession {
             val core = withContext(Dispatchers.Main) { AgentRunner.sessionForCommand(app, sid) }
             withTimeout(20_000) { core.sessionLoaded.first { it } }
@@ -46,9 +46,7 @@ class AgentIntegratedDeliveryE2ETest {
             return core
         }
         try {
-            val owner = app.botRepository.createBot("Delivery owner").also { bots += it.id }
-            val other = app.botRepository.createBot("Delivery observer").also { bots += it.id }
-            val source = session(owner.id); val parent = session(other.id); val child = session()
+            val source = session(); val parent = session(); val child = session()
             val secret = "private-goal-${UUID.randomUUID()}"
             var identity: JSONObject? = null
             val writer = ScriptedProvider { call, history, _ ->
@@ -69,24 +67,16 @@ class AgentIntegratedDeliveryE2ETest {
             assertTrue(AgentRunner.prompt(app, source, "write and complete", wait = true, timeoutMs = 20_000).completed)
             val taskId = identity!!.getString("task_id"); tasks += taskId
             val ref = TaskArtifacts.page(app, source).references.single { it.taskId == taskId }
-            assertFalse(BotContextResolver.workContext(app, other.id).orEmpty().contains(secret))
             TaskArtifacts.share(app, ref)
             val shared = TaskArtifacts.page(app, source).references.single { it.taskId == taskId && it.path.startsWith("/shared/") }
             sharedPaths += shared.path
             assertEquals(TaskArtifacts.State.VERIFIED, TaskArtifacts.verify(app, shared).state)
             assertEquals("integrated delivery\n", WorkspaceFileClient.readAll(null, shared.path).decodeToString())
-            val discovered = BotContextResolver.workContext(app, other.id).orEmpty()
-            val discoveredEntries = JSONArray(discovered.substringAfter('\n'))
-            assertTrue(discoveredEntries.toString(), (0 until discoveredEntries.length()).any { index ->
-                val deliveries = discoveredEntries.optJSONObject(index)?.optJSONArray("shared_deliveries") ?: JSONArray()
-                (0 until deliveries.length()).any { deliveries.optJSONObject(it)?.optString("path") == shared.path }
-            })
-            assertFalse(discovered.contains(secret)); assertFalse(discovered.contains(source))
-            passed("actual model/file/Goal -> explicit shared copy -> Room delivery -> other member discovery preserves private source")
+            passed("actual model/file/Goal -> explicit shared copy -> durable task delivery stays verifiable")
             WorkspaceFileClient.writeBytes(source, ref.path, "changed\n".toByteArray())
-            val proofBefore = app.botTaskRepository.get(taskId)!!.completionEvidence
+            val proofBefore = app.agentTaskRepository.get(taskId)!!.completionEvidence
             assertTrue(runCatching { TaskArtifacts.share(app, ref) }.isFailure)
-            assertEquals(proofBefore, app.botTaskRepository.get(taskId)!!.completionEvidence)
+            assertEquals(proofBefore, app.agentTaskRepository.get(taskId)!!.completionEvidence)
             passed("changed source cannot create a new shared delivery or rewrite historical evidence")
             app.chatRepository.deleteSession(source)
             assertEquals(TaskArtifacts.State.VERIFIED, TaskArtifacts.verify(app, shared).state)
@@ -98,7 +88,7 @@ class AgentIntegratedDeliveryE2ETest {
             passed("non-SAF host URI and ungranted document fail closed without publishing evidence")
 
             AgentStateStore.goalSet(parent, "parent child delivery", app, 4)
-            val root = app.botTaskRepository.sessionGoal(parent)!!; tasks += root.id
+            val root = app.agentTaskRepository.sessionGoal(parent)!!; tasks += root.id
             val job = SubAgentJob(UUID.randomUUID().toString(), parent, "worker", "child delivery", false, 1,
                 SubAgentJobState.RUNNING, childSessionId = child, createdAtMs = System.currentTimeMillis(),
                 parentTaskId = root.id, parentTaskRevision = root.revision, parentStopGeneration = root.stopGeneration,
@@ -145,23 +135,11 @@ class AgentIntegratedDeliveryE2ETest {
             assertFalse(withContext(SubAgentRuntime.WorkContext(job)) { port.runChild(child, "stale work", null, 1000) }.completed)
             passed("paused or changed parent receives a retained late card and permits no new child or wrap-up model request")
 
-            prefs.edit().remove("voice_session").remove("voice_bot").commit()
-            AssistantHomePrefs.setReceptionBot(app, other.id)
-            assertEquals(parent, AssistantHomePrefs.resolveVoiceSession(app))
+            prefs.edit().remove("voice_session").commit()
+            assertEquals(null, AssistantHomePrefs.resolveVoiceSession(app))
             AssistantHomePrefs.rememberVoiceSession(app, parent)
             assertEquals(parent, AssistantHomePrefs.resolveVoiceSession(app))
-            app.chatRepository.updateSessionBot(parent, owner.id)
-            AssistantHomePrefs.setReceptionBot(app, null)
-            assertNull(AssistantHomePrefs.resolveVoiceSession(app))
-            app.chatRepository.updateSessionBot(parent, other.id)
-            AssistantHomePrefs.rememberVoiceSession(app, parent)
-            app.botRepository.setBotEnabled(other.id, false)
-            assertNull(AssistantHomePrefs.resolveVoiceSession(app))
-            app.botRepository.setBotEnabled(other.id, true)
-            AssistantHomePrefs.rememberVoiceSession(app, parent)
-            app.botRepository.deleteBot(other.id)
-            assertNull(AssistantHomePrefs.resolveVoiceSession(app))
-            passed("persisted default reception and recent voice session recheck changed, disabled and deleted Bot identity")
+            passed("voice entry restores the last valid session and ignores deleted sessions")
             report.put("sharedSha256", shared.expectedSha256).put("taskId", taskId).put("parentTaskId", root.id).put("passed", true)
         } catch (error: Throwable) { report.put("passed", false).put("failure", error.stackTraceToString()); throw error }
         finally {
@@ -171,8 +149,7 @@ class AgentIntegratedDeliveryE2ETest {
             File(app.filesDir, "agent-integrated-delivery-e2e.json").writeText(report.toString(2))
             ids.forEach { withContext(Dispatchers.Main) { AgentSessionStore.closeAndAwait(it); AgentSessionStore.release(it) }; app.chatRepository.deleteSession(it) }
             sharedPaths.forEach { runCatching { WorkspaceFileClient.delete(null, it) } }
-            bots.forEach { app.botRepository.deleteBot(it) }
-            tasks.forEach { app.database.openHelper.writableDatabase.execSQL("DELETE FROM bot_tasks WHERE id = ?", arrayOf(it)) }
+            tasks.forEach { app.database.openHelper.writableDatabase.execSQL("DELETE FROM agent_tasks WHERE id = ?", arrayOf(it)) }
         }
     }
 

@@ -20,8 +20,6 @@ class ChatRepository(
 
     fun observeSession(id: String): Flow<ChatSessionEntity?> = dao.observeSession(id)
 
-    suspend fun latestBotConversation(botId: String): ChatSessionEntity? = dao.latestBotConversation(botId)
-
     suspend fun createSession(
         modelId: String,
         title: String? = null,
@@ -31,7 +29,6 @@ class ChatRepository(
         // here; existing call sites that omit it keep the prior
         // memoryEnabled=1 behavior (legacy default).
         memoryEnabled: Boolean = true,
-        botId: String? = null,
         source: String? = null,
         modelBinding: String? = null,
     ): ChatSessionEntity {
@@ -44,7 +41,6 @@ class ChatRepository(
             updatedAt = now,
             memoryEnabled = if (memoryEnabled) 1 else 0,
             source = source,
-            botId = botId,
             modelBinding = modelBinding,
         )
         dao.insertSession(session)
@@ -141,10 +137,6 @@ class ChatRepository(
         dao.updateSessionBinding(sessionId, binding, modelId)
     }
 
-    suspend fun updateSessionBot(sessionId: String, botId: String?) {
-        dao.updateSessionBot(sessionId, botId)
-    }
-
     /**
      * Removes conversations that never received anything (see [ChatDao.emptyUntitledSessionIds]).
      * Older builds left one behind whenever a chat was opened and the process was then killed; the
@@ -185,7 +177,6 @@ class ChatRepository(
             com.openminis.app.tools.android.AndroidDebugSessionStore.clear(id)
             // Cascades messages, compact markers and events in a single Room statement.
             dao.deleteSession(id)
-            com.openminis.app.tools.BotDelegationCoordinator.current()?.cancelSourceSession(id)
             withContext(Dispatchers.IO) { runCatching { onSessionDeleted(id) } }
         } finally {
             com.openminis.app.agent.AgentSessionStore.release(id)

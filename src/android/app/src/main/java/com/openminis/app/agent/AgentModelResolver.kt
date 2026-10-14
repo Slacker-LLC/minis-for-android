@@ -9,11 +9,11 @@ import com.openminis.app.data.repository.availableEntries
 import com.openminis.app.data.repository.hasAnyCredential
 import com.openminis.app.data.repository.instance
 
-/** Shared by direct conversations and delegated execution. */
-object BotModelResolver {
+/** Resolves the selected main model for a session or scheduled task. */
+object AgentModelResolver {
     fun resolve(repository: ProviderRepository, binding: String?): ModelEntry? {
         // Prime the repository's current catalog using the same visibility path
-        // used by Bot conversations, then resolve a pin only when it is an
+        // used by ordinary sessions, then resolve a pin only when it is an
         // explicit entry binding. Legacy group/malformed values follow main.
         val visibleTextEntries = repository.allVisibleEntries().filter { it.model.isTextOutput }
         val pinnedEntryId = (ModelBinding.parse(binding) as? ModelBinding.Entry)?.entryId

@@ -28,7 +28,7 @@ internal object AgentRunner {
         val app = app(context)
         return AgentSessionStore.getOrCreate(sessionId) {
             AgentSession(sessionId, app.chatRepository, app.providerRepository, app.applicationContext,
-                app.memoryRepository, app.skillRepository, app.mcpRepository, app.botRepository)
+                app.memoryRepository, app.skillRepository, app.mcpRepository)
         }
     }
 
@@ -82,7 +82,7 @@ internal object AgentRunner {
         val app = app(context)
         val cfg = app.providerRepository.config.value
         val resolvedEntryId = modelEntryId
-            ?: com.openminis.app.agent.BotModelResolver.resolve(app.providerRepository, null)?.id
+            ?: com.openminis.app.agent.AgentModelResolver.resolve(app.providerRepository, null)?.id
             ?: return@withContext null
         val entry = cfg.modelEntries.firstOrNull { it.id == resolvedEntryId }
             ?: throw RPCException(-32602, "Entry not found: $resolvedEntryId")

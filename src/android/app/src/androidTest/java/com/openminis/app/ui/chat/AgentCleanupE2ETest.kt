@@ -9,7 +9,7 @@ import com.openminis.app.data.repository.TaskArtifacts
 import com.openminis.app.data.repository.awaitConfigLoaded
 import com.openminis.app.data.storage.MediaStore
 import com.openminis.app.data.storage.SessionStorage
-import com.openminis.app.data.db.BotTaskEntity
+import com.openminis.app.data.db.AgentTaskEntity
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.runtime.files.SafeFileTree
 import com.openminis.app.runtime.files.WorkspaceFileClient
@@ -84,7 +84,7 @@ class AgentCleanupE2ETest {
             assertTrue(AgentRunner.prompt(app,sid,"生成分类工作现场并核验成果",wait=true,timeoutMs=25_000).completed)
             assertNotNull(finished); assertFalse(finished!!.content,finished!!.isError)
             val completedId = identity!!.getString("task_id")
-            val historical = app.database.botTaskDao().get(completedId)!!
+            val historical = app.database.agentTaskDao().get(completedId)!!
             val artifact = TaskArtifacts.page(app,sid).references.single { it.taskId == completedId }
             assertEquals(TaskArtifacts.State.VERIFIED,TaskArtifacts.verify(app,artifact).state)
             passed("actual model creates all four file categories and a verified persistent work artifact")
@@ -108,7 +108,7 @@ class AgentCleanupE2ETest {
             val empty = SessionStorage.clear(app,sid,emptySet())
             assertEquals(initial,empty.after); assertEquals(0L,empty.removedBytes)
             assertSame(owner,AgentSessionStore.existing(sid))
-            assertEquals(historical,app.database.botTaskDao().get(completedId))
+            assertEquals(historical,app.database.agentTaskDao().get(completedId))
             passed("empty selection leaves the actual owner, task history and every file unchanged")
 
             val browserResult = SessionStorage.clear(app,sid,setOf(SessionStorage.Category.BROWSER))
@@ -160,7 +160,7 @@ class AgentCleanupE2ETest {
             assertEquals(TaskArtifacts.State.VERIFIED,TaskArtifacts.verify(app,artifact).state)
             passed("actual Android permission denial stays unknown and failed cleanup preserves work bytes instead of reporting empty success")
 
-            app.botTaskRepository.clearSessionGoal(sid)
+            app.agentTaskRepository.clearSessionGoal(sid)
             val active = AgentStateStore.goalSet(sid,"继续当前工作",app,maxGoalRounds=2)
             taskIds += active.id
             val live = prepare(held)
@@ -175,7 +175,7 @@ class AgentCleanupE2ETest {
             assertSame(live,during); assertTrue(during.execution.isClosed)
             val rejected = withContext(Dispatchers.Main) { AgentRunner.submit(during,"不能跨越清理边界") }
             assertEquals(AgentTurnOutcome.Rejected("session_closed"),rejected.result.await())
-            assertEquals(BotTaskEntity.STATUS_PAUSED,app.database.botTaskDao().get(active.id)!!.status)
+            assertEquals(AgentTaskEntity.STATUS_PAUSED,app.database.agentTaskDao().get(active.id)!!.status)
             held.release.complete(Unit)
             val workResult = withTimeout(15_000) { clearing.await() }
             assertEquals(AgentTurnOutcome.Cancelled,withTimeout(15_000) { turn.result.await() })
@@ -188,8 +188,8 @@ class AgentCleanupE2ETest {
             passed("actual held turn cleanup writes before the deletion fence; Goal pauses, crossing submit is rejected, and the late file is then removed")
 
             assertEquals(TaskArtifacts.State.UNAVAILABLE,TaskArtifacts.verify(app,artifact).state)
-            assertEquals(historical.completionEvidence,app.database.botTaskDao().get(completedId)!!.completionEvidence)
-            assertEquals(BotTaskEntity.STATUS_COMPLETED,app.database.botTaskDao().get(completedId)!!.status)
+            assertEquals(historical.completionEvidence,app.database.agentTaskDao().get(completedId)!!.completionEvidence)
+            assertEquals(AgentTaskEntity.STATUS_COMPLETED,app.database.agentTaskDao().get(completedId)!!.status)
             assertNotNull(app.database.chatDao().getSession(sid))
             assertTrue(app.database.chatDao().loadMessages(sid).isNotEmpty())
             passed("selected work deletion makes its current artifact unavailable without rewriting historical completion or deleting the conversation")
@@ -207,7 +207,7 @@ class AgentCleanupE2ETest {
             assertNotSame(live,fresh)
             val resumed = withContext(Dispatchers.Main) { AgentRunner.submit(fresh,"清理后正常对话") }
             assertEquals(AgentTurnOutcome.Completed,withTimeout(15_000) { resumed.result.await() })
-            assertEquals(BotTaskEntity.STATUS_PAUSED,app.database.botTaskDao().get(active.id)!!.status)
+            assertEquals(AgentTaskEntity.STATUS_PAUSED,app.database.agentTaskDao().get(active.id)!!.status)
             passed("a real fresh projection can chat after cleanup while the persistent Goal remains paused")
 
             val bad = runCatching { SessionStorage.clear(app,"../$sid",setOf(SessionStorage.Category.WORK)) }
@@ -229,7 +229,7 @@ class AgentCleanupE2ETest {
             jobIds.forEach { com.openminis.app.tools.JobRegistry.kill(it,"test cleanup") }
             nativeProcesses.forEach { it.stop() }
             for (id in listOf(sid,other)) { AgentSessionStore.release(id); runCatching { app.chatRepository.deleteSession(id) }; media.deleteSessionMedia(id) }
-            taskIds.forEach { app.database.openHelper.writableDatabase.execSQL("DELETE FROM bot_tasks WHERE id = ?",arrayOf(it)) }
+            taskIds.forEach { app.database.openHelper.writableDatabase.execSQL("DELETE FROM agent_tasks WHERE id = ?",arrayOf(it)) }
             runCatching { WorkspaceFileClient.delete(null,global) }
             SafeFileTree.deleteRecursively(File(media.mediaBaseDir,"$marker-link")); SafeFileTree.deleteRecursively(foreign)
             report.put("cleanupComplete",!File(UbuntuPaths.hostSessions,sid).exists() && !File(UbuntuPaths.hostSessions,other).exists() && !foreign.exists())

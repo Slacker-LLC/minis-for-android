@@ -9,7 +9,7 @@
 - 注册工具的 required/type/enum/nested 校验复用 ToolCallValidator；只忽略展示字段 tool_title。动作别名不能带相反 action；非法 JSON 在执行前拒绝。FileEdit 的现役 edits[] 和已声明的旧 old_string/new_string 格式均可达，空替换仍可删除内容。
 - 注册工具的合作式超时由 ToolExecutor 执行。模型层对注册工具不再套第二个时限；browser/memory 已注册并经过同一管线；浏览器沿用既有 90 秒执行时限。超时返回 timedOut/TOOL_TIMEOUT，外部取消继续抛取消并等待协程清理，不能伪装成超时。
 - 首切片保留了 M2 的执行意图位置；后续已将意图写入迁到 ToolExecutor 的权限/确认之后、执行体之前。精确 Room 回执结算仍由会话持久化负责，CLI 传输写出不充当模型持久回执。
-- 极简模式的四个编码主干工具保留，并提供 Goal、Todo、用户提问、Job 查询/读取/输入/取消。完整领域工具仍由标准模式提供；Bot 极简会话保留协调工具。预设说明与实际定义一致。
+- 极简模式的四个编码主干工具保留，并提供 Goal、Todo、用户提问、Job 查询/读取/输入/取消。完整领域工具仍由标准模式提供。预设说明与实际定义一致。
 - 子代理只走现役角色/队列运行时；关闭总开关时不发布委派 schema，也拒绝持有旧名称的执行请求。旧同步 SubagentTool 已删除。canonical schema 实时反映 roster，并采用 task/action；现役 sub_agent 和旧 subagent 来源均识别为子会话，不提供再次委派。
 - Android 诊断能力按实际 DirectRootRunner/App 回退报告，不把 Shizuku READY 宣称为 Root 诊断已可执行。Shizuku 自身连接能力独立保留。Root/SELinux/虚拟屏设备行为仍需真机验收。
 
@@ -33,7 +33,7 @@ MCP 在权限/令牌检查之后、唤醒 Ubuntu 或签发/消费确认票据之
 
 AgentSession 只向 ToolExecutor 传入当前模型调用的不可变 call/run/task 身份，并保留重复动作提醒；旧 dispatchTool 和未注册工具的重复超时分支已删除。共用执行器在参数、权限与确认通过之后检查取消，再同步持久化执行意图；持久化失败则不调用执行体。执行结果保留精确身份，仍由原 Room 保存成功后的路径确认 nonce；已开始且取消的动作保留 UNKNOWN，不能误当成已完成。
 
-MCP 调用方不能提供这份本地模型身份。Guest CLI 的动作由上层 Shell 模型意图覆盖，其独立 stdout 不作为 Room 回执，也不创建另一个检查点系统。delegate_bot 的内部 runId::toolId 仍只用于委派传输，模型检查点保留原始 tool call ID。
+MCP 调用方不能提供这份本地模型身份。Guest CLI 的动作由上层 Shell 模型意图覆盖，其独立 stdout 不作为 Room 回执，也不创建另一个检查点系统。模型检查点保留原始 tool call ID。
 
 browser_use 的 cookies/keywords 沿用 BrowserActionInput 已声明的数组和字符串两种格式；数组逐项校验，不通过放宽其它字段来兼容。真实 guest --cookies 和模型数组调用曾被共用 string 校验误拒，已从设备复现并修复；错误数组项拒绝后保留原 Cookie 值。
 

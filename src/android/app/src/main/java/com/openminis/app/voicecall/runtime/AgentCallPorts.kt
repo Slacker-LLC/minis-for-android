@@ -45,24 +45,24 @@ internal class AgentCallGateway(private val session: AgentSession) : CallModelGa
                         val reply = AgentRunner.responseAfter(session.context, session.currentSessionId, turn.userMessageId)?.trim()
                         val row = turn.userMessageId?.let { session.chatRepository.dao.getMessageById(it) }
                         val app = session.context.applicationContext as com.openminis.app.MinisApp
-                        val task = row?.requestTaskId?.let { app.botTaskRepository.get(it) }
+                        val task = row?.requestTaskId?.let { app.agentTaskRepository.get(it) }
                         val brief = if (task == null) reply?.take(1000)?.takeIf { it.isNotBlank() }
                             ?: "本轮已结束，请在聊天中查看结果。"
                         else buildString {
                             val label = session.context.getString(when (task.status) {
-                                com.openminis.app.data.db.BotTaskEntity.STATUS_COMPLETED -> com.openminis.app.R.string.bots_task_completed
-                                com.openminis.app.data.db.BotTaskEntity.STATUS_PAUSED -> com.openminis.app.R.string.bots_task_paused
-                                com.openminis.app.data.db.BotTaskEntity.STATUS_NEEDS_USER -> com.openminis.app.R.string.bots_task_needs_user
-                                com.openminis.app.data.db.BotTaskEntity.STATUS_WAITING -> com.openminis.app.R.string.work_task_waiting
-                                com.openminis.app.data.db.BotTaskEntity.STATUS_CANCELLED -> com.openminis.app.R.string.bots_task_cancelled
-                                com.openminis.app.data.db.BotTaskEntity.STATUS_BUDGET_EXHAUSTED -> com.openminis.app.R.string.bots_task_budget_exhausted
-                                com.openminis.app.data.db.BotTaskEntity.STATUS_FAILED -> com.openminis.app.R.string.bots_failed
-                                else -> com.openminis.app.R.string.bots_task_active
+                                com.openminis.app.data.db.AgentTaskEntity.STATUS_COMPLETED -> com.openminis.app.R.string.agent_task_completed
+                                com.openminis.app.data.db.AgentTaskEntity.STATUS_PAUSED -> com.openminis.app.R.string.agent_task_paused
+                                com.openminis.app.data.db.AgentTaskEntity.STATUS_NEEDS_USER -> com.openminis.app.R.string.agent_task_needs_user
+                                com.openminis.app.data.db.AgentTaskEntity.STATUS_WAITING -> com.openminis.app.R.string.work_task_waiting
+                                com.openminis.app.data.db.AgentTaskEntity.STATUS_CANCELLED -> com.openminis.app.R.string.agent_task_cancelled
+                                com.openminis.app.data.db.AgentTaskEntity.STATUS_BUDGET_EXHAUSTED -> com.openminis.app.R.string.agent_task_budget_exhausted
+                                com.openminis.app.data.db.AgentTaskEntity.STATUS_FAILED -> com.openminis.app.R.string.agent_task_failed
+                                else -> com.openminis.app.R.string.agent_task_active
                             })
                             append(label).append("。")
                             if (task.progress.isNotBlank()) append(task.progress.take(600))
                             else if (!reply.isNullOrBlank()) append(reply.take(600))
-                            if (task.status == com.openminis.app.data.db.BotTaskEntity.STATUS_COMPLETED && task.completionEvidence != null)
+                            if (task.status == com.openminis.app.data.db.AgentTaskEntity.STATUS_COMPLETED && task.completionEvidence != null)
                                 append(" 已记录验收结果，可在聊天的成果入口核查和打开。")
                         }
                         Result.success(brief)

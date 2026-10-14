@@ -4,7 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.MinisApp
 import com.openminis.app.agent.AgentRunner
-import com.openminis.app.data.db.BotTaskEntity
+import com.openminis.app.data.db.AgentTaskEntity
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.repository.awaitConfigLoaded
 import com.openminis.app.runtime.files.WorkspaceFileClient
@@ -63,7 +63,7 @@ class AgentTaskLoopWorkflowE2ETest {
             } }
             prepare(sid, provider)
             assertTrue(AgentRunner.prompt(app, sid, "交付并验收文件", wait = true, timeoutMs = 30_000).completed)
-            val task = app.botTaskRepository.sessionGoal(sid)!!
+            val task = app.agentTaskRepository.sessionGoal(sid)!!
             assertEquals("COMPLETED", task.status); assertEquals(1, task.autoRunsUsed); assertNotNull(task.completedAt)
             val proof = JSONObject(task.completionEvidence!!)
             assertEquals(task.id, proof.getString("task_id")); assertEquals(2, proof.getJSONArray("references").length())
@@ -82,11 +82,11 @@ class AgentTaskLoopWorkflowE2ETest {
             File(app.filesDir, "agent-task-delivery-e2e.txt").writeBytes(WorkspaceFileClient.readAll(sid, "/workspace/delivery.txt"))
             report.put("delivery", proof)
             withContext(Dispatchers.Main) { AgentRunner.forget(sid) }
-            assertEquals(task.completionEvidence, app.botTaskRepository.sessionGoal(sid)!!.completionEvidence)
+            assertEquals(task.completionEvidence, app.agentTaskRepository.sessionGoal(sid)!!.completionEvidence)
             assertTrue(GoalTools.execute("update_goal", "{\"goal\":\"\"}", sid, app).success)
-            assertNull(app.botTaskRepository.sessionGoal(sid))
-            assertEquals("COMPLETED", app.botTaskRepository.get(task.id)!!.status)
-            assertEquals(task.completionEvidence, app.botTaskRepository.get(task.id)!!.completionEvidence)
+            assertNull(app.agentTaskRepository.sessionGoal(sid))
+            assertEquals("COMPLETED", app.agentTaskRepository.get(task.id)!!.status)
+            assertEquals(task.completionEvidence, app.agentTaskRepository.get(task.id)!!.completionEvidence)
             passed("same core continues a real task, consumes durable budget, verifies file/receipt and preserves delivery proof on reopen")
 
             val rejectSid = session("M2 refusal workflow")
@@ -114,7 +114,7 @@ class AgentTaskLoopWorkflowE2ETest {
             assertTrue(AgentRunner.prompt(app, rejectSid, "验证真实证据和身份要求", wait = true, timeoutMs = 35_000).completed)
             val results = reject.requests.last().flatMap { it.contentParts }.filterIsInstance<AgentContentPart.ToolResult>()
             for (call in 3..10) assertTrue("reject-$call must fail", results.single { it.id == "reject-$call" }.isError)
-            val waiting = app.botTaskRepository.sessionGoal(rejectSid)!!
+            val waiting = app.agentTaskRepository.sessionGoal(rejectSid)!!
             assertEquals("NEEDS_USER", waiting.status); assertNull(waiting.completionEvidence); assertEquals(0, waiting.autoRunsUsed)
             passed("eight false evidence, hash, missing file, forged receipt, stale revision/generation and cross-session completion submissions are rejected")
 
@@ -123,19 +123,19 @@ class AgentTaskLoopWorkflowE2ETest {
             val bounded = ScriptedProvider { _, _, _ -> text("仍有工作尚未验收。") }
             prepare(budgetSid, bounded)
             assertFalse(AgentRunner.prompt(app, budgetSid, "继续执行", wait = true, timeoutMs = 25_000).completed)
-            val exhausted = app.botTaskRepository.sessionGoal(budgetSid)!!
+            val exhausted = app.agentTaskRepository.sessionGoal(budgetSid)!!
             assertEquals(3, bounded.calls); assertEquals(2, exhausted.autoRunsUsed); assertEquals("BUDGET_EXHAUSTED", exhausted.status)
             AgentStateStore.goalSet(budgetSid, exhausted.goal, app, 4)
             AgentStateStore.goalSetActive(budgetSid, true, app)
-            val resumed = app.botTaskRepository.sessionGoal(budgetSid)!!
+            val resumed = app.agentTaskRepository.sessionGoal(budgetSid)!!
             assertEquals(2, resumed.autoRunsUsed); assertEquals("ACTIVE", resumed.status)
             assertEquals(exhausted.stopGeneration + 1, resumed.stopGeneration)
             val chatOnly = ScriptedProvider { _, _, _ -> text("本次只回答进度，不启动工作。") }
             prepare(budgetSid, chatOnly)
             assertTrue(AgentRunner.prompt(app, budgetSid, "只聊聊进度", chatOnly = true, wait = true, timeoutMs = 20_000).completed)
             assertEquals(1, chatOnly.calls)
-            assertEquals("ACTIVE", app.botTaskRepository.sessionGoal(budgetSid)!!.status)
-            assertEquals(2, app.botTaskRepository.sessionGoal(budgetSid)!!.autoRunsUsed)
+            assertEquals("ACTIVE", app.agentTaskRepository.sessionGoal(budgetSid)!!.status)
+            assertEquals(2, app.agentTaskRepository.sessionGoal(budgetSid)!!.autoRunsUsed)
             assertTrue(chatOnly.offeredTools.isEmpty())
             assertTrue(chatOnly.systemPrompts.single()!!.contains("本次仅对话"))
             passed("chat-only requests preserve an active task without consuming continuation budget or enabling tools")
@@ -143,27 +143,27 @@ class AgentTaskLoopWorkflowE2ETest {
             val answer = ScriptedProvider { _, _, _ -> text("只报告当前进度，目标继续暂停。") }
             prepare(budgetSid, answer)
             assertTrue(AgentRunner.prompt(app, budgetSid, "进度如何", wait = true, timeoutMs = 20_000).completed)
-            assertEquals(1, answer.calls); assertEquals(2, app.botTaskRepository.sessionGoal(budgetSid)!!.autoRunsUsed)
+            assertEquals(1, answer.calls); assertEquals(2, app.agentTaskRepository.sessionGoal(budgetSid)!!.autoRunsUsed)
             passed("continuations stop at persisted budget; explicit extension preserves spending; paused questions never resume the task")
 
             AgentStateStore.goalSetActive(budgetSid, true, app)
-            val renewed = app.botTaskRepository.sessionGoal(budgetSid)!!
+            val renewed = app.agentTaskRepository.sessionGoal(budgetSid)!!
             assertEquals("ACTIVE", renewed.status)
-            assertFalse(app.botTaskRepository.exhaustBudget(renewed.id, renewed.revision, renewed.stopGeneration - 1))
-            assertFalse(app.botTaskRepository.exhaustBudget(renewed.id, renewed.revision - 1, renewed.stopGeneration))
-            assertFalse(app.botTaskRepository.updateStateIfWakeable(renewed.id, "NEEDS_USER", "REVIEWING", budgetSid,
+            assertFalse(app.agentTaskRepository.exhaustBudget(renewed.id, renewed.revision, renewed.stopGeneration - 1))
+            assertFalse(app.agentTaskRepository.exhaustBudget(renewed.id, renewed.revision - 1, renewed.stopGeneration))
+            assertFalse(app.agentTaskRepository.updateStateIfWakeable(renewed.id, "NEEDS_USER", "REVIEWING", budgetSid,
                 renewed.revision, renewed.stopGeneration - 1))
-            assertEquals(renewed, app.botTaskRepository.get(renewed.id))
+            assertEquals(renewed, app.agentTaskRepository.get(renewed.id))
             passed("late budget/recipient decisions cannot overwrite a renewed task revision or stop generation")
 
             val foreignSid = session("M2 foreign task override refusal")
             val foreign = ScriptedProvider { _, _, _ -> text("must not run") }
             prepare(foreignSid, foreign)
-            val protected = app.botTaskRepository.sessionGoal(budgetSid)!!
+            val protected = app.agentTaskRepository.sessionGoal(budgetSid)!!
             assertFalse(AgentRunner.prompt(app, foreignSid, "不得领取他人会话的普通任务", wait = true, timeoutMs = 20_000,
                 taskId = protected.id).completed)
             assertEquals(0, foreign.calls)
-            assertEquals(protected, app.botTaskRepository.get(protected.id))
+            assertEquals(protected, app.agentTaskRepository.get(protected.id))
             assertTrue(AgentRunner.awaitStreamExit(app, foreignSid))
             passed("request task identity is bound to its actual job/run/message and rejects a foreign session before any provider/tool execution")
 
@@ -209,20 +209,20 @@ class AgentTaskLoopWorkflowE2ETest {
                 .single { it.id == "ambiguous-complete" }
             assertTrue(refusal.isError); assertTrue(refusal.content.contains("unsettled_tool_outcome_requires_verification"))
             assertEquals(2, ToolCheckpointStore.drainPending(app, reuseSid).size)
-            assertNull(app.botTaskRepository.sessionGoal(reuseSid)!!.completionEvidence)
+            assertNull(app.agentTaskRepository.sessionGoal(reuseSid)!!.completionEvidence)
             passed("two unknown executions sharing a call ID cannot be merged into a single acknowledgement or false completion")
 
             val unknownSid = session("M2 uncertain side effect")
             AgentStateStore.goalSet(unknownSid, "先核验未知写入，不能重放", app, 3)
             WorkspaceFileClient.writeBytes(unknownSid, "/workspace/unknown.txt", "original".toByteArray())
-            val unknownTask = checkNotNull(app.botTaskRepository.sessionGoal(unknownSid))
+            val unknownTask = checkNotNull(app.agentTaskRepository.sessionGoal(unknownSid))
             val unknownExecution = checkNotNull(ToolCheckpointStore.recordIntent(app, unknownSid, "unknown-write", "linux.file.write",
                 JSONObject().put("path", "/workspace/unknown.txt").put("content", "wrong").toString(),
                 "unknown-run", unknownTask.id, unknownTask.revision, unknownTask.stopGeneration))
             val uncertain = ScriptedProvider { _, _, _ -> text("需要核验未知写入。") }
             prepare(unknownSid, uncertain)
             assertFalse(AgentRunner.prompt(app, unknownSid, "报告现场", wait = true, timeoutMs = 20_000).completed)
-            assertEquals("WAITING", app.botTaskRepository.sessionGoal(unknownSid)!!.status)
+            assertEquals("WAITING", app.agentTaskRepository.sessionGoal(unknownSid)!!.status)
             assertEquals(1, uncertain.calls); assertEquals("original", WorkspaceFileClient.readAll(unknownSid, "/workspace/unknown.txt").decodeToString())
             assertEquals(listOf("unknown-write"), ToolCheckpointStore.drainPending(app, unknownSid).map { it.callId })
             passed("unknown side effects stop automatic continuation without replay or false success")
@@ -237,13 +237,13 @@ class AgentTaskLoopWorkflowE2ETest {
             val mismatch = rejectUnknown.requests.last().flatMap { it.contentParts }.filterIsInstance<AgentContentPart.ToolResult>()
                 .single { it.id == "unknown-resolve" }
             assertTrue(mismatch.isError); assertTrue(mismatch.content.contains("unknown_write_does_not_match_verified_file"))
-            assertNull(app.botTaskRepository.sessionGoal(unknownSid)!!.completionEvidence)
+            assertNull(app.agentTaskRepository.sessionGoal(unknownSid)!!.completionEvidence)
             assertEquals(listOf("unknown-write"), ToolCheckpointStore.drainPending(app, unknownSid).map { it.callId })
             passed("reconciliation refuses a real file whose hash differs from the complete unknown write intent, retaining the checkpoint")
 
             val pauseSid = session("M2 pause actual active goal run")
             AgentStateStore.goalSet(pauseSid, "执行中的目标必须立即服从暂停", app, 3)
-            val pauseTask = app.botTaskRepository.sessionGoal(pauseSid)!!
+            val pauseTask = app.agentTaskRepository.sessionGoal(pauseSid)!!
             val entered = CompletableDeferred<Unit>()
             val delegate = ScriptedProvider { _, _, _ -> text("unused") }
             val held = object : com.openminis.app.provider.LLMProvider {
@@ -271,13 +271,13 @@ class AgentTaskLoopWorkflowE2ETest {
             AgentStateStore.goalSetActive(pauseSid, false, app)
             assertEquals(com.openminis.app.agent.AgentTurnOutcome.Cancelled, withTimeout(15_000) { request.result.await() })
             assertTrue(AgentRunner.awaitStreamExit(app, pauseSid))
-            val pausedTask = app.botTaskRepository.sessionGoal(pauseSid)!!
+            val pausedTask = app.agentTaskRepository.sessionGoal(pauseSid)!!
             assertEquals("PAUSED", pausedTask.status); assertEquals(0, pausedTask.autoRunsUsed)
             assertEquals(pauseTask.stopGeneration + 1, pausedTask.stopGeneration)
             assertFalse(GoalTools.execute("update_goal", settle(JSONObject().put("task_id", pauseTask.id)
                 .put("revision", pauseTask.revision).put("stop_generation", pauseTask.stopGeneration), "completed",
                 JSONArray().put(JSONObject().put("type", "file").put("path", "/workspace/not-delivered.txt"))).toString(), pauseSid, app).success)
-            assertNull(app.botTaskRepository.sessionGoal(pauseSid)!!.completionEvidence)
+            assertNull(app.agentTaskRepository.sessionGoal(pauseSid)!!.completionEvidence)
             passed("pausing the actual in-flight owner request cancels its job, waits for cleanup and rejects a late completion")
 
             val largeSid = session("M2 streamed large artifact verification")
@@ -285,79 +285,16 @@ class AgentTaskLoopWorkflowE2ETest {
             fixture.parentFile!!.mkdirs()
             fixture.outputStream().use { stream -> val chunk = ByteArray(1024 * 1024) { 0x5a }; repeat(60) { stream.write(chunk) } }
             AgentStateStore.goalSet(largeSid, "核验已存在的大文件", app, 1)
-            val largeTask = app.botTaskRepository.sessionGoal(largeSid)!!
+            val largeTask = app.agentTaskRepository.sessionGoal(largeSid)!!
             val large = ScriptedProvider { call, _, _ -> if (call == 1) toolCall("large-complete", "update_goal", settle(JSONObject()
                 .put("task_id", largeTask.id).put("revision", largeTask.revision).put("stop_generation", largeTask.stopGeneration), "completed",
                 JSONArray().put(JSONObject().put("type", "file").put("path", "/workspace/large.bin")))) else text("大文件核验已完成。") }
             prepare(largeSid, large)
             assertTrue(AgentRunner.prompt(app, largeSid, "核验大文件并交付", wait = true, timeoutMs = 25_000).completed)
-            val largeProof = JSONObject(app.botTaskRepository.sessionGoal(largeSid)!!.completionEvidence!!)
+            val largeProof = JSONObject(app.agentTaskRepository.sessionGoal(largeSid)!!.completionEvidence!!)
             assertEquals(60L * 1024 * 1024, largeProof.getJSONArray("references").getJSONObject(0).getLong("size"))
             passed("60 MiB artifact evidence is streamed through secure directory handles without the whole-file read limit")
 
-            val bot = app.botRepository.createBot("M2 shared root")
-            val botSession = app.chatRepository.createSession("scripted-model", title = "M2 explicit Bot goal", botId = bot.id)
-            ids += botSession.id
-            try {
-                AgentStateStore.goalSet(botSession.id, "统一显式目标与派工", app)
-                val root = app.botTaskRepository.sessionGoal(botSession.id)!!
-                val delegated = app.botTaskRepository.ensureRootTask(botSession.id, "actual-run", bot.id, "一个工作包")
-                assertEquals(root.id, delegated.id); assertEquals("统一显式目标与派工", delegated.goal)
-                passed("Bot explicit goal and work packages reuse one durable root identity")
-            } finally { app.botRepository.deleteBot(bot.id) }
-
-            for (mode in listOf("plain", "needs_user", "verified", "verified_with_other_goal")) {
-                val owner = app.botRepository.createBot("M2 inbox owner $mode")
-                val ownerSession = app.chatRepository.createSession("scripted-model", title = "M2 inbox actual wake $mode", botId = owner.id)
-                ids += ownerSession.id
-                try {
-                    val root = app.botTaskRepository.ensureRootTask(ownerSession.id, "inbox-fixture-$mode", owner.id,
-                        "核验负责人本地成果", acceptanceCriteria = "核验 owner-result.txt 后交付；缺证据需用户决定")
-                    val verifiedMode = mode.startsWith("verified")
-                    if (verifiedMode) app.botTaskRepository.updateState(root.id, "WAITING", "REVIEWING", ownerSession.id)
-                    val otherGoal = if (mode == "verified_with_other_goal") {
-                        AgentStateStore.goalSet(ownerSession.id, "另一个当前目标不能被老任务回执改动", app, 5)
-                        app.botTaskRepository.sessionGoal(ownerSession.id)!!
-                    } else null
-                    WorkspaceFileClient.writeBytes(ownerSession.id, "/workspace/owner-result.txt", "Bot verified artifact\n".toByteArray())
-                    val reviewer = ScriptedProvider { call, messages, _ -> when {
-                        mode == "plain" -> text("本次复盘回复结束，但没有提交交付证据。")
-                        call == 1 -> toolCall("owner-get-$mode", "get_goal")
-                        otherGoal != null && call == 2 -> toolCall("owner-edit-$mode", "update_goal", JSONObject().put("goal", "修订老任务后核验负责人本地成果"))
-                        otherGoal != null && call == 3 -> toolCall("owner-revised-$mode", "get_goal")
-                        otherGoal != null && call == 4 -> toolCall("owner-proof-$mode", "update_goal", settle(identity(messages, "owner-revised-$mode"),
-                            "completed", JSONArray().put(JSONObject().put("type", "file").put("path", "/workspace/owner-result.txt"))))
-                        otherGoal != null -> text("老任务已核验，另一个当前目标保持原状。")
-                        call == 2 -> toolCall("owner-set-$mode", "update_goal", settle(identity(messages, "owner-get-$mode"),
-                            if (verifiedMode) "completed" else "needs_user", if (verifiedMode) JSONArray()
-                                .put(JSONObject().put("type", "file").put("path", "/workspace/owner-result.txt")) else null))
-                        else -> text("负责人已明确结算任务。")
-                    } }
-                    prepare(ownerSession.id, reviewer)
-                    val event = app.botInboxRepository.enqueue("m2-loop-${root.id}", owner.id,
-                        com.openminis.app.data.db.BotInboxEventEntity.TYPE_DELEGATION_SUBMITTED, "{}", root.id, ownerSession.id)
-                    com.openminis.app.tools.BotDelegationCoordinator.current()!!.recoverAfterProcessStart()
-                    val expected = if (verifiedMode) "COMPLETED" else "NEEDS_USER"
-                    withTimeout(25_000) {
-                        while (app.botTaskRepository.get(root.id)?.status != expected) delay(30)
-                    }
-                    assertTrue(AgentRunner.awaitStreamExit(app, ownerSession.id))
-                    val reviewed = app.botTaskRepository.get(root.id)!!
-                    assertEquals(1, reviewed.autoRunsUsed)
-                    assertEquals(verifiedMode, reviewed.completionEvidence != null)
-                    if (otherGoal != null) {
-                        assertEquals(otherGoal, app.botTaskRepository.sessionGoal(ownerSession.id))
-                        assertTrue(reviewed.goal.startsWith("修订老任务")); assertEquals(root.revision + 1, reviewed.revision)
-                        assertTrue(reviewer.systemPrompts.all { it!!.contains(root.id) && !it.contains(otherGoal.id) })
-                    }
-                    withTimeout(15_000) {
-                        while (com.openminis.app.data.db.AppDatabase.getInstance(app).botInboxEventDao()
-                                .findByDedupeKey(event.dedupeKey)?.status != "CONSUMED") delay(30)
-                    }
-                    assertTrue(reviewer.systemPrompts.first()!!.contains(root.id))
-                    passed("actual Bot inbox wake $mode settles to $expected, consumes its event and never treats a reply as proof")
-                } finally { app.botRepository.deleteBot(owner.id) }
-            }
             report.put("passed", true)
         } catch (error: Throwable) { report.put("passed", false).put("failure", error.toString()); throw error }
         finally { ids.forEach { app.chatRepository.deleteSession(it) }; File(app.filesDir, "agent-task-loop-e2e.json").writeText(report.toString(2)) }
@@ -370,8 +307,8 @@ class AgentTaskLoopWorkflowE2ETest {
         AgentStateStore.goalSet(sid, "进程恢复后先核验已有文件，禁止重写，再交付", app, 7,
             "delivery-after-death.txt 为 M2 recovered delivery，保持哈希，未知写入必须核验")
         AgentStateStore.planSet(sid, "plan", "先读回 → 对照意图 → 核验结算 → 交付", app)
-        val task = app.botTaskRepository.sessionGoal(sid)!!
-        repeat(2) { assertTrue(app.botTaskRepository.recordAutoRun(task.id, 7)) }
+        val task = app.agentTaskRepository.sessionGoal(sid)!!
+        repeat(2) { assertTrue(app.agentTaskRepository.recordAutoRun(task.id, 7)) }
         val provider = ScriptedProvider { call, _, _ -> when (call) {
             1 -> toolCall("before-death-write", "file_write", JSONObject().put("path", "/workspace/delivery-after-death.txt")
                 .put("content", "M2 recovered delivery\n"))
@@ -382,7 +319,7 @@ class AgentTaskLoopWorkflowE2ETest {
         prepare(sid, provider)
         assertTrue(AgentRunner.prompt(app, sid, "保存真实工作文件", wait = true, timeoutMs = 20_000).completed)
         AgentStateStore.goalSetActive(sid, true, app)
-        val resumed = checkNotNull(app.botTaskRepository.sessionGoal(sid))
+        val resumed = checkNotNull(app.agentTaskRepository.sessionGoal(sid))
         ToolCheckpointStore.recordIntent(app, sid, "death-unknown-write", "linux.file.write", JSONObject()
             .put("path", "/workspace/delivery-after-death.txt").put("content", "M2 recovered delivery\n").toString(),
             "death-original-run", resumed.id, resumed.revision, resumed.stopGeneration)
@@ -400,7 +337,7 @@ class AgentTaskLoopWorkflowE2ETest {
         val sid = before.getString("sessionId"); val report = JSONObject()
         try {
             assertNotEquals(before.getInt("pid"), android.os.Process.myPid())
-            val restored = app.botTaskRepository.sessionGoal(sid)!!
+            val restored = app.agentTaskRepository.sessionGoal(sid)!!
             assertEquals("ACTIVE", restored.status); assertEquals(2, restored.autoRunsUsed)
             assertEquals(before.getJSONObject("task").getString("task_id"), restored.id)
             assertEquals(before.getJSONObject("task").getInt("revision"), restored.revision)
@@ -426,7 +363,7 @@ class AgentTaskLoopWorkflowE2ETest {
             assertTrue(provider.systemPrompts.first()!!.contains("先读回 → 对照意图 → 核验结算 → 交付"))
             assertTrue(provider.requests.first().any { it.content.contains("UNKNOWN") })
             assertTrue(provider.requests.first().any { it.content.contains("death-unknown-write") && it.content.contains("intended_arguments") })
-            val task = app.botTaskRepository.sessionGoal(sid)!!
+            val task = app.agentTaskRepository.sessionGoal(sid)!!
             assertEquals("COMPLETED", task.status); assertEquals(2, task.autoRunsUsed)
             assertEquals(restored.stopGeneration, task.stopGeneration)
             val proof = JSONObject(task.completionEvidence!!)
@@ -454,11 +391,11 @@ class AgentTaskLoopWorkflowE2ETest {
                 .put("artifact", after).put("delivery", proof).put("independentVerification", independentProof).put("writeReplayed", false)
         } catch (error: Throwable) { report.put("passed", false).put("failure", error.toString()); throw error }
         finally {
-            val delivered = app.botTaskRepository.sessionGoal(sid)
+            val delivered = app.agentTaskRepository.sessionGoal(sid)
             app.chatRepository.deleteSession(sid)
             if (delivered?.status == "COMPLETED") {
-                assertEquals("COMPLETED", app.botTaskRepository.get(delivered.id)!!.status)
-                assertEquals(delivered.completionEvidence, app.botTaskRepository.get(delivered.id)!!.completionEvidence)
+                assertEquals("COMPLETED", app.agentTaskRepository.get(delivered.id)!!.status)
+                assertEquals(delivered.completionEvidence, app.agentTaskRepository.get(delivered.id)!!.completionEvidence)
             }
             File(app.filesDir, "agent-task-loop-after-death.json").writeText(report.toString(2))
         }

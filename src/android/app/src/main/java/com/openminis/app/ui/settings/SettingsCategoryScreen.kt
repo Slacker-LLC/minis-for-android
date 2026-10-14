@@ -8,7 +8,6 @@ import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.Bolt
@@ -154,7 +153,6 @@ fun SettingsCategoryScreen(
     onBackgroundClick: () -> Unit = {},
     onLogsClick: () -> Unit = {},
     onAboutClick: () -> Unit = {},
-    onTeamClick: () -> Unit = {},
     onScheduledTasksClick: () -> Unit = {},
     onRootfsManagementClick: () -> Unit = {},
     onOpenBackground: () -> Unit = {},
@@ -272,16 +270,7 @@ fun SettingsCategoryScreen(
                         showDivider = false,
                     )
                 }
-                // The same pages the drawer opens; settings reach them too, so everything about the
-                // agent can be set from here (one screen, two entrances).
-                SettingsSection(header = stringResource(R.string.settings_agent_section_team)) {
-                    SettingsRow(
-                        icon = Icons.Outlined.Group,
-                        iconColor = Color(0xFF007AFF),
-                        title = stringResource(R.string.bots_team),
-                        subtitle = stringResource(R.string.settings_agent_team_sub),
-                        onClick = onTeamClick,
-                    )
+                SettingsSection(header = stringResource(R.string.settings_agent_section_tasks)) {
                     SettingsRow(
                         icon = Icons.Outlined.Schedule,
                         iconColor = Color(0xFFFF9500),

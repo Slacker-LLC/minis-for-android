@@ -94,8 +94,6 @@ fun ChatScreen(
     memoryRepository: MemoryRepository? = null,
     skillRepository: com.openminis.app.data.repository.SkillRepository? = null,
     mcpRepository: com.openminis.app.data.repository.MCPRepository? = null,
-    botRepository: com.openminis.app.data.repository.BotRepository? = null,
-    onBotDetails: (String) -> Unit = {},
     onBack: () -> Unit,
     isTwoPane: Boolean = false,
     onToggleSidebar: (() -> Unit)? = null,
@@ -144,7 +142,6 @@ fun ChatScreen(
             memoryRepository = memoryRepository,
             skillRepository = skillRepository,
             mcpRepository = mcpRepository,
-            botRepository = botRepository,
         ),
     )
     // [T-android-larky-longsession-followup] Consume the tail-windowed
@@ -164,14 +161,6 @@ fun ChatScreen(
     val hasOlderMessages by hasOlderMessages_st
     val isStreaming_st = viewModel.isStreaming.collectAsState()
     val isStreaming by isStreaming_st
-    val currentSession by remember(sessionId, chatRepository) {
-        chatRepository.observeSession(sessionId)
-    }.collectAsState(initial = null)
-    val team_st = remember(botRepository) {
-        botRepository?.observeBots() ?: kotlinx.coroutines.flow.flowOf(emptyList())
-    }.collectAsState(initial = emptyList())
-    val team by team_st
-    val currentBot = team.firstOrNull { it.id == currentSession?.botId }
     val generatingMessageId_st = viewModel.generatingMessageId.collectAsState()
     val generatingMessageId by generatingMessageId_st
     val replySpeechState_st = viewModel.replySpeechState.collectAsState()
@@ -1193,7 +1182,6 @@ fun ChatScreen(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             ChatTopBar(
-                onBotDetails = onBotDetails,
                 onBack = onBack,
                 isTwoPane = isTwoPane,
                 onToggleSidebar = onToggleSidebar,
@@ -1202,9 +1190,6 @@ fun ChatScreen(
                 onBrowseChatFiles = onBrowseChatFiles,
                 context = context,
                 viewModel = viewModel,
-                isStreamingState = isStreaming_st,
-                teamState = team_st,
-                currentBot = currentBot,
                 listState = listState,
                 showChatMenuState = showChatMenu_st,
                 showVirtualScreenViewerState = showVirtualScreenViewer_st,
@@ -1308,7 +1293,6 @@ fun ChatScreen(
                 messagesState = messages_st,
                 isStreaming_st = isStreaming_st,
                 isStreamingState = isStreaming_st,
-                currentBot = currentBot,
                 replySpeechStateState = replySpeechState_st,
                 modelName_st = modelName_st,
                 attachments_st = attachments_st,
@@ -1467,7 +1451,7 @@ fun ChatScreen(
     // Model Picker bottom sheet
     ChatModelPickerHost(providerRepository = providerRepository, viewModel = viewModel, showModelPickerState = showModelPicker_st)
 
-    com.openminis.app.voicecall.VoiceConversationHost(viewModel, ensureMicPermissionFlow, currentBot)
+    com.openminis.app.voicecall.VoiceConversationHost(viewModel, ensureMicPermissionFlow)
 
     // Offload permission dialog (also visible over the voice conversation).
     OffloadPermissionDialog()

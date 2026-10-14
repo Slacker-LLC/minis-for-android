@@ -35,7 +35,7 @@ import kotlinx.coroutines.withContext
  * [T-system-prompt-custom] The device owner's system prompt - one text box.
  *
  * Whatever is saved here is injected ahead of every other authored section of
- * the agent prompt (SOUL identity / personality, built-in modules, preset, bot
+ * the agent prompt (SOUL identity / personality, built-in modules, preset
  * and session guidance) and carries an explicit precedence header, so text
  * written here outranks every other setting. Codex-style custom instructions
  * rather than a per-section editor.

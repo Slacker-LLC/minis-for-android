@@ -25,31 +25,31 @@ object AgentSessionStore {
 
     @Synchronized
     internal fun activeRun(id: String): String? = sessions[resolvePersistedId(id)]
-        ?.takeIf { it._isStreaming.value }?.activeBotRunId
+        ?.takeIf { it._isStreaming.value }?.activeRunId
 
     @Synchronized
     internal fun activeRunTask(id: String) = sessions[resolvePersistedId(id)]
         ?.takeIf { it._isStreaming.value }?.activeGoalTask
 
     @Synchronized
-    internal fun updateRunGoal(id: String, task: com.openminis.app.data.db.BotTaskEntity?) {
+    internal fun updateRunGoal(id: String, task: com.openminis.app.data.db.AgentTaskEntity?) {
         val core = sessions[resolvePersistedId(id)]?.takeIf { it._isStreaming.value } ?: return
         core.activeGoalTask = task
-        val run = core.activeBotRunId ?: return
+        val run = core.activeRunId ?: return
         if (task != null) RunCheckpointStore.appendEvent(core.context, resolvePersistedId(id), run,
             org.json.JSONObject().put("type", "task_bound").put("task_id", task.id)
                 .put("revision", task.revision).put("stop_generation", task.stopGeneration).toString())
     }
 
     /** Cancel only work with this durable task identity, even when several tasks share a session. */
-    internal suspend fun stopTaskWork(task: com.openminis.app.data.db.BotTaskEntity, stopOwner: Boolean = true) {
+    internal suspend fun stopTaskWork(task: com.openminis.app.data.db.AgentTaskEntity, stopOwner: Boolean = true) {
         com.openminis.app.tools.JobRegistry.list().filter { it.taskId == task.id && it.status == com.openminis.app.tools.JobRegistry.JobStatus.RUNNING }
             .forEach { com.openminis.app.tools.JobRegistry.kill(it.id, "task was cancelled") }
         com.openminis.app.agent.subagents.SubAgents.cancelTask(task.id)
         if (stopOwner) stopObsoleteGoalRun(task.currentOwnerSessionId ?: task.goalSessionId ?: task.originSessionId, task)
     }
 
-    internal suspend fun stopObsoleteGoalRun(id: String, task: com.openminis.app.data.db.BotTaskEntity) {
+    internal suspend fun stopObsoleteGoalRun(id: String, task: com.openminis.app.data.db.AgentTaskEntity) {
         val core = synchronized(this) { sessions[resolvePersistedId(id)] } ?: return
         val owned = core.activeGoalTask ?: return
         if (core._isStreaming.value && owned.id == task.id &&

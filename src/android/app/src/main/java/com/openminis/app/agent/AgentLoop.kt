@@ -110,11 +110,8 @@ private suspend fun AgentSession.executeAgentLoop(
     reusingAssistantId: String? = null,
 ): AgentTurnOutcome {
     mergeExternalHistory()
-    // Refresh the cached identity before building the tool allow-list. This
-    // also covers a Bot Direct Chat where the user sends immediately after
-    // navigation, before the init coroutine has finished hydrating the VM.
+    // Refresh session source before building the tool allow-list.
     chatRepository.getSession(activeSessionId)?.let { session ->
-        sessionBotId = session.botId
         sessionSource = session.source
     }
     AppLogger.info(TAG_STREAM, "runAgentLoop ENTER provider=${provider.javaClass.simpleName} historySize=${agentHistory.size}")
@@ -131,19 +128,8 @@ private suspend fun AgentSession.executeAgentLoop(
         AppLogger.warning(TAG, "session overrides unavailable for $activeSessionId: ${error.message}")
     }.getOrDefault(SessionOverrides())
 
-    val botPrompt = runCatching {
-        val botId = chatRepository.getSession(activeSessionId)?.botId
-        botId?.let { botRepository?.getBot(it) }
-    }.onFailure { error ->
-        AppLogger.warning(TAG, "bot identity unavailable for $activeSessionId: ${error.message}")
-    }.getOrNull()?.let { bot ->
-        check(bot.enabled) { context.getString(R.string.bots_disabled_footer) }
-        listOfNotNull(com.openminis.app.agent.BotContextResolver.systemPrompt(bot),
-            com.openminis.app.agent.BotContextResolver.workContext(context, bot.id)).joinToString("\n\n")
-    }
     val baseSystemPrompt = AgentRunSetup.systemPrompt(
         callerPrompt = systemPrompt,
-        botPrompt = botPrompt,
         sessionPrompt = sessionOverrides.systemPrompt,
         sessionSource = sessionSource,
         unattended = OffloadPermissionManager.isUnattendedSession(activeSessionId),
@@ -830,9 +816,9 @@ private suspend fun AgentSession.executeAgentLoop(
         // A user may save a goal while an unscoped request is awaiting its model response.
         // Bind it inside that request, without replacing a root it already owns.
         if (activeGoalTask == null) {
-            (context.applicationContext as? com.openminis.app.MinisApp)?.botTaskRepository
+            (context.applicationContext as? com.openminis.app.MinisApp)?.agentTaskRepository
                 ?.sessionGoal(activeSessionId)
-                ?.takeIf { it.status == com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE }
+                ?.takeIf { it.status == com.openminis.app.data.db.AgentTaskEntity.STATUS_ACTIVE }
                 ?.let { AgentSessionStore.updateRunGoal(activeSessionId, it) }
         }
 
@@ -1010,26 +996,23 @@ private suspend fun AgentSession.executeAgentLoop(
             }
             // Auto-title after first exchange
             if (turn == 0) titleGenerator.generateIfNeeded()
-            // Explicit ordinary tasks continue in this same loop, with a durable CAS budget.
-            // Bot wake-ups already have their inbox scheduler and must not start a second one here.
+            // Explicit tasks continue in this same loop, with a durable CAS budget.
             val ownedTask = activeGoalTask
             if (loopOutcome == AgentTurnOutcome.Completed && !chatOnlyForNextTurn && ownedTask != null &&
-                ownedTask.status == com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE &&
-                com.openminis.app.tools.BotDelegationCoordinator.current()?.isOwnerWake(ownedTask.id, activeSessionId) != true &&
-                (context.applicationContext as com.openminis.app.MinisApp).botDelegationRepository.countNonTerminalForRootTask(ownedTask.id) == 0 &&
+                ownedTask.status == com.openminis.app.data.db.AgentTaskEntity.STATUS_ACTIVE &&
                 _promptQueue.value.isEmpty()) {
-                val tasks = (context.applicationContext as com.openminis.app.MinisApp).botTaskRepository
+                val tasks = (context.applicationContext as com.openminis.app.MinisApp).agentTaskRepository
                 val current = tasks.get(ownedTask.id)
-                if (current?.status == com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE &&
+                if (current?.status == com.openminis.app.data.db.AgentTaskEntity.STATUS_ACTIVE &&
                     current.revision == ownedTask.revision && current.stopGeneration == ownedTask.stopGeneration) {
                     if (ToolCheckpointStore.drainPending(context, activeSessionId).isNotEmpty()) {
                         tasks.settleVerified(current.id, current.revision, current.stopGeneration,
-                            com.openminis.app.data.db.BotTaskEntity.STATUS_WAITING,
+                            com.openminis.app.data.db.AgentTaskEntity.STATUS_WAITING,
                             "存在结果未知的工具调用；需要先核验现场，不能自动重放。", null)
                         loopOutcome = AgentTurnOutcome.NeedsAttention("task_has_unsettled_tools")
                     } else {
                         val continued = tasks.continueGoal(current.id, current.revision, current.stopGeneration)
-                        if (continued?.status == com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE) {
+                        if (continued?.status == com.openminis.app.data.db.AgentTaskEntity.STATUS_ACTIVE) {
                             activeGoalTask = continued
                             agentHistory.add(LLMMessage(role = LLMMessage.Role.USER,
                                 content = "继续当前目标。根据实际结果核验验收条件；完成时提交 update_goal 的证据，不能把回复结束当成完成。需要等待或用户决定时明确更新任务状态。"))
@@ -1037,7 +1020,7 @@ private suspend fun AgentSession.executeAgentLoop(
                                 isAwaitingModelResponse = true) }
                             continue
                         }
-                        if (continued?.status == com.openminis.app.data.db.BotTaskEntity.STATUS_BUDGET_EXHAUSTED) {
+                        if (continued?.status == com.openminis.app.data.db.AgentTaskEntity.STATUS_BUDGET_EXHAUSTED) {
                             loopOutcome = AgentTurnOutcome.NeedsAttention("task_auto_continuation_budget_exhausted")
                         }
                     }
@@ -1265,14 +1248,14 @@ internal fun AgentSession.preflightValidateToolCall(
 internal suspend fun AgentSession.executeTool(name: String, argsJson: String, toolId: String): ToolExecutionResult {
     val canonical = com.openminis.app.tools.runtime.ToolRegistry.canonicalName(name)
     val task = activeGoalTask
-    val identity = com.openminis.app.tools.runtime.ToolExecutor.ModelExecution(toolId, activeBotRunId, task?.id,
+    val identity = com.openminis.app.tools.runtime.ToolExecutor.ModelExecution(toolId, activeRunId, task?.id,
         task?.revision, task?.stopGeneration)
     val result = com.openminis.app.tools.runtime.ToolExecutor.execute(
         name = name,
         argsJson = argsJson,
         sessionId = activeSessionId,
         context = context,
-        toolId = if (canonical == "delegate_bot") "${identity.runId.orEmpty()}::$toolId" else toolId,
+        toolId = toolId,
         modelExecution = identity,
     )
     return applyRepeatGuard(name, argsJson, result)

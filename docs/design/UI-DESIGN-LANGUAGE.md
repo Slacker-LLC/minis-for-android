@@ -148,7 +148,7 @@ T153 有意提亮的一组值（`#26262A`/`#2C2C30`/`#3A3A3F`），不回退成 
 - 点击露出的那条（遮罩）、或向左滑动、或系统返回键，都会关闭抽屉（`ModalNavigationDrawer` 行为，
   遮罩色用 `minisOverlayScrim`）。
 - 内容自上而下：标题行（搜索图标、「编辑」文字按钮）→ 搜索框（点搜索图标展开）→ 新建聊天（纯强调色文字行）
-  → 功能入口（Bot、定时任务、终端、文件）→ 置顶 → 分组 → 最近 → 设置。
+  → 功能入口（定时任务、终端、文件）→ 置顶 → 分组 → 最近 → 设置。
 - 会话长按菜单：重命名、置顶/取消置顶、移到分组、选择、删除（红色，需确认）。
 - 分组行：点击展开/折叠（沿用手风琴语义），长按菜单：组内新聊天、置顶、重命名、解散、删除分组及会话。
 - 「编辑」进入多选：顶部变为「取消 / 已选 N / 移动 / 删除」文字按钮；「移动」打开现有分组选择器，
@@ -183,7 +183,7 @@ T153 有意提亮的一组值（`#26262A`/`#2C2C30`/`#3A3A3F`），不回退成 
 | 设置 | `SETTINGS` / `ui/settings/SettingsCategoryScreen.kt` 及各设置页 |
 | 模型与提供商 | `PROVIDER_LIST`、`MODELS` |
 | 文件（存储/共享/挂载/浏览） | `STORAGE`、`SHARED_FOLDERS`、`MOUNTED_FOLDERS`、`FILE_BROWSER` |
-| Bot / 定时任务 | `BOTS`、`SCHEDULED_TASKS` |
+| 定时任务 | `SCHEDULED_TASKS` |
 | 技能 / MCP / 记忆 / Soul / 权限 | `SKILLS`、`MCP`、`MEMORY`、`SOUL`、`PERMISSIONS` |
 | 运行时（rootfs、环境变量、日志） | `ROOTFS_MANAGEMENT`、`ENV_VARS`、`LOGS` |
 | 外观 | `APPEARANCE` |

@@ -31,7 +31,7 @@ object SubAgentLimits {
  *
  * Adapted from OpenMinis 1.14 (`SubAgentDefinition`). Upstream pins a sub agent to a model *group*;
  * this app replaced model groups with fixed model slots, so the pin here is a single model entry
- * ([modelBinding], the same `{"type":"entry",...}` payload a Bot uses). `null` means Auto: the
+ * ([modelBinding]). `null` means Auto: the
  * delegating model picks with `model_choice` (its own model, the main slot, or the light slot).
  */
 @Serializable

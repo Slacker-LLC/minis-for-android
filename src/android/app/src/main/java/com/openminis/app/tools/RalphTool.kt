@@ -107,10 +107,10 @@ object RalphTool {
             var handoff = ""
             for (round in 1..maxRounds) {
                 identity?.model?.taskId?.let { taskId ->
-                    val parent = checkNotNull(app.botTaskRepository.get(taskId)) { "parent_task_missing" }
+                    val parent = checkNotNull(app.agentTaskRepository.get(taskId)) { "parent_task_missing" }
                     check(parent.revision == identity.model.revision && parent.stopGeneration == identity.model.stopGeneration &&
-                        parent.status in setOf(com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE,
-                            com.openminis.app.data.db.BotTaskEntity.STATUS_WAITING, com.openminis.app.data.db.BotTaskEntity.STATUS_NEEDS_USER)) { "parent_task_changed_or_stopped" }
+                        parent.status in setOf(com.openminis.app.data.db.AgentTaskEntity.STATUS_ACTIVE,
+                            com.openminis.app.data.db.AgentTaskEntity.STATUS_WAITING, com.openminis.app.data.db.AgentTaskEntity.STATUS_NEEDS_USER)) { "parent_task_changed_or_stopped" }
                 }
                 manifest.put("rounds_used", round); saveManifest()
                 Log.i(TAG, "round $round/$maxRounds objective=${objective.take(60)}")

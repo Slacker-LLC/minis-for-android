@@ -32,19 +32,16 @@ internal suspend fun withChatVm(
     chatOnly: Boolean,
     provider: ScriptedProvider,
     sessionTitle: String? = "Characterization",
-    botName: String? = null,
     block: suspend (ChatViewModel, ChatRepository, ScriptedProvider) -> Unit,
 ) {
     val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MinisApp
     app.providerRepository.awaitConfigLoaded()
     val db = Room.inMemoryDatabaseBuilder(app, AppDatabase::class.java).build()
     val repository = ChatRepository(db.chatDao())
-    val bots = com.openminis.app.data.repository.BotRepository(db.botDao())
-    val bot = botName?.let { bots.createBot(it, systemPrompt = "Voice identity acceptance") }
-    val session = repository.createSession("scripted-model", title = sessionTitle, botId = bot?.id)
+    val session = repository.createSession("scripted-model", title = sessionTitle)
     val store = ViewModelStore()
     val vm = withContext(Dispatchers.Main) {
-        ChatViewModel(session.id, repository, app.providerRepository, app, botRepository = bots).also { store.put("test", it) }
+        ChatViewModel(session.id, repository, app.providerRepository, app).also { store.put("test", it) }
     }
     try {
         withTimeout(10_000L) { vm.sessionLoaded.first { it } }
@@ -106,5 +103,5 @@ internal fun toolCall(id: String, name: String, args: JSONObject = JSONObject())
 internal fun chatProjection(app: MinisApp, id: String): ChatViewModel = androidx.lifecycle.ViewModelProvider(
     ChatViewModelStore.ownerFor(id),
     ChatViewModel.factory(id, app.chatRepository, app.providerRepository, app,
-        app.memoryRepository, app.skillRepository, app.mcpRepository, app.botRepository),
+        app.memoryRepository, app.skillRepository, app.mcpRepository),
 )[ChatViewModel::class.java]

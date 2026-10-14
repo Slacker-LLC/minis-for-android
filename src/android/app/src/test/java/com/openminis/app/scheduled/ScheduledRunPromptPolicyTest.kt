@@ -7,8 +7,8 @@ import org.junit.Test
 class ScheduledRunPromptPolicyTest {
     @Test
     fun `scheduled session appends fixed soft safety note last`() {
-        val prompt = ScheduledRunPromptPolicy.appendSafetyNote("Bot role\n\nSession override", "scheduled")
-        assertTrue(prompt!!.startsWith("Bot role"))
+        val prompt = ScheduledRunPromptPolicy.appendSafetyNote("Character role\n\nSession override", "scheduled")
+        assertTrue(prompt!!.startsWith("Character role"))
         assertTrue(prompt.contains("Session override"))
         assertTrue(prompt.endsWith(ScheduledRunPromptPolicy.SAFETY_NOTE))
     }

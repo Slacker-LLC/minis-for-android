@@ -225,7 +225,7 @@ internal fun AgentSession.handleUserCancelledCleanup() {
                 "assistant",
                 partsJson,
                 modelSnapshot = modelAttributionSnapshot(currentProvider),
-                requestRunId = activeBotRunId,
+                requestRunId = activeRunId,
             )
         }
         _canResume.value = true
@@ -358,7 +358,7 @@ fun AgentSession.resume() {
                 else "$prefix\n\n${baseSystemPrompt ?: ""}"
             } else baseSystemPrompt
         launch(Dispatchers.IO) {
-            val sourceRunId = beginBotSourceRun()
+            val sourceRunId = beginSourceRun()
             AppLogger.info(TAG_STREAM, "resume streamJob ENTER sid=$activeSessionId")
             try {
                 SessionConcurrencyManager.acquireSlot(activeSessionId)
@@ -366,9 +366,8 @@ fun AgentSession.resume() {
                 SessionActivityTracker.setActive(activeSessionId, onStop = { cancelStream() })
                 val activeFallbackStrategy = providerRepository.config.value.fallbackTrigger
                 val fallbackProviders = buildFallbackProviders(provider)
-                var botTurnSucceeded = false
                 try {
-                    withBotTurnLock {
+                    withSessionTurnLock {
                         AppLogger.info(TAG_STREAM, "resume runAgentLoop CALL")
                         val outcome = runAgentLoop(
                             provider = provider,
@@ -377,7 +376,6 @@ fun AgentSession.resume() {
                             fallbackStrategy = activeFallbackStrategy,
                         )
                         AppLogger.info(TAG_STREAM, "resume runAgentLoop RETURN normal")
-                        botTurnSucceeded = outcome == AgentTurnOutcome.Completed
                         AppLogger.info(TAG_STREAM, "resume request settled")
                     }
                 } catch (e: CancellationException) {
@@ -400,13 +398,11 @@ fun AgentSession.resume() {
                     SessionActivityTracker.setInactive(activeSessionId)
                     com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(activeSessionId)
                     SessionConcurrencyManager.releaseSlot(activeSessionId)
-                    com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, botTurnSucceeded, sourceRunId)
                     AppLogger.info(TAG_STREAM, "resume streamJob FINALLY exit")
                 }
             } catch (e: CancellationException) {
                 AppLogger.info(TAG_STREAM, "resume streamJob CANCELLED waiting for slot")
                 Log.d(TAG, "Cancelled while waiting for concurrency slot (resume)")
-                com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, false, sourceRunId)
             }
             AppLogger.info(TAG_STREAM, "resume streamJob EXIT")
         }

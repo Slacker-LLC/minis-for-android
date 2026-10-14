@@ -136,7 +136,7 @@
     <string name="system_prompt_reset_all_confirm_body">所有自定义文案与开关都会被清除，每个模块都还原为随 App 发布的默认内容。</string>
     <string name="system_prompt_custom_section">自定义系统提示词</string>
     <string name="system_prompt_custom_hint">在这里写下你的系统提示词……</string>
-    <string name="system_prompt_custom_footer">保存后的内容会注入到每次对话的最前面，并附带优先级声明：与人格（Soul）、回复风格、预设、Bot 指令或会话级 Soul 冲突时，以这段内容为准。留空则不注入。</string>
+    <string name="system_prompt_custom_footer">保存后的内容会注入到每次对话的最前面，并附带优先级声明：与人格（Soul）、回复风格、预设或会话级 Soul 冲突时，以这段内容为准。留空则不注入。</string>
     <string name="system_prompt_custom_clear">清空</string>
     <string name="system_prompt_custom_clear_confirm_title">清空自定义系统提示词？</string>
     <string name="system_prompt_custom_clear_confirm_body">输入框会被清空，这段内容不再注入；其它设置不受影响。</string>
@@ -1945,7 +1945,6 @@
     <string name="drawer_recent">最近</string>
     <string name="drawer_no_search_match">未找到相关对话</string>
     <string name="drawer_search_results">%1$d 个结果</string>
-    <string name="settings_agent_section_team">团队与例程</string>
     <string name="settings_agent_team_sub">成员及其职责、模型与例程</string>
     <string name="settings_agent_tasks_sub">定期运行、运行记录与执行者</string>
     <string name="chat_quick_battery_title">查看电池状态</string>
@@ -2086,31 +2085,11 @@
     <plurals name="model_slot_backups_count">
         <item quantity="other">+%1$d 个备用模型</item>
     </plurals>
-    <string name="bots_task_budget_summary">自动复盘 %1$d/%2$d · 修订 %3$d/%4$d · 委派 %5$d/%6$d</string>
-    <string name="bots_task_pause">暂停</string>
-    <string name="bots_task_cancel">取消</string>
-    <string name="bots_task_notification_title">Bot 任务：%1$s</string>
-    <string name="bots_task_notification_needs_user">负责 Bot 需要你处理。</string>
-    <string name="bots_task_notification_completed">负责 Bot 已完成结果复盘。</string>
-    <string name="bots_task_notification_budget">自动复盘预算已用尽。</string>
 
-    <!-- B2: Bot-owned scheduled routines -->
-    <string name="scheduled_task_executor">执行者</string>
-    <string name="scheduled_task_executor_regular">普通聊天（无 Bot）</string>
-    <string name="scheduled_task_executor_loading">正在加载…</string>
-    <string name="scheduled_task_model_bot_default">使用此 Bot 的默认模型</string>
-    <string name="scheduled_task_bot_disabled">Bot 已停用</string>
-    <string name="scheduled_task_bot_label">Bot：%1$s</string>
-    <string name="bots_routines">例程</string>
-    <string name="bots_routines_disabled">此 Bot 已停用。例程仍保持启用，但会跳过执行，直到 Bot 恢复启用。</string>
-    <string name="bots_new_routine">新建例程</string>
-    <string name="bots_routine_no_next">未安排下次运行</string>
+    <!-- Scheduled task strings -->
 
     <!-- B2: capacity/save errors -->
-    <string name="scheduled_task_bot_routine_limit">此 Bot 已有 %1$d 个例程。请先删除一个再添加。</string>
     <string name="scheduled_task_save_failed">无法保存定时任务。</string>
-    <string name="bots_routine_vscreen_busy">虚拟屏正被另一个会话占用。</string>
-    <string name="bots_routine_vscreen_unavailable">虚拟屏已关闭，或设备兼容性自检未通过。</string>
     <string name="scheduled_vscreen_unattended_hint">无人值守运行中的界面操作只使用虚拟屏。</string>
     <string name="scheduled_vscreen_unavailable_warning">虚拟屏尚未通过当前设备自检并启用。仍可保存例程，但界面操作可能失败。</string>
     <string name="settings_vscreen_entry">虚拟屏幕（实验性）</string>
@@ -2197,9 +2176,6 @@
 <string name="scheduled_task_tier_full_confirmation_body">FULL 允许此无人值守例程在现有应用权限范围内执行任意 shell 命令、写入临时目录以外的文件并调用已连接的 MCP 工具。仅在信任提示词和已配置工具时选择。网络访问仍不受限制。</string>
 <string name="scheduled_task_tier_full_confirm">确认完整权限</string>
 <string name="scheduled_task_readonly_denied_preview">READ_ONLY 已阻止 %1$s：%2$s</string>
-    <string name="bots_progress_running">%1$d 项委派工作进行中</string>
-    <string name="bots_progress_none">暂无进行中的工作</string>
-    <string name="bots_members_header">成员</string>
     <string name="browser_desktop_site">桌面版网页</string>
     <string name="browser_tab_count_title">%1$d 个标签页</string>
     <string name="browser_share">分享</string>
@@ -2502,7 +2478,6 @@
     <string name="outcome_pending_title">需要检查的动作</string>
     <string name="outcome_inspect_action">检查 %1$s</string>
     <string name="outcome_kept_unknown">动作仍未确定，已保留原记录。</string>
-    <string name="bots_reception">默认接待成员</string>
     <string name="voice_cancel_recording">取消本次录音</string>
     <string name="voice_stop_playback">停止播报</string>
     <string name="voice_stop_owned_turn">停止本次语音发起的回合</string>
@@ -2515,4 +2490,22 @@
     <string name="work_task_waiting">等待外部结果</string>
     <string name="work_request_review">有待投递指令；恢复后请确认投递方式。</string>
     <string name="work_task_clear_selection">解除所选任务</string>
+    <string name="settings_agent_section_tasks">定时任务</string>
+    <string name="agent_task_completed">已完成</string>
+    <string name="agent_task_cancelled">已取消</string>
+    <string name="agent_task_failed">失败</string>
+    <string name="agent_task_paused">已暂停</string>
+    <string name="agent_task_needs_user">需要你处理</string>
+    <string name="agent_task_budget_exhausted">运行预算已用尽</string>
+    <string name="agent_task_active">进行中</string>
+    <string name="agent_task_phase_planning">规划中</string>
+    <string name="agent_task_phase_reviewing">复核中</string>
+    <string name="agent_task_phase_revising">修订中</string>
+    <string name="agent_task_phase_delivering">交付中</string>
+    <string name="agent_task_phase_executing">执行中</string>
+    <string name="agent_task_pause">暂停任务</string>
+    <string name="agent_task_cancel">取消任务</string>
+    <string name="scheduled_task_legacy_executor_removed">此任务以前绑定的执行者已移除。重新运行前请检查并保存任务。</string>
+    <string name="sub_agent_text_model_required">请选择能够输出文字的模型。</string>
+    <string name="vscreen_display_busy">虚拟屏当前正被另一个会话占用。</string>
 </resources>

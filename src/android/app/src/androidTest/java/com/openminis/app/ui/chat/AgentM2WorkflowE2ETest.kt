@@ -7,7 +7,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.MinisApp
 import com.openminis.app.agent.AgentRunner
 import com.openminis.app.data.db.AppDatabase
-import com.openminis.app.data.db.BotTaskEntity
+import com.openminis.app.data.db.AgentTaskEntity
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.repository.awaitConfigLoaded
 import com.openminis.app.debug.DebugRPCHandler
@@ -76,8 +76,7 @@ class AgentM2WorkflowE2ETest {
             assertTrue(AgentRunner.prompt(app, session.id, "建立目标并完成文件工作", wait = true, timeoutMs = 25_000).completed)
             val goal = rpc("agent.goal.get", session.id)
             assertTrue("goal must be created through the offered schema: $goal", goal.getString("id").isNotBlank())
-            val task = app.botTaskRepository.get(goal.getString("id"))!!
-            assertNull(task.ownerBotId)
+            val task = app.agentTaskRepository.get(goal.getString("id"))!!
             assertEquals(session.id, task.goalSessionId)
             assertEquals(9, task.maxAutoRuns)
             assertTrue(provider.systemPrompts.drop(1).all { it!!.contains("交付可核验 M2 文件") && it.contains("读取文件确认 M2 durable task") })
@@ -86,7 +85,7 @@ class AgentM2WorkflowE2ETest {
             val read = provider.requests.last().flatMap { it.contentParts }.filterIsInstance<AgentContentPart.ToolResult>().single { it.id == "m2-read" }
             assertFalse(read.isError)
             assertTrue(read.content.contains("M2 durable task"))
-            assertEquals(BotTaskEntity.STATUS_PAUSED, task.status)
+            assertEquals(AgentTaskEntity.STATUS_PAUSED, task.status)
             report.put("artifactSha256", sha(bytes)).put("modelCalls", provider.calls).put("taskId", task.id)
             File(app.filesDir, "m2-result-e2e.txt").writeBytes(bytes)
             passed("model creates a durable ordinary task; actual file write/read succeeds; ending the turn does not finish the goal")
@@ -94,8 +93,8 @@ class AgentM2WorkflowE2ETest {
             assertTrue(AgentCommandRegistry.execute(app, session.id, "plan", "保留原文件 → 修改 → 读回核验").ok)
             assertEquals("保留原文件 → 修改 → 读回核验", rpc("agent.plan.get", session.id).getString("plan"))
             rpc("agent.goal.setActive", session.id, JSONObject().put("active", true))
-            assertTrue(app.botTaskRepository.recordAutoRun(task.id, 9))
-            assertTrue(app.botTaskRepository.recordAutoRun(task.id, 9))
+            assertTrue(app.agentTaskRepository.recordAutoRun(task.id, 9))
+            assertTrue(app.agentTaskRepository.recordAutoRun(task.id, 9))
             rpc("agent.goal.setActive", session.id, JSONObject().put("active", false))
             assertTrue(AgentCommandRegistry.execute(app, session.id, "goal", "补充目标：仍需保留源数据").ok)
             val paused = rpc("agent.goal.get", session.id)
@@ -106,7 +105,7 @@ class AgentM2WorkflowE2ETest {
             assertEquals(task.id, paused.getString("id"))
             assertEquals(3, paused.getInt("stopGeneration"))
             assertTrue(paused.getString("acceptanceCriteria").contains("读取文件"))
-            assertFalse(app.botTaskRepository.recordAutoRun(task.id, 9))
+            assertFalse(app.agentTaskRepository.recordAutoRun(task.id, 9))
             passed("Debug and slash commands share task identity, durable plan, pause generation and spent budget without reactivation")
 
             withContext(Dispatchers.Main) { AgentRunner.forget(session.id) }
@@ -125,8 +124,8 @@ class AgentM2WorkflowE2ETest {
             assertFalse(clearer.requests.last().flatMap { it.contentParts }.filterIsInstance<AgentContentPart.ToolResult>()
                 .single { it.id == "m2-clear" }.isError)
             assertTrue(rpc("agent.goal.get", session.id).getString("id").isBlank())
-            assertEquals("CANCELLED", app.botTaskRepository.get(task.id)!!.status)
-            assertNull(app.botTaskRepository.get(task.id)!!.goalSessionId)
+            assertEquals("CANCELLED", app.agentTaskRepository.get(task.id)!!.status)
+            assertNull(app.agentTaskRepository.get(task.id)!!.goalSessionId)
             val results = coroutineScope { (1..2).map { async(Dispatchers.IO) {
                 GoalTools.execute("create_goal", "{\"goal\":\"并行创建只能有一个目标\"}", session.id, app).success
             } }.awaitAll() }
@@ -160,8 +159,8 @@ class AgentM2WorkflowE2ETest {
             assertEquals(kept.getString("id"), rpc("agent.goal.get", empty.id).getString("id"))
             app.chatRepository.deleteSession(empty.id)
             assertNull(app.chatRepository.getSession(empty.id))
-            assertEquals("CANCELLED", app.botTaskRepository.get(kept.getString("id"))!!.status)
-            assertNull(app.botTaskRepository.get(kept.getString("id"))!!.goalSessionId)
+            assertEquals("CANCELLED", app.agentTaskRepository.get(kept.getString("id"))!!.status)
+            assertNull(app.agentTaskRepository.get(kept.getString("id"))!!.goalSessionId)
             passed("empty-draft cleanup and clear preserve explicit task ownership; explicit session deletion atomically stops it")
             report.put("passed", true)
         } catch (error: Throwable) {
@@ -173,7 +172,7 @@ class AgentM2WorkflowE2ETest {
     }
 
     @Test
-    fun migrateLegacyBotTask(): Unit = runBlocking {
+    fun migrateLegacyTaskIntoAgentAndRetainRecoveryCopy(): Unit = runBlocking {
         // Host supplies the committed v23 schema, so this opens an actual v23 DB file.
         val name = "m2-migration-e2e.db"
         app.deleteDatabase(name)
@@ -197,24 +196,35 @@ class AgentM2WorkflowE2ETest {
             db.version = 23
         }
         val db = Room.databaseBuilder(app, AppDatabase::class.java, name)
-            .addMigrations(AppDatabase.MIGRATION_23_24, AppDatabase.MIGRATION_24_25, AppDatabase.MIGRATION_25_26).build()
+            .addMigrations(AppDatabase.MIGRATION_23_24, AppDatabase.MIGRATION_24_25,
+                AppDatabase.MIGRATION_25_26, AppDatabase.MIGRATION_26_27).build()
         val report = JSONObject()
         try {
-            val old = db.botTaskDao().get("legacy-m2")!!
-            assertEquals("legacy-bot", old.ownerBotId); assertEquals("legacy-run", old.originMessageId)
-            assertEquals("PAUSED", old.status); assertEquals("REVISING", old.phase)
-            assertEquals(7, old.revision); assertEquals(2, old.autoRunsUsed); assertEquals(6, old.delegationsUsed)
-            assertEquals(1, old.revisionRoundsUsed); assertEquals(4, old.stopGeneration)
+            val old = db.agentTaskDao().get("legacy-m2")!!
+            assertEquals("legacy-run", old.originMessageId)
+            assertEquals("NEEDS_USER", old.status); assertEquals("REVIEWING", old.phase)
+            assertEquals(7, old.revision); assertEquals(2, old.autoRunsUsed); assertEquals(4, old.stopGeneration)
             assertEquals(1890000000000L, old.deadlineAt); assertEquals(1700000000000L, old.createdAt)
             assertEquals(1700000000001L, old.updatedAt); assertNull(old.completedAt)
-            assertEquals("必须保留预算", old.acceptanceCriteria); assertEquals("legacy-owner-session", old.currentOwnerSessionId)
+            assertEquals("必须保留预算", old.acceptanceCriteria); assertEquals("legacy-session", old.currentOwnerSessionId)
             assertNull(old.goalSessionId); assertEquals(3, old.maxAutoRuns); assertEquals("off", old.planMode)
+            assertTrue(old.progress.contains("已移除"))
+            db.openHelper.readableDatabase.query(
+                "SELECT owner_bot_id, current_owner_session_id, delegations_used, revision_rounds_used FROM bot_tasks WHERE id = ?",
+                arrayOf("legacy-m2"),
+            ).use { archived ->
+                assertTrue(archived.moveToFirst())
+                assertEquals("legacy-bot", archived.getString(0))
+                assertEquals("legacy-owner-session", archived.getString(1))
+                assertEquals(6, archived.getInt(2))
+                assertEquals(1, archived.getInt(3))
+            }
             val oldInput = db.chatDao().getMessageById("legacy-input")!!
             assertEquals("[{\"type\":\"text\",\"value\":\"原始历史正文\"}]", oldInput.partsJson)
             assertNull(oldInput.requestState); assertNull(oldInput.requestDelivery); assertNull(oldInput.requestTaskId)
             assertNull(oldInput.requestTaskGeneration); assertNull(oldInput.requestRunId); assertNull(oldInput.requestUserInput)
             assertTrue(oldInput.isConversationMessage)
-            assertEquals(26, db.openHelper.readableDatabase.version)
+            assertEquals(27, db.openHelper.readableDatabase.version)
             report.put("oldTask", JSONObject().put("id", old.id).put("budgetUsed", old.autoRunsUsed).put("stopGeneration", old.stopGeneration))
                 .put("schemaFrom", 23).put("schemaTo", db.openHelper.readableDatabase.version).put("passed", true)
         } catch (error: Throwable) { report.put("passed", false).put("failure", error.toString()); throw error }
@@ -228,7 +238,7 @@ class AgentM2WorkflowE2ETest {
         val goal = rpc("agent.goal.set", session.id, JSONObject().put("text", "重启后继续核验已有文件，未知写入先观察")
             .put("maxGoalRounds", 11).put("acceptanceCriteria", "保持 M2 restart evidence 文件哈希，不重放未知写入"))
         rpc("agent.plan.set", session.id, JSONObject().put("mode", "plan").put("plan", "已写文件；重启先读回；保留暂停"))
-        repeat(2) { assertTrue(app.botTaskRepository.recordAutoRun(goal.getString("id"), 11)) }
+        repeat(2) { assertTrue(app.agentTaskRepository.recordAutoRun(goal.getString("id"), 11)) }
         rpc("agent.goal.setActive", session.id, JSONObject().put("active", false))
         val provider = ScriptedProvider { call, _, _ -> if (call == 1) toolCall("m2-restart-write", "file_write",
             JSONObject().put("path", "/workspace/m2-restart.txt").put("content", "M2 restart evidence\n")) else text("已保存文件。") }

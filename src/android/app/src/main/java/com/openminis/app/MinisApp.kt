@@ -20,7 +20,6 @@ import com.openminis.app.data.db.AppDatabase
 import com.openminis.app.data.db.DatabaseVersionGuard
 import com.openminis.app.data.repository.BackgroundSettingsRepository
 import com.openminis.app.data.repository.ChatRepository
-import com.openminis.app.data.repository.BotRepository
 import com.openminis.app.data.repository.EnvVarRepository
 import com.openminis.app.data.MountedFoldersStore
 import com.openminis.app.data.repository.MemoryRepository
@@ -146,12 +145,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         private set
     lateinit var chatRepository: ChatRepository
         private set
-    lateinit var botRepository: BotRepository
-    lateinit var botDelegationRepository: com.openminis.app.data.repository.BotDelegationRepository
-        private set
-    lateinit var botTaskRepository: com.openminis.app.data.repository.BotTaskRepository
-        private set
-    lateinit var botInboxRepository: com.openminis.app.data.repository.BotInboxRepository
+    lateinit var agentTaskRepository: com.openminis.app.data.repository.AgentTaskRepository
         private set
     lateinit var providerRepository: ProviderRepository
         private set
@@ -444,10 +438,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         // App-owned Direct Ubuntu path contract initialized first.
         UbuntuRuntime.init(this)
         database = AppDatabase.getInstance(this)
-        botRepository = BotRepository(database.botDao())
-        botDelegationRepository = com.openminis.app.data.repository.BotDelegationRepository(database.botDelegationDao())
-        botTaskRepository = com.openminis.app.data.repository.BotTaskRepository(database.botTaskDao())
-        botInboxRepository = com.openminis.app.data.repository.BotInboxRepository(database.botInboxEventDao())
+        agentTaskRepository = com.openminis.app.data.repository.AgentTaskRepository(database.agentTaskDao())
         chatRepository = ChatRepository(database.chatDao()) { sessionId ->
             com.openminis.app.runtime.ubuntu.UbuntuPaths.deleteSession(
                 applicationContext,
@@ -479,15 +470,6 @@ class MinisApp : Application(), ImageLoaderFactory {
         // [T-eta-character-cards] Stored character cards; the repository reads the database
         // lazily, so nothing is loaded during startup.
         com.openminis.app.roleplay.CharacterRepository.initialize(this)
-        com.openminis.app.tools.BotDelegationCoordinator.install(
-            context = this,
-            botRepository = botRepository,
-            chatRepository = chatRepository,
-            providerRepository = providerRepository,
-            delegationRepository = botDelegationRepository,
-            taskRepository = botTaskRepository,
-            inboxRepository = botInboxRepository,
-        )
         mcpRepository = MCPRepository(this)
         // MCPProvider: Minis as MCP client — connect configured servers and
         // register their tools as mcp.<server>.<tool> (hot-reloadable).
@@ -561,15 +543,6 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.runtime.RootShellHandler(),
             aliasNames = listOf("shell_root"),
-        )
-        com.openminis.app.tools.runtime.ToolRegistry.register(
-            com.openminis.app.tools.runtime.BotDelegationHandler(),
-        )
-        com.openminis.app.tools.runtime.ToolRegistry.register(
-            com.openminis.app.tools.runtime.BotRosterHandler(),
-        )
-        com.openminis.app.tools.runtime.ToolRegistry.register(
-            com.openminis.app.tools.runtime.BotDelegationStatusHandler(),
         )
         // P10: linux.file.* ops (host-side workspace, bind-visible to guest)
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileAppendHandler(), listOf("append_file"))
@@ -850,8 +823,6 @@ class MinisApp : Application(), ImageLoaderFactory {
                 revive = { UbuntuRuntime.ensureReady(force = true).running },
             ),
         )
-        com.openminis.app.tools.BotDelegationCoordinator.current()?.recoverAfterProcessStart()
-
         // Privacy Mode store + redactor wiring. Mirrors iOS
         // EnvVarPrivacyStore.init / EnvVarRedactor static handoff.
         com.openminis.app.data.EnvVarPrivacyStore.init(this)

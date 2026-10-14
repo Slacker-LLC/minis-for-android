@@ -29,7 +29,6 @@
 | `docs/contracts/05-ENGINEERING.md` | 工程、验证与参考边界 |
 | `docs/contracts/06-CURRENT-GAPS.md` | 当前缺口与历史基线说明 |
 | `docs/contracts/07-OWNERSHIP-MIGRATION.md` | 旧 Root-owned 用户数据一次性迁移 |
-| `docs/contracts/08-BOT-COORDINATION.md` | Bot 协调合同 |
 
 ## 硬规则
 
@@ -59,7 +58,7 @@ Android app
 
 ## 网络兼容
 
-当前 `minis-root-network-proxy` 固定监听 `127.0.0.1:18787`，只提供有界 HTTP absolute-form / CONNECT 转发。它是独立兼容 helper，不是 Direct Ubuntu 的权限边界，也不是 Bot/MCP 通信通道。设备若能让 App-UID guest 直接获得正确网络，不应为了形式继续把“Root 网络代理”当成 Root/chroot 的固有步骤。
+当前 `minis-root-network-proxy` 固定监听 `127.0.0.1:18787`，只提供有界 HTTP absolute-form / CONNECT 转发。它是独立兼容 helper，不是 Direct Ubuntu 的权限边界，也不是 MCP 通信通道。设备若能让 App-UID guest 直接获得正确网络，不应为了形式继续把“Root 网络代理”当成 Root/chroot 的固有步骤。
 
 ## 开发前置：本地与远端统一
 

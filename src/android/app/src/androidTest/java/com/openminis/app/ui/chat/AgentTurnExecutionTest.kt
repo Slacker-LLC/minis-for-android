@@ -22,7 +22,7 @@ import com.openminis.app.data.repository.awaitConfigLoaded
 
 /** Uses the real VM/Room loop with an in-process provider; no network or root tools. */
 @RunWith(AndroidJUnit4::class)
-class BotTurnExecutionTest {
+class AgentTurnExecutionTest {
     private suspend fun withVm(block: suspend (ChatViewModel, ChatRepository, ControlledProvider) -> Unit) {
         val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MinisApp
         app.providerRepository.awaitConfigLoaded()
@@ -74,7 +74,7 @@ class BotTurnExecutionTest {
     @Test
     fun liveReceiptIsVisibleOnceAndIncludedOnceInTheNextModelRequest() = runBlocking {
         withVm { vm, repository, provider ->
-            val body = "[Bot 委托结果]\n委托 ID：controlled-receipt\n状态：执行结束\nReview found one failing test."
+            val body = "[任务结果]\n任务 ID：controlled-receipt\n状态：执行结束\nReview found one failing test."
             val receipt = repository.appendMessage(vm.currentSessionId, "assistant",
                 JSONArray().put(JSONObject().put("type", "text").put("value", body)).toString())
             withContext(Dispatchers.Main) {

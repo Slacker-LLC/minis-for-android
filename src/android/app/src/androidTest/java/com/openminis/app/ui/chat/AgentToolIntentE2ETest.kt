@@ -60,7 +60,7 @@ class AgentToolIntentE2ETest {
 
             val heldSid = session()
             AgentStateStore.goalSet(heldSid, "中断后保留已发生副作用的真实执行身份", app, 3)
-            val goal = checkNotNull(app.botTaskRepository.sessionGoal(heldSid))
+            val goal = checkNotNull(app.agentTaskRepository.sessionGoal(heldSid))
             val entered = CompletableDeferred<ToolCheckpointStore.IntentRecord>()
             val cleaned = CompletableDeferred<Unit>()
             ToolRegistry.register(object : ToolHandler {
@@ -69,7 +69,7 @@ class AgentToolIntentE2ETest {
                     val intent = ToolCheckpointStore.drainPending(context, sessionId).single()
                     assertEquals("intent-held-call", intent.callId); assertEquals("todo_write", intent.toolName)
                     assertEquals(goal.id, intent.taskId); assertNotNull(intent.intentId)
-                    assertEquals(AgentSessionStore.existing(sessionId)!!.activeBotRunId, intent.runId)
+                    assertEquals(AgentSessionStore.existing(sessionId)!!.activeRunId, intent.runId)
                     WorkspaceFileClient.writeBytes(sessionId, "/workspace/held.txt", "one actual effect\n".toByteArray())
                     entered.complete(intent)
                     try { awaitCancellation() } finally { cleaned.complete(Unit) }

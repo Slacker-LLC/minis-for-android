@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.openminis.app.data.db.BotEntity
 import com.openminis.app.scheduled.ScheduledTask
 import com.openminis.app.scheduled.ScheduledTaskManager
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +12,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.openminis.app.data.repository.allVisibleEntries
@@ -60,13 +58,6 @@ class ScheduledTasksViewModel(private val appContext: Context) : ViewModel() {
 
     val tasks: StateFlow<List<ScheduledTask>> = manager.store().observe()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    val bots: StateFlow<List<BotEntity>> = (if (ready()) app.botRepository.observeBots() else flowOf<List<BotEntity>>(emptyList()))
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    suspend fun sessionBotId(sessionId: String): String? = withContext(Dispatchers.IO) {
-        if (!ready()) null else app.chatRepository.getSession(sessionId)?.botId
-    }
 
     // ── [T-android-scheduled-tasks-full] Picker data for the editor ──
 

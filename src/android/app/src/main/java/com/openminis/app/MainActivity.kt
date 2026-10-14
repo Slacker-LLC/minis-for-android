@@ -619,7 +619,6 @@ class MainActivity : ComponentActivity() {
                     envVarRepository = app.envVarRepository,
                     skillRepository = app.skillRepository,
                     mcpRepository = app.mcpRepository,
-                    botRepository = app.botRepository,
                     memoryRepository = app.memoryRepository,
                     navController = navController,
                     initialDeepLink = launchDeepLink,
@@ -831,7 +830,7 @@ class MainActivity : ComponentActivity() {
                     catch (error: Exception) {
                         DeepLinkCoordinator.consumePendingChatAction()
                         android.widget.Toast.makeText(this@MainActivity, error.message ?: getString(R.string.voice_call_model), android.widget.Toast.LENGTH_LONG).show()
-                        nav.navigate(Routes.BOTS) { launchSingleTop = true }
+                        nav.navigate(Routes.SESSION_LIST) { launchSingleTop = true }
                     }
                 }
             }

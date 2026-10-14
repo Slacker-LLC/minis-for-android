@@ -151,6 +151,7 @@ fun SessionListScreen(
             ) + persistedSessions
         }
     }
+    val sessionsById = remember(sessions) { sessions.associateBy { it.id } }
     val isInitialLoadComplete by viewModel.isInitialLoadComplete.collectAsState()
     val isSearchActive by viewModel.isSearchActive.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -228,20 +229,11 @@ fun SessionListScreen(
     // While searching, group cards are suppressed: padding a result set with
     // every non-matching group is noise, not structure.
     val showFolderBlock = !isSearchActive || searchQuery.isBlank()
-    val sessionBadges by com.openminis.app.service.SessionBadgeStore.byId.collectAsState()
-    val badgeRevision by com.openminis.app.service.SessionBadgeStore.revision.collectAsState()
-    val freshBadgedIds = remember(sessionBadges, badgeRevision) {
-        com.openminis.app.service.SessionBadgeStore
-            .freshCornerBadgeSessionIds(GROUP_BADGE_FRESH_WINDOW_MS)
-    }
-    val activeSessionIds by SessionActivityTracker.activeSessions.collectAsState()
     val folderPartition = remember(
-        sessions, folders, collapsedFolderIds, showFolderBlock, freshBadgedIds, activeSessionIds,
+        sessions, folders, collapsedFolderIds, showFolderBlock,
     ) {
         if (showFolderBlock) {
-            partitionByFolder(
-                sessions, folders, collapsedFolderIds, freshBadgedIds, activeSessionIds,
-            )
+            partitionByFolder(sessions, folders, collapsedFolderIds)
         } else emptyList<FolderGroupBlock>() to sessions
     }
     val folderBlocks = folderPartition.first
@@ -268,6 +260,7 @@ fun SessionListScreen(
             }
         }
     }
+    val existingFolderIds = remember(folders) { folders.mapTo(HashSet()) { it.id } }
 
     // [T-android-newchat-list-autoscroll] Hoisted scroll state so the VM's
     // new-session signal can drive it. The list is ORDER BY updated_at DESC,
@@ -403,7 +396,7 @@ fun SessionListScreen(
                         // scheduled tasks so the user can see at a glance how many
                         // are configured without opening the list.
                         IconButton(onClick = onBotsClick) {
-                            Icon(Icons.Outlined.Group, contentDescription = stringResource(R.string.bots_team))
+                            Icon(Icons.Outlined.Group, contentDescription = stringResource(R.string.sub_agents_title))
                         }
                         IconButton(onClick = onScheduledTasksClick) {
                             if (scheduledTaskCount > 0) {
@@ -571,8 +564,6 @@ fun SessionListScreen(
                         // [T-android-session-grouping] Membership is "points at a
                         // group that exists", matching partitionByFolder. Hoisted
                         // out of the row so it is not rebuilt per item.
-                        val existingFolderIds = folders.mapTo(HashSet()) { it.id }
-
                         fun androidx.compose.foundation.lazy.LazyListScope.renderSessionRows(
                             rows: List<ChatSessionEntity>,
                             // [T-android-folder-card-ios-parity] Folder members
@@ -717,7 +708,7 @@ fun SessionListScreen(
                                 // Collapsed groups contribute no rows; the card
                                 // still reports the real member count.
                                 renderSessionRows(
-                                    block.ids.mapNotNull { id -> sessions.firstOrNull { it.id == id } },
+                                    block.ids.mapNotNull(sessionsById::get),
                                     inFolder = true,
                                 )
                             }

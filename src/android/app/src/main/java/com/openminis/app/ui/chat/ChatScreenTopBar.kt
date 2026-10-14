@@ -39,7 +39,6 @@ import com.openminis.app.ui.theme.ChatColors
 @OptIn(ExperimentalMaterial3Api::class, kotlinx.coroutines.FlowPreview::class)
 @Composable
 internal fun ChatTopBar(
-    onBotDetails: kotlin.Function1<kotlin.String, kotlin.Unit>,
     onBack: kotlin.Function0<kotlin.Unit>,
     isTwoPane: kotlin.Boolean,
     onToggleSidebar: kotlin.Function0<kotlin.Unit>?,
@@ -48,43 +47,18 @@ internal fun ChatTopBar(
     onBrowseChatFiles: kotlin.Function0<kotlin.Unit>,
     context: android.content.Context,
     viewModel: com.openminis.app.ui.chat.ChatViewModel,
-    isStreamingState: androidx.compose.runtime.State<kotlin.Boolean>,
-    teamState: androidx.compose.runtime.State<kotlin.collections.List<com.openminis.app.data.db.BotEntity>>,
-    currentBot: com.openminis.app.data.db.BotEntity?,
     listState: androidx.compose.foundation.lazy.LazyListState,
     showChatMenuState: androidx.compose.runtime.MutableState<kotlin.Boolean>,
     showVirtualScreenViewerState: androidx.compose.runtime.MutableState<kotlin.Boolean>,
     showClearChatDialogState: androidx.compose.runtime.MutableState<kotlin.Boolean>,
     pagePalette: com.openminis.app.ui.theme.ChatPalette,
 ) {
-    val isStreaming by isStreamingState
-    val team by teamState
     var showChatMenu by showChatMenuState
     var showVirtualScreenViewer by showVirtualScreenViewerState
     var showClearChatDialog by showClearChatDialogState
     Column {
     androidx.compose.material3.CenterAlignedTopAppBar(
-        title = {
-            // Plain chats have no title here (the model and thinking strength live in the
-            // composer); a team member keeps its name and status.
-            currentBot?.let { bot ->
-                Column(
-                    Modifier.clickable { onBotDetails(bot.id) }.padding(vertical = 6.dp),
-                ) {
-                    Text(bot.name, style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        if (isStreaming) stringResource(R.string.bots_working)
-                        else if (!bot.enabled) stringResource(R.string.bots_disabled)
-                        else bot.systemPrompt?.lineSequence()?.firstOrNull { it.isNotBlank() }
-                            ?: stringResource(R.string.bots_details),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = ChatColors.secondaryText,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        },
+        title = {},
         navigationIcon = {
             if (!isTwoPane) {
                 if (onOpenDrawer != null) {
@@ -186,7 +160,7 @@ internal fun ChatTopBar(
         // user-configured font scale on xhdpi/xxhdpi without
         // re-clipping (T-topbar-model-row-clip regression check).
         // Font sizes + lineHeights stay untouched per spec.
-        expandedHeight = if (currentBot == null) 60.dp else 68.dp,
+        expandedHeight = 60.dp,
     )
     // A hairline under the bar only while there is older content scrolled beneath it.
     if (listState.canScrollForward) {

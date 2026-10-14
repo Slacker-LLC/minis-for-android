@@ -4,8 +4,6 @@ import android.content.Context
 import android.app.AlarmManager
 import android.os.Build
 import com.openminis.app.logging.AppLogger
-import com.openminis.app.MinisApp
-import com.openminis.app.scheduled.BotSelectorResult
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
@@ -14,7 +12,6 @@ import com.openminis.app.scheduled.ScheduledTargetMode
 import com.openminis.app.scheduled.ScheduledTask
 import com.openminis.app.scheduled.ScheduledTaskManager
 import com.openminis.app.scheduled.ScheduledTaskTierMutationPolicy
-import com.openminis.app.scheduled.ScheduledTaskPolicy
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -27,11 +24,11 @@ import java.util.Calendar
  * AI actions from a prompt.
  *
  *   minis-scheduled list
- *   minis-scheduled create --label L --time HH:MM --prompt "..." [--bot <id|unique-name>]
+ *   minis-scheduled create --label L --time HH:MM --prompt "..."
  *                          [--repeat once|daily|weekdays|custom --days mon,tue,...]
  *                          [--target new|follow-up|rerun]
  *                          [--session <id>] [--message <id>]
- *                          [--model <modelId>] [--bot <id|unique-name>]
+ *                          [--model <modelId>]
  *                          [--start YYYY-MM-DD] [--end YYYY-MM-DD]
  *                          [--disabled]
  *   minis-scheduled delete --id <taskId>
@@ -61,7 +58,7 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
         return try {
             when (val sub = args.positional.firstOrNull() ?: "list") {
                 "list" -> handleList()
-                "create", "add" -> handleCreate(args, request)
+                "create", "add" -> handleCreate(args)
                 "delete", "remove", "rm" -> handleDelete(args)
                 "enable" -> handleSetEnabled(args, true)
                 "disable" -> handleSetEnabled(args, false)
@@ -78,13 +75,15 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
 
     private fun handleList(): NativeOffloadResult {
         val arr = JSONArray()
-        val names = botNames()
-        for (t in manager.list()) arr.put(taskJson(t, names))
+        for (t in manager.list()) arr.put(taskJson(t))
         val out = withPrecision(JSONObject().put("tasks", arr).put("count", arr.length()))
         return NativeOffloadResult(0, out.toString(2))
     }
 
-    private fun handleCreate(args: OffloadArgs, request: NativeOffloadRequest): NativeOffloadResult {
+    private fun handleCreate(args: OffloadArgs): NativeOffloadResult {
+        if (args.hasFlag("bot") || args.get("bot") != null) {
+            throw IllegalArgumentException("Bot executors are no longer supported")
+        }
         val permissionTier = ScheduledTaskTierMutationPolicy.parseCliTier(args.get("tier"))
         val label = args.get("label", "l") ?: ""
         val (hour, minute) = parseTime(args.get("time", "t")
@@ -94,7 +93,6 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
             parseDays(args.get("days") ?: throw IllegalArgumentException("--days required for custom repeat"))
         } else emptySet()
         val target = parseTarget(args)
-        val botId = resolveBotId(args.get("bot"), target, request)
         val prompt = args.get("prompt", "p") ?: ""
         if (target !is ScheduledTargetMode.RerunMessage && prompt.isBlank()) {
             throw IllegalArgumentException("--prompt required (except for rerun target)")
@@ -108,64 +106,14 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
             prompt = prompt,
             targetMode = target,
             modelId = args.get("model", "m"),
-            botId = botId,
             enabled = !args.hasFlag("disabled"),
             startDateMs = args.get("start")?.let { parseDate(it) },
             endDateMs = args.get("end")?.let { parseDate(it) },
             permissionTier = permissionTier,
         )
         manager.create(task)
-        val out = withPrecision(JSONObject().put("created", taskJson(task, botNames())))
+        val out = withPrecision(JSONObject().put("created", taskJson(task)))
         return NativeOffloadResult(0, out.toString(2))
-    }
-
-    private fun resolveBotId(
-        selector: String?,
-        target: ScheduledTargetMode,
-        request: NativeOffloadRequest,
-    ): String? {
-        val app = context.applicationContext as? MinisApp
-            ?: throw IllegalArgumentException("Cannot resolve --bot in this process")
-        if (!app.subsystemsReady()) {
-            if (!selector.isNullOrBlank()) throw IllegalArgumentException("Bot data is not ready; try again shortly")
-            return null
-        }
-        val bots = runBlocking { app.botRepository.listBots() }
-        val sourceBotId = request.sessionId?.let { id ->
-            runBlocking { app.chatRepository.getSession(id)?.botId }
-        }
-        val selected = when (val resolved = ScheduledTaskPolicy.resolveBotSelector(selector, bots, sourceBotId)) {
-            BotSelectorResult.None -> null
-            is BotSelectorResult.Found -> resolved.bot.id
-            is BotSelectorResult.NotFound -> throw IllegalArgumentException(
-                "No Bot matches '${resolved.selector}'. Use an exact id or unique Bot name.",
-            )
-            is BotSelectorResult.Ambiguous -> {
-                val candidates = resolved.candidates.joinToString { "${it.name} (${it.id})" }
-                throw IllegalArgumentException(
-                    "Bot name '${resolved.selector}' is ambiguous. Candidates: $candidates. Use an id.",
-                )
-            }
-        }
-        val targetSessionId = target.sessionIdOrNull
-        if (targetSessionId != null) {
-            val targetBotId = runBlocking { app.chatRepository.getSession(targetSessionId)?.botId }
-            val explicitSelector = !selector.isNullOrBlank()
-            if ((explicitSelector || sourceBotId != null) && targetBotId != selected) {
-                throw IllegalArgumentException(
-                    "Follow-up and rerun targets keep their existing Bot identity; " +
-                        "the selected Bot must match the target session.",
-                )
-            }
-            return targetBotId ?: selected
-        }
-        return selected
-    }
-
-    private fun botNames(): Map<String, String> {
-        val app = context.applicationContext as? MinisApp ?: return emptyMap()
-        if (!app.subsystemsReady()) return emptyMap()
-        return runBlocking { app.botRepository.listBots().associate { it.id to it.name } }
     }
 
     private fun handleDelete(args: OffloadArgs): NativeOffloadResult {
@@ -294,7 +242,7 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
         }.timeInMillis
     }
 
-    private fun taskJson(t: ScheduledTask, botNames: Map<String, String>): JSONObject = JSONObject().apply {
+    private fun taskJson(t: ScheduledTask): JSONObject = JSONObject().apply {
         put("id", t.id)
         put("label", t.label)
         put("time", "%02d:%02d".format(t.timeOfDayHour, t.timeOfDayMinute))
@@ -304,10 +252,7 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
         put("target", t.targetMode.encode())
         if (t.modelId != null) put("model", t.modelId)
         put("permissionTier", t.permissionTier.name)
-        t.botId?.let { id ->
-            put("botId", id)
-            put("bot", JSONObject().put("id", id).put("name", botNames[id] ?: JSONObject.NULL))
-        }
+        if (t.legacyExecutorRemoved) put("requires_review", true)
         put("enabled", t.enabled)
         t.nextTriggerMs()?.let { put("nextTriggerMs", it) }
         if (t.startDateMs != null) put("startDateMs", t.startDateMs)
@@ -337,7 +282,7 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
 
             (no subcommand)  Same as `list` (default subcommand)
             list
-            create --time HH:MM --prompt "..." [--label L] [--bot <id|name>]
+            create --time HH:MM --prompt "..." [--label L]
                    [--repeat once|daily|weekdays|custom --days mon,tue,...]
                    [--target new|follow-up|rerun --session <id> --message <id>]
                    [--model <modelId>] [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--disabled]
@@ -346,10 +291,6 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
             enable  --id <taskId>
             disable --id <taskId>
             run     --id <taskId>          fire immediately, off-schedule
-
-            --bot accepts an exact Bot id or a unique Bot name; if omitted in a
-            Bot conversation, that conversation's Bot is used. Duplicate names
-            are rejected with candidate ids. `list` includes each task's Bot.
 
             Target modes: new = run prompt in a fresh chat; follow-up = append prompt
             to an existing chat (--session); rerun = re-run a chat (--session) from a

@@ -219,7 +219,7 @@ class AgentAndroidOutcomeFactsE2ETest {
                     if (action == "update") { assertTrue(body.getBoolean("updated")); assertEquals(1, body.getInt("rows")) }
                     val pending = ToolCheckpointStore.drainPending(app, outcome.sid).single()
                     assertEquals(outcome.receipt.executionIntentId, pending.intentId)
-                    val goal = app.botTaskRepository.sessionGoal(outcome.sid)!!
+                    val goal = app.agentTaskRepository.sessionGoal(outcome.sid)!!
                     assertEquals("WAITING", goal.status); assertEquals(0, goal.autoRunsUsed)
                     real.query(CalendarContract.Reminders.CONTENT_URI, arrayOf(CalendarContract.Reminders.MINUTES),
                         "${CalendarContract.Reminders.EVENT_ID}=?", arrayOf(eventId.toString()), null)!!.use {
@@ -270,7 +270,7 @@ class AgentAndroidOutcomeFactsE2ETest {
                 assertEquals(mode == "security", outcome.receipt.isError)
                 val pending = ToolCheckpointStore.drainPending(app, outcome.sid).single()
                 assertEquals(outcome.receipt.executionIntentId, pending.intentId); assertFalse(pending.argsJson.contains(marker))
-                val goal = app.botTaskRepository.sessionGoal(outcome.sid)!!
+                val goal = app.agentTaskRepository.sessionGoal(outcome.sid)!!
                 assertEquals("WAITING", goal.status); assertEquals(0, goal.autoRunsUsed)
                 val rawId = createdRawIds.last()
                 real.query(ContentUris.withAppendedId(ContactsContract.RawContacts.CONTENT_URI, rawId), arrayOf(ContactsContract.RawContacts._ID), null, null, null)!!.use { assertTrue(it.moveToFirst()) }

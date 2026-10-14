@@ -130,7 +130,7 @@ class BackupExporter(
                     onProgress?.invoke("Exporting chats…")
                     stats[BackupCategory.CHATS.key] =
                         exportChats(dataDir, trees, options.snapshotAtMillis)
-                    exportCharactersAndBots(dataDir)
+                    exportCharacters(dataDir)
                     val taskStats = exportAgentTasks(dataDir, options.snapshotAtMillis)
                     val chatStats = checkNotNull(stats[BackupCategory.CHATS.key])
                     stats[BackupCategory.CHATS.key] = chatStats.copy(entries = chatStats.entries + taskStats.first,
@@ -346,11 +346,9 @@ class BackupExporter(
         // Android-only, preserved per §2.2 rule 4.
         put("editCount", JsonPrimitive(s.editCount))
         put("thinkingOverride", s.thinkingOverride?.let(::JsonPrimitive) ?: JsonNull)
-        // Android-only session identity: the bound character (card snapshot), the per-session
-        // settings and the owning bot. Stored verbatim; the importer validates them.
+        // Android-only session identity: the bound character (card snapshot) and per-session settings.
         put("roleplayJson", s.roleplayJson?.let(::JsonPrimitive) ?: JsonNull)
         put("sessionOverrides", s.sessionOverrides?.let(::JsonPrimitive) ?: JsonNull)
-        put("botId", s.botId?.let(::JsonPrimitive) ?: JsonNull)
     }
 
     /**
@@ -590,19 +588,17 @@ class BackupExporter(
         return file.length()
     }
 
-    /** Characters (card, artwork, story memory) and bot definitions → `characters.jsonl` / `bots.jsonl`. */
+    /** User task history and unresolved checkpoints → `agent_tasks.jsonl`. */
     private suspend fun exportAgentTasks(dataDir: File, snapshot: Long): Pair<Int, Long> {
         var count = 0
         var bytes = 0L
         BackupJsonlWriter(dataDir, BackupTasks.FILE).use { writer ->
             var offset = 0
             while (true) {
-                val tasks = db.botTaskDao().backupTasks(snapshot, 100, offset)
+                val tasks = db.agentTaskDao().backupTasks(snapshot, 100, offset)
                 if (tasks.isEmpty()) break
                 for (task in tasks) {
-                    val members = db.botDelegationDao().backupForRootTask(task.id)
-                    val sessions = (listOfNotNull(task.originSessionId, task.currentOwnerSessionId, task.goalSessionId) +
-                        members.flatMap { listOfNotNull(it.sourceSessionId, it.targetSessionId) }).distinct()
+                    val sessions = listOfNotNull(task.originSessionId, task.currentOwnerSessionId, task.goalSessionId).distinct()
                     val rows = sessions.associateWith { sid -> com.openminis.app.tools.ToolCheckpointStore.backupRows(context, sid)
                         .filter { row -> org.json.JSONObject(row).let { it.isNull("taskId") || it.optString("taskId") == task.id } } }
                         .filterValues { it.isNotEmpty() }
@@ -618,7 +614,8 @@ class BackupExporter(
         return count to bytes
     }
 
-    private suspend fun exportCharactersAndBots(dataDir: File) {
+    /** Character cards, artwork and story memory → `characters.jsonl`. */
+    private suspend fun exportCharacters(dataDir: File) {
         val characters = db.characterDao().characters().take(BackupRoleplayMapping.MAX_ITEMS)
         if (characters.isNotEmpty()) {
             BackupJsonlWriter(dataDir, BackupRoleplayMapping.CHARACTER_FILE).use { writer ->
@@ -640,20 +637,7 @@ class BackupExporter(
                 }
             }
         }
-        val bots = db.botDao().listBots().take(BackupRoleplayMapping.MAX_ITEMS)
-        if (bots.isNotEmpty()) {
-            BackupJsonlWriter(dataDir, BackupRoleplayMapping.BOT_FILE).use { writer ->
-                for (bot in bots) {
-                    writer.write(
-                        BackupRoleplayMapping.BOT_TYPE, 1,
-                        BackupFormat.json.encodeToJsonElement(
-                            BackupBotRecord.serializer(), BackupRoleplayMapping.botRecord(bot),
-                        ),
-                    )
-                }
-            }
-        }
-        AppLogger.info(TAG, "[Backup] exported ${characters.size} character(s), ${bots.size} bot(s)")
+        AppLogger.info(TAG, "[Backup] exported ${characters.size} character(s)")
     }
 
     /** The user's custom sub agents → `data/sub_agents.jsonl`, one `SubAgentV1` line each. Returns the count. */

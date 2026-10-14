@@ -11,9 +11,9 @@ class DeviceScreenLeaseTest {
         var now = 0L
         val lease = newLease({ now }, sleep = { now += it })
         try {
-            assertTrue(lease.acquire(0, "attended-a", "Bot\nA", unattended = false) is DeviceScreenLease.Acquisition.Granted)
-            val blocked = lease.acquire(0, "attended-b", "Bot B", unattended = false)
-            assertEquals(DeviceScreenLease.Acquisition.Busy("Bot A"), blocked)
+            assertTrue(lease.acquire(0, "attended-a", "Agent\nA", unattended = false) is DeviceScreenLease.Acquisition.Granted)
+            val blocked = lease.acquire(0, "attended-b", "Agent B", unattended = false)
+            assertEquals(DeviceScreenLease.Acquisition.Busy("Agent A"), blocked)
             assertEquals(30L, now)
         } finally {
             lease.close()

@@ -255,7 +255,6 @@ internal suspend fun ProviderRepository.migrateLegacyGroupsFromDatabase(
 ): ProviderConfig {
     val appDatabase = AppDatabase.getInstance(context)
     val sessionRows = appDatabase.chatDao().listSessionsWithModelBinding()
-    val botRows = appDatabase.botDao().listBots()
     val taskManager = ScheduledTaskManager(context)
     val tasks = taskManager.list()
     val state = LegacyGroupStateParser.fromDatabase(
@@ -269,7 +268,6 @@ internal suspend fun ProviderRepository.migrateLegacyGroupsFromDatabase(
         scheduledBindings = tasks.map {
             LegacyBindingRecord(it.id, it.modelBinding, it.modelId)
         },
-        botBindings = botRows.map { LegacyBindingRecord(it.id, it.modelBinding) },
         legacyAgentLoopGroupIds = snapshot.loopIds
             .filter { it.kind == "group" }
             .sortedBy { it.sortOrder }
@@ -285,7 +283,6 @@ internal suspend fun ProviderRepository.migrateLegacyGroupsFromDatabase(
 internal suspend fun ProviderRepository.migrateLegacyGroupsFromJson(config: ProviderConfig, rawJson: String): ProviderConfig {
     val appDatabase = AppDatabase.getInstance(context)
     val sessionRows = appDatabase.chatDao().listSessionsWithModelBinding()
-    val botRows = appDatabase.botDao().listBots()
     val taskManager = ScheduledTaskManager(context)
     val tasks = taskManager.list()
     val state = LegacyGroupStateParser.fromJson(
@@ -298,7 +295,6 @@ internal suspend fun ProviderRepository.migrateLegacyGroupsFromJson(config: Prov
         scheduledBindings = tasks.map {
             LegacyBindingRecord(it.id, it.modelBinding, it.modelId)
         },
-        botBindings = botRows.map { LegacyBindingRecord(it.id, it.modelBinding) },
     )
     return persistLegacyMigration(state, taskManager)
 }
@@ -330,14 +326,6 @@ internal suspend fun ProviderRepository.persistLegacyMigration(
         AppDatabase.getInstance(context).chatDao().migrateModelBindings(sessionUpdates)
     }
 
-    val botDao = AppDatabase.getInstance(context).botDao()
-    val oldBots = state.botBindings.associateBy { it.id }
-    for (migrated in result.botBindings) {
-        val old = oldBots[migrated.id] ?: continue
-        if (old.binding != migrated.binding) {
-            botDao.updateModelBinding(migrated.id, migrated.binding)
-        }
-    }
     result.warnings.forEach { warning ->
         android.util.Log.w("ProviderRepo", "[ProviderStore] $warning")
     }

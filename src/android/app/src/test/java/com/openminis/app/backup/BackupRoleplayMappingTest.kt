@@ -1,6 +1,5 @@
 package com.openminis.app.backup
 
-import com.openminis.app.data.db.BotEntity
 import com.openminis.app.data.db.CharacterEntity
 import com.openminis.app.roleplay.CharacterStoragePolicy
 import org.json.JSONObject
@@ -44,7 +43,6 @@ class BackupRoleplayMappingTest {
         for (id in listOf("../x", "a/b", "", "a b", "x".repeat(129), "..", "a\\b")) {
             assertFalse(id, BackupRoleplayMapping.validId(id))
             assertNull(id, BackupRoleplayMapping.restorableCharacter(record(id = id)))
-            assertNull(id, BackupRoleplayMapping.restorableBot(BackupBotRecord(id, "Bot", null, null, true, 1, 2)))
         }
         assertTrue(BackupRoleplayMapping.validId("3f2c-AB_9"))
     }
@@ -85,10 +83,4 @@ class BackupRoleplayMappingTest {
         assertFalse(BackupRoleplayMapping.isNewer(4, 5))
     }
 
-    @Test
-    fun `a bot round trips and a nameless one is refused`() {
-        val bot = BotEntity("bot-1", "Helper", "be brief", """{"type":"entry","entryId":"e1"}""", false, 1, 2)
-        assertEquals(bot, BackupRoleplayMapping.restorableBot(BackupRoleplayMapping.botRecord(bot)))
-        assertNull(BackupRoleplayMapping.restorableBot(BackupBotRecord("bot-2", " ", null, null, true, 1, 2)))
-    }
 }

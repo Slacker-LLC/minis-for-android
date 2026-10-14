@@ -29,11 +29,11 @@ PRoot、Alpine、旧特权 broker 或其它 userspace 模拟/双栈后端不属�
 
 ## Android App
 
-App 是应用数据库、Provider/Model、工具注册与权限、用户审批、session 选择、运行时编排、shell 生命周期和恢复策略的权威。不要为 MCP、Terminal、Voice、Bot 或其它入口再造第二套 Agent、数据库、权限或 session 真源。
+App 是应用数据库、Provider/Model、工具注册与权限、用户审批、session 选择、运行时编排、shell 生命周期和恢复策略的权威。不要为 MCP、Terminal、Voice 或其它入口再造第二套 Agent、数据库、权限或 session 真源。
 
 ## Agent 执行所有权
 
-每个 session 由 AgentSessionStore 持有唯一 AgentSession，所有聊天、后台、Bot、子代理、例程、语音与调试入口共享它。ChatViewModel 是输入/显示投影，页面生命周期不拥有模型回合或压缩任务；重建投影不能重建规范历史、重复工具执行或取消核心。
+每个 session 由 AgentSessionStore 持有唯一 AgentSession，聊天、后台、子代理、例程、语音与调试入口共享它。ChatViewModel 是输入/显示投影，页面生命周期不拥有模型回合或压缩任务；重建投影不能重建规范历史、重复工具执行或取消核心。
 
 核心复用 Room、Provider、工具权限、事件与并发管理。一次 Turn 的结果由其请求句柄结算；活动/流式标志只表达当前进度。会话删除先关闭并等待旧执行与持久化清理，再删除 Room 行与文件。历史清空、截断、撤销压缩与下一回合必须串行，不允许迟到回调恢复已清空或已删除内容。
 

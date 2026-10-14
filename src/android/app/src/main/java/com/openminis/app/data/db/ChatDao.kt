@@ -72,14 +72,14 @@ interface ChatDao {
     suspend fun listSessions(): List<ChatSessionEntity>
 
     /**
-     * Conversations that never got anything: no title, no group, no bot, no special source, not
+     * Conversations that never got anything: no title, no group, no special source, not
      * pinned and not a single message. [olderThan] keeps a row that a worker is creating right now.
      */
     @Query(
-        "SELECT s.id FROM sessions s WHERE s.title IS NULL AND s.folder_id IS NULL AND s.bot_id IS NULL " +
+        "SELECT s.id FROM sessions s WHERE s.title IS NULL AND s.folder_id IS NULL " +
             "AND s.source IS NULL AND s.pinned_at IS NULL AND s.created_at < :olderThan " +
             "AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id) " +
-            "AND NOT EXISTS (SELECT 1 FROM bot_tasks t WHERE t.goal_session_id = s.id)",
+        "AND NOT EXISTS (SELECT 1 FROM agent_tasks t WHERE t.goal_session_id = s.id)",
     )
     suspend fun emptyUntitledSessionIds(olderThan: Long): List<String>
 
@@ -89,14 +89,14 @@ interface ChatDao {
      * list was read keeps the session. Returns 1 when it was deleted.
      */
     @Query(
-        "DELETE FROM sessions WHERE id = :id AND title IS NULL AND folder_id IS NULL AND bot_id IS NULL " +
+        "DELETE FROM sessions WHERE id = :id AND title IS NULL AND folder_id IS NULL " +
             "AND source IS NULL AND pinned_at IS NULL " +
             "AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.session_id = :id) " +
-            "AND NOT EXISTS (SELECT 1 FROM bot_tasks t WHERE t.goal_session_id = :id)",
+            "AND NOT EXISTS (SELECT 1 FROM agent_tasks t WHERE t.goal_session_id = :id)",
     )
     suspend fun deleteSessionIfUnusedDraft(id: String): Int
 
-    @Query("SELECT EXISTS (SELECT 1 FROM bot_tasks WHERE goal_session_id = :id)")
+    @Query("SELECT EXISTS (SELECT 1 FROM agent_tasks WHERE goal_session_id = :id)")
     suspend fun hasSessionGoal(id: String): Boolean
 
     @androidx.room.Transaction
@@ -114,9 +114,6 @@ interface ChatDao {
 
     @Query("SELECT * FROM sessions WHERE id = :id")
     fun observeSession(id: String): Flow<ChatSessionEntity?>
-
-    @Query("SELECT * FROM sessions WHERE bot_id = :botId AND (source IS NULL OR source NOT IN ('subagent', 'bot_delegation', 'bot-delegation', 'scheduled')) ORDER BY updated_at DESC, created_at DESC LIMIT 1")
-    suspend fun latestBotConversation(botId: String): ChatSessionEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSession(session: ChatSessionEntity)
@@ -184,13 +181,10 @@ interface ChatDao {
     @Query("SELECT roleplay_json FROM sessions WHERE id = :id")
     suspend fun roleplayBinding(id: String): String?
 
-    @Query("UPDATE sessions SET bot_id = :botId, updated_at = :updatedAt WHERE id = :id")
-    suspend fun updateSessionBot(id: String, botId: String?, updatedAt: Long = System.currentTimeMillis())
-
     @Query("DELETE FROM sessions WHERE id = :id")
     suspend fun deleteSessionRow(id: String)
 
-    @Query("UPDATE bot_tasks SET goal_session_id = NULL, status = CASE WHEN status IN ('COMPLETED', 'CANCELLED', 'FAILED', 'BUDGET_EXHAUSTED') " +
+    @Query("UPDATE agent_tasks SET goal_session_id = NULL, status = CASE WHEN status IN ('COMPLETED', 'CANCELLED', 'FAILED', 'BUDGET_EXHAUSTED') " +
         "THEN status ELSE 'CANCELLED' END, " +
         "stop_generation = stop_generation + 1, updated_at = :now WHERE goal_session_id = :id")
     suspend fun detachDeletedSessionGoal(id: String, now: Long)
@@ -326,7 +320,7 @@ interface ChatDao {
     @Query("UPDATE messages SET request_state = 'RUNNING', request_run_id = :runId, request_task_id = :taskId, " +
         "sort_order = CASE WHEN request_delivery = 'START' THEN sort_order ELSE (SELECT COALESCE(MAX(m.sort_order), -1) + 1 FROM messages m WHERE m.session_id = :sessionId) END " +
         "WHERE id = :id AND session_id = :sessionId AND request_state = 'PENDING' AND request_run_id IS NULL " +
-        "AND (:taskId IS NULL OR EXISTS (SELECT 1 FROM bot_tasks t WHERE t.id = :taskId AND t.revision = :revision AND t.stop_generation = :generation AND t.current_owner_session_id = :sessionId)) " +
+        "AND (:taskId IS NULL OR EXISTS (SELECT 1 FROM agent_tasks t WHERE t.id = :taskId AND t.revision = :revision AND t.stop_generation = :generation AND t.current_owner_session_id = :sessionId)) " +
         "AND (request_delivery != 'STEER' OR (request_task_id IS :taskId AND request_task_generation IS :generation))")
     suspend fun claimRequest(sessionId: String, id: String, runId: String, taskId: String?, revision: Int?, generation: Int?): Int
 

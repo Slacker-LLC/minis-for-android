@@ -24,11 +24,6 @@ object Routes {
     // [T-android-settings-hierarchy] Level 2: the settings of one category (see SettingsCategory).
     const val SETTINGS_CATEGORY = "settings_category/{category}"
     fun settingsCategory(category: String) = "settings_category/$category"
-    const val BOTS = "bots"
-    const val BOTS_ADD = "bots_add"
-    const val BOTS_PROGRESS = "bots_progress"
-    const val BOT_DETAILS = "bots/{botId}"
-    fun botDetails(botId: String) = "bots/${android.net.Uri.encode(botId)}"
     const val PROVIDER_LIST = "providers"
     const val ADD_PROVIDER = "add_provider"
     const val PROVIDER_DETAIL = "provider/{instanceId}"
@@ -132,10 +127,10 @@ object Routes {
     fun sharedFoldersDetail(folderId: String) = "shared_folders_detail/$folderId"
     /** [T-android-scheduled-tasks-design] Scheduled tasks list + editor. */
     const val SCHEDULED_TASKS = "scheduled_tasks"
-    const val SCHEDULED_TASK_EDIT = "scheduled_tasks/edit?taskId={taskId}&botId={botId}"
-    fun scheduledTaskEdit(taskId: String? = null, botId: String? = null): String = buildString {
+    const val SCHEDULED_TASK_EDIT = "scheduled_tasks/edit?taskId={taskId}"
+    fun scheduledTaskEdit(taskId: String? = null): String = buildString {
         append("scheduled_tasks/edit")
-        val args = listOfNotNull(taskId?.let { "taskId=$it" }, botId?.let { "botId=$it" })
+        val args = listOfNotNull(taskId?.let { "taskId=$it" })
         if (args.isNotEmpty()) append("?").append(args.joinToString("&"))
     }
     // [T-android-scheduled-tasks-run-records] per-task execution log.

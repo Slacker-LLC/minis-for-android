@@ -1021,7 +1021,7 @@ internal object ConfigBuiltins {
             ClosureField(
                 path = "prompt.custom",
                 displayName = "Custom system prompt (device owner)",
-                description = "The free-text system prompt written by the device owner in Settings -> System prompt. It is injected ahead of every other authored section and is declared to outrank personality, style, preset, bot and session guidance. Empty means nothing is injected.",
+                description = "The free-text system prompt written by the device owner in Settings -> System prompt. It is injected ahead of every other authored section and is declared to outrank personality, style, preset and session guidance. Empty means nothing is injected.",
                 valueSchema = ConfigSchema.Str(maxLength = CUSTOM_PROMPT_MAX_CHARS),
                 risk = ConfigRisk.NORMAL,
                 revertable = true,

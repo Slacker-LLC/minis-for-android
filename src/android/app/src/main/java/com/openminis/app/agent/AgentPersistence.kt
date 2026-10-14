@@ -320,7 +320,7 @@ internal suspend fun AgentSession.persistAssistantTurn(
             pendingTurn?.sessionId ?: realSessionId.ifEmpty { sessionId }, "assistant", partsJson, tokenJson,
             reasoningContent = reasoningContent ?: pendingTurn?.reasoningContent,
             modelSnapshot = modelSnapshot,
-        requestRunId = activeBotRunId,
+        requestRunId = activeRunId,
         ).id
     }
     val messageId = if (pendingTurn != null) pendingTurn.commit(turn, write) else write()
@@ -372,7 +372,7 @@ internal suspend fun AgentSession.persistAssistantMessage(
         realSessionId.ifEmpty { sessionId }, "assistant", partsJson, tokenJson,
         reasoningContent = reasoningContent,
         modelSnapshot = modelAttributionSnapshot(currentProvider),
-        requestRunId = activeBotRunId,
+        requestRunId = activeRunId,
     )
 }
 
@@ -412,7 +412,7 @@ internal suspend fun AgentSession.persistToolResultMessage(parts: List<AgentCont
  * recovery, which is the state of a run that was never checkpointed.
  */
 internal fun AgentSession.persistRunCheckpoint(partsJson: String) {
-    val runId = activeBotRunId ?: return
+    val runId = activeRunId ?: return
     if (runCheckpointRecorder == null) return
     runCatching {
         runCheckpointTranscript.add("""{"role":"assistant","parts":$partsJson}""")
@@ -427,7 +427,7 @@ internal fun AgentSession.persistRunCheckpoint(partsJson: String) {
 }
 
 internal fun AgentSession.appendRunCheckpointToolResults(results: List<AgentContentPart.ToolResult>) {
-    val runId = activeBotRunId ?: return
+    val runId = activeRunId ?: return
     if (runCheckpointRecorder == null || results.isEmpty()) return
     runCatching {
         results.forEach { result ->
@@ -445,7 +445,7 @@ internal fun AgentSession.appendRunCheckpointToolResults(results: List<AgentCont
  * back into an acknowledged run.
  */
 internal fun AgentSession.finishRunCheckpoint() {
-    val runId = activeBotRunId ?: return
+    val runId = activeRunId ?: return
     val recorder = runCheckpointRecorder ?: return
     runCatching {
         recorder.seal()
@@ -465,8 +465,8 @@ suspend fun AgentSession.reconcileRunCheckpoints() {
     val plan = withContext(Dispatchers.IO) {
         RunRecoveryCoordinator.plan(
             checkpoints = RunCheckpointStore.list(context).filter { it.sessionId == sid },
-            locallyObservedRunId = activeBotRunId,
-            activeRunId = activeBotRunId,
+            locallyObservedRunId = activeRunId,
+            activeRunId = activeRunId,
             activeStateKnown = true,
             terminalStateKnown = true,
         )

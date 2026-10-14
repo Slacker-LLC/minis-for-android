@@ -93,7 +93,6 @@ fun ScheduledTasksScreen(
         factory = ScheduledTasksViewModel.factory(context),
     )
     val tasks by vm.tasks.collectAsState()
-    val bots by vm.bots.collectAsState()
     var pendingDelete by remember { mutableStateOf<ScheduledTask?>(null) }
 
     SettingsScaffold(
@@ -119,7 +118,6 @@ fun ScheduledTasksScreen(
             tasks.forEach { task ->
                 ScheduledTaskCard(
                     task = task,
-                    botName = task.botId?.let { id -> bots.firstOrNull { it.id == id }?.name ?: id },
                     onClick = { onEditTask(task.id) },
                     onToggle = { vm.setEnabled(task.id, it) },
                     onRunNow = { vm.runNow(task) },
@@ -168,7 +166,6 @@ fun ScheduledTasksScreen(
 @Composable
 private fun ScheduledTaskCard(
     task: ScheduledTask,
-    botName: String?,
     onClick: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onRunNow: () -> Unit,
@@ -206,10 +203,10 @@ private fun ScheduledTaskCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (botName != null || task.permissionTier == ScheduledTaskPermissionTier.FULL) {
+                if (task.legacyExecutorRemoved || task.permissionTier == ScheduledTaskPermissionTier.FULL) {
                     Row(modifier = Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (botName != null) {
-                            Chip(stringResource(R.string.scheduled_task_bot_label, botName), ChatColors.ok)
+                        if (task.legacyExecutorRemoved) {
+                            Chip(stringResource(R.string.scheduled_task_legacy_executor_removed), MaterialTheme.colorScheme.error)
                         }
                         if (task.permissionTier == ScheduledTaskPermissionTier.FULL) {
                             Chip(stringResource(R.string.scheduled_task_tier_full), ChatColors.warn)

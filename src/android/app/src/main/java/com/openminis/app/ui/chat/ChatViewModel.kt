@@ -21,7 +21,6 @@ import androidx.compose.material.icons.outlined.ThumbUp
 import com.openminis.app.data.FileMentionIndex
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.repository.ChatRepository
-import com.openminis.app.data.repository.BotRepository
 import com.openminis.app.data.repository.MemoryRepository
 import com.openminis.app.data.repository.ProviderRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,10 +41,9 @@ class ChatViewModel(
     memoryRepository: MemoryRepository? = null,
     skillRepository: com.openminis.app.data.repository.SkillRepository? = null,
     mcpRepository: com.openminis.app.data.repository.MCPRepository? = null,
-    botRepository: BotRepository? = null,
 ) : ViewModel() {
     internal val agentSession = com.openminis.app.agent.AgentSessionStore.getOrCreate(sessionId) {
-        com.openminis.app.agent.AgentSession(sessionId, chatRepository, providerRepository, context.applicationContext, memoryRepository, skillRepository, mcpRepository, botRepository)
+        com.openminis.app.agent.AgentSession(sessionId, chatRepository, providerRepository, context.applicationContext, memoryRepository, skillRepository, mcpRepository)
     }
     internal val sessionId get() = agentSession.sessionId
     internal val chatRepository get() = agentSession.chatRepository
@@ -54,7 +52,6 @@ class ChatViewModel(
     val memoryRepository get() = agentSession.memoryRepository
     val skillRepository get() = agentSession.skillRepository
     val mcpRepository get() = agentSession.mcpRepository
-    val botRepository get() = agentSession.botRepository
     internal val execution get() = agentSession.execution
     internal val sessionScope get() = agentSession.sessionScope
     internal val mediaStore get() = agentSession.mediaStore
@@ -135,12 +132,10 @@ class ChatViewModel(
         set(value) { agentSession.currentProvider = value }
     internal var currentModel get() = agentSession.currentModel
         set(value) { agentSession.currentModel = value }
-    internal var sessionBotId get() = agentSession.sessionBotId
-        set(value) { agentSession.sessionBotId = value }
     internal var sessionSource get() = agentSession.sessionSource
         set(value) { agentSession.sessionSource = value }
-    internal var activeBotRunId get() = agentSession.activeBotRunId
-        set(value) { agentSession.activeBotRunId = value }
+    internal var activeRunId get() = agentSession.activeRunId
+        set(value) { agentSession.activeRunId = value }
     internal var runCheckpointRecorder get() = agentSession.runCheckpointRecorder
         set(value) { agentSession.runCheckpointRecorder = value }
     internal val runCheckpointTranscript get() = agentSession.runCheckpointTranscript
@@ -424,7 +419,6 @@ class ChatViewModel(
             memoryRepository: MemoryRepository?,
             skillRepository: com.openminis.app.data.repository.SkillRepository?,
             mcpRepository: com.openminis.app.data.repository.MCPRepository? = null,
-            botRepository: BotRepository? = null,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -436,7 +430,6 @@ class ChatViewModel(
                     memoryRepository = memoryRepository,
                     skillRepository = skillRepository,
                     mcpRepository = mcpRepository,
-                    botRepository = botRepository,
                 ) as T
             }
         }

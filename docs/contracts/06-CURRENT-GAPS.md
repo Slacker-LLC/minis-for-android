@@ -1,16 +1,18 @@
 # 06 — 当前已确认缺口
 
+> 当前 Bot 页面、成员身份、委派、收件箱与 Bot 定时任务绑定已从现役版本移除。Room v27 会将可复用任务转入普通 Agent 任务，并暂停依赖旧成员或未结算委派的工作供用户检查；旧 Bot 表作为本机恢复副本保留。下方日期早于此次移除的 Bot 描述均为历史记录。
+
 > 基线更新：2026-09-12，`main` 合并提交 `422cc29f`（包含审计提交 `53dada42`）。本文件区分已确认实现缺口、未验证设备行为与历史 Issue 快照；旧 broker/PRoot/storage 结论不作为现役实现依据。
 
 ## Agent 组织补充核对（2026-10-14）
 
 源码基线：`3527ad8165f11c0f98d8a30f96098fc9280faa94` 与当前工作树。以下按当前源码调用链核对；功能细解见 [能力盘点](../analysis/minis-agent-inventory.md)，开发阶段见 [路线](../development/AGENT-ROADMAP.md)。
 
-- **M1–M5 开发与受控集成验收已完成**：Room v26 在消息表保存稳定请求与领取/运行状态；唯一核心、Task 核验、typed CLI/后台 UNKNOWN、SAF/共享/备份和原任务关联协作/语音已接入。17 组工作流（166 个报告子场景）、v23→v26 迁移、4 个 force-stop 阶段、Debug/AndroidTest、Release Kotlin/R8 和 Debug/Release Lint 通过，工件与边界见 [整体说明](../development/M-SERIES-INTEGRATION.md)。真实模型、SAF 系统选择器/撤权、Android 26–28 SAF、Root/OEM/实际音频与生产签名仍未验收。首轮 SAF API 兼容错误已修；旧系统不能确认树内关系时拒绝。
+- **M1–M5 Agent 执行基础已落地；Bot 产品层已移除**：消息请求状态、唯一执行核心、Task 核验、typed CLI/后台 UNKNOWN、SAF/交付/备份等通用能力保留。Bot 接单、成员路由、协作入口和 Bot 语音已移除。Room v27 从旧表迁移通用任务并保留本机旧表副本。M1–M5 的 17 组工作流（166 个报告子场景）、v23→v26 迁移和 4 个 force-stop 阶段是移除前源码的冻结结果，不代表当前 Room v27 工作树；当前改动只做过 Debug、单测源码及 AndroidTest 源码编译。真实模型、SAF 系统选择器/撤权、Android 26–28 SAF、Root/OEM/实际音频与生产签名仍未验收。旧系统不能确认树内关系时拒绝。
 - **子工作恢复保持审查**：子代理中断和 Task 备份恢复不自动重放，结果/预算/身份保留。子代理回执与原 Task/Run/停止代次绑定，Ralph 原子保存父子关系和交接；原目标停止后不自动唤醒。完整真实模型工作及设备级执行仍需验收。
 - **诊断后端事实已对齐，真机仍待验**：能力报告按实际 DirectRootRunner/App 回退生成，不把 Shizuku READY 当作这些 Root 诊断动作已可执行。Shizuku 自身服务状态单独报告；Root 授权撤销、OEM/SELinux 与进程清理仍需设备验收。
 
-成员工作背景复用自身已完成任务和明确共享引用，没有新增独立 Bot 记忆库或放宽长期权限边界。设备行为仍以明确实测为准。
+任务背景复用已完成任务和明确共享引用，没有新增独立任务记忆库或放宽长期权限边界。设备行为仍以明确实测为准。
 
 ## 执行入口重整后的剩余边界（2026-10-12 工作树）
 
@@ -18,7 +20,7 @@
 
 ## 语音接入后的未验证边界（2026-10-14 工作树）
 
-连续语音已接通当前 AgentSession 的完整回合和 Bot 直聊，入口/静音/挂断/补充/点击打断可沿现有边界执行。原生音频全双工、自动说话打断、OEM Root 手机/锁屏唤醒、音频品质仍未完成真机验收。语音 STEER 已复用持久消息输入，系统助理已接最近会话/原成员身份和用户默认接待成员；任务阶段/等待原因/成果及音频控制已接线，本轮受控语音及对象路由场景已通过，实际音频/OEM 仍待验收。具体阶段见 [Bot 与语音融合](../development/BOT-VOICE-INTEGRATION.md)。
+连续语音已接通当前 AgentSession 的完整回合。原生音频全双工、自动说话打断、OEM Root 手机/锁屏唤醒、音频品质仍未完成真机验收。语音 STEER 已复用持久消息输入；任务阶段、等待原因、成果及音频控制已接线，受控语音场景已通过，实际音频/OEM 仍待验收。早期 Bot 语音接入记录见已标为历史的 [Bot 与语音融合](../development/BOT-VOICE-INTEGRATION.md)。
 
 ## 已完成的 Direct Ubuntu 迁移边界
 
@@ -145,7 +147,7 @@ VScreen 使用 Shizuku 协议 **UserService**（shell 或 root 身份，见 05 �
 
 Settings → System prompt 的主入口现在是设备主人自己的系统提示词输入框（类似 Codex 的 custom instructions）：
 保存内容写入 `<filesDir>/system_prompt/custom.md`，注入到组装后提示词的最前面并带优先级声明，
-与人格（SOUL.md）、回复风格、预设、Bot 指令、会话级 Soul 冲突时以它为准；留空则不注入。同一份文本也通过
+与人格（SOUL.md）、回复风格、预设、会话级 Soul 冲突时以它为准；留空则不注入。同一份文本也通过
 config registry 暴露为 `prompt.custom`（带确认与审计回退）。内置的工具/风格章节降为二级页
 （Settings → System prompt → 内置提示词模块），默认文案在 `assets/prompts/<id>.md` 一文件一节，
 覆盖写入 `<filesDir>/system_prompt/<id>.md`，索引与开关为 `prompt.modules`、

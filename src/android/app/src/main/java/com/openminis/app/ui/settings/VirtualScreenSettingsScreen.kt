@@ -158,7 +158,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenRoot: () -> Unit = {})
                 previewBitmap = null
                 operationMessage = ""
             } else {
-                operationMessage = context.getString(R.string.bots_routine_vscreen_busy)
+                operationMessage = context.getString(R.string.vscreen_display_busy)
             }
         }
     }
@@ -279,7 +279,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenRoot: () -> Unit = {})
                         operationMessage,
                         style = MaterialTheme.typography.bodySmall,
                         color = if (operationMessage == context.getString(R.string.vscreen_probe_failed) ||
-                            operationMessage == context.getString(R.string.bots_routine_vscreen_busy)
+                            operationMessage == context.getString(R.string.vscreen_display_busy)
                         ) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp),
                     )

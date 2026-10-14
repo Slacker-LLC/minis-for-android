@@ -125,7 +125,7 @@
     <string name="system_prompt_reset_all_confirm_body">Tous les textes personnalisés et tous les interrupteurs sont effacés ; chaque module revient au texte fourni avec l\'application.</string>
     <string name="system_prompt_custom_section">Invite systeme personnalisee</string>
     <string name="system_prompt_custom_hint">Ecrivez votre invite systeme ici ...</string>
-    <string name="system_prompt_custom_footer">Le texte enregistre est injecte en tete de chaque conversation avec une declaration de priorite explicite : en cas de conflit avec la personnalite (Soul), le style de reponse, les prereglages, les instructions de bot ou un Soul de session, c\'est ce texte qui prime. Laissez vide pour ne rien injecter.</string>
+    <string name="system_prompt_custom_footer">Le texte enregistre est injecte en tete de chaque conversation avec une declaration de priorite explicite : en cas de conflit avec la personnalite (Soul), le style de reponse, les prereglages ou un Soul de session, c\'est ce texte qui prime. Laissez vide pour ne rien injecter.</string>
     <string name="system_prompt_custom_clear">Vider</string>
     <string name="system_prompt_custom_clear_confirm_title">Vider l\'invite systeme personnalisee ?</string>
     <string name="system_prompt_custom_clear_confirm_body">Le champ est vide et rien n\'en est injecte. Les autres reglages ne changent pas.</string>
@@ -1066,7 +1066,6 @@
     <string name="backup_report_extra_settings">Réglages : %1$d</string>
     <string name="backup_report_extra_prompt">Prompt système : %1$d</string>
     <string name="backup_report_extra_characters">Personnages : %1$d</string>
-    <string name="backup_report_extra_bots">Bots : %1$d</string>
     <string name="backup_report_extra_tasks">Tâches planifiées : %1$d</string>
     <string name="backup_report_tasks_disabled">%1$d tâche(s) planifiée(s) ont un accès complet et ont été restaurées désactivées. Vérifiez-les dans Tâches planifiées avant de les activer.</string>
     <string name="backup_report_settings_restart">Les réglages s’appliquent après le redémarrage de l’app.</string>
@@ -1641,7 +1640,6 @@
     <string name="drawer_recent">Récent</string>
     <string name="drawer_no_search_match">Aucune conversation correspondante</string>
     <string name="drawer_search_results">%1$d résultats</string>
-    <string name="settings_agent_section_team">Équipe et routines</string>
     <string name="settings_agent_team_sub">Membres, rôles, modèles et routines</string>
     <string name="settings_agent_tasks_sub">Exécutions récurrentes, historique et exécutants</string>
     <string name="chat_quick_battery_title">Vérifier la batterie</string>
@@ -1783,31 +1781,11 @@
         <item quantity="one">+%1$d modèle de secours</item>
         <item quantity="other">+%1$d modèles de secours</item>
     </plurals>
-    <string name="bots_task_budget_summary">Révisions automatiques %1$d/%2$d · corrections %3$d/%4$d · délégations %5$d/%6$d</string>
-    <string name="bots_task_pause">Mettre en pause</string>
-    <string name="bots_task_cancel">Annuler</string>
-    <string name="bots_task_notification_title">Tâche Bot : %1$s</string>
-    <string name="bots_task_notification_needs_user">Le Bot responsable a besoin de votre intervention.</string>
-    <string name="bots_task_notification_completed">Le Bot responsable a terminé l’examen des résultats.</string>
-    <string name="bots_task_notification_budget">Le budget de révision automatique est épuisé.</string>
 
-    <!-- B2: Bot-owned scheduled routines -->
-    <string name="scheduled_task_executor">Exécutant</string>
-    <string name="scheduled_task_executor_regular">Conversation standard (sans Bot)</string>
-    <string name="scheduled_task_executor_loading">Chargement…</string>
-    <string name="scheduled_task_model_bot_default">Utiliser le modèle par défaut de ce Bot</string>
-    <string name="scheduled_task_bot_disabled">Le Bot est désactivé</string>
-    <string name="scheduled_task_bot_label">Bot : %1$s</string>
-    <string name="bots_routines">Routines</string>
-    <string name="bots_routines_disabled">Ce Bot est désactivé. Ses routines restent activées, mais sont ignorées jusqu’à sa réactivation.</string>
-    <string name="bots_new_routine">Nouvelle routine</string>
-    <string name="bots_routine_no_next">Aucune prochaine exécution prévue</string>
+    <!-- Scheduled task strings -->
 
     <!-- B2: capacity/save errors -->
-    <string name="scheduled_task_bot_routine_limit">Ce Bot possède déjà %1$d routines. Supprimez-en une avant d’en ajouter une autre.</string>
     <string name="scheduled_task_save_failed">Impossible d’enregistrer la tâche planifiée.</string>
-    <string name="bots_routine_vscreen_busy">L’écran virtuel est utilisé par une autre session.</string>
-    <string name="bots_routine_vscreen_unavailable">L’écran virtuel est désactivé ou la vérification de l’appareil a échoué.</string>
     <string name="scheduled_vscreen_unattended_hint">Les actions UI en tâche de fond utilisent uniquement l’écran virtuel.</string>
     <string name="scheduled_vscreen_unavailable_warning">L’écran virtuel n’est pas activé avec une vérification réussie. L’enregistrement reste possible, mais les actions UI peuvent échouer.</string>
     <string name="settings_vscreen_entry">Écran virtuel (expérimental)</string>
@@ -1897,9 +1875,6 @@
     <string name="scheduled_task_next_run">Prochaine exécution %1$s</string>
     <string name="scheduled_task_no_next_run">Aucune prochaine exécution</string>
     <string name="scheduled_tasks_footer">Chaque déclenchement crée une nouvelle discussion et envoie une notification à la fin. Touchez-la pour voir le résultat.</string>
-    <string name="bots_progress_running">%1$d tâches déléguées en cours</string>
-    <string name="bots_progress_none">Rien en cours</string>
-    <string name="bots_members_header">Membres</string>
     <string name="browser_desktop_site">Version ordinateur</string>
     <string name="browser_tab_count_title">%1$d onglets</string>
     <string name="browser_share">Partager</string>
@@ -2206,7 +2181,6 @@
     <string name="outcome_pending_title">Actions à vérifier</string>
     <string name="outcome_inspect_action">Vérifier %1$s</string>
     <string name="outcome_kept_unknown">L’action reste non résolue. Son enregistrement est conservé.</string>
-    <string name="bots_reception">Membre par défaut pour les demandes</string>
     <string name="voice_cancel_recording">Annuler cet enregistrement</string>
     <string name="voice_stop_playback">Arrêter la lecture</string>
     <string name="voice_stop_owned_turn">Arrêter cette demande vocale</string>
@@ -2219,4 +2193,22 @@
     <string name="work_task_waiting">En attente de résultats externes</string>
     <string name="work_request_review">Instructions en attente : confirmer leur envoi après la restauration.</string>
     <string name="work_task_clear_selection">Effacer la sélection de tâche</string>
+    <string name="settings_agent_section_tasks">Tâches planifiées</string>
+    <string name="agent_task_completed">Terminée</string>
+    <string name="agent_task_cancelled">Annulée</string>
+    <string name="agent_task_failed">Échec</string>
+    <string name="agent_task_paused">En pause</string>
+    <string name="agent_task_needs_user">Votre intervention est requise</string>
+    <string name="agent_task_budget_exhausted">Budget d’exécution épuisé</string>
+    <string name="agent_task_active">En cours</string>
+    <string name="agent_task_phase_planning">Planification</string>
+    <string name="agent_task_phase_reviewing">Vérification</string>
+    <string name="agent_task_phase_revising">Révision</string>
+    <string name="agent_task_phase_delivering">Transmission</string>
+    <string name="agent_task_phase_executing">Exécution</string>
+    <string name="agent_task_pause">Mettre la tâche en pause</string>
+    <string name="agent_task_cancel">Annuler la tâche</string>
+    <string name="scheduled_task_legacy_executor_removed">Cette tâche utilisait un moteur d’exécution supprimé. Vérifiez-la et enregistrez-la avant de la relancer.</string>
+    <string name="sub_agent_text_model_required">Choisissez un modèle capable de répondre avec du texte.</string>
+    <string name="vscreen_display_busy">L’écran virtuel est actuellement utilisé par une autre session.</string>
 </resources>

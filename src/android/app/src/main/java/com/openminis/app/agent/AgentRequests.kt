@@ -38,7 +38,7 @@ internal suspend fun AgentSession.claimPendingRequest(row: MessageEntity, runId:
     try {
         requestPayload(row)
         if (steering || row.requestTaskId != null) {
-            val task = activeGoalTask?.id?.let { (context.applicationContext as com.openminis.app.MinisApp).botTaskRepository.get(it) }
+            val task = activeGoalTask?.id?.let { (context.applicationContext as com.openminis.app.MinisApp).agentTaskRepository.get(it) }
             check(row.requestTaskId == task?.id && row.requestTaskGeneration == task?.stopGeneration &&
                 (!steering || task == null || task.status in setOf("ACTIVE", "WAITING", "NEEDS_USER"))) { "request_task_changed" }
         }

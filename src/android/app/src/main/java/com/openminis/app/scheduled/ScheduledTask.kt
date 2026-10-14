@@ -190,8 +190,8 @@ data class ScheduledTask(
     // "Run records" menu opens a screen backed by this. Capped at
     // MAX_RUN_HISTORY by the manager when appending.
     val runHistory: List<ScheduledRun> = emptyList(),
-    /** Bot that owns this routine; null keeps legacy ordinary-chat behavior. */
-    val botId: String? = null,
+    /** Set while decoding an old Bot-bound row so the editor can explain its paused state. */
+    val legacyExecutorRemoved: Boolean = false,
     /** New routines default to read-only; legacy JSON without this field is decoded as FULL. */
     val permissionTier: ScheduledTaskPermissionTier = ScheduledTaskPermissionTier.READ_ONLY,
 ) {
@@ -275,7 +275,6 @@ data class ScheduledTask(
         put("targetMode", targetMode.encode())
         if (modelId != null) put("modelId", modelId)
         if (modelBinding != null) put("modelBinding", modelBinding)
-        if (!botId.isNullOrBlank()) put("botId", botId)
         put("permissionTier", permissionTier.name)
         put("enabled", enabled)
         put("createdAt", createdAt)
@@ -292,10 +291,16 @@ data class ScheduledTask(
     companion object {
         /** Max recorded executions kept per task. */
         const val MAX_RUN_HISTORY = 50
-        /** Maximum number of routines owned by one Bot, including disabled routines. */
-        const val MAX_ROUTINES_PER_BOT = 20
+        private const val LEGACY_EXECUTOR_REMOVED_NOTE = "此定时任务原来绑定了已移除的执行成员，请检查后手动重新启用。"
 
-        fun fromJson(o: JSONObject): ScheduledTask = ScheduledTask(
+        fun fromJson(o: JSONObject): ScheduledTask {
+            val legacyExecutorRemoved = (o.opt("botId") as? String)?.isNotBlank() == true
+            val savedPreview = if (legacyExecutorRemoved && !o.has("lastResultPreview")) {
+                LEGACY_EXECUTOR_REMOVED_NOTE
+            } else if (o.has("lastResultPreview")) {
+                o.optString("lastResultPreview", null)
+            } else null
+            return ScheduledTask(
             id = o.getString("id"),
             label = o.optString("label", ""),
             timeOfDayHour = o.optInt("hour", 9),
@@ -309,13 +314,12 @@ data class ScheduledTask(
             targetMode = ScheduledTargetMode.decode(o.optString("targetMode", null)),
             modelId = if (o.has("modelId")) o.optString("modelId", null) else null,
             modelBinding = if (o.has("modelBinding")) o.optString("modelBinding", null) else null,
-            enabled = o.optBoolean("enabled", true),
+            enabled = o.optBoolean("enabled", true) && !legacyExecutorRemoved,
             createdAt = o.optLong("createdAt", System.currentTimeMillis()),
             startDateMs = if (o.has("startDateMs")) o.optLong("startDateMs") else null,
             endDateMs = if (o.has("endDateMs")) o.optLong("endDateMs") else null,
             lastFiredAt = if (o.has("lastFiredAt")) o.optLong("lastFiredAt") else null,
-            lastResultPreview = if (o.has("lastResultPreview"))
-                o.optString("lastResultPreview", null) else null,
+            lastResultPreview = savedPreview,
             lastResultSessionId = if (o.has("lastResultSessionId"))
                 o.optString("lastResultSessionId", null) else null,
             runHistory = o.optJSONArray("runHistory")?.let { arr ->
@@ -325,8 +329,9 @@ data class ScheduledTask(
                     }
                 }
             } ?: emptyList(),
-            botId = (o.opt("botId") as? String)?.trim()?.takeIf { it.isNotEmpty() },
+            legacyExecutorRemoved = legacyExecutorRemoved,
             permissionTier = ScheduledTaskPermissionTier.fromPersistedJson(o),
-        )
+            )
+        }
     }
 }

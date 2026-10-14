@@ -49,13 +49,6 @@ class BackupImporter(
     private val db: AppDatabase,
 ) {
 
-    /**
-     * Session → bot links written by this restore's chats pass. Bots are restored after chats, so the
-     * links are checked once the bots are in: a link to a bot this device does not end up with is
-     * removed and counted as ignored rather than left dangling.
-     */
-    private val restoredBotLinks = mutableMapOf<String, String>()
-
     /** Records the chats pass refused (invalid session identity fields); reported as `ignored`. */
     private var ignoredInChats = 0
 
@@ -126,7 +119,7 @@ class BackupImporter(
         val warnings: MutableList<String> = mutableListOf(),
         var durationMillis: Long = 0,
         /**
-         * What was restored besides the category records, by key: `characters`, `bots`, `scheduled_tasks`,
+         * What was restored besides the category records, by key: `characters`, `scheduled_tasks`,
          * `settings`, `prompt`; plus `scheduled_tasks_disabled` (full-access tasks restored switched off),
          * `settings_restart` (preferences that apply after a restart) and `ignored` (items the package
          * carried that were refused). The UI localises the keys; the importer writes no user-facing text.
@@ -260,7 +253,7 @@ class BackupImporter(
                     try {
                         when (category) {
                             BackupCategory.CHATS -> {
-                                restoreCharactersAndBots(work, report)
+                                restoreCharacters(work, report)
                                 restoreAgentTasks(work, report)
                             }
                             BackupCategory.PROVIDERS -> restoreAppSettings(work, report)
@@ -458,9 +451,7 @@ class BackupImporter(
                     } else {
                         existing?.sessionOverrides
                     },
-                    botId = if ("botId" in s) s.str("botId")?.takeIf { it.isNotBlank() } else existing?.botId,
                 )
-            record.botId?.let { restoredBotLinks[id] = it }
             if (existing == null) {
                 dao.insertSession(record)
                 newlyInsertedSessionIds.add(id)
@@ -1271,7 +1262,7 @@ class BackupImporter(
         if (ignored > 0) report.extras.merge("ignored", ignored, Int::plus)
     }
 
-    // -- Characters and bots (CHATS) ---------------------------------------------------------------
+    // -- Characters (CHATS) ------------------------------------------------------------------------
 
     private suspend fun restoreAgentTasks(root: File, report: Report) {
         var restored = 0
@@ -1284,38 +1275,38 @@ class BackupImporter(
                 }.getOrNull() }
                 if (record == null) { ignored++; return@readJsonl }
                 val task = record.task
-                val existing = db.botTaskDao().get(task.id)
+                val existing = db.agentTaskDao().get(task.id)
                 if (existing != null && existing.completionEvidence?.let { org.json.JSONObject(it).optJSONObject("restoration")
                         ?.optBoolean("checkpoint_restore_complete", true) } != false) return@readJsonl
                 for (sid in record.checkpoints.keys) {
                     if (!stoppedSessions.add(sid) || db.chatDao().getSession(sid) == null) continue
-                    for (id in db.botTaskDao().taskIdsForSession(sid)) {
-                        db.botTaskDao().stop(id, com.openminis.app.data.db.BotTaskEntity.STATUS_PAUSED, System.currentTimeMillis())
+                    for (id in db.agentTaskDao().taskIdsForSession(sid)) {
+                        db.agentTaskDao().stop(id, com.openminis.app.data.db.AgentTaskEntity.STATUS_PAUSED, System.currentTimeMillis())
                     }
                     com.openminis.app.runtime.ExecutionCoordinator.sessionDidTerminate(sid)
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         com.openminis.app.agent.AgentSessionStore.closeAndAwait(sid)
                     }
                 }
-                val live = task.status !in com.openminis.app.data.db.BotTaskEntity.TERMINAL_STATUSES
+                val live = task.status !in com.openminis.app.data.db.AgentTaskEntity.TERMINAL_STATUSES
                 val evidence = task.completionEvidence?.let { org.json.JSONObject(it) } ?: org.json.JSONObject()
                 evidence.put("restoration", org.json.JSONObject().put("requires_review", live)
                     .put("checkpoint_restore_complete", false).put("restored_at", System.currentTimeMillis())
                     .put("historical", !live).put("checkpoint_sessions", org.json.JSONArray(record.checkpoints.keys)))
-                val goalSession = task.goalSessionId?.takeIf { sid -> db.chatDao().getSession(sid) != null && db.botTaskDao().sessionGoal(sid) == null }
+                val goalSession = task.goalSessionId?.takeIf { sid -> db.chatDao().getSession(sid) != null && db.agentTaskDao().sessionGoal(sid) == null }
                 val restoredTask = existing ?: task.copy(goalSessionId = goalSession,
-                    status = if (live) com.openminis.app.data.db.BotTaskEntity.STATUS_PAUSED else task.status,
+                    status = if (live) com.openminis.app.data.db.AgentTaskEntity.STATUS_PAUSED else task.status,
                     stopGeneration = if (live) task.stopGeneration + 1 else task.stopGeneration,
                     completionEvidence = evidence.toString(),
                     progress = if (live) "从备份恢复，需先核实原工作现场再手动继续。" else task.progress)
-                if (existing == null) db.botTaskDao().insert(restoredTask)
+                if (existing == null) db.agentTaskDao().insert(restoredTask)
                 for ((sid, rows) in record.checkpoints) {
                     if (db.chatDao().getSession(sid) == null) { ignored++; continue }
                     com.openminis.app.tools.ToolCheckpointStore.restoreRows(context, sid, rows)
                 }
                 val finalProof = org.json.JSONObject(checkNotNull(restoredTask.completionEvidence))
                 finalProof.getJSONObject("restoration").put("checkpoint_restore_complete", true)
-                db.botTaskDao().replace(restoredTask.copy(completionEvidence = finalProof.toString()))
+                db.agentTaskDao().replace(restoredTask.copy(completionEvidence = finalProof.toString()))
                 restored++
             }
         } finally {
@@ -1327,7 +1318,7 @@ class BackupImporter(
         if (ignored > 0) report.extras.merge("ignored", ignored, Int::plus)
     }
 
-    private suspend fun restoreCharactersAndBots(root: File, report: Report) {
+    private suspend fun restoreCharacters(root: File, report: Report) {
         val dataDir = File(root, "data")
         var ignored = 0
 
@@ -1361,43 +1352,6 @@ class BackupImporter(
         }
         if (characters > 0) report.extras["characters"] = characters
 
-        val botDao = db.botDao()
-        var bots = 0
-        // The 12-bot limit holds for a restore as it does for creating one; only new ids use it up.
-        var botCount = botDao.countBots()
-        val botRecords = readJsonlList(dataDir, BackupRoleplayMapping.BOT_FILE)
-        if (botRecords.size > BackupRoleplayMapping.MAX_ITEMS) ignored += botRecords.size - BackupRoleplayMapping.MAX_ITEMS
-        for (env in botRecords.take(BackupRoleplayMapping.MAX_ITEMS)) {
-            val record = env.obj?.let {
-                runCatching { BackupFormat.json.decodeFromJsonElement(BackupBotRecord.serializer(), it) }.getOrNull()
-            }
-            val bot = record?.let(BackupRoleplayMapping::restorableBot)
-            if (bot == null) { ignored++; continue }
-            val local = botDao.getBot(bot.id)
-            if (local == null) {
-                if (botCount >= com.openminis.app.data.repository.BotRepository.MAX_BOTS) { ignored++; continue }
-                botDao.insertBot(bot)
-                botCount++
-                bots++
-            } else if (BackupRoleplayMapping.isNewer(bot.updatedAt, local.updatedAt)) {
-                botDao.updateBotProfile(bot.id, bot.name, bot.systemPrompt, bot.modelBinding, bot.updatedAt)
-                botDao.setBotEnabled(bot.id, bot.enabled, bot.updatedAt)
-                bots++
-            }
-        }
-        if (bots > 0) report.extras["bots"] = bots
-
-        // A restored session bound to a bot this device does not have (refused above, or never in the
-        // package) becomes an ordinary chat, and the report says something was left out.
-        val chatDao = db.chatDao()
-        for ((sessionId, botId) in restoredBotLinks) {
-            if (botDao.getBot(botId) != null) continue
-            val session = chatDao.getSession(sessionId) ?: continue
-            if (session.botId != botId) continue
-            chatDao.updateSessionBot(sessionId, null, session.updatedAt)
-            ignored++
-        }
-        restoredBotLinks.clear()
         if (ignored > 0) report.extras.merge("ignored", ignored, Int::plus)
     }
 

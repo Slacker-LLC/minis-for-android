@@ -10,8 +10,6 @@ import com.openminis.app.data.model.AgentToolParam
  * Tool definitions aligned with iOS AIChatViewModel.makeAgentTools().
  */
 object AgentTools {
-    private val BOT_COORDINATION_TOOL_NAMES = setOf("delegate_bot", "list_bots", "check_delegation")
-
     fun makeAgentTools(
         supportsImageInput: Boolean = true,
         // [T-android-vision-group / GH#182] When the main model can't natively
@@ -35,7 +33,6 @@ object AgentTools {
          */
         presetToolset: com.openminis.app.remote.AgentPresetRegistry.Toolset =
             com.openminis.app.remote.AgentPresetRegistry.Toolset.FULL,
-        botEnabled: Boolean = false,
         // Names of the enabled sub agents (the `subagent.agent` enum) while sub agents are allowed
         // (Settings); null withholds delegation. Existing transcripts keep the same tool name.
         subAgentRosterNames: List<String>? = if (com.openminis.app.agent.subagents.SubAgents.isEnabled())
@@ -66,14 +63,6 @@ object AgentTools {
         add(catalogDefinition())
 
         if (presetToolset == com.openminis.app.remote.AgentPresetRegistry.Toolset.CORE) {
-            // Bot coordination is part of the Bot identity contract, so a
-            // minimal Bot session must still be able to list/delegate/check.
-            if (botEnabled) {
-                addAll(
-                    com.openminis.app.tools.runtime.ToolRegistry.definitions()
-                        .filter { it.name in BOT_COORDINATION_TOOL_NAMES },
-                )
-            }
             return@buildList
         }
 
@@ -98,7 +87,7 @@ object AgentTools {
 
         // ToolRegistry owns canonical fork runtime schemas. Legacy definitions
         // above retain their model-facing names; add only canonical handlers
-        // not already represented, while respecting the Bot identity gate.
+        // not already represented, while respecting the tool gates above.
         val legacyCanonicals = mapNotNull {
             com.openminis.app.tools.runtime.ToolRegistry.canonicalName(it.name)
         }.toSet()
@@ -117,7 +106,6 @@ object AgentTools {
             com.openminis.app.tools.runtime.ToolRegistry.definitions().filter {
                 it.name !in legacyCanonicals && it.name !in withheldImageTool &&
                     (memoryEnabled || it.name !in setOf("memory_write", "memory_get")) &&
-                    (botEnabled || it.name !in BOT_COORDINATION_TOOL_NAMES) &&
                     // The registry's own copy of the delegation tool is never offered directly: the
                     // roster definition above stands in for it, and a sub agent's
                     // child gets none.

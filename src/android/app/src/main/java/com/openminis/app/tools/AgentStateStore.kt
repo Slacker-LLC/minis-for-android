@@ -2,8 +2,8 @@ package com.openminis.app.tools
 
 import android.content.Context
 import com.openminis.app.data.db.AppDatabase
-import com.openminis.app.data.db.BotTaskEntity
-import com.openminis.app.data.repository.BotTaskRepository
+import com.openminis.app.data.db.AgentTaskEntity
+import com.openminis.app.data.repository.AgentTaskRepository
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -61,17 +61,17 @@ object AgentStateStore {
     // ── Goal ────────────────────────────────────────────────────────────────
     private fun owner(sessionId: String) = AgentSessionStore.resolvePersistedId(sessionId)
 
-    private fun tasks(context: Context) = BotTaskRepository(AppDatabase.getInstance(context).botTaskDao())
+    private fun tasks(context: Context) = AgentTaskRepository(AppDatabase.getInstance(context).agentTaskDao())
 
-    private fun BotTaskEntity?.asGoal(): Goal {
+    private fun AgentTaskEntity?.asGoal(): Goal {
         if (this == null) return Goal()
         return Goal(
             text = goal, id = id, revision = revision, status = status,
-            active = status == BotTaskEntity.STATUS_ACTIVE,
+            active = status == AgentTaskEntity.STATUS_ACTIVE,
             phase = when (status) {
-                BotTaskEntity.STATUS_ACTIVE -> "active"
-                BotTaskEntity.STATUS_PAUSED -> "paused"
-                BotTaskEntity.STATUS_COMPLETED -> "complete"
+                AgentTaskEntity.STATUS_ACTIVE -> "active"
+                AgentTaskEntity.STATUS_PAUSED -> "paused"
+                AgentTaskEntity.STATUS_COMPLETED -> "complete"
                 else -> status.lowercase()
             },
             maxGoalRounds = maxAutoRuns, roundsUsed = autoRunsUsed,
@@ -99,10 +99,7 @@ object AgentStateStore {
         )
         plans.remove(sid)
         if (task != null) kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-            if (task.status == BotTaskEntity.STATUS_CANCELLED) com.openminis.app.agent.AgentSessionStore.stopTaskWork(task, stopOwner = operation == "set")
-            if (task.status == BotTaskEntity.STATUS_CANCELLED && task.goalSessionId == null && task.ownerBotId != null) {
-                BotDelegationCoordinator.current()?.cancelRootTask(task.id, cancelOwner = operation == "set")
-            }
+            if (task.status == AgentTaskEntity.STATUS_CANCELLED) com.openminis.app.agent.AgentSessionStore.stopTaskWork(task, stopOwner = operation == "set")
             if (operation == "set") AgentSessionStore.stopObsoleteGoalRun(sid, task)
         }
         return task?.takeIf { it.goalSessionId == sid }.asGoal()

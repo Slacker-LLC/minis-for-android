@@ -70,7 +70,7 @@ class ChatAppendTransactionTest {
         repository.appendMessage(sessionId, "assistant", body)
         val receipts = (1..8).map {
             async(Dispatchers.IO) {
-                repository.appendMessage(sessionId, "assistant", body, idempotencyKey = "bot-receipt:same-task")
+                repository.appendMessage(sessionId, "assistant", body, idempotencyKey = "task-receipt:same-task")
             }
         }.awaitAll()
         assertEquals(1, receipts.map { it.id }.toSet().size)

@@ -139,7 +139,6 @@
     <string name="backup_report_extra_settings">Settings: %1$d</string>
     <string name="backup_report_extra_prompt">System prompt: %1$d</string>
     <string name="backup_report_extra_characters">Characters: %1$d</string>
-    <string name="backup_report_extra_bots">Bots: %1$d</string>
     <string name="backup_report_extra_tasks">Scheduled tasks: %1$d</string>
     <string name="backup_report_tasks_disabled">%1$d scheduled task(s) have full access, so they were restored switched off. Review and enable them in Scheduled Tasks.</string>
     <string name="backup_report_settings_restart">Settings apply after you restart the app.</string>

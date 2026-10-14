@@ -105,6 +105,8 @@ import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.theme.minisSheetColor
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 @Composable
@@ -475,14 +477,21 @@ internal fun SessionRow(
         }
 
         // Category icon in colored circle (18% opacity matching iOS)
-        val activeSessions by SessionActivityTracker.activeSessions.collectAsState()
-        val isActive = session.id in activeSessions
+        val isActive by remember(session.id) {
+            SessionActivityTracker.activeSessions
+                .map { session.id in it }
+                .distinctUntilChanged()
+        }.collectAsState(initial = SessionActivityTracker.isActive(session.id))
         // [T-android-session-paused-badge] Head of this session's badge queue
         // — null for the common case. Renders as an overlay in the icon's
         // bottom-right corner, mirroring where iOS's iCloud badge sits so
         // future ICLOUD_SYNCING uses the same anchor.
-        val badgeMap by com.openminis.app.service.SessionBadgeStore.byId.collectAsState()
-        val badgeHead = badgeMap[session.id]?.firstOrNull()
+        val badgeHeadState by remember(session.id) {
+            com.openminis.app.service.SessionBadgeStore.byId
+                .map { it[session.id]?.firstOrNull() }
+                .distinctUntilChanged()
+        }.collectAsState(initial = null)
+        val badgeHead = badgeHeadState
         Box(
             modifier = Modifier.size(44.dp),
         ) {

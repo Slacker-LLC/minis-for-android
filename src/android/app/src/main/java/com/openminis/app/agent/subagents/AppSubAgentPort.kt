@@ -74,10 +74,10 @@ class AppSubAgentPort(private val context: Context) : SubAgentPort {
     private suspend fun parentAllowsWork(job: SubAgentJob): Boolean {
         if (app.chatRepository.getSession(job.parentSessionId) == null) return false
         val taskId = job.parentTaskId ?: return true
-        val task = app.botTaskRepository.get(taskId) ?: return false
+        val task = app.agentTaskRepository.get(taskId) ?: return false
         return task.revision == job.parentTaskRevision && task.stopGeneration == job.parentStopGeneration &&
-            task.status in setOf(com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE,
-                com.openminis.app.data.db.BotTaskEntity.STATUS_WAITING, com.openminis.app.data.db.BotTaskEntity.STATUS_NEEDS_USER)
+            task.status in setOf(com.openminis.app.data.db.AgentTaskEntity.STATUS_ACTIVE,
+                com.openminis.app.data.db.AgentTaskEntity.STATUS_WAITING, com.openminis.app.data.db.AgentTaskEntity.STATUS_NEEDS_USER)
     }
 
     override suspend fun createChild(parentSessionId: String, title: String, model: SubAgentModel): String {
@@ -178,7 +178,7 @@ class AppSubAgentPort(private val context: Context) : SubAgentPort {
             AgentRunner.notifyExternalMessage(context, row)
         }
         if (delivery?.progress == true || (job != null && (!parentAllowsWork(job) ||
-                (job.parentTaskId == null && app.botTaskRepository.sessionGoal(parentSessionId) != null)))) {
+                (job.parentTaskId == null && app.agentTaskRepository.sessionGoal(parentSessionId) != null)))) {
             retainResult()
             return
         }
