@@ -2193,4 +2193,22 @@
     <string name="work_task_waiting">En attente de résultats externes</string>
     <string name="work_request_review">Instructions en attente : confirmer leur envoi après la restauration.</string>
     <string name="work_task_clear_selection">Effacer la sélection de tâche</string>
+    <string name="settings_agent_section_tasks">Tâches planifiées</string>
+    <string name="agent_task_completed">Terminée</string>
+    <string name="agent_task_cancelled">Annulée</string>
+    <string name="agent_task_failed">Échec</string>
+    <string name="agent_task_paused">En pause</string>
+    <string name="agent_task_needs_user">Votre intervention est requise</string>
+    <string name="agent_task_budget_exhausted">Budget d’exécution épuisé</string>
+    <string name="agent_task_active">En cours</string>
+    <string name="agent_task_phase_planning">Planification</string>
+    <string name="agent_task_phase_reviewing">Vérification</string>
+    <string name="agent_task_phase_revising">Révision</string>
+    <string name="agent_task_phase_delivering">Transmission</string>
+    <string name="agent_task_phase_executing">Exécution</string>
+    <string name="agent_task_pause">Mettre la tâche en pause</string>
+    <string name="agent_task_cancel">Annuler la tâche</string>
+    <string name="scheduled_task_legacy_executor_removed">Cette tâche utilisait un moteur d’exécution supprimé. Vérifiez-la et enregistrez-la avant de la relancer.</string>
+    <string name="sub_agent_text_model_required">Choisissez un modèle capable de répondre avec du texte.</string>
+    <string name="vscreen_display_busy">L’écran virtuel est actuellement utilisé par une autre session.</string>
 </resources>

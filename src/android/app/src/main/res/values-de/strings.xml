@@ -2297,4 +2297,22 @@
     <string name="work_task_waiting">Warten auf externe Ergebnisse</string>
     <string name="work_request_review">Ausstehende Anweisungen: Zustellung nach der Wiederherstellung bestätigen.</string>
     <string name="work_task_clear_selection">Aufgabenauswahl aufheben</string>
+    <string name="settings_agent_section_tasks">Geplante Aufgaben</string>
+    <string name="agent_task_completed">Abgeschlossen</string>
+    <string name="agent_task_cancelled">Abgebrochen</string>
+    <string name="agent_task_failed">Fehlgeschlagen</string>
+    <string name="agent_task_paused">Pausiert</string>
+    <string name="agent_task_needs_user">Eingabe erforderlich</string>
+    <string name="agent_task_budget_exhausted">Ausführungslimit erreicht</string>
+    <string name="agent_task_active">Läuft</string>
+    <string name="agent_task_phase_planning">Planung</string>
+    <string name="agent_task_phase_reviewing">Prüfung</string>
+    <string name="agent_task_phase_revising">Überarbeitung</string>
+    <string name="agent_task_phase_delivering">Übergabe</string>
+    <string name="agent_task_phase_executing">Ausführung</string>
+    <string name="agent_task_pause">Aufgabe pausieren</string>
+    <string name="agent_task_cancel">Aufgabe abbrechen</string>
+    <string name="scheduled_task_legacy_executor_removed">Diese Aufgabe verwendete einen entfernten Ausführungsmodus. Prüfe sie und speichere sie, bevor du sie erneut startest.</string>
+    <string name="sub_agent_text_model_required">Wähle ein Modell, das Text ausgeben kann.</string>
+    <string name="vscreen_display_busy">Das virtuelle Display wird derzeit von einer anderen Sitzung verwendet.</string>
 </resources>

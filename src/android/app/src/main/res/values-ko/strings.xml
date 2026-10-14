@@ -2285,4 +2285,22 @@
     <string name="work_task_waiting">외부 결과 대기 중</string>
     <string name="work_request_review">전달 대기 중인 지시가 있습니다. 복원 후 전달 방법을 확인하세요.</string>
     <string name="work_task_clear_selection">작업 선택 해제</string>
+    <string name="settings_agent_section_tasks">예약된 작업</string>
+    <string name="agent_task_completed">완료됨</string>
+    <string name="agent_task_cancelled">취소됨</string>
+    <string name="agent_task_failed">실패함</string>
+    <string name="agent_task_paused">일시 중지됨</string>
+    <string name="agent_task_needs_user">사용자 입력 필요</string>
+    <string name="agent_task_budget_exhausted">실행 예산 소진</string>
+    <string name="agent_task_active">진행 중</string>
+    <string name="agent_task_phase_planning">계획 중</string>
+    <string name="agent_task_phase_reviewing">검토 중</string>
+    <string name="agent_task_phase_revising">수정 중</string>
+    <string name="agent_task_phase_delivering">결과 전달 중</string>
+    <string name="agent_task_phase_executing">실행 중</string>
+    <string name="agent_task_pause">작업 일시 중지</string>
+    <string name="agent_task_cancel">작업 취소</string>
+    <string name="scheduled_task_legacy_executor_removed">이 작업은 삭제된 실행기를 사용했습니다. 다시 실행하기 전에 내용을 검토하고 저장하세요.</string>
+    <string name="sub_agent_text_model_required">텍스트로 응답할 수 있는 모델을 선택하세요.</string>
+    <string name="vscreen_display_busy">가상 디스플레이가 현재 다른 세션에서 사용 중입니다.</string>
 </resources>

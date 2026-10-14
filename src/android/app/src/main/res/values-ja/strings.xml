@@ -2293,4 +2293,22 @@
     <string name="work_task_waiting">外部の結果を待機中</string>
     <string name="work_request_review">未送信の指示があります。復元後に送信方法を確認してください。</string>
     <string name="work_task_clear_selection">タスクの選択を解除</string>
+    <string name="settings_agent_section_tasks">スケジュール済みタスク</string>
+    <string name="agent_task_completed">完了</string>
+    <string name="agent_task_cancelled">キャンセル済み</string>
+    <string name="agent_task_failed">失敗</string>
+    <string name="agent_task_paused">一時停止</string>
+    <string name="agent_task_needs_user">入力が必要です</string>
+    <string name="agent_task_budget_exhausted">実行予算を使い切りました</string>
+    <string name="agent_task_active">実行中</string>
+    <string name="agent_task_phase_planning">計画中</string>
+    <string name="agent_task_phase_reviewing">確認中</string>
+    <string name="agent_task_phase_revising">修正中</string>
+    <string name="agent_task_phase_delivering">結果を提示中</string>
+    <string name="agent_task_phase_executing">実行中</string>
+    <string name="agent_task_pause">タスクを一時停止</string>
+    <string name="agent_task_cancel">タスクをキャンセル</string>
+    <string name="scheduled_task_legacy_executor_removed">このタスクは削除された実行方式を使用していました。再実行する前に内容を確認して保存してください。</string>
+    <string name="sub_agent_text_model_required">テキストで応答できるモデルを選択してください。</string>
+    <string name="vscreen_display_busy">仮想ディスプレイは現在、別のセッションで使用されています。</string>
 </resources>

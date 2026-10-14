@@ -2475,4 +2475,22 @@
     <string name="work_task_waiting">Ожидание внешних результатов</string>
     <string name="work_request_review">Есть ожидающие инструкции. После восстановления подтвердите способ их передачи.</string>
     <string name="work_task_clear_selection">Снять выбор задачи</string>
+    <string name="settings_agent_section_tasks">Запланированные задачи</string>
+    <string name="agent_task_completed">Завершено</string>
+    <string name="agent_task_cancelled">Отменено</string>
+    <string name="agent_task_failed">Ошибка</string>
+    <string name="agent_task_paused">Приостановлено</string>
+    <string name="agent_task_needs_user">Требуется ваше участие</string>
+    <string name="agent_task_budget_exhausted">Лимит запусков исчерпан</string>
+    <string name="agent_task_active">Выполняется</string>
+    <string name="agent_task_phase_planning">Планирование</string>
+    <string name="agent_task_phase_reviewing">Проверка</string>
+    <string name="agent_task_phase_revising">Доработка</string>
+    <string name="agent_task_phase_delivering">Передача результата</string>
+    <string name="agent_task_phase_executing">Выполнение</string>
+    <string name="agent_task_pause">Приостановить задачу</string>
+    <string name="agent_task_cancel">Отменить задачу</string>
+    <string name="scheduled_task_legacy_executor_removed">Эта задача использовала больше недоступный режим выполнения. Проверьте её и сохраните перед повторным запуском.</string>
+    <string name="sub_agent_text_model_required">Выберите модель, способную отвечать текстом.</string>
+    <string name="vscreen_display_busy">Виртуальный экран сейчас используется другой сессией.</string>
 </resources>

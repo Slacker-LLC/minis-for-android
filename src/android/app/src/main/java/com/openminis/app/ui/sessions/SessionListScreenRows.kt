@@ -490,9 +490,7 @@ internal fun SessionRow(
             com.openminis.app.service.SessionBadgeStore.byId
                 .map { it[session.id]?.firstOrNull() }
                 .distinctUntilChanged()
-        }.collectAsState(
-            initial = com.openminis.app.service.SessionBadgeStore.byId.value[session.id]?.firstOrNull(),
-        )
+        }.collectAsState(initial = null)
         val badgeHead = badgeHeadState
         Box(
             modifier = Modifier.size(44.dp),
