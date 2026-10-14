@@ -7,7 +7,7 @@ import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.agent.AgentRunner
 import org.json.JSONObject
-import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CancellationException
 
 /**
  * Ralph loop (DeepSeek Harness dsh-tool-ralph contract, Android port).
@@ -39,9 +39,6 @@ object RalphTool {
     private const val MAX_HANDOFF_CHARS = 8192
     private const val MAX_SUMMARY_CHARS = 2000
 
-    /** Non-zero while a ralph run is active: ralph never nests. */
-    private val activeRuns = AtomicInteger(0)
-
     fun definition(): AgentToolDefinition = AgentToolDefinition(
         name = NAME,
         description = "Run one immutable objective through a sequence of fresh child agents " +
@@ -61,7 +58,7 @@ object RalphTool {
         ),
         required = listOf("tool_title", "objective"),
         propertyOrdering = listOf("tool_title", "objective", "maxRounds"),
-        timeoutMs = null, // each round has its own budget via SubagentLimits
+        timeoutMs = null, // each round has its own budget via RalphLimits
     )
 
     suspend fun execute(argsJson: String, parentSessionId: String?, context: Context): ToolExecutionResult {
@@ -75,31 +72,49 @@ object RalphTool {
         }
         val maxRounds = args.optInt("maxRounds", DEFAULT_MAX_ROUNDS).coerceIn(1, MAX_ROUNDS_CEILING)
 
-        // Ralph never nests: a child agent inside a ralph run calling ralph
-        // again would multiply context instead of bounding it.
-        if (activeRuns.get() > 0) {
-            return ToolExecutionResult(
-                "ralph: a ralph run is already active; do this task directly instead of nesting.",
-                false, toolTitle = title,
-            )
-        }
-
         val app = context.applicationContext as? MinisApp
             ?: return ToolExecutionResult("ralph: app not initialized", false, toolTitle = title)
-
-        activeRuns.incrementAndGet()
+        // The child's real source prevents nesting without serializing unrelated parents.
+        if (parentSessionId != null && app.chatRepository.getSession(parentSessionId)?.source == NAME) {
+            return ToolExecutionResult(
+                "ralph: a Ralph child cannot start a nested Ralph loop; work directly in this round.",
+                false, toolTitle = title, failureKind = ToolFailureKind.PERMISSION_DENIED, executionStarted = false,
+            )
+        }
         // State that crosses rounds. Every round is a new session with its own workspace, so the only
         // place a file written in round 1 is visible in round 2 is the cross-session shared area.
-        val runId = java.util.UUID.randomUUID().toString().take(8)
+        val identity = kotlin.coroutines.coroutineContext[com.openminis.app.tools.runtime.ToolExecutor.ExecutionIdentity]
+        val runId = identity?.intentId ?: java.util.UUID.randomUUID().toString()
         val stateDir = "$GUEST_STATE_ROOT/$runId"
-        runCatching {
-            java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostShared, "ralph/$runId").mkdirs()
+        val backing = java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostShared, "ralph/$runId")
+        val manifest = JSONObject().put("version", 1).put("run_id", runId).put("objective", objective)
+            .put("parent_session_id", parentSessionId ?: JSONObject.NULL)
+            .put("parent_run_id", identity?.model?.runId ?: JSONObject.NULL)
+            .put("parent_task_id", identity?.model?.taskId ?: JSONObject.NULL)
+            .put("parent_task_revision", identity?.model?.revision ?: JSONObject.NULL)
+            .put("parent_stop_generation", identity?.model?.stopGeneration ?: JSONObject.NULL)
+            .put("max_rounds", maxRounds).put("rounds_used", 0).put("status", "RUNNING").put("children", org.json.JSONArray())
+        var terminalKnown = false
+        fun saveManifest() {
+            val atomic = android.util.AtomicFile(java.io.File(backing, "run.json"))
+            val stream = atomic.startWrite()
+            try { stream.write(manifest.toString().toByteArray(Charsets.UTF_8)); atomic.finishWrite(stream) }
+            catch (error: Throwable) { atomic.failWrite(stream); throw error }
         }
         return try {
+            check(backing.mkdirs() || backing.isDirectory) { "could not create Ralph state directory" }
+            saveManifest()
             var handoff = ""
             for (round in 1..maxRounds) {
+                identity?.model?.taskId?.let { taskId ->
+                    val parent = checkNotNull(app.botTaskRepository.get(taskId)) { "parent_task_missing" }
+                    check(parent.revision == identity.model.revision && parent.stopGeneration == identity.model.stopGeneration &&
+                        parent.status in setOf(com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE,
+                            com.openminis.app.data.db.BotTaskEntity.STATUS_WAITING, com.openminis.app.data.db.BotTaskEntity.STATUS_NEEDS_USER)) { "parent_task_changed_or_stopped" }
+                }
+                manifest.put("rounds_used", round); saveManifest()
                 Log.i(TAG, "round $round/$maxRounds objective=${objective.take(60)}")
-                val report = runRound(
+                val (childId, result) = runRound(
                     context = context,
                     app = app,
                     objective = objective,
@@ -108,19 +123,34 @@ object RalphTool {
                     handoff = handoff,
                     title = title,
                     stateDir = stateDir,
-                ) ?: return ToolExecutionResult(
-                    "ralph: round $round failed with an invalid report (see child session). " +
+                    requestId = "ralph:$runId:$round",
+                    onChildCreated = { child -> manifest.getJSONArray("children").put(child); saveManifest() },
+                )
+                if (!result.completed || ToolCheckpointStore.drainPending(context, childId).isNotEmpty()) {
+                    return ToolExecutionResult(
+                        "ralph: round $round did not settle definitively (status=${result.status}, child=$childId). " +
+                            "Child cleanup has completed; inspect its effects before retrying.",
+                        false, toolTitle = title, timedOut = result.timedOut,
+                        failureKind = if (result.timedOut) ToolFailureKind.TOOL_TIMEOUT else ToolFailureKind.OUTCOME_UNKNOWN,
+                    )
+                }
+                val report = parseReport(result.responseText?.trim().orEmpty(), childId) ?: return ToolExecutionResult(
+                    "ralph: round $round failed with an invalid report (child=$childId). " +
                         "Rounds: ${round - 1}, objective unchanged.",
                     false, toolTitle = title,
                 )
+                manifest.put("handoff", report.toHandoff())
+                saveManifest()
                 when (report.status) {
                     "complete" -> {
+                        terminalKnown = true; manifest.put("status", "COMPLETED"); saveManifest()
                         return ToolExecutionResult(
                             "Ralph complete in $round round(s).\n\nSummary: ${report.summary}" +
                                 report.evidence.let { if (it.isBlank()) "" else "\n\nEvidence:\n$it" },                            true, toolTitle = title,
                         )
                     }
                     "blocked" -> {
+                        terminalKnown = true; manifest.put("status", "BLOCKED"); saveManifest()
                         return ToolExecutionResult(
                             "Ralph blocked in round $round.\n\nSummary: ${report.summary}" +
                                 report.blockedReason.let { if (it.isBlank()) "" else "\n\nBlocked: $it" },                            false, toolTitle = title,
@@ -132,18 +162,23 @@ object RalphTool {
                     }
                 }
             }
+            terminalKnown = true; manifest.put("status", "BUDGET_EXHAUSTED"); saveManifest()
             ToolExecutionResult(
                 "Ralph finished after $maxRounds round(s) without reporting completion. " +
                     "Last summary: ${reportFrom(handoff)?.summary ?: "(none)"}",
                 false, toolTitle = title,
             )
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
-        } catch (t: Throwable) {
-            Log.w(TAG, "ralph failed: ${t.message}", t)
-            ToolExecutionResult("ralph failed: ${t.message}", false, toolTitle = title)
+        } catch (error: Exception) {
+            Log.w(TAG, "ralph failed: ${error.message}", error)
+            ToolExecutionResult("ralph failed: ${error.message}", false, toolTitle = title,
+                failureKind = ToolFailureKind.OUTCOME_UNKNOWN)
         } finally {
-            activeRuns.decrementAndGet()
+            if (!terminalKnown && backing.isDirectory) kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable + kotlinx.coroutines.Dispatchers.IO) {
+                manifest.put("status", "OUTCOME_UNKNOWN")
+                saveManifest()
+            }
         }
     }
 
@@ -157,28 +192,23 @@ object RalphTool {
         handoff: String,
         title: String,
         stateDir: String,
-    ): RalphReport? {
-        val childId = AgentRunner.ensureSession(context)
+        requestId: String,
+        onChildCreated: (String) -> Unit,
+    ): Pair<String, AgentRunner.PromptResult> {
+        val childId = AgentRunner.ensureSession(context, source = "ralph")
+        onChildCreated(childId)
         runCatching {
             app.chatRepository.updateSessionTitle(childId, "↳ Ralph $round: " + title.take(36))
-            app.chatRepository.dao.updateSource(childId, "ralph")
         }
 
         val prompt = buildRoundPrompt(objective, round, maxRounds, handoff, stateDir)
-        val result = AgentRunner.prompt(
-            context = context,
-            sessionId = childId,
-            text = prompt,
-            wait = true,
-            timeoutMs = SubagentLimits.timeoutMs(context),
+        // The common runner waits for this exact request's cleanup, not a session-wide busy flag
+        // or a later user turn. A fresh round cannot outrun the request it follows.
+        return childId to AgentRunner.prompt(
+            context = context, sessionId = childId, text = prompt, wait = true,
+            timeoutMs = RalphLimits.timeoutMs(context), awaitCancellationCleanup = true,
+            requestId = requestId,
         )
-
-        val answer = result.responseText?.trim().orEmpty()
-        if (answer.isEmpty() || !result.completed) {
-            Log.w(TAG, "round $round child did not complete (status=${result.status} timedOut=${result.timedOut})")
-            return null
-        }
-        return parseReport(answer, childId)
     }
 
     private fun buildRoundPrompt(
@@ -228,10 +258,11 @@ object RalphTool {
         val report = RalphReport(
             status = status,
             summary = boundedSummary,
-            evidence = json.optString("evidence").trim().take(MAX_HANDOFF_CHARS),
-            nextSteps = json.optString("nextSteps").trim().take(MAX_HANDOFF_CHARS),
-            blockedReason = json.optString("blockedReason").trim().take(MAX_HANDOFF_CHARS),
+            evidence = json.optString("evidence").trim(),
+            nextSteps = json.optString("nextSteps").trim(),
+            blockedReason = json.optString("blockedReason").trim(),
         )
+        if (status == "continue" && report.nextSteps.isBlank() || status == "blocked" && report.blockedReason.isBlank()) return null
         // Bounded handoff: an oversized report must fail the run, not be truncated silently.
         if (report.toHandoff().length > MAX_HANDOFF_CHARS) {
             Log.w(TAG, "round child $childId handoff exceeds $MAX_HANDOFF_CHARS chars")

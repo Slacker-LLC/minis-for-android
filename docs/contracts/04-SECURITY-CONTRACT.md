@@ -23,7 +23,7 @@
 
 `minis-root-network-proxy` 是单用途 loopback HTTP/CONNECT helper。名称中的 `root` 反映当前 Android 部署可让它以特权身份建立出站 socket，**不是协议要求，也不是 Direct Ubuntu chroot 的安全边界本身**。
 
-- 监听固定为 `127.0.0.1:18787`；
+- 正式包监听固定为 `127.0.0.1:18787`；显式并存开发包固定为 `127.0.0.1:18788`，使用各自 Root runtime 的 PID/进程状态目录与 App 私有认证状态，不停止或接管另一包的 helper；
 - 仅接受 HTTP absolute-form 和 CONNECT；
 - 不提供 shell、文件系统、插件、动态配置 RPC 或命令执行接口；
 - 普通 loopback/private/link-local/broadcast 目标拒绝；`198.18.0.0/15` 仅作为明确 VPN Fake-IP 兼容例外；

@@ -58,3 +58,11 @@ Minis for Android 含有从开源项目 **OpenMinis** 衍生的代码：
 See [LICENSE](LICENSE), [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md), [CONTRIBUTORS.md](CONTRIBUTORS.md).
 
 历史执行模型（已废弃）见 [docs/archive/RUNTIME-HISTORY.md](docs/archive/RUNTIME-HISTORY.md)。现行合同见 [docs/contracts/](docs/contracts/00-IDENTITY.md)。
+
+## Design-only reference: OpenBot
+
+- repository: https://github.com/nightly-labs/openbot
+- inspected commit: `a5c182367b24f34cd8334bbeeaac3e45d86420b0` (2026-10-12)
+- repository license: PolyForm Noncommercial License 1.0.0; required notice: Copyright 2026 Norbert Bodziony.
+- inspected areas: persistent mailbox/drain scheduling, task owner and execution threads, queue/steer controls, voice transcription, agent identity.
+- 本轮仅用于设计对照，未将 OpenBot 源码或资源并入产品；实际语音/Bot 改动复用本仓库已有 Kotlin 实现。未来直接源码移植须逐项确认适用许可并另列文件/代码范围，不能将其视为已取得 GPL 授权。

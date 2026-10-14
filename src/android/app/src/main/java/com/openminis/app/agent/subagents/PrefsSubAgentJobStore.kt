@@ -15,7 +15,7 @@ class PrefsSubAgentJobStore(context: Context) : SubAgentJobStore {
     override fun load(): List<SubAgentJob> = decode(prefs.getString(KEY, null))
 
     override fun save(jobs: List<SubAgentJob>) {
-        prefs.edit().putString(KEY, encode(jobs)).apply()
+        check(prefs.edit().putString(KEY, encode(jobs)).commit()) { "subagent_checkpoint_commit_failed" }
     }
 
     companion object {

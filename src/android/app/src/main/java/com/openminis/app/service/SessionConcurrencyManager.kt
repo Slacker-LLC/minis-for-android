@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.LinkedList
-import kotlin.coroutines.resume
 
 /**
  * Limits concurrent agent loop sessions to [maxConcurrent].
@@ -40,7 +39,9 @@ object SessionConcurrencyManager {
                 }
             }
 
-            if (grantImmediately) cont.resume(Unit)
+            // Prompt cancellation can win after a permit is registered but before acquireSlot
+            // returns. The caller has no acquired permit to release from its finally block yet.
+            if (grantImmediately) cont.resume(Unit, onCancellation = { _, _, _ -> releaseSlot(sessionId) })
             cont.invokeOnCancellation {
                 synchronized(stateLock) {
                     val removed = waitQueue.removeAll { it.continuation === cont }
@@ -66,7 +67,7 @@ object SessionConcurrencyManager {
                 if (candidate.continuation.isCancelled) continue
                 _runningSessions.value = _runningSessions.value + candidate.sessionId
                 try {
-                    candidate.continuation.resume(Unit)
+                    candidate.continuation.resume(Unit, onCancellation = { _, _, _ -> releaseSlot(candidate.sessionId) })
                     return
                 } catch (_: IllegalStateException) {
                     _runningSessions.value =

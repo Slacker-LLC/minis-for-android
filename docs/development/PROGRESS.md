@@ -14,6 +14,32 @@
 | ⬜ | 未开始 |
 | ⛔ | 明确排除（附理由） |
 
+## 当前工作树：M1–M5 整体接线（2026-10-14）
+
+最新实现与剩余验收统一见 [M 系列整体接线](M-SERIES-INTEGRATION.md)。M1 核心保留；M2 人工/终态核验、M3 CLI/后台事实、M4 SAF/交付/备份及 M5 持久接单/对象恢复/关联协作已接线。Room v26 复用消息表，没有新增邮箱框架。本轮整体开发及集中验收已完成：17 组工作流（166 个报告子场景）、v23→v26 迁移、4 个 force-stop 恢复阶段、Debug/AndroidTest、Release Kotlin/R8 和 Debug/Release Lint 通过。工件见 `.local/test-runs/m-series-final-20261014/RESULTS.md`，不以此前重复轮次证明新源码。以下按日期保留阶段记录。
+
+## 当前工作树：M1 执行核心与页面投影（2026-10-12）
+
+按 [总体路线](AGENT-ROADMAP.md) 的 M0 → M1 开始，普通 Agent 的文件/Android/请求生命周期有受控端到端基线。原 Headless 执行实现已复用到产品 AgentRunner，旧路径删除；读取投影归到 remote；会话来源随创建事务保存。回合 Job/scope 已迁入 AgentExecution；取消/等待覆盖准备、模型子协程和清理。会话历史、压缩标记、工具循环检测与 outgoing 上下文已归入 AgentConversation；修正撤销压缩历史翻倍、清空摘要残留、部分工具批次占位结果误确认和结构化 Provider 请求漏摘要；修正并发槽位授予与取消竞态，取消后可继续提交。模型循环、预算/offload、压缩执行、队列与其余非 UI 状态已归入 AgentSession；AgentSessionStore 为唯一执行所有者，ViewModel 为页面投影。M1 核心迁移与受控端到端验收已完成（37 场景连续 10 轮、17 项共享入口回归通过），M2 已将普通 Goal、任务计划、预算接续和证据验收接入同一核心；领域恢复与 M3–M5 继续推进。
+
+验证级别为 Debug 构建、Lint 与 Android instrumentation 工作流，不代表全量单测或真实 Root/OEM 验收，也未提交到 main。生命周期切片的 17 个场景连续 10 次通过；普通循环/Bot/附件/语音的 17 项共享回归通过。会话上下文切片的 28 场景连续 3 轮通过，保留原 17 场景，并通过 17 项共享调用方回归；最终 Debug/AndroidTest/Lint 通过。M1 最终 37 场景连续 10 轮（370 次场景执行）及 17 项共享入口回归通过，Debug/AndroidTest 构建、Release Kotlin/R8、Debug/Release Lint 全部通过；安装包/source/hash 与实际文件均已核对。正式 Release APK 尚缺生产签名。实现范围、失败方式和复跑入口见 [执行核心说明](AGENT-CORE-EXECUTION.md)；本地工件目录为 `.local/test-runs/agent-core-20261012/`、`.local/test-runs/agent-lifecycle-20261012/` 、`.local/test-runs/agent-context-20261012/` 与本轮 `.local/test-runs/agent-m1-20261012/`。
+
+## 当前工作树：M2 执行、恢复与真实验收（2026-10-12）
+
+Room v25 保存进度与实际完成证据；普通 ACTIVE 目标在同一串行循环消费持久预算接续。请求绑定真实 Task/Run/用户消息，Bot 老任务唤醒不改写同会话另外设置的 Goal。负责人正常回复不再冒充根目标完成，文件/同任务持久回执经过后端核验才能提交完成。
+
+工具副作用前记录独立执行 ID，真实回执提交后确认精确检查点；重复模型 call_id 不会把旧回执认作新操作成功。完整未知文件写入可以按实际哈希核验，并在同一 Room 事务保存证据和核验回执；不重放操作。用户修改/暂停优先于旧代次，清除 Goal/删除会话保留已完成历史证据。
+
+本次验证证据单独保存到 `.local/test-runs/agent-m2-loop-20261012/`，通过数与最终 APK/源码以 `RESULTS.md` 为准。非文件副作用、SAF 非 POSIX 证据、真实模型与 Root/OEM 行为尚未完整验收，M3–M5 尚未完成；详见 [任务执行](AGENT-TASK-EXECUTION.md)。
+
+## M2 第一切片冻结证据：普通目标持久记录（2026-10-12）
+
+复用现有 BotTask/Room v24，为普通 session 保存目标、验收条件、任务计划、ID/revision、暂停和预算；旧 Bot 任务全字段兼容迁移。模型工具、命令、Debug/Web 和原生目标条读取同一权威状态，真实模型请求携带持久现场。空会话清理保留显式目标，删除 session 会事务停止并解除目标。
+
+受控 Android 端到端工作流 5 场景 × 10 轮（50 次）通过；真实 v23 文件迁移、`am force-stop` 前后恢复通过，暂停预算与文件哈希保持一致，未知写入记录没有重放。最终版本保留并通过 M1 的 37 场景 × 3 轮（111 次）及 17 项共享入口回归，安装 APK 与 1,145 项源码/配置清单已核对。Release 检查的最终结果见本地 `agent-m2-20261012/RESULTS.md`。本轮没有新增/运行 JVM 单元测试，旧类型导入和默认投影只做机械适配及编译检查；不代表真实模型质量或 Root/OEM 已验收。
+
+以上是第一切片的冻结结果，当时尚未实现自动接续与证据验收；本次已继续接入这些能力，最终证据分别保存，不覆写旧清单。实现与复跑入口见 [普通任务持久化](AGENT-TASK-EXECUTION.md)。源码仍为未提交工作树。
+
 ## 一、已完成（main 已包含）
 
 **种子：Minis for Android @ 69e05e51 + Eta 移植线 24 个提交。**
@@ -1305,3 +1331,11 @@ PR3 将运行时模型配置改为 Main、Light、Vision、Voice Input、Voice O
 宿主验证通过：`:app:testDebugUnitTest` 共 2,448 项、0 失败；`:app:lintDebug` 与 `:app:compileDebugAndroidTestKotlin` 成功；八种 strings.xml 和 plural 资源均通过 XML/键完整性检查。Lint 报告仍显示 202 warnings、7 hints，并有 34 条旧 baseline issue 未再触发；这些不阻止任务成功。新模型槽位 UI 与选择器文件没有 lint issue。真机升级旧数据库/备份后验证聊天、语音、视觉、bot、scheduled task 和 Agent `minis-model-use` 的行为仍待设备验收。
 
 Room schema 当前为 v4；如 `06-CURRENT-GAPS.md` 所记，删除旧表属于后续 PR4，需另行升至 v5，本轮不实施。
+
+### 2026-10-12：M2 协作结算与 M3 首个切片
+
+M2 协作 12 场景 × 3 轮、执行闭环 17、持久化 5、M1 核心 37 与共享入口 17 均通过；ACTIVE/PAUSED 真正 force-stop 恢复和 v23→24→25 文件迁移通过。证据独立保存于 `.local/test-runs/agent-m2-coordination-20261012/`，未覆写前一切片。M3 已接入共享参数检查/注册时限、极简任务控制、子代理开关与 schema 收敛、诊断后端事实；验证和剩余边界见 [工具执行](AGENT-TOOLS-EXECUTION.md)。M3–M5 尚未整体完成，生产 Root/OEM 与签名仍需设备证据。
+
+### 2026-10-14：M3 Android 领域结果与持久回执
+
+接续上一轮未完成验收的领域切片，复用 NativeOffloadResult/ToolExecutionResult 向模型、Room 和可选 Guest CLI framing 传递拒绝/执行事实。真实日历事件写入后提醒回执失败原被普通失败 ACK，现保留部分结果与 UNKNOWN，任务保持 WAITING 和原预算。日历读写权限、联系人聚合 ID 观察失败、CLI 原文/退出码及确认后的 MCP 沿已有后端核对。重复场景、恢复、最终源码/APK 与 Release 检查见 [.local/test-runs/agent-m3-domain-outcomes-20261014/RESULTS.md](../../.local/test-runs/agent-m3-domain-outcomes-20261014/RESULTS.md)。非文件独立核验及 M4/M5 完整交付继续按顺序推进，不能据此宣称 M 系列整体完成。

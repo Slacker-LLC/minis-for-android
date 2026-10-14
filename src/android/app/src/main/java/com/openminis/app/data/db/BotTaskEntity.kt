@@ -6,7 +6,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * Durable root task for a user goal that may span several Bot turns.
+ * Durable root task for a user goal spanning ordinary or Bot turns.
  *
  * A delegation is one work package inside this record. Keeping the root
  * lifecycle separate means a worker finishing a turn cannot accidentally mark
@@ -18,13 +18,17 @@ import androidx.room.PrimaryKey
         Index(value = ["origin_session_id", "origin_message_id"], name = "index_bot_tasks_origin"),
         Index(value = ["owner_bot_id", "status", "updated_at"], name = "index_bot_tasks_owner_status"),
         Index(value = ["status", "updated_at"], name = "index_bot_tasks_status_updated"),
+        Index(value = ["goal_session_id"], unique = true, name = "index_bot_tasks_goal_session"),
     ],
 )
+@kotlinx.serialization.Serializable
 data class BotTaskEntity(
     @PrimaryKey val id: String,
     @ColumnInfo(name = "origin_session_id") val originSessionId: String,
     @ColumnInfo(name = "origin_message_id") val originMessageId: String? = null,
-    @ColumnInfo(name = "owner_bot_id") val ownerBotId: String,
+    @ColumnInfo(name = "owner_bot_id") val ownerBotId: String?,
+    /** Null on legacy delegation roots; otherwise the session's current explicit Goal. */
+    @ColumnInfo(name = "goal_session_id") val goalSessionId: String? = null,
     val goal: String,
     @ColumnInfo(name = "acceptance_criteria") val acceptanceCriteria: String? = null,
     val status: String = STATUS_ACTIVE,
@@ -39,6 +43,11 @@ data class BotTaskEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(name = "completed_at") val completedAt: Long? = null,
+    @ColumnInfo(name = "max_auto_runs", defaultValue = "3") val maxAutoRuns: Int = 3,
+    @ColumnInfo(name = "plan_mode", defaultValue = "'off'") val planMode: String = "off",
+    @ColumnInfo(name = "task_plan", defaultValue = "''") val taskPlan: String = "",
+    @ColumnInfo(name = "progress", defaultValue = "''") val progress: String = "",
+    @ColumnInfo(name = "completion_evidence") val completionEvidence: String? = null,
 ) {
     companion object {
         const val STATUS_ACTIVE = "ACTIVE"

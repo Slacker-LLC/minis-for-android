@@ -84,7 +84,7 @@ class RootfsManager private constructor(private val context: Context) {
         _installState.value = RootfsInstallState.Idle
     }
 
-    suspend fun getRootfsSize(): Long = withContext(Dispatchers.IO) {
+    suspend fun getRootfsSize(): Long? = withContext(Dispatchers.IO) {
         if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
         UbuntuKernel.measureRootfsSize()
     }

@@ -50,7 +50,7 @@ fun TokenUsageSheet(
     viewModel: ChatViewModel,
     onDismiss: () -> Unit,
 ) {
-    var stats by remember { mutableStateOf<ChatViewModel.SessionTokenStats?>(null) }
+    var stats by remember { mutableStateOf<com.openminis.app.agent.AgentSession.SessionTokenStats?>(null) }
     val contextWindow = remember { viewModel.currentModelContextWindow }
     val maxOutput = remember { viewModel.currentModelMaxOutputTokens }
     val thinking = remember { viewModel.thinkingInfo() }

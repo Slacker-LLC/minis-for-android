@@ -244,11 +244,26 @@ internal object GuestCommandBridge {
         val handler = resolveHandler(cmd)
             ?: if (cmd == "minis-config") configHandler else null
             ?: return NativeOffloadResult(127, "$cmd handler not registered\n")
-        val argv = ArrayList<String>(args.size + 1).apply {
+        // Opt-in framing preserves the default clipboard bytes and existing CLI JSON shapes.
+        // Consume only a leading transport flag so a literal argument value is never removed.
+        val executionJson = args.firstOrNull() == "--execution-json"
+        val commandArgs = if (executionJson) args.drop(1) else args
+        val argv = ArrayList<String>(commandArgs.size + 1).apply {
             add(cmd)
-            addAll(args)
+            addAll(commandArgs)
         }
-        return handler.handle(
+        // Capture the actual owner before dispatch; a late callback cannot contaminate its successor.
+        val shellOutcome = NativeOffloadServer.currentShell(sessionId)
+        val backgroundJobs = com.openminis.app.tools.JobRegistry.list().filter {
+            it.sessionId == sessionId && it.status == com.openminis.app.tools.JobRegistry.JobStatus.RUNNING
+        }
+        val backgroundExecutions = backgroundJobs.mapNotNull { it.executionIntentId?.let { id -> NativeOffloadServer.ShellOutcome(id, sessionId) } }
+        if (Thread.currentThread().isInterrupted) return NativeOffloadResult(130, "$cmd: request cancelled before dispatch\n",
+            com.openminis.app.tools.ToolFailureKind.USER_CANCELLATION, false)
+        NativeOffloadServer.beginNative(shellOutcome)
+        backgroundExecutions.forEach(NativeOffloadServer::beginNative)
+        var observed: NativeOffloadResult? = null
+        val result = try { handler.handle(
             NativeOffloadRequest(
                 pid = pid,
                 argv = argv,
@@ -257,7 +272,24 @@ internal object GuestCommandBridge {
                 sessionId = sessionId,
                 stdin = stdin,
             ),
-        )
+        ).also { observed = it } } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            observed = NativeOffloadResult(130, "$cmd: request cancelled during execution\n",
+                com.openminis.app.tools.ToolFailureKind.USER_CANCELLATION, true)
+            throw cancelled
+        } catch (_: Exception) {
+            NativeOffloadResult(1, "$cmd: no definitive execution receipt\n",
+                com.openminis.app.tools.ToolFailureKind.OUTCOME_UNKNOWN, true).also { observed = it }
+        } finally {
+            val receipt = observed
+            if (receipt != null) shellOutcome?.observe(receipt)
+            if (receipt == null || receipt.failureKind?.outcomeUnknown == true)
+                backgroundJobs.forEach { com.openminis.app.tools.JobRegistry.markNativeOutcomeUnknown(it.id) }
+            NativeOffloadServer.endNative(shellOutcome)
+            backgroundExecutions.forEach(NativeOffloadServer::endNative)
+        }
+        return if (!executionJson) result else result.copy(output = org.json.JSONObject()
+            .put("exit_code", result.exitCode).put("output", result.output)
+            .put("execution", result.toToolExecutionResult().executionFacts()).toString() + "\n")
     }
 
     private fun acceptLoop(server: ServerSocket, expectedToken: String) {

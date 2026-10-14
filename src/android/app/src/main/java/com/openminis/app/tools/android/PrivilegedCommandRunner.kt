@@ -208,40 +208,30 @@ object LinuxCapabilityParser {
 
 /** Passive Root discovery and the last probe result. */
 object RootCommandRunner {
-    private val knownPaths = listOf(
-        "/system/bin/su", "/system/xbin/su", "/sbin/su", "/su/bin/su",
-        "/data/adb/ksu/bin/su", "/debug_ramdisk/su",
-    )
-
-    @Volatile private var lastProbe: RootProbeResult? = null
+    @Volatile private var lastProbe: Pair<String?, RootProbeResult>? = null
     private val probeInFlight = AtomicBoolean(false)
 
-    fun passiveSuPath(): String? {
-        knownPaths.firstOrNull { File(it).canExecute() }?.let { return it }
-        val path = System.getenv("PATH").orEmpty().split(File.pathSeparatorChar)
-            .map { File(it, "su") }.firstOrNull { it.canExecute() }
-        return path?.absolutePath
-    }
+    fun passiveSuPath(): String? = DirectRootRunner.findSu()
 
-    fun cachedProbe(): RootProbeResult? = lastProbe
+    fun cachedProbe(): RootProbeResult? = lastProbe?.takeIf { it.first == passiveSuPath() }?.second
 
     fun accessState(): RootAccessState = RootAccessStateResolver.resolve(
         suPath = passiveSuPath(),
-        probe = lastProbe,
+        probe = cachedProbe(),
         probing = probeInFlight.get(),
     )
 
     fun snapshot(): RootAccessSnapshot {
         val suPath = passiveSuPath()
         return RootAccessSnapshot(
-            state = RootAccessStateResolver.resolve(suPath, lastProbe, probeInFlight.get()),
+            state = RootAccessStateResolver.resolve(suPath, cachedProbe(), probeInFlight.get()),
             suPath = suPath,
-            probe = lastProbe,
+            probe = cachedProbe(),
         )
     }
 
-    internal fun updateProbe(probe: RootProbeResult) {
-        lastProbe = probe
+    internal fun updateProbe(probe: RootProbeResult, suPath: String? = passiveSuPath()) {
+        lastProbe = suPath to probe
     }
 
     internal fun beginProbe() {
@@ -465,7 +455,8 @@ object PrivilegedCommandRunner {
 
     /** Explicit Root authorization probe; passive capability reads never invoke su. */
     suspend fun requestActiveRootProbe(context: Context, sessionId: String): RootProbeResult {
-        if (RootCommandRunner.passiveSuPath() == null) {
+        val suPath = RootCommandRunner.passiveSuPath()
+        if (suPath == null) {
             return RootProbeResult(false, error = "su executable not found").also {
                 RootCommandRunner.updateProbe(it)
             }
@@ -487,7 +478,7 @@ object PrivilegedCommandRunner {
             } else {
                 RootProbeParser.parse(result.stdout, result.exitCode, result.stderr)
             }
-            RootCommandRunner.updateProbe(probe)
+            RootCommandRunner.updateProbe(probe, suPath)
             return probe
         } finally {
             RootCommandRunner.endProbe()

@@ -17,7 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import com.openminis.app.ui.chat.enqueuePrompt
+import com.openminis.app.agent.enqueueAgentPrompt
 import com.openminis.app.data.repository.allVisibleEntries
 import com.openminis.app.data.repository.availableEntries
 import com.openminis.app.data.repository.hasAnyCredential
@@ -55,7 +55,7 @@ class AppSubAgentPort(private val context: Context) : SubAgentPort {
         val entry: ModelEntry? = when (choice) {
             SubAgentModelChoice.SAME_AS_ME -> {
                 val parentEntryId = withContext(Dispatchers.Main) {
-                    AgentRunner.viewModelForCommand(context, parentSessionId).activeEntryId.value
+                    AgentRunner.sessionForCommand(context, parentSessionId).activeEntryId.value
                 }
                 usable.firstOrNull { it.id == parentEntryId } ?: slot(ModelSlot.main)
             }
@@ -71,10 +71,19 @@ class AppSubAgentPort(private val context: Context) : SubAgentPort {
         return instance.isEnabled && repo.hasAnyCredential(instance)
     }
 
+    private suspend fun parentAllowsWork(job: SubAgentJob): Boolean {
+        if (app.chatRepository.getSession(job.parentSessionId) == null) return false
+        val taskId = job.parentTaskId ?: return true
+        val task = app.botTaskRepository.get(taskId) ?: return false
+        return task.revision == job.parentTaskRevision && task.stopGeneration == job.parentStopGeneration &&
+            task.status in setOf(com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE,
+                com.openminis.app.data.db.BotTaskEntity.STATUS_WAITING, com.openminis.app.data.db.BotTaskEntity.STATUS_NEEDS_USER)
+    }
+
     override suspend fun createChild(parentSessionId: String, title: String, model: SubAgentModel): String {
-        val childId = AgentRunner.ensureSession(context, null)
+        kotlin.coroutines.coroutineContext[SubAgentRuntime.WorkContext]?.job?.let { check(parentAllowsWork(it)) { "parent_task_changed_or_stopped" } }
+        val childId = AgentRunner.ensureSession(context, source = ChatSessionEntity.SOURCE_SUB_AGENT)
         app.chatRepository.updateSessionTitle(childId, title)
-        app.chatRepository.dao.updateSource(childId, ChatSessionEntity.SOURCE_SUB_AGENT)
         model.entryId?.let { AgentRunner.applyModelOverride(context, childId, it) }
         AppLogger.info(TAG, "child ${childId.take(8)} for parent ${parentSessionId.take(8)} model=${model.label}")
         return childId
@@ -86,6 +95,8 @@ class AppSubAgentPort(private val context: Context) : SubAgentPort {
         thinking: ThinkingLevel?,
         timeoutMs: Long,
     ): ChildOutcome {
+        val job = kotlin.coroutines.coroutineContext[SubAgentRuntime.WorkContext]?.job
+        if (job != null && !parentAllowsWork(job)) return ChildOutcome(false, "Parent task changed or stopped; no child request was submitted.", false)
         val result = AgentRunner.prompt(
             context = context,
             sessionId = childSessionId,
@@ -93,11 +104,15 @@ class AppSubAgentPort(private val context: Context) : SubAgentPort {
             thinkingLevel = thinking,
             wait = true,
             timeoutMs = timeoutMs,
+            requestId = job?.let { "subagent:${it.id}:${if (it.resumed) "resume" else "start"}" } ?: java.util.UUID.randomUUID().toString(),
+            awaitCancellationCleanup = true,
         )
+        val unknown = com.openminis.app.tools.ToolCheckpointStore.drainPending(context, childSessionId).isNotEmpty()
         return ChildOutcome(
-            completed = result.status.equals("Completed", ignoreCase = true) && !result.timedOut,
+            completed = result.completed && !unknown,
             text = result.responseText,
             timedOut = result.timedOut,
+            outcomeUnknown = unknown || result.timedOut || !result.streamExited,
         )
     }
 
@@ -115,6 +130,7 @@ class AppSubAgentPort(private val context: Context) : SubAgentPort {
     }
 
     override suspend fun wrapUpChild(childSessionId: String, graceMs: Long): String? {
+        kotlin.coroutines.coroutineContext[SubAgentRuntime.WorkContext]?.job?.let { if (!parentAllowsWork(it)) return null }
         AgentRunner.cancel(context, childSessionId)
         val result = AgentRunner.prompt(
             context = context,
@@ -127,7 +143,10 @@ class AppSubAgentPort(private val context: Context) : SubAgentPort {
         return result.responseText?.takeIf { result.status.equals("Completed", ignoreCase = true) }
     }
 
-    override suspend fun cancelChild(childSessionId: String): Boolean = AgentRunner.cancel(context, childSessionId)
+    override suspend fun cancelChild(childSessionId: String): Boolean {
+        val job = kotlin.coroutines.coroutineContext[SubAgentRuntime.WorkContext]?.job ?: return false
+        return AgentRunner.cancelOwnedRequest(childSessionId, "subagent:${job.id}:${if (job.resumed) "resume" else "start"}")
+    }
 
     /**
      * Queues the correction into the child's running loop (read at its next turn). The child has no
@@ -135,9 +154,9 @@ class AppSubAgentPort(private val context: Context) : SubAgentPort {
      */
     override suspend fun steerChild(childSessionId: String, message: String): Boolean =
         withContext(Dispatchers.Main) {
-            val vm = AgentRunner.viewModelForCommand(context, childSessionId)
+            val vm = AgentRunner.sessionForCommand(context, childSessionId)
             if (!vm.isStreaming.value) return@withContext false
-            vm.enqueuePrompt("[Correction from the delegating agent] $message")
+            vm.enqueueAgentPrompt("[Correction from the delegating agent] $message")
             true
         }
 
@@ -148,26 +167,45 @@ class AppSubAgentPort(private val context: Context) : SubAgentPort {
      * whatever the user has attached there.
      */
     override suspend fun deliverToParent(parentSessionId: String, text: String) {
+        val delivery = kotlin.coroutines.coroutineContext[SubAgentRuntime.WorkContext]
+        val job = delivery?.job
+        val requestId = job?.let { "subagent-result:${it.id}" } ?: java.util.UUID.randomUUID().toString()
+        suspend fun retainResult() {
+            if (app.chatRepository.getSession(parentSessionId) == null) return
+            val key = if (delivery?.progress == true) "subagent-progress:${job!!.id}:${com.openminis.app.util.Sha256.hex(text.toByteArray())}" else "$requestId:card"
+            val row = app.chatRepository.appendMessage(parentSessionId, "assistant", org.json.JSONArray().put(
+                org.json.JSONObject().put("type", "text").put("value", text)).toString(), idempotencyKey = key)
+            AgentRunner.notifyExternalMessage(context, row)
+        }
+        if (delivery?.progress == true || (job != null && (!parentAllowsWork(job) ||
+                (job.parentTaskId == null && app.botTaskRepository.sessionGoal(parentSessionId) != null)))) {
+            retainResult()
+            return
+        }
         repeat(DELIVERY_ATTEMPTS) { attempt ->
             if (app.chatRepository.getSession(parentSessionId) == null) {
                 AppLogger.warning(TAG, "parent ${parentSessionId.take(8)} is gone; dropping the callback")
                 return
             }
             AgentRunner.waitForSettle(context, parentSessionId, SETTLE_WAIT_MS)
+            if (job != null && !parentAllowsWork(job)) { retainResult(); return }
             val result = AgentRunner.prompt(
                 context = context,
                 sessionId = parentSessionId,
                 text = text,
                 wait = false,
                 timeoutMs = SETTLE_WAIT_MS,
+                taskId = job?.parentTaskId,
+                requestId = requestId,
             )
             val busy = result.status.equals("Busy", ignoreCase = true) ||
                 result.responseText == "session_busy" || result.responseText == "session_compacting"
-            if (!busy && result.status.let { it.equals("Running", true) || it.equals("Completed", true) }) return
+            if (!busy && result.status.let { it.equals("Accepted", true) || it.equals("Running", true) || it.equals("Completed", true) }) return
             AppLogger.info(TAG, "callback to ${parentSessionId.take(8)} not accepted (${result.status}/${result.responseText}); retry ${attempt + 1}")
             delay(RETRY_DELAY_MS)
         }
-        AppLogger.warning(TAG, "callback to ${parentSessionId.take(8)} could not be delivered")
+        retainResult()
+        AppLogger.warning(TAG, "callback to ${parentSessionId.take(8)} retained without starting a review turn")
     }
 
     private fun textOf(partsJson: String): String? = runCatching {
@@ -224,6 +262,20 @@ object SubAgents {
             )
                 .also { runtime = it }
         }
+
+    suspend fun cancelTask(taskId: String) { runtime?.cancelTask(taskId) }
+
+    fun executionInFlight(executionId: String): Boolean = runtime?.registry?.jobs?.value?.values?.any { job ->
+        job.parentExecutionId == executionId && (job.isActive || job.childSessionId?.let { child ->
+            com.openminis.app.agent.AgentSessionStore.existing(child)?.execution?.currentJob?.isCompleted == false ||
+                com.openminis.app.runtime.guest.NativeOffloadServer.nativeInFlightForSession(child) ||
+                com.openminis.app.tools.JobRegistry.list().any { it.sessionId == child && it.status == com.openminis.app.tools.JobRegistry.JobStatus.RUNNING }
+        } == true)
+    } == true
+
+    fun activeForTask(taskId: String, sessionId: String): Boolean = runtime?.registry?.jobs?.value?.values?.any {
+        it.isActive && (it.parentTaskId == taskId || (it.parentTaskId == null && it.parentSessionId == sessionId))
+    } == true
 
     /** Whether the delegation tool is offered at all (Settings master switch). */
     fun isEnabled(): Boolean = SubAgentStore.enabled.value

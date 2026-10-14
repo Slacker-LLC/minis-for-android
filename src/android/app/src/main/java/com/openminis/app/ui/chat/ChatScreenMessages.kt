@@ -141,7 +141,7 @@ internal fun ChatMessageList(
     generatingMessageIdState: androidx.compose.runtime.State<kotlin.String?>,
     replySpeechStateState: androidx.compose.runtime.State<com.openminis.app.speech.ReplySpeechState>,
     canResumeState: androidx.compose.runtime.State<kotlin.Boolean>,
-    compactProgressState: androidx.compose.runtime.State<com.openminis.app.ui.chat.ChatViewModel.CompactProgress?>,
+    compactProgressState: androidx.compose.runtime.State<com.openminis.app.agent.AgentSession.CompactProgress?>,
     errorState: androidx.compose.runtime.State<kotlin.String?>,
     listState: androidx.compose.foundation.lazy.LazyListState,
     inputTextState: androidx.compose.runtime.State<kotlin.String>,

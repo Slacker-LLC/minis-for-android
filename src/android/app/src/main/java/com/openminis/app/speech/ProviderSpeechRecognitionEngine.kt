@@ -303,6 +303,8 @@ class ProviderSpeechRecognitionEngine(private val appContext: Context) : SpeechR
      * (`VoiceInputPanel.swift:642-669`) — the user re-taps for the next
      * utterance rather than the mic staying hot.
      */
+    var conversationMode: Boolean = false
+
     private fun startVadCapture(
         locale: Locale,
         repo: com.openminis.app.data.repository.ProviderRepository,
@@ -341,7 +343,7 @@ class ProviderSpeechRecognitionEngine(private val appContext: Context) : SpeechR
                     val heldSeconds = WavSegmentMerger.totalSeconds(pendingSegments)
 
                     if (reason == SegmentEndReason.SILENCE_DETECTED &&
-                        heldSeconds < MIN_SEGMENT_SECONDS
+                        heldSeconds < if (conversationMode) 0.2f else MIN_SEGMENT_SECONDS
                     ) {
                         Log.i(
                             TAG,
@@ -397,6 +399,7 @@ class ProviderSpeechRecognitionEngine(private val appContext: Context) : SpeechR
                     // here, so just settle the mic.
                     Log.i(TAG, "[vad] session limit $limit — stopping")
                     stopVad()
+                    if (conversationMode && transcribeJob?.isActive != true) listener.onFinal("")
                 }
 
                 override fun onCaptureError(message: String) {
@@ -405,6 +408,7 @@ class ProviderSpeechRecognitionEngine(private val appContext: Context) : SpeechR
                     listener.onError(RecognitionError.AUDIO_ERROR, message)
                 }
             },
+            conversationMode = conversationMode,
         ).also {
             // iOS splits this by engine: 59 s for Apple's system ASR (which
             // rejects >60 s per request) and the full 300 s session cap for

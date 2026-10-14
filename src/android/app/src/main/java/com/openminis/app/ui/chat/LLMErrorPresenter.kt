@@ -1,5 +1,7 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.agent.*
+
 import android.content.Context
 import com.openminis.app.R
 import com.openminis.app.data.model.LLMError
@@ -95,6 +97,10 @@ internal object LLMErrorPresenter {
 }
 
 /** A failed model request, shown in the chat as [LLMErrorPresenter] words it. */
-internal fun ChatViewModel.setInlineError(e: Throwable) {
+internal fun com.openminis.app.agent.AgentSession.setInlineError(e: Throwable) {
+    if (e is com.openminis.app.tools.ToolCheckpointStore.Unavailable) {
+        setInlineError(context.getString(R.string.tool_checkpoint_unavailable))
+        return
+    }
     setInlineError(LLMErrorPresenter.present(context, e).ifBlank { e.message ?: "Unknown error" })
 }

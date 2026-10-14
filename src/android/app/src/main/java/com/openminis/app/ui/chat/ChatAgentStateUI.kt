@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +59,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
 
 /**
@@ -341,19 +343,31 @@ fun AgentStateBars(
     sessionId: String,
     modifier: Modifier = Modifier,
 ) {
+    TaskWorkSummary(sessionId)
+    UnknownOutcomeActions(sessionId)
     val context = LocalContext.current
-    var goal by remember { mutableStateOf(AgentStateStore.Goal()) }
+    val scope = rememberCoroutineScope()
+    var goal by remember(sessionId) { mutableStateOf(AgentStateStore.Goal()) }
     var todo by remember { mutableStateOf(AgentStateStore.TodoList()) }
-    var plan by remember { mutableStateOf(AgentStateStore.Plan()) }
+    var plan by remember(sessionId) { mutableStateOf(AgentStateStore.Plan()) }
     var deliverables by remember { mutableStateOf<List<AgentStateStore.Deliverable>>(emptyList()) }
     var editingGoal by remember { mutableStateOf(false) }
-    var goalDraft by remember { mutableStateOf("") }
+    var goalDraft by remember(sessionId) { mutableStateOf("") }
+    fun updateState(block: suspend () -> Unit) {
+        scope.launch {
+            try { block() }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (error: Exception) { Toast.makeText(context, error.message, Toast.LENGTH_SHORT).show() }
+        }
+    }
 
     LaunchedEffect(sessionId) {
+        AgentStateStore.observeGoal(sessionId, context).collect { goal = it }
+    }
+    LaunchedEffect(sessionId) {
         while (isActive) {
-            goal = AgentStateStore.goalGet(sessionId)
             todo = AgentStateStore.todoGet(sessionId)
-            plan = AgentStateStore.planGet(sessionId)
+            plan = AgentStateStore.planGet(sessionId, context)
             deliverables = AgentStateStore.deliverablesGet(sessionId)
             delay(1500)
         }
@@ -394,7 +408,7 @@ fun AgentStateBars(
                             modifier = Modifier.weight(1f),
                         )
                         MinisTextButton(
-                            onClick = { AgentStateStore.planSet(sessionId, "off") },
+                            onClick = { updateState { AgentStateStore.planSet(sessionId, "off", context = context) } },
                             contentPadding = PaddingValues(horizontal = 6.dp),
                         ) { Text(stringResource(R.string.voice_panel_exit_edit), style = MaterialTheme.typography.labelMedium) }
                     }
@@ -419,11 +433,11 @@ fun AgentStateBars(
                             contentPadding = PaddingValues(horizontal = 6.dp),
                         ) { Text(stringResource(R.string.memory_action_edit), style = MaterialTheme.typography.labelMedium) }
                         MinisTextButton(
-                            onClick = { AgentStateStore.goalSetActive(sessionId, !goal.active) },
+                            onClick = { updateState { AgentStateStore.goalSetActive(sessionId, !goal.active, context) } },
                             contentPadding = PaddingValues(horizontal = 6.dp),
                         ) { Text(stringResource(if (goal.active) R.string.common_pause else R.string.backup_tab_restore), style = MaterialTheme.typography.labelMedium) }
                         MinisTextButton(
-                            onClick = { AgentStateStore.goalSet(sessionId, "") },
+                            onClick = { updateState { AgentStateStore.goalSet(sessionId, "", context) } },
                             contentPadding = PaddingValues(horizontal = 6.dp),
                         ) { Text(stringResource(R.string.browser_settings_clear), style = MaterialTheme.typography.labelMedium) }
                     }
@@ -527,8 +541,10 @@ fun AgentStateBars(
                         MinisTextButton(onClick = { editingGoal = false }) { Text(stringResource(R.string.cancel)) }
                         MinisTextButton(
                             onClick = {
-                                AgentStateStore.goalSet(sessionId, goalDraft)
-                                editingGoal = false
+                                updateState {
+                                    AgentStateStore.goalSet(sessionId, goalDraft, context)
+                                    editingGoal = false
+                                }
                             },
                         ) { Text(stringResource(R.string.save)) }
                     }

@@ -1,6 +1,7 @@
 package com.openminis.app.ui.chat
 
-import com.openminis.app.ui.chat.InLoopContextPolicy.Decision
+import com.openminis.app.agent.InLoopContextPolicy
+import com.openminis.app.agent.InLoopContextPolicy.Decision
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

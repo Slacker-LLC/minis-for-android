@@ -761,6 +761,9 @@ class MinisApp : Application(), ImageLoaderFactory {
             ),
             aliasNames = listOf("android_deploy"),
         )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.ToolCatalogHandler(), aliasNames = listOf("find_tools"),
+        )
         // android.* (read-first): capabilities + app + ui(screenshot/observe)
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.runtime.AndroidToolHandler(
@@ -793,6 +796,9 @@ class MinisApp : Application(), ImageLoaderFactory {
                 com.openminis.app.tools.runtime.AndroidToolHandler(toolName, toolName),
             )
         }
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.runtime.BrowserUseHandler())
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.runtime.MemoryToolHandler(write = true))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.runtime.MemoryToolHandler(write = false))
         // P3 read-first wave 2: image read, agent goal/todo/subagent/ask, jobs
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.runtime.LinuxReadImageHandler(),
@@ -800,7 +806,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         )
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.runtime.AgentGoalHandler(),
-            aliasNames = listOf("get_goal", "create_goal", "update_goal"),
+            aliasNames = listOf("get_goal", "create_goal", "update_goal", "verify_outcome", "review_restored_task"),
             aliasesAreActions = true,
         )
         com.openminis.app.tools.runtime.ToolRegistry.register(

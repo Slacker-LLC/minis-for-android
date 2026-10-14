@@ -1,18 +1,13 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.agent.*
+
 import android.util.Log
+import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 
-/**
- * Process-level cache of ChatViewModels keyed by sessionId. Mirrors iOS
- * `ViewModelCache` — a session's agent loop keeps running even if the user
- * leaves the chat screen, and the row in the sessions list shows a spinning
- * indicator while streaming is in flight.
- *
- * Without this, scoping the ChatViewModel to a NavBackStackEntry means
- * `popBackStack()` would cancel `viewModelScope` and kill the streaming job.
- */
+/** Process-level page projections. AgentSessionStore alone owns session execution. */
 object ChatViewModelStore {
 
     private const val TAG = "ChatVMStore"
@@ -25,25 +20,15 @@ object ChatViewModelStore {
      */
     private val stores = mutableMapOf<String, ViewModelStore>()
 
-    /**
-     * Draft → canonical mapping. When a draft ("__new__...") session is
-     * persisted, we add `draftKey -> realId` here so lookups via the old key
-    * (from a ChatScreen whose `sessionId` parameter is still the draft)
-    * continue to hit the same live store.
-    */
-   private val aliases = mutableMapOf<String, String>()
-
-    private val aliasGeneration = androidx.compose.runtime.mutableIntStateOf(0)
-
     private fun resolveKey(sessionId: String): String =
-        aliases[sessionId] ?: sessionId
+        com.openminis.app.agent.AgentSessionStore.resolvePersistedId(sessionId)
 
     @Synchronized
     fun resolvePersistedId(sessionId: String): String = resolveKey(sessionId)
 
     @androidx.compose.runtime.Composable
     fun rememberPersistedId(sessionId: String): String {
-        val generation = aliasGeneration.intValue
+        val generation = com.openminis.app.agent.AgentSessionStore.aliasGeneration.collectAsState().value
         return androidx.compose.runtime.remember(sessionId, generation) {
             resolveKey(sessionId)
         }
@@ -52,6 +37,9 @@ object ChatViewModelStore {
     @Synchronized
     fun ownerFor(sessionId: String): ViewModelStoreOwner {
         val key = resolveKey(sessionId)
+        val previousKey = stores.keys.firstOrNull { resolveKey(it) == key }
+        if (previousKey != null && previousKey != key) stores[key] = stores.remove(previousKey)!!
+        if (!com.openminis.app.agent.AgentSessionStore.hasSession(key)) stores.remove(key)?.clear()
         val store = stores.getOrPut(key) {
             Log.d(TAG, "allocate store for $key (total=${stores.size + 1})")
             ViewModelStore()
@@ -63,18 +51,18 @@ object ChatViewModelStore {
 
     /** True when a ViewModel store is live for [sessionId] (alias-aware). */
     @Synchronized
-    fun hasStore(sessionId: String): Boolean = resolveKey(sessionId) in stores
+    fun hasStore(sessionId: String): Boolean = com.openminis.app.agent.AgentSessionStore.hasSession(sessionId) && stores.keys.any { resolveKey(it) == resolveKey(sessionId) }
 
     /**
-     * Drop the cached VM for this session (cancels `viewModelScope`, triggers
-     * `ChatViewModel.onCleared`). Call when the session is deleted. Also
+     * Drop the cached VM for this session (clears the page projection and explicitly releases its runtime owner). Call when the session is deleted. Also
      * clears any draft alias pointing at this canonical id.
      */
     @Synchronized
     fun release(sessionId: String) {
         val key = resolveKey(sessionId)
-        aliases.entries.removeAll { it.value == key }
-        aliasGeneration.intValue++
+        val projectionKeys = stores.keys.filter { resolveKey(it) == key }
+        projectionKeys.forEach { stores.remove(it)?.clear() }
+        com.openminis.app.agent.AgentSessionStore.release(key)
         stores.remove(key)?.let {
             it.clear()
             Log.d(TAG, "release store for $key (remaining=${stores.size})")
@@ -104,18 +92,21 @@ object ChatViewModelStore {
     /** The id as the ChatScreen mounted it (a draft keeps its draft id), for observers of the visible chat. */
     val mountedSessionId: kotlinx.coroutines.flow.StateFlow<String?> = activeSessionIdInternal
 
+    private var activeMountGeneration = 0L
+
     @Synchronized
-    fun setActiveSession(sessionId: String?) {
+    fun setActiveSession(sessionId: String?): Long {
+        activeMountGeneration++
         activeSessionIdInternal.value = sessionId
+        return activeMountGeneration
     }
 
-    /**
-     * Clears the active session only if it is still [sessionId]. A screen that is being replaced by
-     * another chat disposes after the new one has mounted; an unconditional clear would erase the
-     * newcomer.
-     */
-    fun clearActiveSession(sessionId: String) {
-        activeSessionIdInternal.compareAndSet(sessionId, null)
+    /** An outgoing page may dispose after its replacement mounts, even for the same session. */
+    @Synchronized
+    fun clearActiveSession(sessionId: String, mountGeneration: Long) {
+        if (activeMountGeneration == mountGeneration) {
+            activeSessionIdInternal.compareAndSet(sessionId, null)
+        }
     }
 
     @Synchronized
@@ -125,8 +116,7 @@ object ChatViewModelStore {
         if (store != null) {
             stores[toSessionId] = store
         }
-        aliases[fromSessionId] = toSessionId
-        aliasGeneration.intValue++
+        com.openminis.app.agent.AgentSessionStore.rename(fromSessionId, toSessionId)
         Log.d(TAG, "rename store $fromSessionId -> $toSessionId (alias kept)")
     }
 

@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
  * app cannot borrow the Root-owned listener merely by reaching loopback.
  */
 internal object RootNetworkProxy {
-    const val PROXY_LISTEN = "127.0.0.1:18787"
+    const val PROXY_LISTEN = com.openminis.app.BuildConfig.MINIS_ROOT_PROXY_LISTEN
     internal val PROXY_ENV_KEYS: Set<String> = setOf(
         "http_proxy",
         "https_proxy",
@@ -284,7 +284,7 @@ internal object RootNetworkProxy {
 
     private fun listenerReady(): Boolean = try {
         Socket().use { socket ->
-            socket.connect(InetSocketAddress("127.0.0.1", 18787), 150)
+            socket.connect(InetSocketAddress("127.0.0.1", com.openminis.app.BuildConfig.MINIS_ROOT_PROXY_PORT), 150)
         }
         true
     } catch (_: Exception) {

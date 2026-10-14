@@ -70,7 +70,7 @@ internal fun androidx.compose.foundation.layout.ColumnScope.ChatMessagePane(
     replySpeechState_st: androidx.compose.runtime.State<com.openminis.app.speech.ReplySpeechState>,
     replySpeechStateState: androidx.compose.runtime.State<com.openminis.app.speech.ReplySpeechState>,
     canResume_st: androidx.compose.runtime.State<kotlin.Boolean>,
-    compactProgress_st: androidx.compose.runtime.State<com.openminis.app.ui.chat.ChatViewModel.CompactProgress?>,
+    compactProgress_st: androidx.compose.runtime.State<com.openminis.app.agent.AgentSession.CompactProgress?>,
     error_st: androidx.compose.runtime.State<kotlin.String?>,
     sessionTitle_st: androidx.compose.runtime.State<kotlin.String>,
     listState: androidx.compose.foundation.lazy.LazyListState,

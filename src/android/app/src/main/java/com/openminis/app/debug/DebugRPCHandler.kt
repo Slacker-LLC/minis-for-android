@@ -84,4 +84,4 @@ class DebugRPCHandler(internal val context: Context) {
 
 }
 
-internal class RPCException(val code: Int, override val message: String) : Exception(message)
+internal typealias RPCException = com.openminis.app.remote.RPCException

@@ -2,23 +2,16 @@ package com.openminis.app.debug
 
 import android.content.Context
 import com.openminis.app.tools.JobRegistry
-import com.openminis.app.tools.SubagentLimits
+import com.openminis.app.tools.RalphLimits
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * `agent.settings.*` RPC handlers for the Web Remote frontend.
- *
- * Mirrors the DeepSeek Harness agent knobs that are worth exposing remotely:
- * Model selection follows the fixed Main/Light slots; the `subagent` tool
- * exposes only a depth cap and per-run timeout here. Slot selection lives in
- * `provider.slots.*`.
- */
+/** Agent execution settings, using the same stored budget as the native Ralph settings. */
 internal object AgentRpcMethods {
 
     fun settingsGet(context: Context): JSONObject = JSONObject().apply {
-        put("maxDepth", SubagentLimits.maxDepth(context))
-        put("timeoutMinutes", SubagentLimits.timeoutMs(context) / 60_000L)
+        put("scope", "ralph_round")
+        put("timeoutMinutes", RalphLimits.timeoutMs(context) / 60_000L)
     }
 
     /**
@@ -88,18 +81,17 @@ internal object AgentRpcMethods {
     }
 
     fun settingsSet(context: Context, params: JSONObject): JSONObject {
-        val maxDepth = params.optInt("maxDepth", SubagentLimits.DEFAULT_MAX_DEPTH)
-        val timeoutMinutes = params.optLong("timeoutMinutes", SubagentLimits.DEFAULT_TIMEOUT_MINUTES)
-        if (maxDepth !in SubagentLimits.MAX_DEPTH_RANGE) {
-            throw RPCException(-32602, "maxDepth must be in ${SubagentLimits.MAX_DEPTH_RANGE}")
+        if (params.has("maxDepth")) throw RPCException(-32602, "maxDepth has no runtime effect and is no longer a setting; use timeoutMinutes for Ralph rounds")
+        val value = params.opt("timeoutMinutes")
+        if (value !is Int && value !is Long) throw RPCException(-32602, "timeoutMinutes must be an integer")
+        val timeoutMinutes = (value as Number).toLong()
+        if (timeoutMinutes !in RalphLimits.TIMEOUT_MINUTES_RANGE) {
+            throw RPCException(-32602, "timeoutMinutes must be in ${RalphLimits.TIMEOUT_MINUTES_RANGE}")
         }
-        if (timeoutMinutes !in SubagentLimits.TIMEOUT_MINUTES_RANGE) {
-            throw RPCException(-32602, "timeoutMinutes must be in ${SubagentLimits.TIMEOUT_MINUTES_RANGE}")
-        }
-        SubagentLimits.save(context, maxDepth, timeoutMinutes)
+        RalphLimits.save(context, timeoutMinutes)
         return JSONObject().apply {
             put("ok", true)
-            put("maxDepth", maxDepth)
+            put("scope", "ralph_round")
             put("timeoutMinutes", timeoutMinutes)
         }
     }

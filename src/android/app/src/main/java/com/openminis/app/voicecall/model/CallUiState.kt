@@ -8,9 +8,9 @@ data class CallAiState(
 
 /** 当前通话所展示的模型信息。UI 只负责显示，不负责决定。 */
 data class CallUiModel(
-    val providerName: String = "DeepSeek",
-    val modelName: String = "deepseek-v4",
-    val statusText: String = "实时语音"
+    val providerName: String = "",
+    val modelName: String = "",
+    val statusText: String = "语音对话"
 )
 
 /**

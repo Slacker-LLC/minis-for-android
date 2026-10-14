@@ -259,7 +259,10 @@ class BackupImporter(
                 if (categoryReport != null && categoryReport.failed == null) {
                     try {
                         when (category) {
-                            BackupCategory.CHATS -> restoreCharactersAndBots(work, report)
+                            BackupCategory.CHATS -> {
+                                restoreCharactersAndBots(work, report)
+                                restoreAgentTasks(work, report)
+                            }
                             BackupCategory.PROVIDERS -> restoreAppSettings(work, report)
                             else -> Unit
                         }
@@ -573,6 +576,15 @@ class BackupImporter(
                     modelDisplayName = m.str("modelDisplayName"),
                     providerType = m.str("providerType"),
                     providerInstanceId = m.str("providerInstanceId"),
+                    requestState = m.str("requestState")?.let { state ->
+                        if (state in setOf("PENDING", "NEEDS_REVIEW")) "NEEDS_REVIEW"
+                        else if (state == "RUNNING") "INTERRUPTED" else state },
+                    requestDelivery = m.str("requestDelivery"),
+                    requestTaskId = m.str("requestTaskId"),
+                    requestTaskGeneration = m.int("requestTaskGeneration"),
+                    requestRunId = m.str("requestRunId"),
+                    requestUserInput = false, // Imported pending instructions require new local authorization.
+
                 )
             )
             report.imported += 1
@@ -1260,6 +1272,60 @@ class BackupImporter(
     }
 
     // -- Characters and bots (CHATS) ---------------------------------------------------------------
+
+    private suspend fun restoreAgentTasks(root: File, report: Report) {
+        var restored = 0
+        var ignored = 0
+        val stoppedSessions = mutableSetOf<String>()
+        try {
+            readJsonl(File(root, "data"), BackupTasks.FILE) { env ->
+                val record = env.obj?.let { runCatching {
+                    BackupFormat.json.decodeFromJsonElement(BackupTaskRecord.serializer(), it).also(BackupTasks::validate)
+                }.getOrNull() }
+                if (record == null) { ignored++; return@readJsonl }
+                val task = record.task
+                val existing = db.botTaskDao().get(task.id)
+                if (existing != null && existing.completionEvidence?.let { org.json.JSONObject(it).optJSONObject("restoration")
+                        ?.optBoolean("checkpoint_restore_complete", true) } != false) return@readJsonl
+                for (sid in record.checkpoints.keys) {
+                    if (!stoppedSessions.add(sid) || db.chatDao().getSession(sid) == null) continue
+                    for (id in db.botTaskDao().taskIdsForSession(sid)) {
+                        db.botTaskDao().stop(id, com.openminis.app.data.db.BotTaskEntity.STATUS_PAUSED, System.currentTimeMillis())
+                    }
+                    com.openminis.app.runtime.ExecutionCoordinator.sessionDidTerminate(sid)
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        com.openminis.app.agent.AgentSessionStore.closeAndAwait(sid)
+                    }
+                }
+                val live = task.status !in com.openminis.app.data.db.BotTaskEntity.TERMINAL_STATUSES
+                val evidence = task.completionEvidence?.let { org.json.JSONObject(it) } ?: org.json.JSONObject()
+                evidence.put("restoration", org.json.JSONObject().put("requires_review", live)
+                    .put("checkpoint_restore_complete", false).put("restored_at", System.currentTimeMillis())
+                    .put("historical", !live).put("checkpoint_sessions", org.json.JSONArray(record.checkpoints.keys)))
+                val goalSession = task.goalSessionId?.takeIf { sid -> db.chatDao().getSession(sid) != null && db.botTaskDao().sessionGoal(sid) == null }
+                val restoredTask = existing ?: task.copy(goalSessionId = goalSession,
+                    status = if (live) com.openminis.app.data.db.BotTaskEntity.STATUS_PAUSED else task.status,
+                    stopGeneration = if (live) task.stopGeneration + 1 else task.stopGeneration,
+                    completionEvidence = evidence.toString(),
+                    progress = if (live) "从备份恢复，需先核实原工作现场再手动继续。" else task.progress)
+                if (existing == null) db.botTaskDao().insert(restoredTask)
+                for ((sid, rows) in record.checkpoints) {
+                    if (db.chatDao().getSession(sid) == null) { ignored++; continue }
+                    com.openminis.app.tools.ToolCheckpointStore.restoreRows(context, sid, rows)
+                }
+                val finalProof = org.json.JSONObject(checkNotNull(restoredTask.completionEvidence))
+                finalProof.getJSONObject("restoration").put("checkpoint_restore_complete", true)
+                db.botTaskDao().replace(restoredTask.copy(completionEvidence = finalProof.toString()))
+                restored++
+            }
+        } finally {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable + kotlinx.coroutines.Dispatchers.Main) {
+                stoppedSessions.forEach(com.openminis.app.agent.AgentSessionStore::release)
+            }
+        }
+        if (restored > 0) report.extras["agent_tasks"] = restored
+        if (ignored > 0) report.extras.merge("ignored", ignored, Int::plus)
+    }
 
     private suspend fun restoreCharactersAndBots(root: File, report: Report) {
         val dataDir = File(root, "data")

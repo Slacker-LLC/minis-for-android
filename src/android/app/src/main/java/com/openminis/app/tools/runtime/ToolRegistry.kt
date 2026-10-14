@@ -7,6 +7,10 @@ import com.openminis.app.tools.ToolFailureKind
 import com.openminis.app.tools.ToolTimeoutPolicy
 import com.openminis.app.util.shellQuote
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import com.openminis.app.tools.ToolCheckpointStore
 import org.json.JSONObject
 
 /**
@@ -140,13 +144,44 @@ object ToolRegistry {
     fun contains(name: String): Boolean = canonicalName(name) != null
 
     fun definitionsForCaller(caller: String): List<AgentToolDefinition> {
-        if (caller == ToolPermissionManager.CALLER_LOCAL) return definitions()
+        val offered = definitions().filter {
+            it.name != com.openminis.app.agent.subagents.SubAgentToolSchema.HANDLER_NAME ||
+                com.openminis.app.agent.subagents.SubAgents.isEnabled()
+        }
+        if (caller == ToolPermissionManager.CALLER_LOCAL) return offered
         val mcpVisible = ToolPermissionManager.mcpVisibleTools()
-        return definitions().filter { it.name in mcpVisible }
+        return offered.filter { it.name in mcpVisible }
     }
 }
 
 object ToolExecutor {
+    private val executingIntents = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    fun isExecutionInFlight(executionId: String?): Boolean = executionId != null &&
+        (executingIntents.contains(executionId) || com.openminis.app.runtime.guest.NativeOffloadServer.nativeInFlight(executionId) ||
+            com.openminis.app.agent.subagents.SubAgents.executionInFlight(executionId) ||
+            com.openminis.app.tools.JobRegistry.list().any { it.executionIntentId == executionId && it.status == com.openminis.app.tools.JobRegistry.JobStatus.RUNNING })
+    /** Immutable model identity; a guest/MCP response is not a persisted model receipt. */
+    data class ModelExecution(val callId: String, val runId: String?, val taskId: String?,
+        val revision: Int? = null, val stopGeneration: Int? = null)
+
+    /** Execution identity is supplied by the runtime, never by model arguments/call IDs. */
+    internal class ExecutionIdentity(val model: ModelExecution, val intentId: String) :
+        kotlin.coroutines.AbstractCoroutineContextElement(Key) {
+        companion object Key : kotlin.coroutines.CoroutineContext.Key<ExecutionIdentity>
+    }
+
+    /** Validate the same published contract before a caller issues or consumes approval. */
+    fun validateArguments(name: String, arguments: JSONObject): String? {
+        val canonical = ToolRegistry.canonicalName(name) ?: return "Error: unknown_tool: $name"
+        val definition = ToolRegistry.definition(canonical) ?: return "Error: no handler for $canonical"
+        val aliasAction = JSONObject(ToolRegistry.argsForCall(name, "{}")).optString("action")
+        if (aliasAction.isNotEmpty() && arguments.has("action") && arguments.optString("action") != aliasAction) {
+            return "Error: action_alias_mismatch: $name requires action=$aliasAction"
+        }
+        val normalized = JSONObject(ToolRegistry.argsForCall(name, arguments.toString()))
+        return ToolCallValidator.preflight(canonical, normalized, listOf(definition))?.let { "Error: invalid_arguments: $it" }
+    }
+
     suspend fun execute(
         name: String,
         argsJson: String,
@@ -155,11 +190,25 @@ object ToolExecutor {
         caller: String = ToolPermissionManager.CALLER_LOCAL,
         toolId: String = "",
         confirmBypassed: Boolean = false,
+        // A trusted local transport may bind its existing engine and output representation.
+        // This callback is never selected by tool JSON or exposed through MCP.
+        localExecution: (suspend () -> ToolExecutionResult)? = null,
+        boundOutput: Boolean = true,
+        modelExecution: ModelExecution? = null,
     ): ToolExecutionResult {
+        fun rejected(output: String, kind: ToolFailureKind) =
+            ToolExecutionResult(output, false, failureKind = kind, executionStarted = false)
+        if ((localExecution != null || modelExecution != null) && caller != ToolPermissionManager.CALLER_LOCAL) {
+            return rejected("Error: permission_denied: local execution binding", ToolFailureKind.PERMISSION_DENIED)
+        }
         val canonical = ToolRegistry.canonicalName(name)
-            ?: return ToolExecutionResult("Error: unknown_tool: $name", false)
+            ?: return rejected("Error: unknown_tool: $name", ToolFailureKind.UNAVAILABLE)
         val handler = ToolRegistry.handler(canonical)
-            ?: return ToolExecutionResult("Error: no handler for $canonical", false)
+            ?: return rejected("Error: no handler for $canonical", ToolFailureKind.UNAVAILABLE)
+        val originalArgs = try { JSONObject(argsJson) } catch (_: org.json.JSONException) {
+            return rejected("Error: invalid_arguments: expected a JSON object", ToolFailureKind.INVALID_ARGUMENTS)
+        }
+        validateArguments(name, originalArgs)?.let { return rejected(it, ToolFailureKind.INVALID_ARGUMENTS) }
         @Suppress("NAME_SHADOWING")
         val argsJson = ToolRegistry.argsForCall(name, argsJson)
         if (com.openminis.app.offload.OffloadPermissionManager.tierFor(sessionId) ==
@@ -171,7 +220,7 @@ object ToolExecutor {
                 com.openminis.app.offload.OffloadPermissionManager.recordScheduledTierDenial(
                     sessionId, canonical, "remote MCP integration",
                 )
-                return ToolExecutionResult("Error: $mcpDenial", false)
+                return rejected("Error: $mcpDenial", ToolFailureKind.PERMISSION_DENIED)
             }
             if (canonical == "linux.shell") {
                 val command = runCatching { JSONObject(argsJson).optString("command", "") }.getOrDefault("")
@@ -180,14 +229,14 @@ object ToolExecutor {
                     com.openminis.app.offload.OffloadPermissionManager.recordScheduledTierDenial(
                         sessionId, canonical, denial.substringAfter(": ").take(200),
                     )
-                    return ToolExecutionResult("Error: $denial", false)
+                    return rejected("Error: $denial", ToolFailureKind.PERMISSION_DENIED)
                 }
             } else if (policy.codeExecutionDenial(canonical) != null) {
                 val denial = policy.codeExecutionDenial(canonical)!!
                 com.openminis.app.offload.OffloadPermissionManager.recordScheduledTierDenial(
                     sessionId, canonical, "code execution or package installation",
                 )
-                return ToolExecutionResult("Error: $denial", false)
+                return rejected("Error: $denial", ToolFailureKind.PERMISSION_DENIED)
             } else {
                 val args = runCatching { JSONObject(argsJson) }.getOrNull()
                 val denial = policy.fileWriteDenial(canonical, args)
@@ -195,7 +244,7 @@ object ToolExecutor {
                     com.openminis.app.offload.OffloadPermissionManager.recordScheduledTierDenial(
                         sessionId, canonical, policy.fileWriteSummary(canonical, args),
                     )
-                    return ToolExecutionResult("Error: $denial", false)
+                    return rejected("Error: $denial", ToolFailureKind.PERMISSION_DENIED)
                 }
             }
         }
@@ -208,10 +257,10 @@ object ToolExecutor {
             }
         }.getOrNull()
         if (ToolPermissionManager.isRemoteVirtualDisplayDenied(canonical, caller, requestedDisplayId)) {
-            return ToolExecutionResult("Error: permission_denied: virtual-display android.ui is local-only", false)
+            return rejected("Error: permission_denied: virtual-display android.ui is local-only", ToolFailureKind.PERMISSION_DENIED)
         }
         if (!ToolPermissionManager.isAllowedFor(canonical, caller, sessionId, requestedDisplayId)) {
-            return ToolExecutionResult("Error: permission_denied: $canonical", false)
+            return rejected("Error: permission_denied: $canonical", ToolFailureKind.PERMISSION_DENIED)
         }
         if (ToolPermissionManager.needsConfirm(canonical, caller) && !confirmBypassed) {
             // MCP callers must arrive here only after MCPServer consumed its
@@ -219,7 +268,7 @@ object ToolExecutor {
             // existing in-app approval seam instead of retrying forever with a
             // confirm_required result that has no ticket to approve.
             if (caller != ToolPermissionManager.CALLER_LOCAL) {
-                return ToolExecutionResult("Error: confirm_required: $canonical", false)
+                return rejected("Error: confirm_required: $canonical", ToolFailureKind.APPROVAL_REQUIRED)
             }
             val decision = com.openminis.app.tools.ApprovalSeam.request(
                 context = context,
@@ -228,21 +277,58 @@ object ToolExecutor {
                 summary = "参数=${argsJson.take(800)}",
             )
             if (decision.decision != "allowed-once") {
-                return ToolExecutionResult(
+                return rejected(
                     "Error: approval_${decision.decision}: $canonical",
-                    false,
+                    ToolFailureKind.APPROVAL_DENIED,
                 )
             }
         }
-        val raw = ProviderRouter.route(canonical)
+        currentCoroutineContext().ensureActive()
+        // Gates and approval have finished. Persist immediately before entering the execution body.
+        val intentId = if (modelExecution != null) {
+            ToolCheckpointStore.recordIntent(context, sessionId, modelExecution.callId, name,
+                originalArgs.toString(), modelExecution.runId, modelExecution.taskId,
+                modelExecution.revision, modelExecution.stopGeneration)
+                ?: return rejected("Tool execution checkpoint could not be persisted; no action was executed.", ToolFailureKind.CHECKPOINT_FAILURE)
+        } else null
+        currentCoroutineContext().ensureActive()
+        suspend fun invokeBody(): ToolExecutionResult = localExecution?.invoke() ?: ProviderRouter.route(canonical)
             ?.execute(canonical, argsJson, sessionId, context, toolId) {
-                handler.execute(argsJson, sessionId, context, toolId)
-            }
-            ?: handler.execute(argsJson, sessionId, context, toolId)
+                handler.executeForCaller(argsJson, sessionId, context, toolId, caller)
+            } ?: handler.executeForCaller(argsJson, sessionId, context, toolId, caller)
+        suspend fun invokeHandler(): ToolExecutionResult = if (modelExecution != null && intentId != null) {
+            kotlinx.coroutines.withContext(ExecutionIdentity(modelExecution, intentId)) { invokeBody() }
+        } else invokeBody()
+        // Shared cooperative deadline; approval waiting does not consume tool execution time.
+        val timeoutMs = handler.definition.timeoutMs
+        val nativeOutcome = if (canonical == "linux.shell" && modelExecution != null)
+            com.openminis.app.runtime.guest.NativeOffloadServer.beginShell(sessionId, checkNotNull(intentId)) else null
+        if (intentId != null) executingIntents.add(intentId)
+        val raw = try {
+            if (timeoutMs == null) invokeHandler() else withTimeoutOrNull(timeoutMs) { invokeHandler() }
+                ?: ToolExecutionResult("Error: tool call timed out after $timeoutMs ms.", false,
+                    timedOut = true, failureKind = ToolFailureKind.TOOL_TIMEOUT)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            ToolExecutionResult("Error: tool execution returned no definitive outcome: ${error.message ?: error.javaClass.simpleName}",
+                false, failureKind = ToolFailureKind.OUTCOME_UNKNOWN)
+        } finally {
+            if (intentId != null) executingIntents.remove(intentId)
+            if (nativeOutcome != null) com.openminis.app.runtime.guest.NativeOffloadServer.endShell(sessionId, nativeOutcome)
+        }
+        currentCoroutineContext().ensureActive()
+        val nativeUnknown = nativeOutcome?.unknownKind ?: nativeOutcome?.takeIf {
+            com.openminis.app.runtime.guest.NativeOffloadServer.nativeInFlight(it.executionId)
+        }?.let { ToolFailureKind.OUTCOME_UNKNOWN }
+        val classified = (if (nativeUnknown != null && raw.failureKind?.outcomeUnknown != true)
+            raw.copy(failureKind = nativeUnknown) else raw).classifiedAfterExecution()
         // [T-tool-result-budget-android] The dispatch is where a result stops being a
         // tool's private business and becomes a message part, so it is where the bound
         // lives; tools that already bound themselves stay well under it.
-        return ToolResultBudget.bounded(sessionId = sessionId, toolName = canonical, result = raw)
+        val result = if (boundOutput) ToolResultBudget.bounded(sessionId = sessionId, toolName = canonical, result = classified) else classified
+        return if (modelExecution == null) result else result.copy(executionIntentId = intentId,
+            executionRunId = modelExecution.runId, executionTaskId = modelExecution.taskId)
     }
 }
 
@@ -250,6 +336,9 @@ interface ToolHandler {
     val definition: AgentToolDefinition
     val isMcpTool: Boolean get() = false
     suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String = ""): ToolExecutionResult
+    /** Caller comes from the trusted transport, never from tool arguments. */
+    suspend fun executeForCaller(argsJson: String, sessionId: String, context: Context, toolId: String, caller: String): ToolExecutionResult =
+        execute(argsJson, sessionId, context, toolId)
 }
 
 class LinuxFileReadHandler : ToolHandler {
@@ -481,17 +570,39 @@ class LinuxReadImageHandler : ToolHandler {
 class AgentGoalHandler : ToolHandler {
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "agent.goal",
-        description = "Get, create, or update the session goal. Pass action=get_goal|create_goal|update_goal; create_goal/update_goal also need `goal` text (empty clears).",
+        description = "Get/create/update the durable task. Create needs goal text; update accepts goal text (empty clears) OR status. Completing requires task_id, revision, stop_generation from get_goal, progress explaining how acceptance criteria were met, and actual evidence. A reply alone never completes the task. Paused/waiting/needs_user need the same task identity and a progress explanation. verify_outcome independently verifies one exact unknown action: automatic checks a non-append file write fingerprint; verification=user asks the actual user to inspect other effects, and uncertainty remains pending. Supply exact execution_id and run_id plus current task identity; no status or completion evidence. Verification preserves task state and never replays the action.",
         parameters = mapOf(
             "tool_title" to com.openminis.app.data.model.AgentToolParam("string", "Short summary of this call, shown to the user."),
-            "action" to com.openminis.app.data.model.AgentToolParam("string", "get_goal | create_goal | update_goal."),
+            "action" to com.openminis.app.data.model.AgentToolParam("string", "get_goal | create_goal | update_goal | verify_outcome | review_restored_task. The last action asks the actual user to inspect a restored task; it leaves the task paused."),
             "goal" to com.openminis.app.data.model.AgentToolParam("string", "The goal text for create_goal/update_goal."),
+            "acceptance_criteria" to com.openminis.app.data.model.AgentToolParam("string", "Verifiable completion conditions; retained when omitted on update."),
+            "max_goal_rounds" to com.openminis.app.data.model.AgentToolParam("integer", "Maximum automatic continuation rounds, 1..100. Updating does not reset rounds already used."),
+            "status" to com.openminis.app.data.model.AgentToolParam("string", "completed | paused | waiting | needs_user. Use instead of goal text."),
+            "task_id" to com.openminis.app.data.model.AgentToolParam("string", "Exact current task_id from get_goal."),
+            "revision" to com.openminis.app.data.model.AgentToolParam("integer", "Current revision from get_goal."),
+            "stop_generation" to com.openminis.app.data.model.AgentToolParam("integer", "Current stop_generation from get_goal."),
+            "progress" to com.openminis.app.data.model.AgentToolParam("string", "Acceptance explanation or concrete reason for waiting/stopping, at most 2000 characters."),
+            "verification" to com.openminis.app.data.model.AgentToolParam("string", "verify_outcome method: automatic (default) or user (actual user inspects the effect).", enumValues = listOf("automatic", "user")),
+            "outcome" to com.openminis.app.data.model.AgentToolParam("object", "One exact unknown execution from get_goal, for verify_outcome only.", properties = mapOf(
+                "execution_id" to com.openminis.app.data.model.AgentToolParam("string", "Exact unknown execution ID; call IDs alone are not unique."),
+                "run_id" to com.openminis.app.data.model.AgentToolParam("string", "Original Run ID of the unknown execution."),
+            ), requiredProperties = listOf("execution_id", "run_id")),
+            "evidence" to com.openminis.app.data.model.AgentToolParam("array", "1..16 actual evidence references. Files are hashed by Minis; tool results must already be persisted successes.",
+                items = com.openminis.app.data.model.AgentToolParam("object", "File or durable tool receipt.", properties = mapOf(
+                    "type" to com.openminis.app.data.model.AgentToolParam("string", "file | document | tool_result"),
+                    "uri" to com.openminis.app.data.model.AgentToolParam("string", "Persistently granted SAF content URI for type=document; checked in its own permission domain."),
+                    "path" to com.openminis.app.data.model.AgentToolParam("string", "Workspace/shared/mounted file path for type=file."),
+                    "sha256" to com.openminis.app.data.model.AgentToolParam("string", "Optional expected file SHA-256; mismatches reject completion."),
+                    "call_id" to com.openminis.app.data.model.AgentToolParam("string", "Your original tool call id for type=tool_result."),
+                    "execution_id" to com.openminis.app.data.model.AgentToolParam("string", "Exact execution ID for type=tool_result when a call ID was reused."),
+                ), requiredProperties = listOf("type"))),
         ),
         required = listOf("tool_title", "action"),
         propertyOrdering = listOf("tool_title", "action", "goal"),
+        timeoutMs = 605_000L,
     )
     override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult =
-        com.openminis.app.tools.GoalTools.execute(JSONObject(argsJson).optString("action"), argsJson, sessionId, context)
+        com.openminis.app.tools.GoalTools.execute(JSONObject(argsJson).optString("action"), argsJson, sessionId, context, toolId)
 }
 
 class AgentTodoHandler : ToolHandler {
@@ -521,23 +632,19 @@ class AgentTodoHandler : ToolHandler {
 }
 
 class AgentSubagentHandler : ToolHandler {
-    override val definition: AgentToolDefinition = AgentToolDefinition(
-        name = "agent.subagent",
-        description = "Delegate a self-contained sub-task to a child agent that runs in its own session with its own context, then return only its final answer. The child CANNOT see this conversation: write `prompt` as a complete, standalone task including all needed paths, names and constraints.",
-        parameters = mapOf(
-            "tool_title" to com.openminis.app.data.model.AgentToolParam("string", "Short summary of the delegated task, shown to the user."),
-            "prompt" to com.openminis.app.data.model.AgentToolParam("string", "The complete, self-contained task for the child agent."),
-        ),
-        required = listOf("tool_title", "prompt"),
-        propertyOrdering = listOf("tool_title", "prompt"),
-    )
+    override val definition: AgentToolDefinition
+        get() = com.openminis.app.agent.subagents.SubAgentToolSchema.definition(
+            com.openminis.app.agent.subagents.SubAgentStore.currentRoster().map { it.name },
+            name = com.openminis.app.agent.subagents.SubAgentToolSchema.HANDLER_NAME,
+        )
     override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult {
         val title = runCatching { JSONObject(argsJson).optString("tool_title", "") }.getOrDefault("")
         val app = context.applicationContext as? com.openminis.app.MinisApp
         // Delegation is one level deep from a sub agent: its own session never delegates, whichever
         // way the tool is configured.
-        val isSubAgentChild = app?.chatRepository?.getSession(sessionId)?.source ==
-            com.openminis.app.data.db.ChatSessionEntity.SOURCE_SUB_AGENT
+        val isSubAgentChild = com.openminis.app.data.db.ChatSessionEntity.isSubAgentSource(
+            app?.chatRepository?.getSession(sessionId)?.source,
+        )
         if (isSubAgentChild) {
             return ToolExecutionResult(
                 com.openminis.app.agent.subagents.SubAgentTask.error(
@@ -546,13 +653,27 @@ class AgentSubagentHandler : ToolHandler {
                 false, toolTitle = title,
             )
         }
-        // While sub agents are allowed (Settings) the model was given the roster schema, so the call
-        // goes to the roster runtime; with the switch off the older single-shot behaviour is unchanged.
+        // The Settings switch also gates callers that still hold an old schema.
         if (!com.openminis.app.agent.subagents.SubAgents.isEnabled()) {
-            return com.openminis.app.tools.SubagentTool.execute(argsJson, sessionId, context)
+            return ToolExecutionResult(com.openminis.app.agent.subagents.SubAgentTask.error(
+                "subagents_disabled", "Sub agents are disabled in Settings.",
+            ), false, toolTitle = title)
         }
-        val reply = com.openminis.app.agent.subagents.SubAgents.runtime(context).execute(argsJson, sessionId)
-        return ToolExecutionResult(reply.text, reply.ok, toolTitle = title)
+        val actual = kotlin.coroutines.coroutineContext[ToolExecutor.ExecutionIdentity]
+        val ownership = com.openminis.app.agent.subagents.SubAgentRuntime.ParentExecution(actual?.model?.runId,
+            actual?.model?.taskId, actual?.model?.revision, actual?.model?.stopGeneration, actual?.intentId)
+        val reply = try {
+            kotlinx.coroutines.withContext(ownership) { com.openminis.app.agent.subagents.SubAgents.runtime(context).execute(argsJson, sessionId) }
+        } catch (error: com.openminis.app.agent.subagents.SubAgentJobRegistry.StorageUnavailable) {
+            val started = com.openminis.app.agent.subagents.SubAgents.runtime(context).registry.jobs.value.values.any {
+                it.parentExecutionId == actual?.intentId && it.childSessionId != null
+            }
+            return ToolExecutionResult("Sub agent checkpoint could not be persisted; inspect its durable state before continuing.", false,
+                toolTitle = title, failureKind = if (started) ToolFailureKind.OUTCOME_UNKNOWN else ToolFailureKind.CHECKPOINT_FAILURE,
+                executionStarted = started)
+        }
+        return ToolExecutionResult(reply.text, reply.ok, toolTitle = title,
+            failureKind = if (reply.outcomeUnknown) ToolFailureKind.OUTCOME_UNKNOWN else null)
     }
 }
 

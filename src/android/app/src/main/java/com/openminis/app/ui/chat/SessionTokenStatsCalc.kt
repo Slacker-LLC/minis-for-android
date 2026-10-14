@@ -9,7 +9,7 @@ internal object SessionTokenStatsCalc {
      * reading wins. The loop count approximates iterations as max(tool blocks, assistant messages),
      * matching iOS.
      */
-    fun aggregate(usages: List<String>, messages: List<ChatMessage>): ChatViewModel.SessionTokenStats {
+    fun aggregate(usages: List<String>, messages: List<ChatMessage>): com.openminis.app.agent.AgentSession.SessionTokenStats {
         var input = 0L
         var output = 0L
         var cacheRead = 0L
@@ -30,6 +30,6 @@ internal object SessionTokenStatsCalc {
         val toolCalls = messages.filter { it.role == "assistant" }
             .sumOf { msg -> msg.toolBlocks.count { it.kind != "text" && it.kind != "info" } }
         val loops = maxOf(toolCalls, assistantCount)
-        return ChatViewModel.SessionTokenStats(input, output, cacheRead, cacheWrite, context, loops)
+        return com.openminis.app.agent.AgentSession.SessionTokenStats(input, output, cacheRead, cacheWrite, context, loops)
     }
 }

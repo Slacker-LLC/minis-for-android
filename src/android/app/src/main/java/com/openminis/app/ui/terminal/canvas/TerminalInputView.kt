@@ -30,9 +30,9 @@ import androidx.compose.ui.viewinterop.AndroidView
  *   - Printable char  → utf-8 bytes
  *   - Ctrl+letter     → control code (via Shift state from the accessory bar)
  *
- * Uses a custom BaseInputConnection that refuses to buffer text — every
- * `commitText()` is flushed immediately so the PTY sees keystrokes in the
- * same order the user typed them.
+ * Uses a custom BaseInputConnection that keeps IME composing text local and
+ * flushes only committed text, so the PTY never receives replaceable Pinyin
+ * pre-edit updates.
  */
 @Composable
 fun TerminalInputView(
@@ -92,9 +92,7 @@ private fun createHiddenEditText(context: Context): TerminalInputEditText =
         setSingleLine()
         isFocusable = true
         isFocusableInTouchMode = true
-        inputType = InputType.TYPE_CLASS_TEXT or
-            InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or
-            InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+        inputType = TERMINAL_INPUT_TYPE
         imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN or EditorInfo.IME_FLAG_NO_EXTRACT_UI
         setBackgroundColor(0x00000000)
     }
@@ -105,6 +103,8 @@ class TerminalInputEditText @JvmOverloads constructor(
 
     private var onInputBytes: ((ByteArray) -> Unit)? = null
     private var getAppCursorMode: () -> Boolean = { false }
+    private var composingText = ""
+    private var composingCursor = 0
 
     fun bind(onInput: (ByteArray) -> Unit, appCursorMode: () -> Boolean) {
         this.onInputBytes = onInput
@@ -112,45 +112,83 @@ class TerminalInputEditText @JvmOverloads constructor(
     }
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
-        outAttrs.inputType = InputType.TYPE_CLASS_TEXT or
-            InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or
-            InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+        outAttrs.inputType = TERMINAL_INPUT_TYPE
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN or
             EditorInfo.IME_FLAG_NO_EXTRACT_UI or
             EditorInfo.IME_ACTION_DONE
 
         return object : BaseInputConnection(this, false) {
-            // Most IME keys are routed through commitText. Forward verbatim
-            // and immediately clear any buffered composing state so the
-            // hidden EditText never accumulates characters.
+            // A terminal cannot replace text already written to its PTY. Keep
+            // pre-edit text local until the IME commits it, then send only the
+            // final value once.
             override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
-                if (text == null || text.isEmpty()) return true
-                send(text.toString().toByteArray(Charsets.UTF_8))
+                composingText = ""
+                composingCursor = 0
+                if (!text.isNullOrEmpty()) send(text.toString().toByteArray(Charsets.UTF_8))
                 return true
             }
 
             override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean {
-                if (text == null || text.isEmpty()) return true
-                send(text.toString().toByteArray(Charsets.UTF_8))
+                composingText = text?.toString().orEmpty()
+                composingCursor = if (newCursorPosition > 0) {
+                    composingText.length + newCursorPosition - 1
+                } else {
+                    newCursorPosition
+                }.coerceIn(0, composingText.length)
                 return true
             }
 
             override fun sendKeyEvent(event: KeyEvent?): Boolean {
                 event ?: return false
                 if (event.action != KeyEvent.ACTION_DOWN) return true
+                if (event.keyCode == KeyEvent.KEYCODE_DEL && composingText.isNotEmpty()) {
+                    deleteFromComposition(beforeLength = 1, afterLength = 0)
+                    return true
+                }
                 return handleKeyEvent(event)
             }
 
             override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
+                if (composingText.isNotEmpty()) {
+                    deleteFromComposition(beforeLength, afterLength)
+                    return true
+                }
                 repeat(beforeLength) { send(byteArrayOf(0x7F)) }
                 return true
             }
 
-            override fun finishComposingText(): Boolean = true
+            override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int): Boolean {
+                if (composingText.isEmpty()) {
+                    repeat(beforeLength) { send(byteArrayOf(0x7F)) }
+                    return true
+                }
+                var start = composingCursor
+                repeat(beforeLength) {
+                    if (start > 0) start = Character.offsetByCodePoints(composingText, start, -1)
+                }
+                var end = composingCursor
+                repeat(afterLength) {
+                    if (end < composingText.length) end = Character.offsetByCodePoints(composingText, end, 1)
+                }
+                deleteFromComposition(composingCursor - start, end - composingCursor)
+                return true
+            }
+
+            override fun finishComposingText(): Boolean {
+                val pending = composingText
+                composingText = ""
+                composingCursor = 0
+                if (pending.isNotEmpty()) send(pending.toByteArray(Charsets.UTF_8))
+                return true
+            }
         }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_DEL && composingText.isNotEmpty()) {
+            deleteFromComposition(beforeLength = 1, afterLength = 0)
+            return true
+        }
         return handleKeyEvent(event) || super.onKeyDown(keyCode, event)
     }
 
@@ -203,4 +241,31 @@ class TerminalInputEditText @JvmOverloads constructor(
     private fun send(bytes: ByteArray) {
         onInputBytes?.invoke(bytes)
     }
+
+    private fun deleteFromComposition(beforeLength: Int, afterLength: Int) {
+        val start = (composingCursor - beforeLength).coerceAtLeast(0)
+        val end = (composingCursor + afterLength).coerceAtMost(composingText.length)
+        if (start >= end) return
+
+        var safeStart = start
+        var safeEnd = end
+        if (safeStart > 0 && safeStart < composingText.length &&
+            Character.isHighSurrogate(composingText[safeStart - 1]) &&
+            Character.isLowSurrogate(composingText[safeStart])
+        ) {
+            safeStart--
+        }
+        if (safeEnd > 0 && safeEnd < composingText.length &&
+            Character.isHighSurrogate(composingText[safeEnd - 1]) &&
+            Character.isLowSurrogate(composingText[safeEnd])
+        ) {
+            safeEnd++
+        }
+
+        composingText = composingText.removeRange(safeStart, safeEnd)
+        composingCursor = safeStart
+    }
 }
+
+private const val TERMINAL_INPUT_TYPE =
+    InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS

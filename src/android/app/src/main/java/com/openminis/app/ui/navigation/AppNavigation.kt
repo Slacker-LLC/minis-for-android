@@ -96,6 +96,18 @@ fun AppNavigation(
     initialDeepLink: DeepLinkAction? = null,
 ) {
     val context = LocalContext.current
+    fun browseArtifactDirectory(sourceSessionId: String?, path: String) {
+        val absolute = if (path.startsWith('/')) path else "/workspace/$path"
+        FilePreviewHolder.fileBrowserViewModel = FileBrowserViewModel(
+            rootPath = java.io.File(context.cacheDir, "guest-file-browser"),
+            rootLabel = context.getString(com.openminis.app.R.string.storage_artifacts_title),
+            appContext = context.applicationContext,
+            guestRootPath = absolute.substringBeforeLast('/').ifEmpty { "/" },
+            guestSessionId = sourceSessionId,
+        )
+        navController.safeNavigate(Routes.FILE_BROWSER)
+    }
+
 
     // T219-5: use the application-scoped singleton from MinisApp so UI
     // add/remove shares state with RuntimePathRegistry and the lifecycle re-probe
@@ -174,8 +186,22 @@ fun AppNavigation(
             // Voice/camera additionally seed DeepLinkCoordinator.pendingChatAction
             // (done up-front in startDestination block below so the seed
             // lands before ChatScreen's first compose).
+            is DeepLinkAction.NewVoiceChat -> {
+                try {
+                    val restored = com.openminis.app.data.AssistantHomePrefs.resolveVoiceSession(context)
+                    DeepLinkCoordinator.setPendingChatAction(DeepLinkCoordinator.ChatAction.START_VOICE)
+                    navController.navigate(Routes.chat(restored ?: "__new__${java.util.UUID.randomUUID()}")) {
+                        popUpTo(Routes.SESSION_LIST) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (error: Exception) {
+                    DeepLinkCoordinator.consumePendingChatAction()
+                    android.widget.Toast.makeText(context, error.message ?: context.getString(com.openminis.app.R.string.voice_call_model), android.widget.Toast.LENGTH_LONG).show()
+                    navController.navigate(Routes.BOTS) { launchSingleTop = true }
+                }
+            }
             is DeepLinkAction.NewChat,
-            is DeepLinkAction.NewVoiceChat,
             is DeepLinkAction.NewCameraChat -> {
                 // Navigation handled by startDestination = chat/<__new__…>
                 // when the launch intent carries one of these actions.
@@ -310,12 +336,7 @@ fun AppNavigation(
         // its first LaunchedEffect tick. Mirrors the htmlShortcut path —
         // avoids a sessions-list flash and a duplicate back-stack entry.
         val quickActionStart: String? = when (initialDeepLink) {
-            is DeepLinkAction.NewVoiceChat -> {
-                DeepLinkCoordinator.setPendingChatAction(
-                    DeepLinkCoordinator.ChatAction.START_VOICE,
-                )
-                Routes.chat("__new__${java.util.UUID.randomUUID()}")
-            }
+            is DeepLinkAction.NewVoiceChat -> Routes.SESSION_LIST
             is DeepLinkAction.NewCameraChat -> {
                 DeepLinkCoordinator.setPendingChatAction(
                     DeepLinkCoordinator.ChatAction.OPEN_CAMERA,
@@ -507,6 +528,7 @@ fun AppNavigation(
                     onOpenMounts = { navController.safeNavigate(Routes.MOUNTED_FOLDERS) },
                     onOpenSessionFiles = { navController.safeNavigate(Routes.STORAGE) },
                     onOpenBackup = { navController.safeNavigate(Routes.BACKUP) },
+                    onBrowseArtifact = ::browseArtifactDirectory,
                 )
             } else {
                 SettingsCategoryScreen(
@@ -942,6 +964,7 @@ fun AppNavigation(
             SessionStorageDetailScreen(
                 sessionId = sessionId,
                 chatDao = chatRepository.dao,
+                onBrowseArtifact = ::browseArtifactDirectory,
                 onBack = { navController.safePopBackStack() },
                 onBrowseFiles = {
                     FilePreviewHolder.fileBrowserViewModel = FileBrowserViewModel(

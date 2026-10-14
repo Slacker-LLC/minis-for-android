@@ -34,7 +34,7 @@ object UbuntuPaths {
     }
 
     /** Legacy/root runtime root. Only rootfs and migration source remain here. */
-    const val HOST_MINIS = "/data/adb/minis"
+    const val HOST_MINIS = com.openminis.app.BuildConfig.MINIS_ROOT_STATE_BASE
     const val HOST_ROOTFS = "$HOST_MINIS/rootfs"
     const val LEGACY_WORKSPACE = "$HOST_MINIS/workspace"
     const val LEGACY_MEMORY = "$HOST_MINIS/memory"

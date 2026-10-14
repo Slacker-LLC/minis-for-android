@@ -27,6 +27,10 @@ class FakeCallRuntime : CallRuntime {
         _events.tryEmit(CallEvent.BloubStateChanged(BloubState.LISTENING))
     }
 
+    override fun listenForFollowUp() {
+        _events.tryEmit(CallEvent.BloubStateChanged(BloubState.LISTENING))
+    }
+
     fun emitBloubState(state: BloubState) {
         _events.tryEmit(CallEvent.BloubStateChanged(state))
     }

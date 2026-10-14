@@ -34,14 +34,14 @@ object JobTools {
 
     /**
      * Dispatch entry point, called by ChatViewModel.dispatchTool for all
-     * three job tool names. [sessionId] and [context] are part of the uniform
-     * tool-executor signature but unused — the registry is process-global.
+     * job tools. Correlated jobs remain scoped to their owning session; legacy
+     * unbound jobs and explicit app-level diagnostics keep their global context.
      */
     suspend fun execute(name: String, argsJson: String, sessionId: String?, context: Context): ToolExecutionResult =
         when (name) {
-            NAME_OUTPUT -> jobOutput(argsJson)
-            NAME_LIST -> jobList()
-            NAME_KILL -> jobKill(argsJson)
+            NAME_OUTPUT -> jobOutput(argsJson, sessionId)
+            NAME_LIST -> jobList(sessionId)
+            NAME_KILL -> jobKill(argsJson, sessionId)
             NAME_INPUT -> jobInput(argsJson, sessionId)
             else -> ToolExecutionResult("job: unknown action " + name, false)
         }
@@ -113,12 +113,14 @@ object JobTools {
 
     // ── Executors ───────────────────────────────────────────────────────────
 
-    internal suspend fun jobOutput(argsJson: String): ToolExecutionResult {
+    internal suspend fun jobOutput(argsJson: String, sessionId: String? = null): ToolExecutionResult {
         val args = runCatching { JSONObject(argsJson) }.getOrNull()
             ?: return ToolExecutionResult("job_output: invalid arguments JSON", false)
         val jobId = args.optString("job_id").trim()
         if (jobId.isEmpty()) return ToolExecutionResult("job_output: missing 'job_id'", false)
         if (JobRegistry.get(jobId) == null) return ToolExecutionResult("job_output: no such job: " + jobId, false)
+        if (!belongsToSession(jobId, sessionId)) return ToolExecutionResult("job_output: job belongs to another session", false,
+            failureKind = ToolFailureKind.PERMISSION_DENIED, executionStarted = false)
 
         val wait = args.optBoolean("wait", false)
         val timeoutMs = args.optLong("timeout_ms", DEFAULT_WAIT_TIMEOUT_MS).coerceAtLeast(0L)
@@ -149,8 +151,8 @@ object JobTools {
         )
     }
 
-    private fun jobList(): ToolExecutionResult {
-        val jobs = JobRegistry.list()
+    private fun jobList(sessionId: String?): ToolExecutionResult {
+        val jobs = JobRegistry.list().filter { belongsToSession(it.id, sessionId) }
         if (jobs.isEmpty()) return ToolExecutionResult("(no jobs)", true)
         val lines = jobs.joinToString("\n") { job ->
             job.id + " [" + job.kind + "] " + job.status.name + " \u2014 " + job.label
@@ -174,12 +176,19 @@ object JobTools {
         }
     }
 
-    private fun jobKill(argsJson: String): ToolExecutionResult {
+    private fun belongsToSession(jobId: String, sessionId: String?): Boolean {
+        val owner = JobRegistry.get(jobId)?.sessionId
+        return sessionId.isNullOrBlank() || owner == null || owner == sessionId
+    }
+
+    private fun jobKill(argsJson: String, sessionId: String?): ToolExecutionResult {
         val args = runCatching { JSONObject(argsJson) }.getOrNull()
             ?: return ToolExecutionResult("job_kill: invalid arguments JSON", false)
         val jobId = args.optString("job_id").trim()
         if (jobId.isEmpty()) return ToolExecutionResult("job_kill: missing 'job_id'", false)
         if (JobRegistry.get(jobId) == null) return ToolExecutionResult("job_kill: no such job: " + jobId, false)
+        if (!belongsToSession(jobId, sessionId)) return ToolExecutionResult("job_kill: job belongs to another session", false,
+            failureKind = ToolFailureKind.PERMISSION_DENIED, executionStarted = false)
         val reason = args.optString("reason", "")
         return if (JobRegistry.kill(jobId, reason)) {
             ToolExecutionResult("cancellation-requested", true)

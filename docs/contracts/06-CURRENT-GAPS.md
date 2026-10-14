@@ -2,6 +2,24 @@
 
 > 基线更新：2026-09-12，`main` 合并提交 `422cc29f`（包含审计提交 `53dada42`）。本文件区分已确认实现缺口、未验证设备行为与历史 Issue 快照；旧 broker/PRoot/storage 结论不作为现役实现依据。
 
+## Agent 组织补充核对（2026-10-14）
+
+源码基线：`3527ad8165f11c0f98d8a30f96098fc9280faa94` 与当前工作树。以下按当前源码调用链核对；功能细解见 [能力盘点](../analysis/minis-agent-inventory.md)，开发阶段见 [路线](../development/AGENT-ROADMAP.md)。
+
+- **M1–M5 开发与受控集成验收已完成**：Room v26 在消息表保存稳定请求与领取/运行状态；唯一核心、Task 核验、typed CLI/后台 UNKNOWN、SAF/共享/备份和原任务关联协作/语音已接入。17 组工作流（166 个报告子场景）、v23→v26 迁移、4 个 force-stop 阶段、Debug/AndroidTest、Release Kotlin/R8 和 Debug/Release Lint 通过，工件与边界见 [整体说明](../development/M-SERIES-INTEGRATION.md)。真实模型、SAF 系统选择器/撤权、Android 26–28 SAF、Root/OEM/实际音频与生产签名仍未验收。首轮 SAF API 兼容错误已修；旧系统不能确认树内关系时拒绝。
+- **子工作恢复保持审查**：子代理中断和 Task 备份恢复不自动重放，结果/预算/身份保留。子代理回执与原 Task/Run/停止代次绑定，Ralph 原子保存父子关系和交接；原目标停止后不自动唤醒。完整真实模型工作及设备级执行仍需验收。
+- **诊断后端事实已对齐，真机仍待验**：能力报告按实际 DirectRootRunner/App 回退生成，不把 Shizuku READY 当作这些 Root 诊断动作已可执行。Shizuku 自身服务状态单独报告；Root 授权撤销、OEM/SELinux 与进程清理仍需设备验收。
+
+成员工作背景复用自身已完成任务和明确共享引用，没有新增独立 Bot 记忆库或放宽长期权限边界。设备行为仍以明确实测为准。
+
+## 执行入口重整后的剩余边界（2026-10-12 工作树）
+
+原 Headless 执行实现已归回产品层 AgentRunner，远程只读投影复用到 remote 包，旧 Headless 路径已删除；会话来源随创建事务保存，不再由共用入口统一标为 debug。普通 Agent 的受控文件/Android/生命周期流程已建立基线。活跃回合 Job 与执行 scope 已归到 AgentExecution，等待包含准备、子协程与清理；释放会话所有者显式关闭执行，旧实例拒绝提交。会话历史、压缩标记、工具循环检测及 outgoing 历史修复/恢复提醒已由 AgentExecution 的 AgentConversation 持有，撤销压缩重复加载、清空摘要残留、占位结果误确认与结构化请求漏摘要已修正；并发槽位授予后、acquireSlot 返回前取消造成的槽位泄漏也已修正。模型循环、上下文预算/offload、压缩执行、队列及其余非 UI 执行状态已归入 AgentSession，AgentSessionStore 为唯一执行所有者，ChatViewModelStore 仅保存页面投影；M1 核心迁移与受控端到端验收已完成（37 场景连续 10 轮、17 项共享入口回归通过），见 [核心说明](../development/AGENT-CORE-EXECUTION.md)。M2–M5 的后续接线已按顺序补齐；当前整体状态见 [接线说明](../development/M-SERIES-INTEGRATION.md)，旧核心验收只保留其冻结基线。真实模型完整任务、Ubuntu 构建及 Root/OEM 设备行为待验；受控模型配合真实 WebView 的浏览器下载/Cookie 流程已有独立模拟器证据。
+
+## 语音接入后的未验证边界（2026-10-14 工作树）
+
+连续语音已接通当前 AgentSession 的完整回合和 Bot 直聊，入口/静音/挂断/补充/点击打断可沿现有边界执行。原生音频全双工、自动说话打断、OEM Root 手机/锁屏唤醒、音频品质仍未完成真机验收。语音 STEER 已复用持久消息输入，系统助理已接最近会话/原成员身份和用户默认接待成员；任务阶段/等待原因/成果及音频控制已接线，本轮受控语音及对象路由场景已通过，实际音频/OEM 仍待验收。具体阶段见 [Bot 与语音融合](../development/BOT-VOICE-INTEGRATION.md)。
+
 ## 已完成的 Direct Ubuntu 迁移边界
 
 以下不再属于“待实现”项：
@@ -207,3 +225,17 @@ config registry 暴露为 `prompt.custom`（带确认与审计回退）。内置
 ## PR4 — 下个版本移除旧模型组 Room 表（暂缓）
 
 PR2/PR3 只把运行配置迁移到固定 Model Slots，并保留旧表作为迁移/回滚兼容边界；本阶段不删 `provider_model_groups` 表、不升级 Room schema。后续 PR4 才能在数据升级路径和真机备份恢复验收完成后删除该表并将 Room schema 从当前 v4 升至 v5。
+
+## M3 既有切片证据（历史阶段）
+
+共享执行器已接入动作别名/JSON/schema 检查和注册工具超时；极简模式保留任务与 Job 控制。子代理开关同时隐藏与拒绝委派，旧同步实现已删除，旧 child 来源仍被识别。诊断能力不再把 Shizuku READY 当作 Root 诊断后端。browser/memory 已注册，浏览器 CLI 共享参数/权限/时限并保留既有单页与输出协议；工具发现已复用活跃会话定义与 MCP 令牌 scope，目录不代表实际设备后端可用；其它领域 CLI 仍有独立路径，模型执行意图已迁到共用执行器的权限/确认之后，Room 精确回执仍由会话持久化结算，不能宣称共享管线已全部完成。结构化失败/执行开始标记已沿模型结果与 Room 保存；超时、异常和观察失败回执不再清除未知执行意图，普通目标因此等待核验，MCP/浏览器 CLI 保留同一执行事实。日历/联系人/位置/剪贴板已有共用领域实现和撤销权限场景证据；日历/联系人目标选择、提醒、空字段及模型/CLI 交叉读写已通过模拟器真实 ContentProvider 核对。四领域 NativeOffloadResult 已传递执行开始与失败事实，Guest CLI 的可选 --execution-json 保留既有正文/退出码；多步日历提醒和联系人聚合观察不确定时不 ACK 精确意图，非文件动作仍无独立核验入口。旧深度选项已删除；Ralph 单轮时限、原生设置及 RPC 已按真实调用方收敛。原共用 runner 已会发出取消，现役 Ralph 进一步等待精确请求清理，超时保留 typed 未知副作用事实，不再用全局计数阻挡独立父会话。Ralph 运行与根任务/Job 的持久关联仍随 M5 整理。详见 [M3 工具执行](../development/AGENT-TOOLS-EXECUTION.md)。
+
+## M2 既有核验与检查点证据（历史阶段）
+
+完整非 append 文件写入已接入 verify_outcome，以 execution ID/Run/Task/revision/stopGeneration 对照实际指纹。核验回执先在 Room 持久提交，再确认精确检查点；重复 call ID 的另一执行保留。新意图保存字节数/哈希摘要，不保存长正文。核验不隐式完成或恢复 WAITING/NEEDS_USER，暂停/跨会话/错误版本和非文件副作用拒绝。共享参数修复仅对声明为 string 的字段转文本，必填对象/数组/数值保留类型。检查点坏行导致实际任务误完成已从端到端复现；读取、追加与确认现共用整文件校验，对坏编码/字段、重复执行身份、权限/I/O 错误及非普通文件失败关闭，保留现场、不启动模型/动作、不自动接续或消费目标预算。历史 reported 仍未知，非模型读取不再误滤无新执行身份的旧记录；页面压力检查可明确拒绝。检查点切片证据见 [任务执行](../development/AGENT-TASK-EXECUTION.md)。非文件领域核验、跨入口完整结果交接及完整真实模型任务仍待开发/验收。
+
+检查点相关的既有 JVM `ToolCheckpointRecoveryTest` 仍使用缺 args/at 的薄 pending 夹具，以及按 call ID 结算新 nonce 的旧前提，与当前检查点生产合同不符。当前切片按用户要求只新增/执行端到端验证，既有 JVM 测试仅类型编译；不能据此称旧 JVM 断言或完整 CI 已通过。有效旧记录、坏记录拒绝与精确 execution 结算以实际 App/Room 端到端证据为准，旧夹具整理仍待处理。
+
+## M4 既有存储切片证据（历史阶段）
+
+文件页已用原生应用统计覆盖共享/技能/记忆/用户目录、缓存和保留数据；Root rootfs 探测失败保留未知，总量标明已测量下界。会话别名重复计量已从真实文件 E2E 复现并修复，总览/详情/app.info 共用 sessionTreeSize。持久成果引用与当前文件核查已复用 completionEvidence 接入文件入口，来源 session 由实际执行器保存，历史完成事实不随当前文件变化重写。会话分类预览与清理已接入关闭/等待边界，不可读目录误报空值已修复；实际 MainActivity 默认浏览器清理及点击保留成果打开来源目录已核对。记忆读改写串行、独立条目身份与真实 session 来源、日志注入窗口预算已接入；技能元数据预算及按需读取使用记录也已核对调用链。共享资料交接、成员上下文、备份/外部目录的交付闭环仍未完整验收，真实 Root guest 进程清理仍需设备证据；不能据此宣称 M4/M5 完成。见 [工作现场与交付](../development/AGENT-WORKSPACE-DELIVERY.md)。

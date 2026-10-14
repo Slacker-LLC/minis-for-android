@@ -462,6 +462,7 @@ data class MemoryToolRecord(
     val output: String,
     val writtenContent: String? = null,
     val keywords: String? = null,
+    val entryId: String? = null,
 )
 
 /**

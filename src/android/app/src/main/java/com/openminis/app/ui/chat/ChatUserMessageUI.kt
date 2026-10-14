@@ -1,5 +1,7 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.agent.*
+
 // [T-android-split-chat] User-message rendering extracted verbatim from
 // ChatScreen.kt: UserMessageBubble, UserAttachmentList, FileAttachmentTile,
 // fileIconFor, ImageGalleryDialog. Full import block copied (unused=warnings).

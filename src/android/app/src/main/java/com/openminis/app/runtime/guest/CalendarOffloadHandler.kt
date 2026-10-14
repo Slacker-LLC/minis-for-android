@@ -14,6 +14,7 @@ import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
+import com.openminis.app.tools.ToolFailureKind
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -48,26 +49,29 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
         // --help/-h; no subcommand defaults to `list` (resolveDateRange
         // already defaults to the last-24h..now window with no flags).
         if (args.hasFlag("h", "help")) {
-            return NativeOffloadResult(0, HELP)
+            return NativeOffloadResult(0, HELP, executionStarted = false)
         }
         // T330: tri-state agent gate before any work.
         OffloadGate.enforce("calendar", "android-calendar", args, request)?.let { return it }
 
+        val sub = args.positional.firstOrNull() ?: "list"
         return try {
-            when (val sub = args.positional.firstOrNull() ?: "list") {
+            when (sub) {
                 "list" -> doList(args)
                 "create" -> doCreate(args)
                 "update" -> doUpdate(args)
                 "delete" -> doDelete(args)
                 "freebusy" -> doFreebusy(args)
                 "calendars" -> doListCalendars(args)
-                else -> NativeOffloadResult(2, "android-calendar: unknown subcommand '$sub'\n$HELP")
+                else -> NativeOffloadResult.invalidArguments("android-calendar: unknown subcommand '$sub'\n$HELP")
             }
         } catch (e: Throwable) {
             AppLogger.warning(TAG, "uncaught: ${e.message}")
             NativeOffloadResult(
                 1,
                 OffloadOutput.formatBody(JSONObject().put("error", "internal").put("message", e.message ?: "unknown").toString(), args) + "\n",
+                failureKind = if (sub in setOf("create", "update", "delete")) ToolFailureKind.OUTCOME_UNKNOWN else ToolFailureKind.EXECUTION_FAILED,
+                executionStarted = true,
             )
         }
     }
@@ -118,7 +122,7 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
             )
         }
         OffloadPermissionManager.permissionFailure("android-calendar", permissions, result)?.let { body ->
-            return NativeOffloadResult(77, OffloadOutput.formatBody(body.toString(), args) + "\n")
+            return NativeOffloadResult.permissionDenied(OffloadOutput.formatBody(body.toString(), args) + "\n")
         }
         return null
     }
@@ -133,9 +137,7 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
         )?.let { return it }
 
         val (startMs, endMs) = resolveDateRange(args)
-            ?: return NativeOffloadResult(
-                2,
-                "android-calendar list: invalid or missing date range. Use --today, --days N, or --start/--end (ISO 8601 or YYYY-MM-DD).\n",
+            ?: return NativeOffloadResult.invalidArguments("android-calendar list: invalid or missing date range. Use --today, --days N, or --start/--end (ISO 8601 or YYYY-MM-DD).\n",
             )
         // --limit is the apple-calendar name; --max kept as alias.
         val limit = args.getInt("limit") ?: args.getInt("max") ?: DEFAULT_LIMIT
@@ -162,7 +164,7 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
                 CalendarContract.Events.CONTENT_URI, projection, selection, selArgs, sort,
             )
         } catch (e: SecurityException) {
-            return NativeOffloadResult(77, providerBlockedJson("READ_CALENDAR", e, args))
+            return NativeOffloadResult(77, providerBlockedJson("READ_CALENDAR", e, args), failureKind = ToolFailureKind.PERMISSION_DENIED, executionStarted = true)
         } catch (e: Throwable) {
             return NativeOffloadResult(1, providerErrorJson(e, args))
         } ?: return NativeOffloadResult(1, providerErrorJson(null, args))
@@ -232,26 +234,26 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
     private fun doCreate(args: OffloadArgs): NativeOffloadResult {
         ensurePermission(
             permissions = listOf(Manifest.permission.WRITE_CALENDAR, Manifest.permission.READ_CALENDAR),
-            satisfied = { hasWrite() },
+            satisfied = { hasRead() && hasWrite() },
             humanLabel = "write",
             settingsId = Manifest.permission.WRITE_CALENDAR,
             args = args,
         )?.let { return it }
 
         val title = args.get("title")
-            ?: return NativeOffloadResult(2, "android-calendar create: --title is required\n")
+            ?: return NativeOffloadResult.invalidArguments("android-calendar create: --title is required\n")
         val startStr = args.get("start")
-            ?: return NativeOffloadResult(2, "android-calendar create: --start is required\n")
+            ?: return NativeOffloadResult.invalidArguments("android-calendar create: --start is required\n")
         val startMs = parseDate(startStr)
-            ?: return NativeOffloadResult(2, "android-calendar: invalid --start '$startStr'\n")
+            ?: return NativeOffloadResult.invalidArguments("android-calendar: invalid --start '$startStr'\n")
         // A --end that was given must parse (and come after the start); only a missing --end defaults.
         val endStr = args.get("end")
         val parsedEnd = if (endStr != null) {
-            parseDate(endStr) ?: return NativeOffloadResult(2, "android-calendar: invalid --end '$endStr'\n")
+            parseDate(endStr) ?: return NativeOffloadResult.invalidArguments("android-calendar: invalid --end '$endStr'\n")
         } else null
         val allDay = args.hasFlag("all-day")
         if (parsedEnd != null && parsedEnd <= startMs && !allDay) {
-            return NativeOffloadResult(2, "android-calendar create: --end must be after --start\n")
+            return NativeOffloadResult.invalidArguments("android-calendar create: --end must be after --start\n")
         }
         // An all-day event is stored as UTC midnights with an exclusive end; the given dates are
         // local calendar days. Anything else (local midnight, or "+1 hour") is not a whole day.
@@ -287,7 +289,8 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
         return try {
             val uri = context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
             if (uri == null) {
-                NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "insert_failed").put("message", "ContentResolver.insert returned null").toString(), args) + "\n")
+                NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "insert_failed").put("message", "ContentResolver.insert returned null").toString(), args) + "\n",
+                    failureKind = ToolFailureKind.OBSERVATION_FAILED, executionStarted = true)
             } else {
                 val eventId = uri.lastPathSegment?.toLongOrNull()
                 val reminderSet = if (eventId != null && alarmMinutes != null && alarmMinutes >= 0) {
@@ -304,12 +307,18 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
                 // Report the reminder the provider actually stored; the event itself was created.
                 if (reminderSet == true) data.put("alarm_minutes_before", alarmMinutes)
                 if (reminderSet == false) data.put("reminder_error", "the event was created but its reminder could not be saved")
-                NativeOffloadResult(if (reminderSet == false) 1 else 0, OffloadOutput.formatBody(data.toString(2), args) + "\n")
+                NativeOffloadResult(if (reminderSet == false) 1 else 0, OffloadOutput.formatBody(data.toString(2), args) + "\n",
+                    failureKind = when {
+                        reminderSet == false -> ToolFailureKind.OUTCOME_UNKNOWN
+                        eventId == null -> ToolFailureKind.OBSERVATION_FAILED
+                        else -> null
+                    },
+                    executionStarted = true)
             }
         } catch (e: SecurityException) {
-            NativeOffloadResult(77, providerBlockedJson("WRITE_CALENDAR", e, args))
+            NativeOffloadResult(77, providerBlockedJson("WRITE_CALENDAR", e, args), failureKind = ToolFailureKind.OUTCOME_UNKNOWN, executionStarted = true)
         } catch (e: Throwable) {
-            NativeOffloadResult(1, providerErrorJson(e, args))
+            NativeOffloadResult(1, providerErrorJson(e, args), failureKind = ToolFailureKind.OUTCOME_UNKNOWN, executionStarted = true)
         }
     }
 
@@ -318,24 +327,24 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
     private fun doUpdate(args: OffloadArgs): NativeOffloadResult {
         ensurePermission(
             permissions = listOf(Manifest.permission.WRITE_CALENDAR, Manifest.permission.READ_CALENDAR),
-            satisfied = { hasWrite() },
+            satisfied = { hasRead() && hasWrite() },
             humanLabel = "write",
             settingsId = Manifest.permission.WRITE_CALENDAR,
             args = args,
         )?.let { return it }
 
         val id = args.getLong("id")
-            ?: return NativeOffloadResult(2, "android-calendar update: --id <event_id> is required\n")
+            ?: return NativeOffloadResult.invalidArguments("android-calendar update: --id <event_id> is required\n")
 
         // Build a sparse ContentValues with only the fields the caller supplied.
         val values = ContentValues()
         args.get("title")?.let { values.put(CalendarContract.Events.TITLE, it) }
         args.get("start")?.let { s ->
-            val ms = parseDate(s) ?: return NativeOffloadResult(2, "android-calendar update: invalid --start '$s'\n")
+            val ms = parseDate(s) ?: return NativeOffloadResult.invalidArguments("android-calendar update: invalid --start '$s'\n")
             values.put(CalendarContract.Events.DTSTART, ms)
         }
         args.get("end")?.let { e ->
-            val ms = parseDate(e) ?: return NativeOffloadResult(2, "android-calendar update: invalid --end '$e'\n")
+            val ms = parseDate(e) ?: return NativeOffloadResult.invalidArguments("android-calendar update: invalid --end '$e'\n")
             values.put(CalendarContract.Events.DTEND, ms)
         }
         args.get("location")?.let { values.put(CalendarContract.Events.EVENT_LOCATION, it) }
@@ -354,7 +363,7 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
         val alarmMinutes = args.getInt("alarm")
 
         if (values.size() == 0 && alarmMinutes == null) {
-            return NativeOffloadResult(2, "android-calendar update: nothing to update — supply at least one field flag\n")
+            return NativeOffloadResult.invalidArguments("android-calendar update: nothing to update — supply at least one field flag\n")
         }
 
         return try {
@@ -372,11 +381,13 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
                 .put("rows", updated)
             if (reminderSet == true) data.put("alarm_minutes_before", alarmMinutes)
             if (reminderSet == false) data.put("reminder_error", "the reminder could not be replaced")
-            NativeOffloadResult(if (reminderSet == false) 1 else 0, OffloadOutput.formatBody(data.toString(2), args) + "\n")
+            NativeOffloadResult(if (reminderSet == false) 1 else 0, OffloadOutput.formatBody(data.toString(2), args) + "\n",
+                failureKind = if (reminderSet == false) ToolFailureKind.OUTCOME_UNKNOWN else null,
+                executionStarted = true)
         } catch (e: SecurityException) {
-            NativeOffloadResult(77, providerBlockedJson("WRITE_CALENDAR", e, args))
+            NativeOffloadResult(77, providerBlockedJson("WRITE_CALENDAR", e, args), failureKind = ToolFailureKind.OUTCOME_UNKNOWN, executionStarted = true)
         } catch (e: Throwable) {
-            NativeOffloadResult(1, providerErrorJson(e, args))
+            NativeOffloadResult(1, providerErrorJson(e, args), failureKind = ToolFailureKind.OUTCOME_UNKNOWN, executionStarted = true)
         }
     }
 
@@ -392,7 +403,7 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
         )?.let { return it }
 
         val id = args.getLong("id")
-            ?: return NativeOffloadResult(2, "android-calendar delete: --id <event_id> is required\n")
+            ?: return NativeOffloadResult.invalidArguments("android-calendar delete: --id <event_id> is required\n")
 
         return try {
             val uri = CalendarContract.Events.CONTENT_URI.buildUpon()
@@ -409,9 +420,9 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
             val data = JSONObject().put("id", id).put("deleted", true).put("rows", rows)
             NativeOffloadResult(0, OffloadOutput.formatBody(data.toString(2), args) + "\n")
         } catch (e: SecurityException) {
-            NativeOffloadResult(77, providerBlockedJson("WRITE_CALENDAR", e, args))
+            NativeOffloadResult(77, providerBlockedJson("WRITE_CALENDAR", e, args), failureKind = ToolFailureKind.OUTCOME_UNKNOWN, executionStarted = true)
         } catch (e: Throwable) {
-            NativeOffloadResult(1, providerErrorJson(e, args))
+            NativeOffloadResult(1, providerErrorJson(e, args), failureKind = ToolFailureKind.OUTCOME_UNKNOWN, executionStarted = true)
         }
     }
 
@@ -426,12 +437,12 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
             args = args,
         )?.let { return it }
 
-        val startStr = args.get("start") ?: return NativeOffloadResult(2, "android-calendar freebusy: --start is required\n")
-        val endStr = args.get("end") ?: return NativeOffloadResult(2, "android-calendar freebusy: --end is required\n")
-        val startMs = parseDate(startStr) ?: return NativeOffloadResult(2, "android-calendar: invalid --start '$startStr'\n")
-        val endMs = parseDate(endStr) ?: return NativeOffloadResult(2, "android-calendar: invalid --end '$endStr'\n")
+        val startStr = args.get("start") ?: return NativeOffloadResult.invalidArguments("android-calendar freebusy: --start is required\n")
+        val endStr = args.get("end") ?: return NativeOffloadResult.invalidArguments("android-calendar freebusy: --end is required\n")
+        val startMs = parseDate(startStr) ?: return NativeOffloadResult.invalidArguments("android-calendar: invalid --start '$startStr'\n")
+        val endMs = parseDate(endStr) ?: return NativeOffloadResult.invalidArguments("android-calendar: invalid --end '$endStr'\n")
         if (endMs <= startMs) {
-            return NativeOffloadResult(2, "android-calendar freebusy: --end must be after --start\n")
+            return NativeOffloadResult.invalidArguments("android-calendar freebusy: --end must be after --start\n")
         }
 
         val projection = arrayOf(
@@ -447,7 +458,7 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
         val cursor = try {
             context.contentResolver.query(CalendarContract.Events.CONTENT_URI, projection, selection, selArgs, sort)
         } catch (e: SecurityException) {
-            return NativeOffloadResult(77, providerBlockedJson("READ_CALENDAR", e, args))
+            return NativeOffloadResult(77, providerBlockedJson("READ_CALENDAR", e, args), failureKind = ToolFailureKind.PERMISSION_DENIED, executionStarted = true)
         } catch (e: Throwable) {
             return NativeOffloadResult(1, providerErrorJson(e, args))
         } ?: return NativeOffloadResult(1, providerErrorJson(null, args))
@@ -497,9 +508,9 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
     /**
      * Insert a single reminder row for [eventId] at [minutesBefore]. Mirrors
      * iOS EKAlarm.alarmWithRelativeOffset(-N * 60). Reminders.METHOD_ALERT
-     * is the standard reminder type; ContentResolver.insert returns null on
-     * provider failure, which we silently swallow — the event itself is
-     * already created/updated.
+     * is the standard reminder type. A null or exceptional reply does not
+     * prove the reminder was not written; callers retain an unknown outcome
+     * alongside the event's already-known result.
      */
     /** True only when the provider accepted the reminder row. */
     private fun insertReminder(eventId: Long, minutesBefore: Int): Boolean {
@@ -525,7 +536,7 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
                 arrayOf(eventId.toString()),
             )
         } catch (e: Throwable) {
-            // The old reminder is still there: adding another would leave two, so stop here.
+            // Deletion has no definitive receipt; do not add another reminder blindly.
             AppLogger.warning(TAG, "replaceReminder delete failed for event=$eventId: ${e.message}")
             return false
         }
@@ -602,9 +613,7 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
     }
 
     private fun calendarTargetError(args: OffloadArgs, rejected: CalendarTarget.Rejected): NativeOffloadResult =
-        NativeOffloadResult(
-            2,
-            OffloadOutput.formatBody(
+        NativeOffloadResult.invalidArguments(OffloadOutput.formatBody(
                 JSONObject()
                     .put("error", "calendar_target_invalid")
                     .put("message", rejected.reason)
@@ -627,6 +636,7 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
                     .toString(),
                 args,
             ) + "\n",
+            failureKind = ToolFailureKind.UNAVAILABLE, executionStarted = false,
         )
 
     /** ISO 8601 with offset (e.g. 2026-04-26T13:51:00+08:00). Matches
@@ -822,6 +832,9 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
         private const val DEFAULT_LIMIT = 50
         private const val HELP = """android-calendar — list, create, update, delete events; query free/busy
                                     (mirrors apple-calendar)
+
+For execution facts: android-calendar --execution-json <subcommand> [arguments].
+The bridge returns {exit_code, output, execution}; default output is unchanged.
 
 Usage:
   android-calendar                  Same as `list` (default subcommand)

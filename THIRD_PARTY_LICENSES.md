@@ -58,7 +58,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `agent/AgentContextBudget.kt` | `agent/model/AgentContextBudget.kt` |
 | `agent/AgentContextCompactor.kt` | `agent/model/AgentContextCompactor.kt` |
 | `accessibility/AccessibilityNodeIdentity.kt`, `MainThreadCallGate.kt`, `MainThreadCallBridge.kt`, `PackageWindowVisibility.kt`, `ScreenshotWindowPolicy.kt`, `ScrollEventObservationGate.kt` | `agent/accessibility/*`, `agent/device/*` |
-| `tools/android/AndroidUiActionEvidence.kt`, `ScrollAxisContract.kt`, `ScrollEvidenceContract.kt`, `ScrollGestureContract.kt`, `RootScrollMotionContract.kt`, `GestureFallbackPolicy.kt`, `ScreenshotOutcomePolicy.kt`, `ShellActionOutcomePolicy.kt`, `FocusedWindowParser.kt`, `AndroidDisplaySizeParser.kt` | `agent/accessibility/*`, `agent/device/*` |
+| `tools/android/AndroidUiActionEvidence.kt`, `ScrollAxisContract.kt`, `ScrollEvidenceContract.kt`, `ScrollGestureContract.kt`, `RootScrollMotionContract.kt`, `GestureFallbackPolicy.kt`, `ScreenshotOutcomePolicy.kt`, `FocusedWindowParser.kt`, `AndroidDisplaySizeParser.kt` | `agent/accessibility/*`, `agent/device/*` |
 | `tools/ToolSensitivePolicy.kt` | `agent/model/AgentSensitiveToolPolicy.kt`, `agent/model/AgentConversationCodec.kt` |
 | `agent/RunCheckpointStore.kt`, `agent/RunCheckpointRecorder.kt`, `agent/RunContextSnapshot.kt`, `agent/RunRecoveryCoordinator.kt` | `agent/runtime/AgentRunCheckpointStore.kt`, `agent/runtime/AgentRunCheckpointRecorder.kt`, `agent/runtime/AgentEventRecoveryProjection.kt`, `ui/app/AgentRunRecoveryCoordinator.kt` |
 | `data/repository/MemoryInjectionBudget.kt` (window budget, heading index, revision) | `agent/memory/AgentMemoryContext.kt` |
@@ -153,7 +153,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 
 | Component | Source | License | Current use |
 |---|---|---|---|
-| Adapted VScreen support code | [android-notes/ShadowAuto](https://github.com/android-notes/ShadowAuto) @ `611e5eb0e1c94befda3c17c97438912dfd30e8a8` | Apache-2.0 | Shizuku shell UserService, virtual-display session, display-targeted UI/input, IME policy, clipboard bridge and bounded screenshots |
+| Adapted VScreen support code | [android-notes/ShadowAuto](https://github.com/android-notes/ShadowAuto) @ `611e5eb0e1c94befda3c17c97438912dfd30e8a8` | Apache-2.0 | Shizuku shell UserService, virtual-display session, display-targeted UI/input, IME policy and bounded screenshots |
 
 License text: [third_party/shadowauto/LICENSE](third_party/shadowauto/LICENSE), copied from the pinned source commit. The pinned tree has no separate `NOTICE`, and the migrated source files carry no file-level copyright headers. Each adapted file therefore records its exact upstream path and commit plus an Apache-2.0 notice and modification statement; no copyright owner is inferred from the commit author.
 
@@ -166,7 +166,6 @@ Only these source files are adapted; the upstream automation entry point, socket
 | `tools/android/vscreen/service/internal/VirtualDisplaySession.kt` | `android-shell/src/main/java/com/silentauto/shell/VirtualDisplaySession.java` (video/encoder path omitted) |
 | `tools/android/vscreen/service/internal/WindowManagerBridge.kt` | `android-shell/src/main/java/com/silentauto/shell/WindowManagerBridge.java` |
 | `tools/android/vscreen/service/internal/InputBridge.kt` | `android-shell/src/main/java/com/silentauto/shell/InputBridge.java` |
-| `tools/android/vscreen/service/internal/ClipboardBridge.kt` | `android-shell/src/main/java/com/silentauto/shell/ClipboardBridge.java` |
 | `tools/android/vscreen/service/internal/UiBridge.kt` | `android-shell/src/main/java/com/silentauto/shell/UiBridge.java` |
 | `tools/android/vscreen/service/internal/UiNodeUtils.kt` | `android-shell/src/main/java/com/silentauto/shell/UiNodeUtils.java` |
 | `tools/android/vscreen/service/internal/ScreenCapture.kt` | `android-shell/src/main/java/com/silentauto/shell/ScreenCapture.java` (bounded JPEG path only) |

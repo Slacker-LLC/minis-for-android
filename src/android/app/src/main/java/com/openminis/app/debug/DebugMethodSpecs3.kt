@@ -288,22 +288,20 @@ internal val baseMethodsPart3: List<MethodSpec> = listOf(
         // ── Agent settings (web remote: agent.settings.*) ─────────────────────
         MethodSpec(
             name = "agent.settings.get",
-            description = "Return the subagent delegation limits (depth cap and per-run timeout). " +
+            description = "Return the Ralph per-round time limit (scope=ralph_round). " +
                 "Fixed model slots and their ordered entry IDs are managed through provider.slots.get/provider.slots.set; per-model defaults use provider.models.setDefaults.",
             params = emptyList(),
-            returns = "{maxDepth, timeoutMinutes}",
+            returns = "{scope:ralph_round, timeoutMinutes}",
             example = ex(),
         ),
         MethodSpec(
             name = "agent.settings.set",
-            description = "Update the subagent delegation limits. maxDepth is 1..5, " +
-                "timeoutMinutes is 1..30.",
+            description = "Update the Ralph per-round time limit. timeoutMinutes is 1..30; a stopped round awaits its owned child cleanup.",
             params = listOf(
-                ParamSpec("maxDepth", "int", required = true, description = "Delegation depth cap (1..5)."),
-                ParamSpec("timeoutMinutes", "int", required = true, description = "Per-child run timeout in minutes (1..30)."),
+                ParamSpec("timeoutMinutes", "int", required = true, description = "Ralph round timeout in minutes (1..30)."),
             ),
-            returns = "{ok:true, maxDepth, timeoutMinutes}",
-            example = ex("maxDepth" to 3, "timeoutMinutes" to 10),
+            returns = "{ok:true, scope:ralph_round, timeoutMinutes}",
+            example = ex("timeoutMinutes" to 10),
         ),
         MethodSpec(
             name = "agent.sessionPermission.get",
@@ -332,17 +330,19 @@ internal val baseMethodsPart3: List<MethodSpec> = listOf(
         // ── Agent bars: goal / todo / plan / deliverables ───────────────────
         MethodSpec(
             name = "agent.goal.get",
-            description = "Return the session goal (text, active, updatedAt). Empty text = no goal.",
+            description = "Return the durable session goal with task id, revision, status, criteria and saved budget. Empty text = no goal.",
             params = listOf(ParamSpec("sessionId", "string", required = true, description = "Target session id.")),
             returns = "{text, active, updatedAt}",
             example = ex("sessionId" to "6D0F…"),
         ),
         MethodSpec(
             name = "agent.goal.set",
-            description = "Set (or clear with blank text) the session goal.",
+            description = "Set (or clear with blank text) the durable session goal; edits preserve pause and spent budget.",
             params = listOf(
                 ParamSpec("sessionId", "string", required = true, description = "Target session id."),
                 ParamSpec("text", "string", required = true, description = "Goal text; blank clears."),
+                ParamSpec("acceptanceCriteria", "string", required = false, description = "Verifiable completion conditions; retained if omitted."),
+                ParamSpec("maxGoalRounds", "integer", required = false, description = "Maximum automatic continuation rounds, 1..100."),
             ),
             returns = "{text, active, updatedAt}",
             example = ex("sessionId" to "6D0F…", "text" to "完成 Web Remote 设置页"),

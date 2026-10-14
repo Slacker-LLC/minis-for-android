@@ -44,13 +44,13 @@ import com.openminis.app.R
 import com.openminis.app.data.MountedFoldersStore
 import com.openminis.app.data.db.ChatDao
 
-/** Colours of the three usage segments, matching the legend dots. */
+/** Runtime, installed program and app data; database/session/cache rows are subsets of data. */
 private val ShellColor = Color(0xFF0A84FF)
 private val DatabaseColor = Color(0xFFFF9F0A)
 private val SessionsColor = Color(0xFF34C759)
 
 /**
- * Proportions of the usage bar: Shell container, database, session files. All zero when nothing is
+ * Proportions of three measured usage segments. All zero when nothing is
  * measured yet, so the bar shows as an empty track instead of dividing by zero.
  */
 internal fun storageBarShares(shell: Long, database: Long, sessions: Long): List<Float> {
@@ -76,6 +76,7 @@ fun FilesHubScreen(
     onOpenMounts: () -> Unit,
     onOpenSessionFiles: () -> Unit,
     onOpenBackup: () -> Unit,
+    onBrowseArtifact: (String?, String) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     var snapshot by remember { mutableStateOf<StorageSnapshot?>(null) }
@@ -150,6 +151,8 @@ fun FilesHubScreen(
             )
         }
 
+        TaskArtifactsSection(onBrowse = onBrowseArtifact)
+
         // Backups are files too: they are written to Downloads/Minis Backups and restored from a file.
         SettingsSection(header = stringResource(R.string.files_section_backup)) {
             SettingsRow(
@@ -176,7 +179,9 @@ private fun UsageHeader(snapshot: StorageSnapshot?) {
     ) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = snapshot?.let { Formatter.formatFileSize(context, it.total) } ?: "—",
+                text = snapshot?.takeIf { it.hasMeasuredTotal }?.let {
+                    (if (it.totalComplete) "" else "≥ ") + Formatter.formatFileSize(context, it.total)
+                } ?: "—",
                 fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -189,7 +194,7 @@ private fun UsageHeader(snapshot: StorageSnapshot?) {
             )
         }
         Spacer(Modifier.height(10.dp))
-        val shares = storageBarShares(snapshot?.shellSize ?: 0L, snapshot?.dbSize ?: 0L, snapshot?.sessionsTotal ?: 0L)
+        val shares = storageBarShares(snapshot?.shellSize ?: 0L, snapshot?.appSize ?: 0L, snapshot?.appDataSize ?: 0L)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -203,8 +208,12 @@ private fun UsageHeader(snapshot: StorageSnapshot?) {
         }
         Spacer(Modifier.height(12.dp))
         LegendRow(ShellColor, stringResource(R.string.storage_overview_shell), snapshot?.shellSize)
-        LegendRow(DatabaseColor, stringResource(R.string.storage_overview_database), snapshot?.dbSize)
-        LegendRow(SessionsColor, stringResource(R.string.storage_overview_sessions), snapshot?.sessionsTotal)
+        LegendRow(DatabaseColor, stringResource(R.string.storage_overview_app), snapshot?.appSize)
+        LegendRow(SessionsColor, stringResource(R.string.storage_overview_data), snapshot?.appDataSize)
+        if (snapshot != null && !snapshot.totalComplete) {
+            Text(stringResource(R.string.storage_total_partial), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -219,7 +228,7 @@ private fun LegendRow(color: Color, label: String, bytes: Long?) {
         Spacer(Modifier.width(10.dp))
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text(
-            text = bytes?.let { Formatter.formatFileSize(context, it) } ?: "—",
+            text = bytes?.let { Formatter.formatFileSize(context, it) } ?: stringResource(R.string.storage_size_unavailable),
             fontFamily = FontFamily.Monospace,
             fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

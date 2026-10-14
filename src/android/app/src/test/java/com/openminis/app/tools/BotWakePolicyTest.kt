@@ -81,15 +81,15 @@ class BotWakePolicyTest {
     fun `wake completion maps to the required three task transitions`() {
         assertEquals(
             BotWakePolicy.WakeTransition(BotTaskEntity.STATUS_ACTIVE, BotTaskEntity.PHASE_EXECUTING),
-            BotWakePolicy.transition(completed = true, hasNewDelegations = true),
+            BotWakePolicy.transition(completed = true, hasNewDelegations = true, verifiedCompletion = false),
         )
         assertEquals(
             BotWakePolicy.WakeTransition(BotTaskEntity.STATUS_COMPLETED, BotTaskEntity.PHASE_DELIVERING),
-            BotWakePolicy.transition(completed = true, hasNewDelegations = false),
+            BotWakePolicy.transition(completed = true, hasNewDelegations = false, verifiedCompletion = true),
         )
         assertEquals(
             BotWakePolicy.WakeTransition(BotTaskEntity.STATUS_NEEDS_USER, BotTaskEntity.PHASE_REVIEWING),
-            BotWakePolicy.transition(completed = false, hasNewDelegations = true),
+            BotWakePolicy.transition(completed = false, hasNewDelegations = true, verifiedCompletion = false),
         )
     }
 

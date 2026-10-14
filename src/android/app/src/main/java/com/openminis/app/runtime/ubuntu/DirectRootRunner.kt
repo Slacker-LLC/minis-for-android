@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
 internal object DirectRootRunner {
     private const val MAX_CAPTURE_CHARS = 1_048_576
     /** Root-owned runtime state; App-owned guest data never lives here. */
-    internal const val ROOT_STATE_DIR = "/data/adb/minis/runtime"
+    internal const val ROOT_STATE_DIR = "${UbuntuPaths.HOST_MINIS}/runtime"
     private const val CLEANUP_TIMEOUT_MS = 900L
 
     data class Result(

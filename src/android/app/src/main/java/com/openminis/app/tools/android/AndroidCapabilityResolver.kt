@@ -54,7 +54,8 @@ object AndroidCapabilityResolver {
             ShizukuManager.State.NOT_RUNNING -> CapabilityStatus.REQUIRES_USER_GRANT
             ShizukuManager.State.NOT_INSTALLED -> CapabilityStatus.UNAVAILABLE
         }
-        val privilegedAvailable = root?.authorized == true || shizuku.state == ShizukuManager.State.READY
+        // These diagnostic handlers execute through DirectRootRunner, not the Shizuku service.
+        val privilegedAvailable = root?.authorized == true
 
         return JSONObject().apply {
             put("root", JSONObject().apply {
@@ -132,20 +133,23 @@ object AndroidCapabilityResolver {
                 put("logcat", CapabilityFact(
                     if (privilegedAvailable) CapabilityStatus.AVAILABLE else CapabilityStatus.PARTIAL,
                     if (privilegedAvailable) "full-device logcat through a privileged shell" else "normal app can only read its own log stream",
-                    if (root?.authorized == true) "root" else if (shizuku.state == ShizukuManager.State.READY) "shizuku" else "app",
+                    if (privilegedAvailable) "root" else "app",
                 ).toJson())
                 put("dumpsys", CapabilityFact(
                     if (privilegedAvailable) CapabilityStatus.AVAILABLE else CapabilityStatus.PARTIAL,
                     if (privilegedAvailable) "privileged dumpsys available" else "ordinary SDK APIs and app-owned diagnostics only",
+                    if (privilegedAvailable) "root" else "app",
                 ).toJson())
                 put("meminfo", CapabilityFact(
                     if (privilegedAvailable) CapabilityStatus.AVAILABLE else CapabilityStatus.PARTIAL,
-                    if (privilegedAvailable) "dumpsys meminfo is available" else "memory details are limited to the OpenMinis process",
+                    if (privilegedAvailable) "dumpsys meminfo is available" else "memory details are limited to the Minis process",
+                    if (privilegedAvailable) "root" else "app",
                 ).toJson())
                 put("debuggerd", rootOnlyFact(root, "debuggerd requires authorized root and target access"))
                 put("dropbox", CapabilityFact(
                     if (privilegedAvailable) CapabilityStatus.PARTIAL else CapabilityStatus.UNAVAILABLE,
-                    "DropBox visibility depends on Android version, shell grants, and OEM policy",
+                    "DropBox visibility depends on Android version, Root grants, and OEM policy",
+                    if (privilegedAvailable) "root" else "none",
                 ).toJson())
                 put("tombstones", rootOnlyFact(root, "tombstone directory access is SELinux- and ROM-dependent"))
                 put("anrTraces", rootOnlyFact(root, "ANR trace access is SELinux- and ROM-dependent"))

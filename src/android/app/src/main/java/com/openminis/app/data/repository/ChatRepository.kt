@@ -164,15 +164,31 @@ class ChatRepository(
         return deleted
     }
 
-    suspend fun deleteSession(id: String) {
-        com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(id)
-        com.openminis.app.tools.android.AndroidDebugSessionStore.clear(id)
-        // One statement: messages, compact markers and events go with the session through their
-        // ON DELETE CASCADE foreign keys. Deleting the messages first, as a separate commit, left a
-        // message-less session behind if the second step was interrupted.
-        dao.deleteSession(id)
-        withContext(Dispatchers.IO) {
-            runCatching { onSessionDeleted(id) }
+    /** Exit cleanup must recheck task ownership in the same statement as draft deletion. */
+    suspend fun deleteUnusedDraft(id: String) = withContext(kotlinx.coroutines.NonCancellable) {
+        // A protected session should keep its idle execution owner as well as its Room row.
+        if (dao.hasSessionGoal(id)) return@withContext false
+        com.openminis.app.agent.AgentSessionStore.closeAndAwait(id)
+        try {
+            if (dao.deleteSessionIfUnusedDraft(id) == 0) return@withContext false
+            releaseDeletedSession(id)
+            true
+        } finally {
+            com.openminis.app.agent.AgentSessionStore.release(id)
+        }
+    }
+
+    suspend fun deleteSession(id: String) = withContext(kotlinx.coroutines.NonCancellable) {
+        com.openminis.app.agent.AgentSessionStore.closeAndAwait(id)
+        try {
+            com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(id)
+            com.openminis.app.tools.android.AndroidDebugSessionStore.clear(id)
+            // Cascades messages, compact markers and events in a single Room statement.
+            dao.deleteSession(id)
+            com.openminis.app.tools.BotDelegationCoordinator.current()?.cancelSourceSession(id)
+            withContext(Dispatchers.IO) { runCatching { onSessionDeleted(id) } }
+        } finally {
+            com.openminis.app.agent.AgentSessionStore.release(id)
         }
     }
 
@@ -441,8 +457,15 @@ class ChatRepository(
         reasoningContent: String? = null,
         modelSnapshot: ModelAttributionSnapshot? = null,
         idempotencyKey: String? = null,
+        requestState: String? = null,
+        requestDelivery: String? = null,
+        requestTaskId: String? = null,
+        requestTaskGeneration: Int? = null,
+        requestRunId: String? = null,
+        requestUserInput: Boolean? = null,
     ): MessageEntity {
         val now = System.currentTimeMillis()
+        require(requestState == null || partsJson.length <= MAX_MESSAGE_PARTS_JSON_LENGTH) { "request_payload_too_large" }
         // Cap the body so a runaway tool_result (e.g. a 13 MB browser_use
         // dump — Issue #17) cannot land an oversize blob into a Room row
         // that later fails CursorWindow's 2 MB ceiling on read. We keep
@@ -468,6 +491,8 @@ class ChatRepository(
             modelDisplayName = modelSnapshot?.displayName,
             providerType = modelSnapshot?.providerTypeRaw,
             providerInstanceId = modelSnapshot?.providerInstanceId,
+            requestState = requestState, requestDelivery = requestDelivery, requestTaskId = requestTaskId,
+            requestTaskGeneration = requestTaskGeneration, requestRunId = requestRunId, requestUserInput = requestUserInput,
         )
         return dao.appendMessageWithPreview(message, extractTextPreview(capped), ifAbsent = idempotencyKey != null)
     }

@@ -20,7 +20,7 @@ import com.openminis.app.tools.SessionPermissionStore
  *    prompt configuration only, and the limitation is stated in its
  *    description rather than hidden behind a label.
  *  - `minimal`  极简模式 — genuinely reduced runtime: only the persistent
- *    Bash shell and the file read/write/edit trio are exposed to the model
+ *    Bash shell, file read/write/edit trio and task controls are exposed to the model
  *    (tool configuration + prompt configuration both change).
  *
  * Legacy ids from earlier versions remain resolvable as aliases so existing
@@ -79,11 +79,11 @@ object AgentPresetRegistry {
             trust = "system",
             isDefault = false,
             name = "极简模式",
-            description = "仅提供持久 Bash 与文件读写编辑等核心编码能力，减少暴露给模型的其他工具与提示词，适合长期稳定运行",
+            description = "提供持久 Bash、文件读写编辑以及目标、计划、提问与后台工作控制，减少暴露给模型的其他工具与提示词，适合长期稳定运行",
             permission = null,
             toolset = Toolset.CORE,
             promptSection = """
-                当前预设为极简模式：只提供核心编码工具（持久 Shell、文件读取、文件写入、文件编辑）。不要假设存在浏览器、Goal、子代理、Job 或其他工具；对无法完成的需求，应如实说明能力边界。"""
+                当前预设为极简模式：提供核心编码工具（持久 Shell、文件读取、文件写入、文件编辑）及目标、计划、用户提问和后台工作控制。不要假设存在浏览器、子代理或其他领域工具；对无法完成的需求，应如实说明能力边界。"""
                 .trimIndent(),
         ),
     )

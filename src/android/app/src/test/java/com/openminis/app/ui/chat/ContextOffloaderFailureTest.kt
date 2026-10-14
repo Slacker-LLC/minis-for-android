@@ -1,5 +1,9 @@
 package com.openminis.app.ui.chat
 
+import com.openminis.app.agent.OffloadStore
+
+import com.openminis.app.agent.ContextOffloader
+
 import com.openminis.app.data.ContextOffload
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.model.LLMMessage

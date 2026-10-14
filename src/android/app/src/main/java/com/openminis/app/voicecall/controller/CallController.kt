@@ -75,6 +75,10 @@ class CallController(
         runtime.interrupt()
     }
 
+    fun listenForFollowUp() {
+        runtime.listenForFollowUp()
+    }
+
     fun setBloubState(s: BloubState) {
         state = state.copy(ai = CallAiState(s, BloubStateMapper.subtitle(s)))
     }

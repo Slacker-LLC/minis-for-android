@@ -35,20 +35,17 @@ class BotTurnExecutionTest {
             ChatViewModel(session.id, repository, app.providerRepository, app).also { store.put("test", it) }
         }
         try {
-            @Suppress("UNCHECKED_CAST")
-            val loaded = ChatViewModel::class.java.getDeclaredField("sessionLoaded").apply { isAccessible = true }
-                .get(vm) as StateFlow<Boolean>
-            withTimeout(10_000L) { loaded.first { it } }
+            withTimeout(10_000L) { vm.sessionLoaded.first { it } }
             withContext(Dispatchers.Main) {
-                // Keep production construction unchanged; replace only the test's transport.
-                ChatViewModel::class.java.getDeclaredField("currentProvider").apply { isAccessible = true }.set(vm, provider)
-                ChatViewModel::class.java.getDeclaredField("currentModel").apply { isAccessible = true }.set(vm, provider.model)
+                vm.currentProvider = provider
+                vm.currentModel = provider.model
                 vm.chatOnlyForNextTurn = true
             }
             block(vm, repository, provider)
         } finally {
             withContext(Dispatchers.Main) { store.clear() }
-            vm.awaitStreamExit(5_000L)
+            com.openminis.app.agent.AgentSessionStore.closeAndAwait(session.id)
+            com.openminis.app.agent.AgentSessionStore.release(session.id)
             SessionEventHub.clear(session.id)
             db.close()
         }
