@@ -39,7 +39,7 @@ class RalphReportParsingTest {
     }
 
     private fun reply(summary: String, extra: String = "") =
-        """{"status":"continue","summary":${org.json.JSONObject.quote(summary)}$extra}"""
+        """{"status":"continue","summary":${org.json.JSONObject.quote(summary)},"nextSteps":"continue"$extra}"""
 
     @Test
     fun `a summary within the limit is kept exactly`() {

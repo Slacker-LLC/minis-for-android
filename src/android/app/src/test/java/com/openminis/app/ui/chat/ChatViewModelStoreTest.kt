@@ -2,14 +2,13 @@ package com.openminis.app.ui.chat
 
 import org.junit.After
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The store is the only owner of a session's ChatViewModel. Both delete paths
- * (session list, RPC) must release the same entry, and a draft id must reach
- * the same store as the persisted id it became.
+ * Process-level page projections. AgentSessionStore is the only execution
+ * owner, so a projection is kept only while its runtime owner is alive: a bare
+ * id with no runtime owner never keeps a cached ViewModelStore, and release
+ * stays safe when nothing is owned.
  */
 class ChatViewModelStoreTest {
 
@@ -23,12 +22,11 @@ class ChatViewModelStoreTest {
     }
 
     @Test
-    fun `a store exists only after ownerFor and is gone after release`() {
+    fun `a projection without a runtime owner is not cached`() {
         val s = id("a")
         assertFalse(ChatViewModelStore.hasStore(s))
-        val first = ChatViewModelStore.ownerFor(s).viewModelStore
-        assertTrue(ChatViewModelStore.hasStore(s))
-        assertSame(first, ChatViewModelStore.ownerFor(s).viewModelStore)
+        ChatViewModelStore.ownerFor(s)
+        assertFalse("no runtime owner keeps no cached projection", ChatViewModelStore.hasStore(s))
 
         ChatViewModelStore.release(s)
         assertFalse(ChatViewModelStore.hasStore(s))
@@ -42,14 +40,10 @@ class ChatViewModelStoreTest {
     }
 
     @Test
-    fun `releasing the persisted id also drops what the draft id reached`() {
+    fun `releasing a renamed pair without a runtime owner releases nothing`() {
         val draft = id("draft")
         val real = id("real")
-        val store = ChatViewModelStore.ownerFor(draft).viewModelStore
         ChatViewModelStore.rename(draft, real)
-
-        assertSame(store, ChatViewModelStore.ownerFor(draft).viewModelStore)
-        assertTrue(ChatViewModelStore.hasStore(draft))
 
         ChatViewModelStore.release(real)
         assertFalse(ChatViewModelStore.hasStore(real))

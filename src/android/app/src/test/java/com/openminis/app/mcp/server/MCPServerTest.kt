@@ -33,6 +33,22 @@ class MCPServerTest {
             com.openminis.app.tools.runtime.LinuxShellHandler(),
             aliasNames = listOf("shell_execute"),
         )
+        // tools/call validates the published schema before issuing a confirmation, so the
+        // android definitions have to be registered for the confirm-flow tests below.
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.AndroidToolHandler(
+                com.openminis.app.tools.android.AndroidAgentTools.CAPABILITIES,
+                "android.capabilities",
+            ),
+            aliasNames = listOf("android_capabilities"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.AndroidToolHandler(
+                com.openminis.app.tools.android.AndroidAgentTools.APP,
+                "android.app",
+            ),
+            aliasNames = listOf("android_app"),
+        )
         // A fixed port is flaky across back-to-back JVM tests because a just-closed
         // loopback socket can still make the next bind fail with EADDRINUSE. Reserve
         // an ephemeral loopback port for this test case, then let MCPServer bind it.
@@ -49,6 +65,8 @@ class MCPServerTest {
     fun tearDown() {
         server?.stop()
         com.openminis.app.tools.runtime.ToolRegistry.unregister("linux.shell")
+        com.openminis.app.tools.runtime.ToolRegistry.unregister("android.capabilities")
+        com.openminis.app.tools.runtime.ToolRegistry.unregister("android.app")
         TokenStore.setInMemoryForTest(emptyList())
     }
 
@@ -123,7 +141,7 @@ class MCPServerTest {
 
     @Test
     fun `CONFIRM tool without confirm_id gets confirm_required`() {
-        val body = """{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"android.app.force_stop","arguments":{}}}"""
+        val body = """{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"android.app","arguments":{"tool_title":"t","action":"stop","packageName":"com.example.app"}}}"""
         val resp = post(body, token = "secret-token")
         assertEquals(200, resp.code)
         val json = org.json.JSONObject(resp.body!!.string())
@@ -137,7 +155,7 @@ class MCPServerTest {
 
     @Test
     fun `linux tool with Ubuntu down answers unavailable without burning a confirm`() {
-        val body = """{"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"linux.shell","arguments":{"cmd":"echo hi"}}}"""
+        val body = """{"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"linux.shell","arguments":{"command":"echo hi"}}}"""
         val text = post(body, token = "secret-token").body!!.string()
         assertFalse(text.contains("confirm_required"))
         assertFalse(text.contains("-32001"))
@@ -146,7 +164,7 @@ class MCPServerTest {
 
     @Test
     fun `legacy alias uses canonical policy before MCP gate`() {
-        val body = """{"jsonrpc":"2.0","id":17,"method":"tools/call","params":{"name":"shell_execute","arguments":{"cmd":"echo hi"}}}"""
+        val body = """{"jsonrpc":"2.0","id":17,"method":"tools/call","params":{"name":"shell_execute","arguments":{"command":"echo hi"}}}"""
         val text = post(body, token = "secret-token").body!!.string()
         assertTrue(text.contains("ubuntu_runtime_unavailable"))
         assertFalse(text.contains("permission_denied"))
@@ -154,27 +172,27 @@ class MCPServerTest {
 
     @Test
     fun `valid confirm_id proceeds to execution and cannot be reused`() {
-        val issueBody = """{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"android.app.force_stop","arguments":{}}}"""
+        val issueBody = """{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"android.app","arguments":{"tool_title":"t","action":"stop","packageName":"com.example.app"}}}"""
         val issued = org.json.JSONObject(post(issueBody, token = "secret-token").body!!.string())
         val confirmId = issued.getJSONObject("error").getJSONObject("data").getString("confirm_id")
 
         // User approves first — the notification path (McpConfirmReceiver) answers
         // the server's queue via ConfirmQueue.shared.
-        assertEquals(ConfirmQueue.Result.OK, ConfirmQueue.shared!!.approve(confirmId, "android.app.force_stop"))
+        assertEquals(ConfirmQueue.Result.OK, ConfirmQueue.shared!!.approve(confirmId, "android.app"))
 
         // The approved ticket cannot be moved to a different argument set.
-        val changedArgsBody = """{"jsonrpc":"2.0","id":111,"method":"tools/call","params":{"name":"android.app.force_stop","arguments":{"packageName":"com.example.other"},"confirm_id":"$confirmId"}}"""
+        val changedArgsBody = """{"jsonrpc":"2.0","id":111,"method":"tools/call","params":{"name":"android.app","arguments":{"tool_title":"t","action":"stop","packageName":"com.example.other"},"confirm_id":"$confirmId"}}"""
         val changedArgs = org.json.JSONObject(post(changedArgsBody, token = "secret-token").body!!.string())
         assertEquals("wrong_request", changedArgs.getJSONObject("error").getJSONObject("data").getString("reason"))
 
         // consume OK → enters the execution path (result frame, no confirm_required)
-        val execBody = """{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"android.app.force_stop","arguments":{},"confirm_id":"$confirmId"}}"""
+        val execBody = """{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"android.app","arguments":{"tool_title":"t","action":"stop","packageName":"com.example.app"},"confirm_id":"$confirmId"}}"""
         val execText = post(execBody, token = "secret-token").body!!.string()
         assertFalse(execText.contains("confirm_required"))
         assertTrue(org.json.JSONObject(execText).has("result"))
 
         // same id again → REUSED
-        val replayBody = """{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"android.app.force_stop","arguments":{},"confirm_id":"$confirmId"}}"""
+        val replayBody = """{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"android.app","arguments":{"tool_title":"t","action":"stop","packageName":"com.example.app"},"confirm_id":"$confirmId"}}"""
         val replay = org.json.JSONObject(post(replayBody, token = "secret-token").body!!.string())
         val err = replay.getJSONObject("error")
         assertEquals(-32002, err.getInt("code"))
@@ -184,7 +202,7 @@ class MCPServerTest {
 
     @Test
     fun `unknown confirm_id gets confirm_rejected`() {
-        val body = """{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"android.app.force_stop","arguments":{},"confirm_id":"c-nope"}}"""
+        val body = """{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"android.app","arguments":{"tool_title":"t","action":"stop","packageName":"com.example.app"},"confirm_id":"c-nope"}}"""
         val json = org.json.JSONObject(post(body, token = "secret-token").body!!.string())
         val err = json.getJSONObject("error")
         assertEquals(-32002, err.getInt("code"))
@@ -194,7 +212,7 @@ class MCPServerTest {
 
     @Test
     fun `ALLOWED tool executes without confirm`() {
-        val body = """{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"android.capabilities","arguments":{}}}"""
+        val body = """{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"android.capabilities","arguments":{"tool_title":"t","action":"get"}}}"""
         val text = post(body, token = "secret-token").body!!.string()
         assertTrue(org.json.JSONObject(text).has("result"))
         assertFalse(text.contains("confirm_required"))

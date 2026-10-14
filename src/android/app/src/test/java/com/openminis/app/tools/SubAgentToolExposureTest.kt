@@ -2,8 +2,6 @@ package com.openminis.app.tools
 
 import com.openminis.app.agent.subagents.SubAgentToolSchema
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -28,12 +26,9 @@ class SubAgentToolExposureTest {
     }
 
     @Test
-    fun `sub agents switched off - the older single-shot schema under the same name`() {
+    fun `sub agents switched off - no delegation tool is offered`() {
         val found = subagent(tools(roster = null))
-        assertEquals(1, found.size)
-        assertEquals("subagent", found.single().name)
-        assertNotNull(found.single().parameters["prompt"])
-        assertFalse(found.single().parameters.containsKey("action"))
+        assertTrue("delegation is withheld while sub agents are off", found.isEmpty())
     }
 
     // ── Negative case ───────────────────────────────────────────────────────

@@ -19,7 +19,9 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class NavigationPolicyTest {
     @After
-    fun reset() = ChatViewModelStore.setActiveSession(null)
+    fun reset() {
+        ChatViewModelStore.setActiveSession(null)
+    }
 
     private fun registry(state: Lifecycle.State): LifecycleRegistry {
         val owner = object : LifecycleOwner {

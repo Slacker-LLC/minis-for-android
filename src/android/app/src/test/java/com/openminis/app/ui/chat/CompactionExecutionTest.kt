@@ -129,10 +129,15 @@ class CompactionExecutionTest {
     }
 
     @Test
-    fun `a failed marker write does not lose the compaction`() {
+    fun `a failed marker write publishes nothing instead of a marker the DB cannot see`() {
         val h = history(60, long)
         val db = Db(allIds(h), failInsert = true)
-        val r = run(h, FakeProvider("Short summary."), db)
-        assertTrue(r is CompactionExecution.Result.Done)
+        try {
+            run(h, FakeProvider("Short summary."), db)
+            fail("expected the marker write failure to reach the caller")
+        } catch (e: IllegalStateException) {
+            assertTrue(e.message.orEmpty().contains("disk full"))
+        }
+        assertTrue(db.inserted.isEmpty())
     }
 }

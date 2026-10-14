@@ -23,6 +23,8 @@ import com.openminis.app.deeplink.DeepLinkCoordinator
 import com.openminis.app.speech.ReadAloudPlayer
 import com.openminis.app.speech.SpeechRecognitionManager
 import com.openminis.app.ui.chat.ChatViewModel
+import com.openminis.app.ui.components.MinisButton
+import com.openminis.app.ui.components.MinisOutlinedButton
 import com.openminis.app.voicecall.bloub.BloubAvatar
 import com.openminis.app.voicecall.controller.CallController
 import com.openminis.app.voicecall.model.BloubSize
@@ -163,10 +165,10 @@ internal fun VoiceConversationHost(
                         TextButton(onClick = { if (player.isInitialized()) player.value.stop() }) { Text(stringResource(R.string.voice_stop_playback)) }
                         TextButton(onClick = { gateway.cancel() }) { Text(stringResource(R.string.voice_stop_owned_turn)) }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            OutlinedButton(onClick = { controller.setMuted(!controller.state.muted) }) {
+                            MinisOutlinedButton(onClick = { controller.setMuted(!controller.state.muted) }) {
                                 Text(stringResource(if (controller.state.muted) R.string.voice_call_unmute else R.string.voice_call_mute))
                             }
-                            Button(onClick = {
+                            MinisButton(onClick = {
                                 controller.interrupt()
                                 controller.setMuted(false)
                             }) {
@@ -177,10 +179,10 @@ internal fun VoiceConversationHost(
                             TextButton(onClick = { input.stop() }) { Text(stringResource(R.string.voice_call_submit)) }
                         }
                     } else {
-                        Button(onClick = { openCall() }, enabled = !opening) { Text(stringResource(R.string.voice_call_retry)) }
+                        MinisButton(onClick = { openCall() }, enabled = !opening) { Text(stringResource(R.string.voice_call_retry)) }
                     }
                     TextButton(onClick = { endAudio() }) { Text(stringResource(R.string.voice_call_back)) }
-                    OutlinedButton(onClick = { endAudio() }) { Text(stringResource(R.string.voice_call_end)) }
+                    MinisOutlinedButton(onClick = { endAudio() }) { Text(stringResource(R.string.voice_call_end)) }
                 }
             }
         }

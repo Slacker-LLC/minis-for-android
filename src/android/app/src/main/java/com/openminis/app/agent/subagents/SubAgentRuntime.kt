@@ -354,7 +354,11 @@ class SubAgentRuntime(
             SubAgentJobState.QUEUED -> complete(jobId, SubAgentJobState.CANCELLED, "Cancelled before it started.")
             SubAgentJobState.RUNNING -> {
                 cancelRequested.add(jobId)
-                job.childSessionId?.let { runCatching { withContext(WorkContext(job)) { port.cancelChild(it) } } }
+                // The caller is already cancelling, so the cancel request itself must run
+                // NonCancellable or withContext would abort before the child is stopped.
+                job.childSessionId?.let {
+                    runCatching { withContext(NonCancellable + WorkContext(job)) { port.cancelChild(it) } }
+                }
             }
             else -> Unit
         }
