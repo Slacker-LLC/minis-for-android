@@ -18,6 +18,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import com.openminis.app.agent.ensureSessionForSettings
 import com.openminis.app.R
 import com.openminis.app.data.repository.ensureDefaultVoiceInputSlot
@@ -46,6 +47,9 @@ import java.util.Locale
 @Composable
 internal fun VoiceConversationHost(
     viewModel: ChatViewModel,
+    sessionId: String?,
+    /** Mirrors `ChatScreen(isChatDestination=…)`; deep-link actions require it. */
+    fromChatRoute: Boolean,
     ensureMicPermission: suspend () -> Boolean,
 ) {
     val context = LocalContext.current
@@ -55,7 +59,22 @@ internal fun VoiceConversationHost(
     val gateway = remember(viewModel) { AgentCallGateway(viewModel.agentSession) }
     val input = remember(viewModel) { AgentCallSpeechInput(viewModel.providerRepository) }
     val runtime = remember(viewModel) {
-        MinisCallRuntimeAdapter(input, gateway, AgentCallSpeechOutput(player), scope)
+        MinisCallRuntimeAdapter(
+            input,
+            gateway,
+            AgentCallSpeechOutput(player),
+            scope,
+            texts = CallRuntimeTexts(
+                listening = context.getString(R.string.voice_call_listening_hint),
+                recognitionFailed = { detail ->
+                    context.getString(R.string.voice_call_recognition_failed, detail)
+                },
+                taskIncomplete = { detail ->
+                    if (detail.isNullOrBlank()) context.getString(R.string.voice_call_task_incomplete_generic)
+                    else context.getString(R.string.voice_call_task_incomplete, detail)
+                },
+            ),
+        )
     }
     val controller = remember(runtime) { CallController(runtime, scope) }
     var visible by remember(viewModel) { mutableStateOf(false) }
@@ -63,6 +82,7 @@ internal fun VoiceConversationHost(
     var requestVersion by remember(viewModel) { mutableIntStateOf(0) }
     var entryError by remember(viewModel) { mutableStateOf<String?>(null) }
     val pending by DeepLinkCoordinator.pendingChatAction.collectAsState()
+    val lifecycleState by lifecycle.currentStateAsState()
     val modelName by viewModel.modelName.collectAsState()
     val active = controller.state.active
 
@@ -104,8 +124,15 @@ internal fun VoiceConversationHost(
         }
     }
 
-    LaunchedEffect(pending) {
-        if (pending == DeepLinkCoordinator.ChatAction.START_VOICE) {
+    // 深链冷启动时组合先于 onResume，而 openCall 只在 RESUMED 下开麦：早于前台
+    // 消费 pending 会静默停在 Ready 让用户再点一次，所以等前台就绪后再消费。
+    LaunchedEffect(pending, lifecycleState) {
+        if (!lifecycleState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
+        // Only the session this action was minted for may consume it: the
+        // screen being navigated away from collects the same flow.
+        if (DeepLinkCoordinator.pendingChatActionFor(sessionId, fromChatRoute) ==
+            DeepLinkCoordinator.ChatAction.START_VOICE
+        ) {
             DeepLinkCoordinator.consumePendingChatAction()
             openCall()
         }

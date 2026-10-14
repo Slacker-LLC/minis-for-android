@@ -2241,6 +2241,10 @@
     <string name="voice_call_state_error">Ein Fehler ist aufgetreten</string>
     <string name="voice_call_model">Aktuelles Chatmodell</string>
     <string name="voice_call_preparing">Mikrofon wird vorbereitet…</string>
+    <string name="voice_call_listening_hint">Sprich, um Aufgaben in diesem Chat auszuführen.</string>
+    <string name="voice_call_recognition_failed">Erkennung fehlgeschlagen: %1$s. Prüfe den Spracherkennungsdienst und versuche es erneut.</string>
+    <string name="voice_call_task_incomplete">Aufgabe nicht abgeschlossen: %1$s</string>
+    <string name="voice_call_task_incomplete_generic">Aufgabe nicht abgeschlossen. Öffne den Chat für Details.</string>
     <string name="voice_call_hint">Sprich, um Aufgaben in diesem Chat auszuführen. Unterbrechen stoppt diese Sprachaufgabe. Nach dem Verlassen laufen angenommene Aufgaben im Chat weiter.</string>
     <string name="voice_call_mute">Audio pausieren</string>
     <string name="voice_call_unmute">Audio fortsetzen</string>

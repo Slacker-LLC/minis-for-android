@@ -2409,6 +2409,10 @@
     <string name="voice_call_state_error">發生錯誤</string>
     <string name="voice_call_model">目前對話模型</string>
     <string name="voice_call_preparing">正在準備麥克風…</string>
+    <string name="voice_call_listening_hint">直接說話，任務會在目前對話執行。</string>
+    <string name="voice_call_recognition_failed">辨識失敗：%1$s。請檢查語音服務後重試。</string>
+    <string name="voice_call_task_incomplete">任務未完成：%1$s</string>
+    <string name="voice_call_task_incomplete_generic">任務未完成。返回聊天可查看詳情。</string>
     <string name="voice_call_hint">直接說話即可指揮目前對話執行任務。點擊打斷可停止本次語音任務後繼續說。退出語音後，已接受的任務繼續在聊天裡執行。</string>
     <string name="voice_call_mute">暫停音訊</string>
     <string name="voice_call_unmute">恢復音訊</string>

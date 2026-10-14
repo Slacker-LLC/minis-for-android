@@ -2526,6 +2526,10 @@
 
     <string name="voice_call_model">Current chat model</string>
     <string name="voice_call_preparing">Preparing microphone…</string>
+    <string name="voice_call_listening_hint">Speak to run tasks in this chat.</string>
+    <string name="voice_call_recognition_failed">Recognition failed: %1$s. Check the speech service and retry.</string>
+    <string name="voice_call_task_incomplete">Task not finished: %1$s</string>
+    <string name="voice_call_task_incomplete_generic">Task not finished. Open the chat to see the details.</string>
     <string name="voice_call_hint">Speak to run tasks in this chat. Tap interrupt to stop this voice turn and speak again. Leaving ends audio; accepted tasks continue in chat.</string>
     <string name="voice_call_mute">Pause audio</string>
     <string name="voice_call_unmute">Resume audio</string>

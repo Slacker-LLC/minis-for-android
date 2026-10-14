@@ -13,12 +13,28 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 
+/**
+ * 运行时可见文案由 UI 层注入，避免 runtime 里写死某一种语言。
+ * 默认值只覆盖不接 UI 的调用方（例如 androidTest 的脚本化通话）。
+ */
+class CallRuntimeTexts(
+    val listening: String = "Listening…",
+    val recognitionFailed: (String) -> String = {
+        "Recognition failed: $it. Check the speech service and retry."
+    },
+    /** [detail] is null when the failure carried no message of its own. */
+    val taskIncomplete: (String?) -> String = { detail ->
+        "Task not finished" + if (detail.isNullOrBlank()) "" else ": $detail"
+    },
+)
+
 /** ASR → 完整 Agent → TTS。每次聆听独立代数，重复/晚到回调不能再提交任务。 */
 class MinisCallRuntimeAdapter(
     private val input: CallSpeechInput,
     private val model: CallModelGateway,
     private val output: CallSpeechOutput,
     private val scope: CoroutineScope,
+    private val texts: CallRuntimeTexts = CallRuntimeTexts(),
 ) : CallRuntime {
     private val _events = MutableSharedFlow<CallEvent>(extraBufferCapacity = 16)
     override val events: SharedFlow<CallEvent> = _events
@@ -106,7 +122,7 @@ class MinisCallRuntimeAdapter(
         val gen = ++generation
         listening = true
         state(BloubState.LISTENING)
-        subtitle("我在听…")
+        subtitle(texts.listening)
         input.start(
             onPartial = { partial -> scope.launch {
                 if (valid(gen) && listening) subtitle(partial)
@@ -125,7 +141,7 @@ class MinisCallRuntimeAdapter(
                 } else {
                     // 配置/权限/网络错误留在界面，显式重试，避免持续耗电/请求。
                     state(BloubState.ERROR)
-                    subtitle("识别失败：${message ?: error.name}。请检查语音服务后重试。")
+                    subtitle(texts.recognitionFailed(message ?: error.name))
                 }
             } },
         )
@@ -161,7 +177,7 @@ class MinisCallRuntimeAdapter(
             } catch (error: Exception) {
                 if (valid(gen)) {
                     state(BloubState.ERROR)
-                    subtitle("任务未完成：${error.message ?: "请返回聊天查看"}")
+                    subtitle(texts.taskIncomplete(error.message))
                 }
             }
         }

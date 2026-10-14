@@ -96,6 +96,12 @@ fun ChatScreen(
     mcpRepository: com.openminis.app.data.repository.MCPRepository? = null,
     onBack: () -> Unit,
     isTwoPane: Boolean = false,
+    /**
+     * True when this ChatScreen is rendered by the `chat/<sessionId>`
+     * destination. Deep-link chat actions (voice / camera) are consumed only
+     * here so the screen being navigated away from cannot swallow them.
+     */
+    isChatDestination: Boolean = false,
     onToggleSidebar: (() -> Unit)? = null,
     sidebarCollapsed: Boolean = false,
     onOpenDrawer: (() -> Unit)? = null,
@@ -460,7 +466,7 @@ fun ChatScreen(
     // — camera is always available so it can fire from the top-level scope.
     LaunchedEffect(sessionId) {
         val pending = com.openminis.app.deeplink.DeepLinkCoordinator
-            .pendingChatAction.value
+            .pendingChatActionFor(sessionId, isChatDestination)
         if (pending == com.openminis.app.deeplink.DeepLinkCoordinator
                 .ChatAction.OPEN_CAMERA
         ) {
@@ -482,7 +488,7 @@ fun ChatScreen(
     // does not overwrite whatever the user typed meanwhile.
     LaunchedEffect(sessionId) {
         val pending = com.openminis.app.deeplink.DeepLinkCoordinator
-            .pendingChatAction.value
+            .pendingChatActionFor(sessionId, isChatDestination)
         if (pending == com.openminis.app.deeplink.DeepLinkCoordinator
                 .ChatAction.ANALYZE_SCREEN
         ) {
@@ -1451,7 +1457,12 @@ fun ChatScreen(
     // Model Picker bottom sheet
     ChatModelPickerHost(providerRepository = providerRepository, viewModel = viewModel, showModelPickerState = showModelPicker_st)
 
-    com.openminis.app.voicecall.VoiceConversationHost(viewModel, ensureMicPermissionFlow)
+    com.openminis.app.voicecall.VoiceConversationHost(
+        viewModel,
+        sessionId,
+        isChatDestination,
+        ensureMicPermissionFlow,
+    )
 
     // Offload permission dialog (also visible over the voice conversation).
     OffloadPermissionDialog()

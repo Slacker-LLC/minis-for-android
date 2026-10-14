@@ -2419,6 +2419,10 @@
     <string name="voice_call_state_error">Произошла ошибка</string>
     <string name="voice_call_model">Модель текущего чата</string>
     <string name="voice_call_preparing">Подготовка микрофона…</string>
+    <string name="voice_call_listening_hint">Говорите, чтобы выполнять задачи в этом чате.</string>
+    <string name="voice_call_recognition_failed">Сбой распознавания: %1$s. Проверьте голосовую службу и повторите.</string>
+    <string name="voice_call_task_incomplete">Задача не завершена: %1$s</string>
+    <string name="voice_call_task_incomplete_generic">Задача не завершена. Откройте чат, чтобы увидеть детали.</string>
     <string name="voice_call_hint">Говорите, чтобы выполнять задачи в этом чате. Прерывание останавливает текущую голосовую задачу. После выхода принятые задачи продолжаются в чате.</string>
     <string name="voice_call_mute">Приостановить аудио</string>
     <string name="voice_call_unmute">Продолжить аудио</string>

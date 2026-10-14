@@ -2237,6 +2237,10 @@
     <string name="voice_call_state_error">エラーが発生しました</string>
     <string name="voice_call_model">現在のチャットモデル</string>
     <string name="voice_call_preparing">マイクを準備中…</string>
+    <string name="voice_call_listening_hint">話しかけると、このチャットでタスクを実行します。</string>
+    <string name="voice_call_recognition_failed">認識に失敗しました：%1$s。音声サービスを確認して再試行してください。</string>
+    <string name="voice_call_task_incomplete">タスクが完了しませんでした：%1$s</string>
+    <string name="voice_call_task_incomplete_generic">タスクが完了しませんでした。チャットで詳細を確認してください。</string>
     <string name="voice_call_hint">話しかけると、このチャットでタスクを実行します。中断ボタンで今回の音声タスクを止められます。音声を終了しても、受け付けたタスクはチャットで続きます。</string>
     <string name="voice_call_mute">音声を一時停止</string>
     <string name="voice_call_unmute">音声を再開</string>

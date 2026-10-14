@@ -2137,6 +2137,10 @@
     <string name="voice_call_state_error">Une erreur est survenue</string>
     <string name="voice_call_model">Modèle du chat actuel</string>
     <string name="voice_call_preparing">Préparation du microphone…</string>
+    <string name="voice_call_listening_hint">Parlez pour lancer des tâches dans ce chat.</string>
+    <string name="voice_call_recognition_failed">Échec de la reconnaissance : %1$s. Vérifiez le service vocal puis réessayez.</string>
+    <string name="voice_call_task_incomplete">Tâche inachevée : %1$s</string>
+    <string name="voice_call_task_incomplete_generic">Tâche inachevée. Ouvrez le chat pour les détails.</string>
     <string name="voice_call_hint">Parlez pour lancer des tâches dans ce chat. Interrompre arrête la tâche vocale en cours. Après la fermeture, les tâches acceptées continuent dans le chat.</string>
     <string name="voice_call_mute">Mettre en pause</string>
     <string name="voice_call_unmute">Reprendre</string>

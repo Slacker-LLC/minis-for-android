@@ -193,8 +193,13 @@ fun AppNavigation(
             is DeepLinkAction.NewVoiceChat -> {
                 try {
                     val restored = com.openminis.app.data.AssistantHomePrefs.resolveVoiceSession(context)
-                    DeepLinkCoordinator.setPendingChatAction(DeepLinkCoordinator.ChatAction.START_VOICE)
-                    navController.navigate(Routes.chat(restored ?: "__new__${java.util.UUID.randomUUID()}")) {
+                    val target = restored ?: "__new__${java.util.UUID.randomUUID()}"
+                    DeepLinkCoordinator.setPendingChatAction(
+                        DeepLinkCoordinator.ChatAction.START_VOICE,
+                        sessionId = target,
+                        chatRouteOnly = true,
+                    )
+                    navController.navigate(Routes.chat(target)) {
                         popUpTo(Routes.SESSION_LIST) { inclusive = false }
                         launchSingleTop = true
                     }
@@ -342,10 +347,13 @@ fun AppNavigation(
         val quickActionStart: String? = when (initialDeepLink) {
             is DeepLinkAction.NewVoiceChat -> Routes.SESSION_LIST
             is DeepLinkAction.NewCameraChat -> {
+                val draftId = "__new__${java.util.UUID.randomUUID()}"
                 DeepLinkCoordinator.setPendingChatAction(
                     DeepLinkCoordinator.ChatAction.OPEN_CAMERA,
+                    sessionId = draftId,
+                    chatRouteOnly = true,
                 )
-                Routes.chat("__new__${java.util.UUID.randomUUID()}")
+                Routes.chat(draftId)
             }
             is DeepLinkAction.NewChat -> Routes.chat("__new__${java.util.UUID.randomUUID()}")
             else -> null
@@ -480,6 +488,7 @@ fun AppNavigation(
        composable(Routes.SESSION_LIST) {
             ChatSplitScaffoldRoute(
                 initialSessionId = null,
+                isChatDestination = false,
                 navController = navController,
                 chatRepository = chatRepository,
                 providerRepository = providerRepository,
@@ -496,6 +505,7 @@ fun AppNavigation(
             val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
             ChatSplitScaffoldRoute(
                 initialSessionId = sessionId,
+                isChatDestination = true,
                 navController = navController,
                 chatRepository = chatRepository,
                 providerRepository = providerRepository,

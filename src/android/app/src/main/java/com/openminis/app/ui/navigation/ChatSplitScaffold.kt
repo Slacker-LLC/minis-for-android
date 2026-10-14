@@ -843,6 +843,12 @@ fun isDraftSessionId(id: String?): Boolean = id?.startsWith("__new__") == true
 @Composable
 fun ChatSplitScaffoldRoute(
     initialSessionId: String?,
+    /**
+     * True when this scaffold was mounted by the `chat/<sessionId>`
+     * destination (as opposed to `sessions`). Deep-link chat actions are
+     * consumed only here — see [com.openminis.app.deeplink.DeepLinkCoordinator].
+     */
+    isChatDestination: Boolean,
     navController: androidx.navigation.NavHostController,
     chatRepository: com.openminis.app.data.repository.ChatRepository,
     providerRepository: com.openminis.app.data.repository.ProviderRepository,
@@ -876,6 +882,7 @@ fun ChatSplitScaffoldRoute(
                 onToggleSidebar, sidebarCollapsed ->
                 com.openminis.app.ui.chat.ChatScreen(
                     sessionId = sessionId,
+                    isChatDestination = isChatDestination,
                     chatRepository = chatRepository,
                     providerRepository = providerRepository,
                     memoryRepository = memoryRepository,
@@ -909,6 +916,7 @@ fun ChatSplitScaffoldRoute(
     } else {
         ChatPhoneDrawerScaffold(
             initialSessionId = initialSessionId,
+            isChatDestination = isChatDestination,
             navController = navController,
             chatRepository = chatRepository,
             providerRepository = providerRepository,
@@ -922,6 +930,7 @@ fun ChatSplitScaffoldRoute(
 @Composable
 private fun ChatPhoneDrawerScaffold(
     initialSessionId: String?,
+    isChatDestination: Boolean,
     navController: androidx.navigation.NavHostController,
     chatRepository: com.openminis.app.data.repository.ChatRepository,
     providerRepository: com.openminis.app.data.repository.ProviderRepository,
@@ -1046,6 +1055,7 @@ private fun ChatPhoneDrawerScaffold(
     ) {
         com.openminis.app.ui.chat.ChatScreen(
             sessionId = currentSessionId,
+            isChatDestination = isChatDestination,
             chatRepository = chatRepository,
             providerRepository = providerRepository,
             memoryRepository = memoryRepository,
