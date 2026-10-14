@@ -23,6 +23,21 @@ const FALLBACK_DNS: &[&str] = &[
 ];
 static DNS_QUERY_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
+/// The helper is loopback-only; the port stays configurable so an explicit
+/// coexistence dev build can run its own listener on 127.0.0.1:18788 without
+/// borrowing, stopping or taking over the production helper.
+fn loopback_listen(value: &str) -> Option<String> {
+    let (host, port) = value.rsplit_once(':')?;
+    if host != "127.0.0.1" {
+        return None;
+    }
+    let port: u16 = port.parse().ok()?;
+    if port == 0 {
+        return None;
+    }
+    Some(format!("127.0.0.1:{port}"))
+}
+
 #[cfg(target_os = "android")]
 unsafe extern "C" {
     fn prctl(option: i32, arg2: usize, arg3: usize, arg4: usize, arg5: usize) -> i32;
@@ -51,9 +66,10 @@ fn main() {
             other => usage(&format!("unknown argument: {other}")),
         }
     }
-    if listen != DEFAULT_LISTEN {
-        usage("listen address is fixed to loopback 127.0.0.1:18787");
-    }
+    let listen = match loopback_listen(&listen) {
+        Some(address) => address,
+        None => usage("listen address must be loopback 127.0.0.1:<port>"),
+    };
     if !auth_stdin {
         usage("--auth-stdin is required");
     }
@@ -68,7 +84,7 @@ fn usage(error: &str) -> ! {
     if !error.is_empty() {
         eprintln!("root-network-proxy: {error}");
     }
-    eprintln!("usage: minis-root-network-proxy [--listen 127.0.0.1:18787] --auth-stdin");
+    eprintln!("usage: minis-root-network-proxy [--listen 127.0.0.1:<port>] --auth-stdin");
     std::process::exit(if error.is_empty() { 0 } else { 2 });
 }
 
@@ -712,6 +728,40 @@ mod tests {
         msg.extend_from_slice(&[0, 0, 0, 60]);
         msg.extend_from_slice(&[0, 4, 8, 8, 8, 8]);
         msg
+    }
+
+    #[test]
+    fn loopback_listen_accepts_contract_ports() {
+        assert_eq!(
+            loopback_listen("127.0.0.1:18787").as_deref(),
+            Some("127.0.0.1:18787")
+        );
+        assert_eq!(
+            loopback_listen("127.0.0.1:18788").as_deref(),
+            Some("127.0.0.1:18788")
+        );
+        assert_eq!(
+            loopback_listen("127.0.0.1:00007").as_deref(),
+            Some("127.0.0.1:7")
+        );
+    }
+
+    #[test]
+    fn loopback_listen_rejects_non_loopback_and_bad_values() {
+        for value in [
+            "0.0.0.0:18787",
+            "192.168.1.5:18787",
+            "localhost:18787",
+            "::1:18787",
+            "[::1]:18787",
+            "127.0.0.1:0",
+            "127.0.0.1:65536",
+            "127.0.0.1:",
+            "127.0.0.1:http",
+            "",
+        ] {
+            assert_eq!(loopback_listen(value), None, "accepted {value}");
+        }
     }
 
     #[test]

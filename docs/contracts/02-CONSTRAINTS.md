@@ -33,7 +33,7 @@
 
 ## 网络
 
-- 当前 loopback 代理只能监听 `127.0.0.1:18787`，不得开放 LAN/public bind，也不得增加命令、文件、插件或通用 RPC 面。
+- 当前 loopback 代理只允许监听 `127.0.0.1`：正式包固定 `127.0.0.1:18787`，显式并存开发包固定 `127.0.0.1:18788`；不得开放 LAN/public bind，也不得增加命令、文件、插件或通用 RPC 面。
 - HTTP/CONNECT 代理本身不需要 Root；使用特权身份只能作为 Android UID/VPN/BPF 出站兼容机制，不能借此扩大 Root 权限面。
 - 代理默认拒绝普通 loopback/private/link-local/broadcast 目标；仅保留明确的 VPN Fake-IP 兼容范围。
 - 云 Provider、OAuth、更新元数据、带凭证请求走 HTTPS；禁止隐式公网明文 HTTP fallback。
