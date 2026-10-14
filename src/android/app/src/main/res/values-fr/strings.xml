@@ -1793,10 +1793,8 @@
     <string name="vscreen_allow_physical_unattended">Autoriser les actions en arrière-plan sur l’écran physique</string>
     <string name="vscreen_allow_physical_unattended_risk">Risque : une routine en arrière-plan pourrait contrôler l’écran que vous utilisez. Désactivé par défaut ; l’écran virtuel seul est plus sûr.</string>
     <string name="vscreen_check_compatibility">Vérifier la compatibilité de l’appareil</string>
-    <string name="vscreen_dpi">Densité (dpi)</string>
     <string name="vscreen_enabled_label">Activer l’écran virtuel</string>
     <string name="vscreen_enabled_summary">Une vérification récente de l’appareil est effectuée avant l’activation.</string>
-    <string name="vscreen_height">Hauteur (px)</string>
     <string name="vscreen_no_display">Aucun écran virtuel actif.</string>
     <string name="vscreen_reason_service_timeout">Le processus du service n’a pas démarré à temps. Mettez l’application à jour et réessayez ; si cela persiste, signalez ce code.</string>
     <string name="vscreen_fail_dialog_title">Ces vérifications ont échoué</string>
@@ -1843,8 +1841,10 @@
     <string name="vscreen_reason_wrong_identity">Le service ne s’est pas exécuté en Root (0). Accordez le root à Minis et réessayez.</string>
     <string name="vscreen_release">Libérer l’écran virtuel</string>
     <string name="vscreen_released">Écran virtuel libéré.</string>
-    <string name="vscreen_resolution">Résolution et densité</string>
-    <string name="vscreen_resolution_bounds">Largeur : 320–1920 px · hauteur : 480–2560 px · densité : 120–640 dpi.</string>
+    <string name="vscreen_resolution">Résolution de l’appareil et échelle</string>
+    <string name="vscreen_scale">Échelle de résolution</string>
+    <string name="vscreen_scale_value">%1$d%%</string>
+    <string name="vscreen_scale_summary">Utilise la résolution physique actuelle du téléphone. La densité d’affichage est ajustée automatiquement selon l’échelle.</string>
     <string name="vscreen_status_fail">Échec</string>
     <string name="vscreen_status_pass">Réussi</string>
     <string name="vscreen_status_skipped">Ignoré</string>
@@ -1862,7 +1862,6 @@
     <string name="vscreen_step_uiautomation">Observation de l’interface</string>
     <string name="vscreen_step_unknown">Vérification de compatibilité</string>
     <string name="vscreen_title">Écran virtuel</string>
-    <string name="vscreen_width">Largeur (px)</string>
 <string name="scheduled_task_permission_tier">Autorisations de la routine</string>
 <string name="scheduled_task_tier_read_only">Lecture seule</string>
 <string name="scheduled_task_tier_full">Accès complet</string>

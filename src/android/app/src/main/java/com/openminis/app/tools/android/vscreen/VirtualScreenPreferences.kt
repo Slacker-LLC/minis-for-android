@@ -60,19 +60,29 @@ internal class VirtualScreenPreferences(context: Context) {
         )
     }
 
-    fun displaySettings(): VirtualScreenDisplaySettings = VirtualScreenDisplaySettings(
-        width = preferences.getInt(KEY_WIDTH, VirtualScreenDisplaySettings.DEFAULT_WIDTH),
-        height = preferences.getInt(KEY_HEIGHT, VirtualScreenDisplaySettings.DEFAULT_HEIGHT),
-        dpi = preferences.getInt(KEY_DPI, VirtualScreenDisplaySettings.DEFAULT_DPI),
-    ).takeIf(VirtualScreenDisplaySettingsPolicy::isValid) ?: VirtualScreenDisplaySettings()
+    fun displaySettings(): VirtualScreenDisplaySettings {
+        val hasLegacyDimensions = preferences.contains(LEGACY_KEY_WIDTH) ||
+            preferences.contains(LEGACY_KEY_HEIGHT) || preferences.contains(LEGACY_KEY_DPI)
+        if (hasLegacyDimensions) {
+            val editor = preferences.edit()
+                .remove(LEGACY_KEY_WIDTH)
+                .remove(LEGACY_KEY_HEIGHT)
+                .remove(LEGACY_KEY_DPI)
+            if (!preferences.contains(KEY_SCALE)) {
+                editor.putFloat(KEY_SCALE, VirtualScreenDisplaySettings.DEFAULT_SCALE)
+            }
+            editor.apply()
+        }
+        val scale = runCatching {
+            preferences.getFloat(KEY_SCALE, VirtualScreenDisplaySettings.DEFAULT_SCALE)
+        }.getOrDefault(VirtualScreenDisplaySettings.DEFAULT_SCALE)
+        return VirtualScreenDisplaySettings(scale)
+            .takeIf(VirtualScreenDisplaySettingsPolicy::isValid) ?: VirtualScreenDisplaySettings()
+    }
 
     fun setDisplaySettings(settings: VirtualScreenDisplaySettings) {
         require(VirtualScreenDisplaySettingsPolicy.isValid(settings)) { "invalid_vscreen_display_settings" }
-        preferences.edit()
-            .putInt(KEY_WIDTH, settings.width)
-            .putInt(KEY_HEIGHT, settings.height)
-            .putInt(KEY_DPI, settings.dpi)
-            .apply()
+        preferences.edit().putFloat(KEY_SCALE, settings.scale).apply()
     }
 
     fun hasCurrentPassingProbe(currentFingerprint: String = currentDeviceFingerprint()): Boolean =
@@ -85,9 +95,10 @@ internal class VirtualScreenPreferences(context: Context) {
         private const val KEY_TIMESTAMP = "probe_timestamp_ms"
         private const val KEY_FINGERPRINT = "probe_fingerprint"
         private const val KEY_JSON = "probe_json"
-        private const val KEY_WIDTH = "display_width"
-        private const val KEY_HEIGHT = "display_height"
-        private const val KEY_DPI = "display_dpi"
+        private const val KEY_SCALE = "display_scale"
+        private const val LEGACY_KEY_WIDTH = "display_width"
+        private const val LEGACY_KEY_HEIGHT = "display_height"
+        private const val LEGACY_KEY_DPI = "display_dpi"
 
         /**
          * Which privileged host ran the probe. A probe passed under an earlier host (the Shizuku

@@ -2073,10 +2073,8 @@
     <string name="vscreen_allow_physical_unattended">允許無人值守時操作實體螢幕</string>
     <string name="vscreen_allow_physical_unattended_risk">風險：背景例程可能控制您正在使用的螢幕。預設關閉；只使用虛擬螢幕較安全。</string>
     <string name="vscreen_check_compatibility">檢查裝置相容性</string>
-    <string name="vscreen_dpi">密度（dpi）</string>
     <string name="vscreen_enabled_label">啟用虛擬螢幕</string>
     <string name="vscreen_enabled_summary">啟用前會先執行目前裝置的自我檢查。</string>
-    <string name="vscreen_height">高度（px）</string>
     <string name="vscreen_no_display">目前沒有虛擬螢幕。</string>
     <string name="vscreen_reason_service_timeout">服務程序沒有及時啟動。請更新應用程式後重試；仍然出現請回報此代碼。</string>
     <string name="vscreen_fail_dialog_title">這些檢測沒有通過</string>
@@ -2123,8 +2121,10 @@
     <string name="vscreen_reason_wrong_identity">服務沒有以 Root（0）身分執行。請為 Minis 授予 Root 後重試。</string>
     <string name="vscreen_release">釋放虛擬螢幕</string>
     <string name="vscreen_released">虛擬螢幕已釋放。</string>
-    <string name="vscreen_resolution">解析度與密度</string>
-    <string name="vscreen_resolution_bounds">寬度：320–1920 px；高度：480–2560 px；密度：120–640 dpi。</string>
+    <string name="vscreen_resolution">裝置解析度與縮放比例</string>
+    <string name="vscreen_scale">解析度縮放</string>
+    <string name="vscreen_scale_value">%1$d%%</string>
+    <string name="vscreen_scale_summary">直接讀取手機目前解析度，顯示密度會隨縮放比例自動計算。</string>
     <string name="vscreen_status_fail">失敗</string>
     <string name="vscreen_status_pass">通過</string>
     <string name="vscreen_status_skipped">已略過</string>
@@ -2142,7 +2142,6 @@
     <string name="vscreen_step_uiautomation">介面觀察</string>
     <string name="vscreen_step_unknown">相容性檢查</string>
     <string name="vscreen_title">虛擬螢幕</string>
-    <string name="vscreen_width">寬度（px）</string>
 <string name="scheduled_task_permission_tier">例程權限</string>
 <string name="scheduled_task_tier_read_only">唯讀</string>
 <string name="scheduled_task_tier_full">完整權限</string>

@@ -1897,10 +1897,8 @@
     <string name="vscreen_allow_physical_unattended">Physische Bildschirmaktionen im Hintergrund erlauben</string>
     <string name="vscreen_allow_physical_unattended_risk">Risiko: Hintergrundroutinen könnten den von dir verwendeten Bildschirm steuern. Standardmäßig aus; nur virtuelles Display ist sicherer.</string>
     <string name="vscreen_check_compatibility">Gerätekompatibilität prüfen</string>
-    <string name="vscreen_dpi">Dichte (dpi)</string>
     <string name="vscreen_enabled_label">Virtuelles Display aktivieren</string>
     <string name="vscreen_enabled_summary">Vor dem Aktivieren wird ein aktueller Gerätetest ausgeführt.</string>
-    <string name="vscreen_height">Höhe (px)</string>
     <string name="vscreen_no_display">Es ist kein virtuelles Display aktiv.</string>
     <string name="vscreen_reason_service_timeout">Der Dienstprozess ist nicht rechtzeitig gestartet. App aktualisieren und erneut versuchen; bei Wiederholung diesen Code melden.</string>
     <string name="vscreen_fail_dialog_title">Diese Prüfungen sind fehlgeschlagen</string>
@@ -1947,8 +1945,10 @@
     <string name="vscreen_reason_wrong_identity">Der Dienst lief nicht als Root (0). Erteile Minis Root und versuche es erneut.</string>
     <string name="vscreen_release">Virtuelles Display freigeben</string>
     <string name="vscreen_released">Virtuelles Display freigegeben.</string>
-    <string name="vscreen_resolution">Auflösung und Dichte</string>
-    <string name="vscreen_resolution_bounds">Breite: 320–1920 px · Höhe: 480–2560 px · Dichte: 120–640 dpi.</string>
+    <string name="vscreen_resolution">Geräteauflösung und Skalierung</string>
+    <string name="vscreen_scale">Skalierung</string>
+    <string name="vscreen_scale_value">%1$d%%</string>
+    <string name="vscreen_scale_summary">Verwendet die aktuelle physische Bildschirmauflösung. Die Anzeigedichte wird automatisch mit dem Skalierungsfaktor angepasst.</string>
     <string name="vscreen_status_fail">Fehlgeschlagen</string>
     <string name="vscreen_status_pass">Bestanden</string>
     <string name="vscreen_status_skipped">Übersprungen</string>
@@ -1966,7 +1966,6 @@
     <string name="vscreen_step_uiautomation">UI-Erfassung</string>
     <string name="vscreen_step_unknown">Kompatibilitätsprüfung</string>
     <string name="vscreen_title">Virtuelles Display</string>
-    <string name="vscreen_width">Breite (px)</string>
 <string name="scheduled_task_permission_tier">Berechtigungen der Routine</string>
 <string name="scheduled_task_tier_read_only">Nur lesen</string>
 <string name="scheduled_task_tier_full">Vollzugriff</string>

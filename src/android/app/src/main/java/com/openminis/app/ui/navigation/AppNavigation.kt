@@ -1,6 +1,8 @@
 package com.openminis.app.ui.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -82,6 +84,9 @@ import com.openminis.app.ui.onboarding.OnboardingModelSelectionScreen
 
 
 
+
+private fun String?.isPrimarySurface(): Boolean =
+    this == Routes.SESSION_LIST || this == Routes.ASSISTANT_HOME || this == Routes.CHAT
 
 @Composable
 fun AppNavigation(
@@ -400,28 +405,44 @@ fun AppNavigation(
         // flashes; the slightly longer enter spec (300ms vs 220ms) is
         // covered by the same guard.
         enterTransition = {
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = tween(300, easing = EmphasizedDecelerate),
-            ) + fadeIn(animationSpec = tween(300, easing = EmphasizedDecelerate))
+            if (initialState.destination.route.isPrimarySurface() || targetState.destination.route.isPrimarySurface()) {
+                EnterTransition.None
+            } else {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(300, easing = EmphasizedDecelerate),
+                ) + fadeIn(animationSpec = tween(300, easing = EmphasizedDecelerate))
+            }
         },
         exitTransition = {
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = tween(200, easing = EmphasizedAccelerate),
-            ) + fadeOut(animationSpec = tween(200, easing = EmphasizedAccelerate))
+            if (initialState.destination.route.isPrimarySurface() || targetState.destination.route.isPrimarySurface()) {
+                ExitTransition.None
+            } else {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(200, easing = EmphasizedAccelerate),
+                ) + fadeOut(animationSpec = tween(200, easing = EmphasizedAccelerate))
+            }
         },
         popEnterTransition = {
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = tween(300, easing = EmphasizedDecelerate),
-            ) + fadeIn(animationSpec = tween(300, easing = EmphasizedDecelerate))
+            if (initialState.destination.route.isPrimarySurface() || targetState.destination.route.isPrimarySurface()) {
+                EnterTransition.None
+            } else {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(300, easing = EmphasizedDecelerate),
+                ) + fadeIn(animationSpec = tween(300, easing = EmphasizedDecelerate))
+            }
         },
         popExitTransition = {
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = tween(200, easing = EmphasizedAccelerate),
-            ) + fadeOut(animationSpec = tween(200, easing = EmphasizedAccelerate))
+            if (initialState.destination.route.isPrimarySurface() || targetState.destination.route.isPrimarySurface()) {
+                ExitTransition.None
+            } else {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(200, easing = EmphasizedAccelerate),
+                ) + fadeOut(animationSpec = tween(200, easing = EmphasizedAccelerate))
+            }
         },
     ) {
         // [T-android-assistant-home] Greeting + 2×2 quick actions. Reached from

@@ -5,19 +5,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VirtualScreenDisplaySettingsPolicyTest {
-    @Test fun defaultsMatchTheLowResourceProfile() {
+    @Test fun defaultUsesTheFullDeviceResolution() {
         val settings = VirtualScreenDisplaySettings()
         assertTrue(VirtualScreenDisplaySettingsPolicy.isValid(settings))
-        assertTrue(settings.width == 720 && settings.height == 1600 && settings.dpi == 320)
+        assertTrue(settings.scale == 1.0f)
     }
 
-    @Test fun dimensionsAndDensityAreBounded() {
-        assertFalse(VirtualScreenDisplaySettingsPolicy.isValid(VirtualScreenDisplaySettings(width = 319)))
-        assertFalse(VirtualScreenDisplaySettingsPolicy.isValid(VirtualScreenDisplaySettings(width = 1921)))
-        assertFalse(VirtualScreenDisplaySettingsPolicy.isValid(VirtualScreenDisplaySettings(height = 479)))
-        assertFalse(VirtualScreenDisplaySettingsPolicy.isValid(VirtualScreenDisplaySettings(height = 2561)))
-        assertFalse(VirtualScreenDisplaySettingsPolicy.isValid(VirtualScreenDisplaySettings(dpi = 119)))
-        assertFalse(VirtualScreenDisplaySettingsPolicy.isValid(VirtualScreenDisplaySettings(dpi = 641)))
-        assertTrue(VirtualScreenDisplaySettingsPolicy.isValid(VirtualScreenDisplaySettings(width = 1080, height = 2340, dpi = 440)))
+    @Test fun scaleIsBounded() {
+        assertFalse(VirtualScreenDisplaySettingsPolicy.isValid(VirtualScreenDisplaySettings(scale = 0.49f)))
+        assertFalse(VirtualScreenDisplaySettingsPolicy.isValid(VirtualScreenDisplaySettings(scale = 1.01f)))
+        assertFalse(VirtualScreenDisplaySettingsPolicy.isValid(VirtualScreenDisplaySettings(scale = Float.NaN)))
+        assertTrue(VirtualScreenDisplaySettingsPolicy.isValid(VirtualScreenDisplaySettings(scale = 0.5f)))
+        assertTrue(VirtualScreenDisplaySettingsPolicy.isValid(VirtualScreenDisplaySettings(scale = 1.0f)))
     }
 }

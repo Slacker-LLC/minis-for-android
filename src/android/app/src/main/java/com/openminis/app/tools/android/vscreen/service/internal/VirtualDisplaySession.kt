@@ -154,14 +154,16 @@ internal class VirtualDisplaySession private constructor(
         private const val TAG = "VScreenSession"
         private const val MAX_IMAGES = 6
         private const val KEEP_FRAMES = 3
-        private const val MAX_DIMENSION = 2400
-        private const val MAX_PIXELS = 4_194_304L
 
         fun create(width: Int, height: Int, dpi: Int): VirtualDisplaySession {
-            require(width in 320..MAX_DIMENSION && height in 320..MAX_DIMENSION && dpi in 80..800) {
+            require(
+                width in DisplaySpec.MIN_DIMENSION..DisplaySpec.MAX_DIMENSION &&
+                    height in DisplaySpec.MIN_DIMENSION..DisplaySpec.MAX_DIMENSION &&
+                    dpi in DisplaySpec.MIN_DPI..DisplaySpec.MAX_DPI,
+            ) {
                 "invalid_display_spec"
             }
-            require(width.toLong() * height.toLong() <= MAX_PIXELS) { "display_too_large" }
+            require(width.toLong() * height.toLong() <= DisplaySpec.MAX_PIXELS) { "display_too_large" }
             val shellContext = ShellContext.get()
             val manager = displayManager(shellContext)
             val reader = newReader(width, height)

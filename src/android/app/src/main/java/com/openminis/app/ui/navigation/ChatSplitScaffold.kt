@@ -939,6 +939,7 @@ private fun ChatPhoneDrawerScaffold(
                 chatRepository,
                 providerRepository,
                 appContext,
+                observeSessionListOnStart = false,
             ),
         )
 

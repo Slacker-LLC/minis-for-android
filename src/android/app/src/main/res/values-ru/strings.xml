@@ -2073,10 +2073,8 @@
     <string name="vscreen_allow_physical_unattended">Разрешить фоновые действия на физическом экране</string>
     <string name="vscreen_allow_physical_unattended_risk">Риск: фоновый сценарий сможет управлять используемым вами экраном. По умолчанию выключено; виртуальный экран безопаснее.</string>
     <string name="vscreen_check_compatibility">Проверить совместимость устройства</string>
-    <string name="vscreen_dpi">Плотность (dpi)</string>
     <string name="vscreen_enabled_label">Включить виртуальный экран</string>
     <string name="vscreen_enabled_summary">Перед включением запускается свежая проверка устройства.</string>
-    <string name="vscreen_height">Высота (px)</string>
     <string name="vscreen_no_display">Активного виртуального экрана нет.</string>
     <string name="vscreen_reason_service_timeout">Процесс службы не запустился вовремя. Обновите приложение и повторите; если повторяется, сообщите этот код.</string>
     <string name="vscreen_fail_dialog_title">Эти проверки не пройдены</string>
@@ -2123,8 +2121,10 @@
     <string name="vscreen_reason_wrong_identity">Служба запущена не от имени Root (0). Предоставьте Minis root и повторите.</string>
     <string name="vscreen_release">Освободить виртуальный экран</string>
     <string name="vscreen_released">Виртуальный экран освобождён.</string>
-    <string name="vscreen_resolution">Разрешение и плотность</string>
-    <string name="vscreen_resolution_bounds">Ширина: 320–1920 px · высота: 480–2560 px · плотность: 120–640 dpi.</string>
+    <string name="vscreen_resolution">Разрешение устройства и масштаб</string>
+    <string name="vscreen_scale">Масштаб разрешения</string>
+    <string name="vscreen_scale_value">%1$d%%</string>
+    <string name="vscreen_scale_summary">Используется текущее физическое разрешение телефона. Плотность экрана автоматически меняется вместе с масштабом.</string>
     <string name="vscreen_status_fail">Ошибка</string>
     <string name="vscreen_status_pass">Пройдено</string>
     <string name="vscreen_status_skipped">Пропущено</string>
@@ -2142,7 +2142,6 @@
     <string name="vscreen_step_uiautomation">Наблюдение за интерфейсом</string>
     <string name="vscreen_step_unknown">Проверка совместимости</string>
     <string name="vscreen_title">Виртуальный экран</string>
-    <string name="vscreen_width">Ширина (px)</string>
 <string name="scheduled_task_permission_tier">Права сценария</string>
 <string name="scheduled_task_tier_read_only">Только чтение</string>
 <string name="scheduled_task_tier_full">Полный доступ</string>

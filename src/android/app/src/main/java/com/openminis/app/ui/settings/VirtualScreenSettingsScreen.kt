@@ -13,10 +13,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -32,7 +31,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.openminis.app.R
 import com.openminis.app.tools.android.DeviceScreenLease
@@ -42,7 +40,6 @@ import com.openminis.app.tools.android.VirtualScreenObservationRegistry
 import com.openminis.app.tools.android.vscreen.VirtualScreenClient
 import com.openminis.app.tools.android.vscreen.VirtualScreenClientProvider
 import com.openminis.app.tools.android.vscreen.VirtualScreenDisplaySettings
-import com.openminis.app.tools.android.vscreen.VirtualScreenDisplaySettingsPolicy
 import com.openminis.app.tools.android.vscreen.VirtualScreenPreferences
 import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.ui.components.MinisButton
@@ -52,6 +49,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import kotlin.math.roundToInt
 
 private data class ProbeRow(val id: String, val status: String, val code: String, val detail: String)
 private data class PreviewResult(val displayId: Int?, val bitmap: Bitmap?)
@@ -73,9 +71,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenRoot: () -> Unit = {})
     var previewBusy by remember { mutableStateOf(false) }
     var allowPhysicalUnattended by remember { mutableStateOf(UnattendedAccessPrefs.allowsPhysicalScreen(context)) }
     val savedSpec = remember(context) { preferences.displaySettings() }
-    var widthText by remember { mutableStateOf(savedSpec.width.toString()) }
-    var heightText by remember { mutableStateOf(savedSpec.height.toString()) }
-    var dpiText by remember { mutableStateOf(savedSpec.dpi.toString()) }
+    var scale by remember { mutableStateOf(savedSpec.scale) }
     var activeDisplayId by remember { mutableStateOf<Int?>(client.displayId) }
 
     // The bitmap is captured when the effect starts: reading previewBitmap inside onDispose would return
@@ -163,14 +159,9 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenRoot: () -> Unit = {})
         }
     }
 
-    fun saveDisplaySettingsIfValid() {
+    fun saveDisplaySettings() {
         if (activeDisplayId != null) return
-        val spec = VirtualScreenDisplaySettings(
-            width = widthText.toIntOrNull() ?: return,
-            height = heightText.toIntOrNull() ?: return,
-            dpi = dpiText.toIntOrNull() ?: return,
-        )
-        if (VirtualScreenDisplaySettingsPolicy.isValid(spec)) preferences.setDisplaySettings(spec)
+        preferences.setDisplaySettings(VirtualScreenDisplaySettings(scale))
     }
 
     if (showFailures) {
@@ -291,41 +282,33 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenRoot: () -> Unit = {})
         if (enabled) {
             SettingsSection(header = stringResource(R.string.vscreen_resolution)) {
                 val sizeLocked = activeDisplayId != null
-                val currentSpec = VirtualScreenDisplaySettings(
-                    width = widthText.toIntOrNull() ?: 0,
-                    height = heightText.toIntOrNull() ?: 0,
-                    dpi = dpiText.toIntOrNull() ?: 0,
-                )
-                SettingsInlineTextRow(
-                    title = stringResource(R.string.vscreen_width),
-                    value = widthText,
-                    onValueChange = { widthText = it.filter(Char::isDigit).take(4); saveDisplaySettingsIfValid() },
-                    numeric = true,
-                    enabled = !sizeLocked,
-                )
-                SettingsInlineTextRow(
-                    title = stringResource(R.string.vscreen_height),
-                    value = heightText,
-                    onValueChange = { heightText = it.filter(Char::isDigit).take(4); saveDisplaySettingsIfValid() },
-                    numeric = true,
-                    enabled = !sizeLocked,
-                )
-                SettingsInlineTextRow(
-                    title = stringResource(R.string.vscreen_dpi),
-                    value = dpiText,
-                    onValueChange = { dpiText = it.filter(Char::isDigit).take(3); saveDisplaySettingsIfValid() },
-                    numeric = true,
-                    enabled = !sizeLocked,
-                    showDivider = false,
-                )
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    if (!VirtualScreenDisplaySettingsPolicy.isValid(currentSpec)) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            stringResource(R.string.vscreen_resolution_bounds),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
+                            text = stringResource(R.string.vscreen_scale),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = stringResource(R.string.vscreen_scale_value, (scale * 100).roundToInt()),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    Slider(
+                        value = scale,
+                        onValueChange = { scale = (it * 20f).roundToInt() / 20f },
+                        onValueChangeFinished = ::saveDisplaySettings,
+                        valueRange = VirtualScreenDisplaySettings.MIN_SCALE..
+                            VirtualScreenDisplaySettings.MAX_SCALE,
+                        steps = 9,
+                        enabled = !sizeLocked,
+                    )
+                    Text(
+                        text = stringResource(R.string.vscreen_scale_summary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 

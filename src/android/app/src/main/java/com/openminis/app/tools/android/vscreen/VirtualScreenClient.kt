@@ -124,19 +124,16 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
         return result.toJson()
     }
 
-    fun openDisplay(width: Int? = null, height: Int? = null, dpi: Int? = null): Int {
+    fun openDisplay(): Int {
         if (!preferences.isEnabled()) {
             throw VirtualScreenClientException(VirtualScreenPolicy.UNAVAILABLE, "VScreen is disabled or its device probe is not current and passing")
         }
-        val configured = preferences.displaySettings()
-        val actualWidth = width ?: configured.width
-        val actualHeight = height ?: configured.height
-        val actualDpi = dpi ?: configured.dpi
-        val id = execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).createDisplay(actualWidth, actualHeight, actualDpi) }
+        val scale = preferences.displaySettings().scale
+        val id = execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).createDisplay(scale) }
         if (id == 0) throw VirtualScreenClientException(VirtualScreenPolicy.PHYSICAL_DISPLAY_REFUSED, "Service returned the physical display")
         synchronized(stateLock) {
             activeDisplayId = id
-            activeDisplaySize = actualWidth to actualHeight
+            activeDisplaySize = null
             displayLostPending = false
             reconnectAttempts = 0
         }
@@ -447,9 +444,6 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
         private const val DEFAULT_TIMEOUT_MS = 8_000L
         private const val ACT_TIMEOUT_MS = 12_000L
         private const val SCREENSHOT_TIMEOUT_MS = 15_000L
-        private const val DEFAULT_WIDTH = 720
-        private const val DEFAULT_HEIGHT = 1280
-        private const val DEFAULT_DPI = 320
         private val THREAD_IDS = AtomicInteger()
     }
 }

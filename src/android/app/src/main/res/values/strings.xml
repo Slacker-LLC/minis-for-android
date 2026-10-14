@@ -2187,10 +2187,8 @@
     <string name="vscreen_allow_physical_unattended">Allow unattended physical-screen actions</string>
     <string name="vscreen_allow_physical_unattended_risk">Risk: background routines could control the screen you are using. Off by default; virtual-screen-only access is safer.</string>
     <string name="vscreen_check_compatibility">Check device compatibility</string>
-    <string name="vscreen_dpi">Density (dpi)</string>
     <string name="vscreen_enabled_label">Enable virtual display</string>
     <string name="vscreen_enabled_summary">Enabling runs a fresh device self-check first.</string>
-    <string name="vscreen_height">Height (px)</string>
     <string name="vscreen_no_display">There is no active virtual display.</string>
     <string name="vscreen_reason_service_timeout">The service process did not start in time. Update the app and try again; if it keeps happening, report this code.</string>
     <string name="vscreen_fail_dialog_title">These checks did not pass</string>
@@ -2237,8 +2235,10 @@
     <string name="vscreen_reason_wrong_identity">The service did not run as Root (UID 0). Grant Minis Root and retry.</string>
     <string name="vscreen_release">Release virtual display</string>
     <string name="vscreen_released">Virtual display released.</string>
-    <string name="vscreen_resolution">Resolution and density</string>
-    <string name="vscreen_resolution_bounds">Width: 320–1920 px · height: 480–2560 px · density: 120–640 dpi.</string>
+    <string name="vscreen_resolution">Device resolution and scale</string>
+    <string name="vscreen_scale">Scale</string>
+    <string name="vscreen_scale_value">%1$d%%</string>
+    <string name="vscreen_scale_summary">Uses the phone’s current physical resolution. Display density is adjusted automatically with this scale.</string>
     <string name="vscreen_status_fail">Failed</string>
     <string name="vscreen_status_pass">Passed</string>
     <string name="vscreen_status_skipped">Skipped</string>
@@ -2256,7 +2256,6 @@
     <string name="vscreen_step_uiautomation">UI observation</string>
     <string name="vscreen_step_unknown">Compatibility check</string>
     <string name="vscreen_title">Virtual display</string>
-    <string name="vscreen_width">Width (px)</string>
 <string name="scheduled_task_permission_tier">Routine permissions</string>
 <string name="scheduled_task_tier_read_only">Read-only</string>
 <string name="scheduled_task_tier_full">Full</string>
