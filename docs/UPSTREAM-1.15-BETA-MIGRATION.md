@@ -15,6 +15,8 @@
 
 状态图例：✅ 已有 · 🟡 部分 · ❌ 没有 · ⛔ 不适用 / 不建议
 
+**迁移进度（2026-10-16）**：各表「我们现状」列开头带 **已迁移 / 部分迁移 / 未迁移** 标记的行，后面跟提交号与分支，`｜迁移前：` 之后是迁移前的原文。分支 `F` = `fix/upstream-1.15-fixes`（只含修复），`D` = `feat/upstream-1.15-deferred`（修复 + 功能）。「已迁移」只表示代码已提交并带宿主测试，**真机均未验证**。其余没标记的行状态不变。总览表的计数是迁移前快照，未随之改动。
+
 ### 总览
 
 | 版本 | 新功能 | 修复 | 打磨 | 其中 ✅ | 🟡 | ❌ | ⛔ |
@@ -34,8 +36,8 @@
 
 | # | 上游条目 | 我们现状 | 证据 | 建议动作 |
 |---|---|---|---|---|
-| 1 | 应用内更新：Stable/Beta 渠道、跳过某版本、下载前校验、About 与「检查更新」小红点、显示 build 号 | 🟡 已有检查更新/下载安装/build 号；渠道按安装版本自动判定（dev 包即 beta），**不可选**；**无跳过版本、无安装包校验、无红点** | `S/data/UpdateChecker.kt:508-514,380-394`；`S/data/PendingUpdateStore.kt:122-140`；`S/ui/settings/AboutScreen.kt:85` | 先补「跳过此版本」+ 红点（小改）；校验与渠道选择等我们真有双渠道发布流程再定 |
-| 2 | 环境变量可停用（保留值与备注，停止注入） | ❌ 无停用态，只能删 | `S/data/repository/EnvVarRepository.kt:29-42`（条目仅 id/key/note/createdAt）；`S/runtime/ExecutionCoordinator.kt:109,171,357`（全量注入） | 加 `enabled` 字段 + 注入过滤 + UI 开关（小改） |
+| 1 | 应用内更新：Stable/Beta 渠道、跳过某版本、下载前校验、About 与「检查更新」小红点、显示 build 号 | 🟡 **部分迁移** 已迁「跳过此版本」+ About/检查更新红点（`d3a4057a`，D）；下载前校验与渠道选择未做｜迁移前：🟡 已有检查更新/下载安装/build 号；渠道按安装版本自动判定（dev 包即 beta），**不可选**；**无跳过版本、无安装包校验、无红点** | `S/data/UpdateChecker.kt:508-514,380-394`；`S/data/PendingUpdateStore.kt:122-140`；`S/ui/settings/AboutScreen.kt:85` | 先补「跳过此版本」+ 红点（小改）；校验与渠道选择等我们真有双渠道发布流程再定 |
+| 2 | 环境变量可停用（保留值与备注，停止注入） | ✅ **已迁移** `cce60d24`（D）｜迁移前：❌ 无停用态，只能删 | `S/data/repository/EnvVarRepository.kt:29-42`（条目仅 id/key/note/createdAt）；`S/runtime/ExecutionCoordinator.kt:109,171,357`（全量注入） | 加 `enabled` 字段 + 注入过滤 + UI 开关（小改） |
 | 3 | 有定时任务的会话在两次运行之间保持运行（保留转圈与 Stop；Stop 确认后同时关闭其定时任务） | ❌ 无会话保活 | `S/scheduled/ScheduledTaskManager.kt`（仅 AlarmManager 注册/取消）；`S/service/SessionActivityTracker.kt:10-28` | 涉及会话生命周期与 Stop 语义，单独排期 |
 | 4 | 服务商额度与余额（服务商页、模型选择器与模型组胶囊、余额不足黄点、输入框上下文行） | 🟡 覆盖 DeepSeek/Moonshot/SiliconFlow/OpenRouter/中转站/订阅；黄点在**输入框模型 chip 旁**；模型组已迁为只读旧数据、无胶囊 | `S/provider/quota/ProviderQuota.kt:61-77,172-180`；`ProviderQuotaRepository.kt:114-140`；`S/ui/settings/ProviderQuotaSection.kt:159,175`；`ProviderDetailScreen.kt:582`；`S/ui/chat/ChatModelPickerSheet.kt:566`；`ChatScreenComposer.kt:1167-1174` | 按需补模型组胶囊；黄点位置与上游不同属设计选择 |
 | 5 | Share Chat：选消息导出为一张长图或可搜索 PDF（手机/平板宽度、深浅外观、带助手与模型页眉） | ❌ 消息分享=纯文本；会话导出 zip 内为 md/txt/json | `S/ui/chat/ChatScreenMessages.kt:114-123`；`S/ui/sessions/SessionListScreenRows.kt:1077-1087` | 独立功能（长图渲染 + PDF 生成），列为候选，非核心 |
@@ -48,19 +50,19 @@
 | # | 上游条目 | 我们现状 | 证据 | 建议动作 |
 |---|---|---|---|---|
 | 1 | 点回复显示用量不再因点链接/选字/点行间误触发 | ⛔ 我们用量只在长按菜单里，无该入口类型 | `S/ui/chat/ChatMessageMenu.kt:100,135`；`ChatScreenPane.kt:504` | 无 |
-| 2 | MCP 变量选择列表可滚动；变量编辑面板打开即完全展开 | 🟡 选择器**不可滚动**（普通 Column）；sheet **默认部分展开**；env 编辑框固定 72dp | `S/ui/settings/MCPIntegrationsScreen.kt:847-895,852-855,645-651`（对照表单本身用了 `skipPartiallyExpanded`，`:239-242`） | 加 `verticalScroll` + `skipPartiallyExpanded`（小改） |
+| 2 | MCP 变量选择列表可滚动；变量编辑面板打开即完全展开 | ✅ **已迁移** `06c74e31`（F）：选择器可滚动、面板开到底｜迁移前：🟡 选择器**不可滚动**（普通 Column）；sheet **默认部分展开**；env 编辑框固定 72dp | `S/ui/settings/MCPIntegrationsScreen.kt:847-895,852-855,645-651`（对照表单本身用了 `skipPartiallyExpanded`，`:239-242`） | 加 `verticalScroll` + `skipPartiallyExpanded`（小改） |
 | 3 | 华为等设备授权后不卡转圈：浏览器自动关闭回 App；完成页有「返回 Minis」按钮 | 🟡 完成页只有文字 + `window.close()`，**无按钮**；靠 localhost 深链回 App，无显式关 Tab 逻辑 | `S/auth/OAuthCallbackServer.kt:187-189`；`S/auth/OAuthRedirectActivity.kt:17-58`；`ClaudeOAuthManager.kt:187-192`；`OpenAIOAuthManager.kt:88-96` | 完成页加按钮（跳 localhost 深链）+ 视设备情况显式关 Tab（中改） |
-| 4 | 授权被拒/失败立即结束并给出原因，不再等 5 分钟 | 🟡 服务端收到 `error=` 会立即停监听；但只有 xAI 与 MCP 唤醒等待方，**Claude/OpenAI 无唤醒、无超时、无 `access_denied` 处理** | `S/auth/OAuthCallbackServer.kt:197-203`；`XAIOAuthManager.kt:455-459`；`mcp/oauth/MCPOAuthController.kt:99`；`ClaudeOAuthManager.kt:171-175`；`OpenAIOAuthManager.kt:70-86`；UI `S/ui/settings/ProviderDetailScreen.kt:1040-1067` | 接上 `onExternalCancel` + 显示原因（小改，设备侧可感） |
+| 4 | 授权被拒/失败立即结束并给出原因，不再等 5 分钟 | ✅ **已迁移** `7affbf19`（F）：Claude/OpenAI/OpenRouter/Antigravity 拒绝授权即时结束并给出原因｜迁移前：🟡 服务端收到 `error=` 会立即停监听；但只有 xAI 与 MCP 唤醒等待方，**Claude/OpenAI 无唤醒、无超时、无 `access_denied` 处理** | `S/auth/OAuthCallbackServer.kt:197-203`；`XAIOAuthManager.kt:455-459`；`mcp/oauth/MCPOAuthController.kt:99`；`ClaudeOAuthManager.kt:171-175`；`OpenAIOAuthManager.kt:70-86`；UI `S/ui/settings/ProviderDetailScreen.kt:1040-1067` | 接上 `onExternalCancel` + 显示原因（小改，设备侧可感） |
 | 5 | 模型拒绝回应时明确提示、可重试，不再无声结束 | ❌ 空回复提示以 `finishedCleanly` 为条件，拒答仍留空气泡 | `S/agent/AgentLoop.kt:929-995`；provider 层无 refusal 分支 | 识别 refusal（内容/stop_reason）→ 可见提示 + 可重试（中改） |
 | 6 | Claude 5「关闭思考」真正关闭（不能关的降到最低档） | ✅ | `S/provider/thinking/ThinkingRuleResolver.kt:710-722`；`OpenAIProviderResponses.kt:184`；`provider/anthropic/AnthropicProvider.kt:436-450` | 无 |
 | 7 | 定时任务卡片显示第几次运行与下一步，结束后不显示为空 | 🟡 有「下次运行」；**无「第 N 次」** | `S/ui/scheduled/ScheduledTasksScreen.kt:233-234`；`S/scheduled/ScheduledTask.kt:192`；`S/ui/scheduled/ScheduledTaskRunsScreen.kt:74,104-119` | 卡片加「第 N 次」（小改） |
 | 8 | 子代理生成的文件/图片与其创建的定时任务归属当前会话 | 🟡 文件写入按**调用方 session** 作用域，但子代理跑在自己的子会话；定时任务**无来源会话字段** | `S/runtime/guest/ModelUseOffloadHandlerImages.kt:254-281`；`S/agent/subagents/AppSubAgentPort.kt:83-89`；`S/scheduled/ScheduledTask.kt:161-195` | 子代理产物重挂父会话 + 定时任务加创建者字段（中改，涉及数据模型，单独排期） |
-| 9 | 模型选择器里模型名不再过早换行 | ❌ 模型名 Text 无 `maxLines`/`overflow` | `S/ui/chat/ChatModelPickerSheet.kt:654,771`；`S/ui/components/UnifiedModelPickerSheet.kt:545,559` | 加 `maxLines=1` + Ellipsis（微改） |
+| 9 | 模型选择器里模型名不再过早换行 | ✅ **已迁移** `06c74e31`（F）｜迁移前：❌ 模型名 Text 无 `maxLines`/`overflow` | `S/ui/chat/ChatModelPickerSheet.kt:654,771`；`S/ui/components/UnifiedModelPickerSheet.kt:545,559` | 加 `maxLines=1` + Ellipsis（微改） |
 | 10 | 点停止不再因每条运行中的 shell 卡一下 | ✅ 整进程组一次 TERM/KILL，最多等 900ms | `S/runtime/ExecutionCoordinator.kt:303-310`；`S/runtime/ubuntu/RootPersistentShell.kt:307-324` | 无 |
-| 11 | 配置审批弹窗跟随应用语言 | 🟡 弹窗标题/按钮**硬编码英文**，其余走资源 | `S/ui/settings/ConfigConfirmDialog.kt:85-87,123`（对照通知侧 `notif_config_confirm_*` 已本地化） | 改 `stringResource` + 补 8 语言（微改） |
+| 11 | 配置审批弹窗跟随应用语言 | ✅ **已迁移** `06c74e31`（F）：标题与按钮走资源，补 8 语言｜迁移前：🟡 弹窗标题/按钮**硬编码英文**，其余走资源 | `S/ui/settings/ConfigConfirmDialog.kt:85-87,123`（对照通知侧 `notif_config_confirm_*` 已本地化） | 改 `stringResource` + 补 8 语言（微改） |
 | 12 | 分享预览关闭闪退、分享页状态栏图标看不清 | ⛔ 无 Share Chat 功能 | — | 若做新功能 5 再一并处理 |
-| 13 | 定时任务不再误触发「重复调用工具」警告 | ❌ 循环/重复保护无 scheduled/unattended 分支 | `S/agent/AgentLoop.kt:1272-1300`；`S/agent/ToolLoopDetector.kt:75` | 检测器加豁免（小改，直接减少误报） |
-| 14 | 不把后台时间误判为卡顿而开启性能保护 | ❌ 心跳间隔 >3s 即计 hang 并开降级渲染 | `S/diagnostics/HangDetector.kt:76,193-230`；`S/ui/chat/LargeContentGuard.kt:220-222` | 加前后台判断（小改） |
+| 13 | 定时任务不再误触发「重复调用工具」警告 | ✅ **已迁移** `bb3818b2`（F）：重复调用计数在新请求开始时清零｜迁移前：❌ 循环/重复保护无 scheduled/unattended 分支 | `S/agent/AgentLoop.kt:1272-1300`；`S/agent/ToolLoopDetector.kt:75` | 检测器加豁免（小改，直接减少误报） |
+| 14 | 不把后台时间误判为卡顿而开启性能保护 | ✅ **已迁移** `03be5948`（F）：非前台观测不计 hang｜迁移前：❌ 心跳间隔 >3s 即计 hang 并开降级渲染 | `S/diagnostics/HangDetector.kt:76,193-230`；`S/ui/chat/LargeContentGuard.kt:220-222` | 加前后台判断（小改） |
 
 ### 1.3 打磨
 
@@ -79,11 +81,11 @@
 
 | # | 上游条目 | 我们现状 | 证据 | 建议动作 |
 |---|---|---|---|---|
-| 1 | 对话内提问卡片（选项/确认/多题向导），未作答的问题在 App 关闭后仍可作答 | 🟡 有单选/多选/自定义/跳过卡片；**无多题向导**（只取 `firstOrNull`）；**进程内内存态，关 App 不保留** | `S/ui/chat/ChatAgentStateUI.kt:76-227`；`S/ui/chat/ChatScreen.kt:1470`；`S/tools/QuestionCenter.kt:11-13`；`S/tools/AskUserQuestionTool.kt:46` | 先做持久化（问题落库 + 恢复），再做多题向导（中改） |
+| 1 | 对话内提问卡片（选项/确认/多题向导），未作答的问题在 App 关闭后仍可作答 | ❌ **未迁移**。试做过「卡片落 SharedPreferences、重启后以带原问题的用户消息送回」的方案，编译未通过即撤回（半成品补丁不在仓库）。助手回合要等整轮工具结束才写库，进程被杀后历史里没有可配对的 tool_use，所以不能照「恢复挂起的工具调用」去做；等上游源码再按其实现对齐｜迁移前：🟡 有单选/多选/自定义/跳过卡片；**无多题向导**（只取 `firstOrNull`）；**进程内内存态，关 App 不保留** | `S/ui/chat/ChatAgentStateUI.kt:76-227`；`S/ui/chat/ChatScreen.kt:1470`；`S/tools/QuestionCenter.kt:11-13`；`S/tools/AskUserQuestionTool.kt:46` | 先做持久化（问题落库 + 恢复），再做多题向导（中改） |
 | 2 | 连续工具调用折叠成「运行了 N 个工具 · 9s」，设置 › 外观 › 工具调用，默认关闭 | 🟡 有折叠行与开关，但开关在「设置 › 聊天」、默认开启、文案「已完成 N 个步骤」 | `S/ui/chat/ChatWorkProcessUI.kt:91-160`；`S/ui/settings/ChatInputSettingsScreen.kt:225-241`；`S/data/StepsPresentationPrefs.kt:61`；`R/values-zh/strings.xml:1499-1509` | 对齐上游（默认关、位置、文案）或保持现状——需产品取舍 |
 | 3 | 定时任务：标题下倒计时胶囊；常驻通知与浮动窗显示「下次运行 · 2/30」 | 🟡 仅列表页「下次运行 X」与完成通知 | `S/ui/scheduled/ScheduledTasksScreen.kt:233-241`；`S/scheduled/ScheduledAgentRunner.kt:343` | 与 beta.1 新功能 3 一起排期 |
 | 4 | 输入框上方上下文用量与额度两行轮换显示 | ❌ 只有模型旁小圆点与消息菜单里的 ctx | `S/ui/chat/ChatScreenComposer.kt:1170`；`ChatReplyUsage.kt:66`；`ChatMessageMenu.kt:196` | 实现两行轮换（中改） |
-| 5 | 自动重试显示黄色「↻ 1/3」标记，点击看本次任务的重试记录 | ❌ 重试计数只在状态流，UI 无标记与记录 | `S/agent/AgentSession.kt:592-597`；`S/ui/chat/ChatViewModel.kt:123-126`；`ChatIndicators.kt:99-135` | 纯 UI 补齐（小改） |
+| 5 | 自动重试显示黄色「↻ 1/3」标记，点击看本次任务的重试记录 | ✅ **已迁移** `48e44ba5`（D）｜迁移前：❌ 重试计数只在状态流，UI 无标记与记录 | `S/agent/AgentSession.kt:592-597`；`S/ui/chat/ChatViewModel.kt:123-126`；`ChatIndicators.kt:99-135` | 纯 UI 补齐（小改） |
 | 6 | 工具支持嵌套结构参数，所有服务商 | ✅ object/array 递归建模并进入四家序列化与校验 | `S/data/model/AgentToolDefinition.kt:152-187`；`OpenAIProviderRequests.kt:439`；`provider/anthropic/AnthropicProvider.kt:466`；`provider/gemini/GeminiProvider.kt:343`；`S/tools/runtime/ToolCallValidator.kt:188-215` | 无 |
 
 ### 2.2 修复
@@ -91,18 +93,18 @@
 | # | 上游条目 | 我们现状 | 证据 | 建议动作 |
 |---|---|---|---|---|
 | 1a | 启动 agent shell 不再让 App 静默退出 | ✅ 启动失败/启动即退出被捕获清理 | `S/runtime/ubuntu/RootPersistentShell.kt:86-141` | 无 |
-| 1b | `yes … \| head -c N` 不再卡到超时 | ❌ 只有标记行 + 900s 超时，无管道/提前结束检测 | `S/tools/ToolTimeoutPolicy.kt:26-29`；`S/runtime/ubuntu/RootPersistentShell.kt:171-190` | 检测管道关闭/提前结束并收尾（中改，真机可感） |
-| 2 | 超大文件不崩：file_read 流式、file_edit 拒 >8MB、文件工具超时 | ❌ file_read 全量入内存（50MB 上限）；file_edit 无 8MB 拒绝；两工具无 `timeoutMs` → 不套超时 | `S/tools/FileReadTool.kt:65-69`；`FileEditTool.kt:92`；`ToolRegistry.kt:308`；`ToolTimeoutPolicy.kt:41-43` | 建议优先：加 timeoutMs + 8MB 拒绝 + 流式读（中改，防卡死/崩溃） |
+| 1b | `yes … \| head -c N` 不再卡到超时 | 🟡 **部分迁移** `1bb168f3`（F）修的是**读 stdin 的命令吃掉完成标记**（命令包成 `{ … } < /dev/null`）。字面的 `yes | head -c N` 在迁移前实测就不卡，不是这条修复的触发条件；上游说明里那条命令只是例子，真实问题类别以此为准。管道提前收尾检测未做｜迁移前：❌ 只有标记行 + 900s 超时，无管道/提前结束检测 | `S/tools/ToolTimeoutPolicy.kt:26-29`；`S/runtime/ubuntu/RootPersistentShell.kt:171-190` | 检测管道关闭/提前结束并收尾（中改，真机可感） |
+| 2 | 超大文件不崩：file_read 流式、file_edit 拒 >8MB、文件工具超时 | ✅ **已迁移** `bf6fc4bd`（F）：file_read 流式、file_edit 拒 >8MB、三个文件工具 60s 超时；配套 `1d19d34c`（流式读写不受 50MB 内存上限约束）、`07f55187`（分享大文件）、`b55866a6`（安装 APK 暂存）｜迁移前：❌ file_read 全量入内存（50MB 上限）；file_edit 无 8MB 拒绝；两工具无 `timeoutMs` → 不套超时 | `S/tools/FileReadTool.kt:65-69`；`FileEditTool.kt:92`；`ToolRegistry.kt:308`；`ToolTimeoutPolicy.kt:41-43` | 建议优先：加 timeoutMs + 8MB 拒绝 + 流式读（中改，防卡死/崩溃） |
 | 3 | 后台被拒启前台服务时不再崩溃 | ✅ 无活动会话拒绝起 FGS | `S/service/AgentForegroundServicePolicy.kt:16-20`；`AgentForegroundService.kt:75-77,476-484` | 无 |
-| 4 | 拒信证书给出明确说明，不静默重试三次 | 🟡 已归类为永久失败、**不重试**；但专门文案只落日志，未直达用户 | `S/provider/LLMFailureClassifier.kt:312-320`；`S/agent/AgentLoop.kt:772-783`；用户侧文案 `S/ui/chat/LLMErrorPresenter.kt:85,113` | 把 TLS 专门文案接到横幅（微改） |
+| 4 | 拒信证书给出明确说明，不静默重试三次 | ✅ **已迁移** `cf9f03b9`（F）｜迁移前：🟡 已归类为永久失败、**不重试**；但专门文案只落日志，未直达用户 | `S/provider/LLMFailureClassifier.kt:312-320`；`S/agent/AgentLoop.kt:772-783`；用户侧文案 `S/ui/chat/LLMErrorPresenter.kt:85,113` | 把 TLS 专门文案接到横幅（微改） |
 | 5 | Android 备份能在旧 iOS 恢复服务商密钥与环境变量 | ✅ 线格式与 iOS 冻结结构一致，含 ISO-8601 与跨端标记 | `S/backup/BackupFormat.kt:156-159,402-415,427-452`；`BackupExporter.kt:710-767,833` | 无 |
 | 6 | 重新打开对话后工具耗时不再丢失 | ❌ 从 DB 重建块时不设耗时，codec 也不编码 | `S/ui/chat/ChatModels.kt:126`；`ChatMessageMapper.kt:169-186` | 把耗时写进 `AssistantTurnCodec`（中改） |
-| 7 | 定时任务单条通知；预览显示「定时任务 · 名称」；新对话也显示倒计时胶囊 | 🟡 单通知已实现（`task.id.hashCode()` 唯一，重跑替换）；**预览无前缀**；**无胶囊** | `S/scheduled/ScheduledAgentRunner.kt:322-355`；`S/ui/sessions/SessionListScreenRows.kt:573` | 补预览前缀（小改）；胶囊并入 2.1-3 |
+| 7 | 定时任务单条通知；预览显示「定时任务 · 名称」；新对话也显示倒计时胶囊 | 🟡 **部分迁移** `89d7f72c`（F）：通知正文首行改为「定时任务 · 名称」；会话列表预览前缀与倒计时胶囊未做｜迁移前：🟡 单通知已实现（`task.id.hashCode()` 唯一，重跑替换）；**预览无前缀**；**无胶囊** | `S/scheduled/ScheduledAgentRunner.kt:322-355`；`S/ui/sessions/SessionListScreenRows.kt:573` | 补预览前缀（小改）；胶囊并入 2.1-3 |
 | 8 | 工具胶囊 Stop 不残留「运行中」；旧胶囊的 Stop 不误停当前回复 | ✅ 停止时在飞工具块统一翻 CANCELLED；仅 RUNNING 渲染停止按钮 | `S/agent/AgentLifecycle.kt:119-165`；`S/ui/chat/ChatAssistantMessageUI.kt:508-513`；`ChatScreenMessages.kt:630-637`；`ChatMessageMapper.kt:177-183` | 无 |
 | 9 | 标题后红色模型切换闪烁不卡住 | ⛔ 触发端已按上游修复（同模型换端点不闪）；我们**从未有该红闪 UI**，无卡住路径 | `S/agent/AgentLoop.kt:677-724`；`S/ui/chat/ChatViewModel.kt:106-107`（无消费者） | 无（可考虑清理死状态 `fallbackTrigger`） |
-| 10 | App 自处理的事（图片压缩、上下文自愈）不再弹提示 | ❌ 图片压缩仍弹 Snackbar；无自动修复类过滤 | `S/ui/chat/ChatScreen.kt:1006-1032`；`R/values-zh/strings.xml:1180` | 过滤自动类提示（微改） |
+| 10 | App 自处理的事（图片压缩、上下文自愈）不再弹提示 | ✅ **已迁移** `2900e81e`、`06c74e31`（F）：图片压缩不再弹 Snackbar｜迁移前：❌ 图片压缩仍弹 Snackbar；无自动修复类过滤 | `S/ui/chat/ChatScreen.kt:1006-1032`；`R/values-zh/strings.xml:1180` | 过滤自动类提示（微改） |
 | 11 | 运行中发送的消息不留会被模型模仿的桥接行 | ✅ bridge 只进 `agentHistory`，从不落库、不进 UI | `S/agent/AgentSend.kt:139-141`；`AgentLoop.kt:1138-1141`；`S/ui/chat/ChatViewModel.kt:237` | 无（附注：`ChatModels.kt:182-200` 过滤名单是旧文案，可清理） |
-| 12 | 运行中的 STDIO MCP 服务器有上限；停止时结束整个进程树 | 🟡 仅有连接扇出并发上限 4；**运行中数量无上限**；停止只 destroy 直接子进程，无进程组 | `S/mcp/client/MCPProvider.kt:39,108-110`；`MCPStdioTransport.kt:193-196` | 加运行上限 + 进程组终止（中改，防泄漏） |
+| 12 | 运行中的 STDIO MCP 服务器有上限；停止时结束整个进程树 | ✅ **已迁移** `58572fb7`（F）：运行上限 + 停止时结束整个进程树｜迁移前：🟡 仅有连接扇出并发上限 4；**运行中数量无上限**；停止只 destroy 直接子进程，无进程组 | `S/mcp/client/MCPProvider.kt:39,108-110`；`MCPStdioTransport.kt:193-196` | 加运行上限 + 进程组终止（中改，防泄漏） |
 
 ### 2.3 打磨
 
@@ -120,7 +122,7 @@
 | # | 上游条目 | 我们现状 | 证据 | 建议动作 |
 |---|---|---|---|---|
 | 1 | 长任务增量裁剪上下文（先从最旧清思考、卸载大工具输出、合并旧步骤） | 🟡 有旧区大工具输出清理与超限卸载；**缺清旧推理、合并旧步骤** | `S/agent/OutgoingHistory.kt:88-131`；`ToolResultBudget.kt:20-40`；`CompactionSummarizer.kt:106` | 长任务稳定性项，建议优先 |
-| 2 | 停止按钮先问「停止这个任务？」，可在 设置 › 外观 关闭 | ❌ 直接 `cancelStream()`，无确认与设置项 | `S/ui/chat/ChatScreenComposer.kt:1656-1675` | 加确认 + 设置项（小改） |
+| 2 | 停止按钮先问「停止这个任务？」，可在 设置 › 外观 关闭 | ✅ **已迁移** `824cb0fc`（D）｜迁移前：❌ 直接 `cancelStream()`，无确认与设置项 | `S/ui/chat/ChatScreenComposer.kt:1656-1675` | 加确认 + 设置项（小改） |
 | 3 | 子代理卡片显示任务、工具调用、最新输出，可 Steer/Stop；完成通知主对话 | 🟡 有任务/结果/Steer/Stop 与完成回传；**卡片不显示工具调用与实时输出** | `S/ui/chat/ChatSubAgentCard.kt:65-165`；`S/agent/subagents/SubAgentRuntime.kt:309-313` | 补工具调用与最新输出（中改） |
 | 4 | 最多同时 6 个对话、每对话 3 个子代理 | 🟡 子代理 3 一致；**会话上限是 5** | `S/service/SessionConcurrencyManager.kt:15`；`SubAgentJobRegistry.kt:310` | 对齐为 6（微改）或保持 5（需理由） |
 | 5 | 长按定时任务计时胶囊 → 「立即执行」 | 🟡 有列表/编辑页按钮；无计时胶囊与长按菜单 | `S/ui/scheduled/ScheduledTasksScreen.kt:241`；`ScheduledTaskEditScreen.kt:664` | 并入 2.1-3 胶囊工作 |
@@ -129,7 +131,7 @@
 | 8 | 长按工具状态栏切换预览窗；长按思考块切换「流式展开思考」 | 🟡 两项都是设置里的开关，无长按手势 | `S/ui/settings/ChatInputSettingsScreen.kt:194,156`；`S/ui/chat/ChatComposerWidgets.kt:781-975`；`ChatAssistantMessageUI.kt:688-694` | 可选 |
 | 9 | 朗读音量滑块 + 朗读时压低其他应用 | 🟡 已有 ducking（`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`）；**无音量滑块** | `S/speech/ReadAloudPlayer.kt:569` | 加滑块（小改） |
 | 10 | 设置 › 存储：清理孤立的会话文件 | ❌ 只有针对现存会话的 Clear Session Files | `S/ui/settings/StorageManagementScreen.kt:241-258` | 加 orphan 扫描清理（中改，省空间收益明确） |
-| 11 | OpenAI 兼容服务商可单独设置响应等待时间 | ❌ `readTimeout` 硬编码 600s，配置无该字段 | `S/provider/openai/OpenAIProvider.kt:355`；`S/data/model/ProviderConfig.kt` | 加 per-provider 超时字段（小改，本地模型受益） |
+| 11 | OpenAI 兼容服务商可单独设置响应等待时间 | ✅ **已迁移** `f20dc6ca`（D）｜迁移前：❌ `readTimeout` 硬编码 600s，配置无该字段 | `S/provider/openai/OpenAIProvider.kt:355`；`S/data/model/ProviderConfig.kt` | 加 per-provider 超时字段（小改，本地模型受益） |
 | 12 | 显示 Kimi Code 订阅用量；MiniMax、OpenCode 链接官方控制台 | ✅ | `S/provider/quota/ProviderQuota.kt:64,91,138-139,154,181`；`S/ui/settings/ProviderQuotaSection.kt:51` | 无 |
 
 ### 3.2 修复
@@ -146,13 +148,13 @@
 | 8 | shell 输出中文等多字节不乱码；沙盒 git 恢复可用 | ✅ LANG/LC_ALL=C.UTF-8；guest 同 locale；UTF-8 解码；git 已安装并探测 | `S/runtime/ubuntu/UbuntuKernel.kt:623-624`；`UbuntuProvisioner.kt:31,158,228`；`S/runtime/guest/GuestCommandBridge.kt:372-392` | 无 |
 | 9 | 发送前被缩小的图片不再从请求里丢失 | ✅ 压缩字节进 ImagePart；超预算改可回读文本占位 | `S/ui/chat/UserAttachmentPreparer.kt:219-225`；`S/provider/ImageBudget.kt:30-46`；`S/ui/chat/RequestImageBudget.kt:14-75` | 无 |
 | 10 | 浏览器 UA 设置对所有新标签生效；Cookie 全部清除与逐站删除恢复 | ✅ UA 对新标签生效；逐站删除仅写空 Cookie，**可能不彻底** | `S/browser/BrowserTabPool.kt:833-836,1074-1079`；`S/ui/browser/BrowserSettingsSheet.kt:390-392,427-428` | 可加固逐站删除（小改） |
-| 11 | 录音中点击发送等识别完成、只发一次 | ❌ 直接 sendMessage，发送键只看 hasText/附件 | `S/ui/chat/ChatScreenHandlers.kt:14-48`；`ChatScreenComposer.kt:1654-1692` | 发送前 await 识别结果（中改） |
-| 12 | 记忆/人设/技能编辑器里键盘不遮挡正在编辑的行 | ❌ 这些编辑器未接焦点滚动与 imePadding | `S/ui/util/BringIntoViewOnFocus.kt:38`（仅两处使用）；`S/ui/chat/MemoryDetailScreens.kt:67`；`S/ui/settings/SoulSettingsScreen.kt:650` | 接入 bringIntoView/imePadding（小改） |
+| 11 | 录音中点击发送等识别完成、只发一次 | ✅ **已迁移** `af0897f4`（F）｜迁移前：❌ 直接 sendMessage，发送键只看 hasText/附件 | `S/ui/chat/ChatScreenHandlers.kt:14-48`；`ChatScreenComposer.kt:1654-1692` | 发送前 await 识别结果（中改） |
+| 12 | 记忆/人设/技能编辑器里键盘不遮挡正在编辑的行 | ✅ **已迁移** `ecfcb409`（F）｜迁移前：❌ 这些编辑器未接焦点滚动与 imePadding | `S/ui/util/BringIntoViewOnFocus.kt:38`（仅两处使用）；`S/ui/chat/MemoryDetailScreens.kt:67`；`S/ui/settings/SoulSettingsScreen.kt:650` | 接入 bringIntoView/imePadding（小改） |
 | 13 | 对话标题跟随重命名/重新生成；任务结束后「正在思考」行不残留 | ✅ | `S/agent/AgentSend.kt:283`；`AgentLoop.kt:1219-1240`；`AgentSession.kt:277-284`；`S/ui/chat/ChatScreen.kt:182` | 无 |
-| 14 | 复制的对话标题递增（「Foo (Copy)」「Foo (Copy 2)」） | ❌ 只有 `(Copy)`，再复制得 `(Copy) (Copy)` | `S/data/SessionForkManager.kt:90`；`R/values/strings.xml:1954` | 微改 |
+| 14 | 复制的对话标题递增（「Foo (Copy)」「Foo (Copy 2)」） | ✅ **已迁移** `06c74e31`（F）｜迁移前：❌ 只有 `(Copy)`，再复制得 `(Copy) (Copy)` | `S/data/SessionForkManager.kt:90`；`R/values/strings.xml:1954` | 微改 |
 | 15 | 备份：保存某服务器时其他 SMB 不再用错凭据列出；恢复进度本地化 | 🟡 恢复进度已全本地化；SMB **结构上不串**（每远程取自己名字的密钥、同名被拒），未见专门修复 | `S/ui/settings/backup/BackupAndRestoreScreenSections.kt:573-581`；`S/backup/remote/RcloneRemoteStore.kt:178,196,210,309`；`RcloneDestinationsViewModel.kt:190,211,247,255` | 无（保存时全量重同步所有远程，可留意） |
 | 16 | 提问卡片被截断的问题总能展开；「移动到…」只在有共享内容时显示 | ✅ 问题文本可滚动全览；`Move to…` 由 `hasInjectedShareContent` 驱动，发送/关面板即清 | `S/ui/chat/ChatAgentStateUI.kt:150-160`；`S/ui/chat/ChatScreenComposer.kt:326`；`ChatScreenBottom.kt:226-227,315` | 无 |
-| 17 | 悬浮胶囊拖到靠近左/上边缘时位置不丢失 | 🟡 恢复与旋转会夹回屏内；**拖拽松手保存不夹取**，负坐标存档后读端判无效 → 位置回默认 | `S/service/ToolOverlayController.kt:249-256,659-660,758-765,928-932`；`S/data/repository/BackgroundSettingsRepository.kt:81-85` | 保存前 clamp（微改） |
+| 17 | 悬浮胶囊拖到靠近左/上边缘时位置不丢失 | ✅ **已迁移** `06c74e31`（F）：保存前夹进屏幕｜迁移前：🟡 恢复与旋转会夹回屏内；**拖拽松手保存不夹取**，负坐标存档后读端判无效 → 位置回默认 | `S/service/ToolOverlayController.kt:249-256,659-660,758-765,928-932`；`S/data/repository/BackgroundSettingsRepository.kt:81-85` | 保存前 clamp（微改） |
 | 18 | 启动反复崩溃能自恢复；崩溃提示点「暂不」不再关闭崩溃保护 | ✅ 连续崩溃进安全模式仍可启动；暂不分享只 24h 抑制提示，force-home 保护保留 | `S/crash/CrashFrequencyDetector.kt:57,263-265,606-616`；`S/MinisApp.kt:84,117-118,142,378` | 无 |
 | 19 | 用量：零余额币种不盖过仍有余额的另一种；点回复下方仅靠末尾才弹用量胶囊 | 🟡 币种显示已正确（全零才 EMPTY，headline 取最大）；**用量胶囊触发状态是死路径**，点空白弹胶囊的交互不存在 | `S/provider/quota/ProviderQuota.kt:38-50`；`S/ui/settings/ProviderQuotaSection.kt:141-145`；`S/ui/chat/ChatScreen.kt:390-391`；`ChatMessageMenu.kt:135,195` | 要么接上交互，要么删死代码（微改） |
 
@@ -231,3 +233,17 @@
 - 存储孤立文件清理（3.1-10）；配置变更摘要与详情页（1.1-6）；Codex 速度三档（1.1-7）
 
 **不做（除非需求变化）**：见第 5 节。
+
+---
+
+## 7. 迁移进度与暂缓
+
+**已迁移 18 项、部分迁移 3 项**（1.1-1 更新跳过、2.2-1b、2.2-7）。第 1 批除 4.2-1 外均已迁；第 2 批已迁环境变量停用、更新跳过+红点、STDIO MCP 上限、编辑器键盘遮挡、录音中点发送、OpenAI 兼容独立超时；批外另迁了停止前确认（3.1-2）与自动重试标记（2.1-5）。逐项提交号见各表。
+
+**第 1 批未做**：提问卡片滚动不回弹（4.2-1）。
+
+**第 2 批未做**：提问卡片持久化（2.1-1，试做后撤回，原因见该行）、过期工具耗时落库（2.2-6）、上下文用量/额度两行轮换（2.1-4）、朗读音量滑块（3.1-9）、MCP/Skills 面板搜索与批量（3.1-6/7）、增量裁剪补充清旧推理与合并旧步骤（3.1-1）。
+
+**决定（2026-10-16，项目所有者）**：上游 beta 源码不公开，这些剩余条目只能依据说明原文和 APK 资源名猜实现，且上游做法已与我们当前架构不再贴合——**暂停迁移，等上游把源码完整发布后再按其实现对齐**。第 3 批同样暂缓。已迁移的功能项（`D` 分支上的 `824cb0fc`、`48e44ba5`、`cce60d24`、`f20dc6ca`、`d3a4057a`）是否保留，也待那时再定。
+
+**与上游行为的已知出入**：2.2-1b 的字面命令 `yes | head -c N` 在迁移前就不卡，修复的是同一类里「读 stdin 的命令」；上游说明对问题的描述不准确，不能据此宣称「已复现并修复上游问题」。
