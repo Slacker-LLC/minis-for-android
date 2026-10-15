@@ -2,7 +2,9 @@ package com.openminis.app.voicecall.controller
 
 import com.openminis.app.voicecall.model.BloubState
 import com.openminis.app.voicecall.model.CallMode
+import com.openminis.app.voicecall.runtime.CallEndReason
 import com.openminis.app.voicecall.runtime.CallEvent
+import com.openminis.app.voicecall.runtime.CallNotice
 import com.openminis.app.voicecall.runtime.CallRuntime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +30,7 @@ class CallControllerTest {
         val mutedEvents = mutableListOf<Boolean>()
         val interrupts = mutableListOf<Unit>()
         private val _events = MutableSharedFlow<CallEvent>(extraBufferCapacity = 16)
+        fun emit(event: CallEvent) { _events.tryEmit(event) }
         override val events: SharedFlow<CallEvent> = _events
         override fun start() { started++ }
         override fun stop() { stopped++; _events.tryEmit(CallEvent.BloubStateChanged(BloubState.IDLE)) }
@@ -150,5 +153,42 @@ class CallControllerTest {
         val c = controller(runtime)
         c.sendText("你好")
         assertEquals(listOf("你好"), runtime.sentTexts)
+    }
+
+    @Test
+    fun `runtime ended event leaves the call and keeps transcript for the ended screen`() {
+        val rt = FakeRuntime()
+        val c = controller(rt)
+        c.startCall(CallMode.VOICE)
+        rt.emit(CallEvent.Transcript(fromUser = true, text = "你好"))
+        rt.emit(CallEvent.Ended(CallEndReason.IDLE_TIMEOUT, null))
+        assertFalse(c.state.active)
+        assertEquals(CallEndReason.IDLE_TIMEOUT, c.state.ended?.reason)
+        assertEquals(listOf("你好"), c.state.transcript.map { it.text })
+        // 再次开始通话会清掉结束页与旧记录。
+        c.startCall(CallMode.VOICE)
+        assertNull(c.state.ended)
+        assertTrue(c.state.transcript.isEmpty())
+    }
+
+    @Test
+    fun `ended event outside a call is ignored`() {
+        val rt = FakeRuntime()
+        val c = controller(rt)
+        rt.emit(CallEvent.Ended(CallEndReason.TASK_FAILED, "x"))
+        assertNull(c.state.ended)
+    }
+
+    @Test
+    fun `identical notices re-trigger the toast and can be cleared`() {
+        val rt = FakeRuntime()
+        val c = controller(rt)
+        c.startCall(CallMode.VOICE)
+        rt.emit(CallEvent.Notice(CallNotice.IDLE_REMINDER))
+        val first = c.state.toast!!.seq
+        c.clearToast()
+        assertNull(c.state.toast)
+        rt.emit(CallEvent.Notice(CallNotice.IDLE_REMINDER))
+        assertTrue(c.state.toast!!.seq > first)
     }
 }

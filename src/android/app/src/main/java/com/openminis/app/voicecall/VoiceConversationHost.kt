@@ -1,8 +1,25 @@
 package com.openminis.app.voicecall
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.CallEnd
+import androidx.compose.material.icons.rounded.ChatBubbleOutline
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.MicOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -11,7 +28,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -30,13 +48,14 @@ import com.openminis.app.ui.chat.ChatViewModel
 import com.openminis.app.ui.chat.TaskWorkSummary
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisOutlinedButton
-import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.minisPageBackground
 import com.openminis.app.voicecall.controller.CallController
 import com.openminis.app.voicecall.grok.VoiceBotAvatar
 import com.openminis.app.voicecall.grok.voiceCallStatusRes
 import com.openminis.app.voicecall.model.BloubState
+import com.openminis.app.voicecall.model.CallEnded
+import com.openminis.app.voicecall.model.CallToast
 import com.openminis.app.voicecall.model.CallMode
 import com.openminis.app.voicecall.runtime.*
 import kotlinx.coroutines.delay
@@ -64,16 +83,6 @@ internal fun VoiceConversationHost(
             gateway,
             AgentCallSpeechOutput(player),
             scope,
-            texts = CallRuntimeTexts(
-                listening = context.getString(R.string.voice_call_listening_hint),
-                recognitionFailed = { detail ->
-                    context.getString(R.string.voice_call_recognition_failed, detail)
-                },
-                taskIncomplete = { detail ->
-                    if (detail.isNullOrBlank()) context.getString(R.string.voice_call_task_incomplete_generic)
-                    else context.getString(R.string.voice_call_task_incomplete, detail)
-                },
-            ),
         )
     }
     val controller = remember(runtime) { CallController(runtime, scope) }
@@ -81,6 +90,7 @@ internal fun VoiceConversationHost(
     var opening by remember(viewModel) { mutableStateOf(false) }
     var requestVersion by remember(viewModel) { mutableIntStateOf(0) }
     var entryError by remember(viewModel) { mutableStateOf<String?>(null) }
+    var chatOpen by remember(viewModel) { mutableStateOf(false) }
     val pending by DeepLinkCoordinator.pendingChatAction.collectAsState()
     val lifecycleState by lifecycle.currentStateAsState()
     val modelName by viewModel.modelName.collectAsState()
@@ -90,6 +100,7 @@ internal fun VoiceConversationHost(
         requestVersion++
         opening = false
         visible = false
+        chatOpen = false
         controller.endCall()
         viewModel.voiceConversationActive.value = false
     }
@@ -137,6 +148,11 @@ internal fun VoiceConversationHost(
             openCall()
         }
     }
+    // runtime 自动挂断（空闲/连续出错）后音频已停，只需把聊天页的「语音占用」标记放掉。
+    val ended = controller.state.ended
+    LaunchedEffect(ended) {
+        if (ended != null) viewModel.voiceConversationActive.value = false
+    }
     LaunchedEffect(active) {
         while (controller.state.active) {
             delay(1000)
@@ -163,121 +179,303 @@ internal fun VoiceConversationHost(
     if (visible) {
         Dialog(onDismissRequest = { endAudio() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             Surface(Modifier.fillMaxSize(), color = minisPageBackground(ChatColors.isDark)) {
-                val characterState = controller.state.effectiveBloubState
+                val state = controller.state
+                val characterState = state.effectiveBloubState
                 val statusLine = when {
                     entryError != null -> entryError.orEmpty()
                     opening -> stringResource(R.string.voice_call_preparing)
+                    state.ended != null -> stringResource(R.string.voice_call_ended_title)
                     else -> stringResource(voiceCallStatusRes(characterState))
                 }
-                val detailLine = if (active) controller.state.ai.subtitle else stringResource(R.string.voice_call_hint)
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .systemBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    // 顶栏：只在通话进行时给计时，失败/准备中不显示无意义的 00:00。
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.voice_call_title), style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.weight(1f))
-                        if (active) {
-                            Text(
-                                callClock(controller.state.elapsedSeconds),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = ChatColors.secondaryText,
-                            )
-                        }
-                    }
-                    Text(
-                        modelName.ifBlank { context.getString(R.string.voice_call_model) },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ChatColors.secondaryText,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    // 中部：角色居中，下面是状态词与最近一句字幕（长回答截断，全文在聊天里看）。
-                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Column(
-                            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            VoiceBotAvatar(characterState, Modifier.size(180.dp))
-                            Spacer(Modifier.height(20.dp))
-                            Text(
-                                statusLine,
-                                style = MaterialTheme.typography.headlineSmall,
-                                textAlign = TextAlign.Center,
-                                color = if (characterState == BloubState.ERROR) MaterialTheme.colorScheme.error else Color.Unspecified,
-                            )
-                            if (detailLine.isNotBlank()) {
+                val toastText = state.toast?.let { toastText(context, it) }
+                Box(Modifier.fillMaxSize()) {
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .systemBarsPadding()
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        // 顶栏：返回（结束音频）、计时、聊天记录。没有别的文字入口。
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { endAudio() }) {
+                                Icon(
+                                    Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = stringResource(R.string.voice_call_leave_to_chat),
+                                )
+                            }
+                            Spacer(Modifier.weight(1f))
+                            if (active) {
                                 Text(
-                                    detailLine,
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    callClock(state.elapsedSeconds),
+                                    style = MaterialTheme.typography.labelLarge,
                                     color = ChatColors.secondaryText,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 4,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(top = 10.dp),
+                                )
+                            }
+                            Spacer(Modifier.weight(1f))
+                            IconButton(onClick = { chatOpen = true }) {
+                                Icon(
+                                    Icons.Rounded.ChatBubbleOutline,
+                                    contentDescription = stringResource(R.string.voice_call_back),
                                 )
                             }
                         }
-                    }
 
-                    TaskWorkSummary(viewModel.agentSession.activeSessionId)
-
-                    // 底部：一行一个主操作（设计语言：整页最多一个强调按钮），
-                    // 其余行是可换行的文字按钮，最后一行始终留给离开/挂断。
-                    if (active) {
-                        val primary = when {
-                            controller.state.muted -> R.string.voice_call_unmute to { controller.setMuted(false) }
-                            characterState == BloubState.LISTENING -> R.string.voice_call_submit to { input.stop() }
-                            characterState == BloubState.ERROR -> R.string.voice_call_retry to { controller.interrupt(); controller.setMuted(false) }
-                            else -> R.string.voice_call_interrupt to { controller.interrupt(); controller.setMuted(false) }
+                        // 中部：只有角色和一个状态词。点角色：听的时候是「现在发送」，
+                        // 想/说/出错时是「打断并重新说」。
+                        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                val orbLabel = stringResource(
+                                    if (characterState == BloubState.LISTENING) R.string.voice_call_submit
+                                    else R.string.voice_call_interrupt,
+                                )
+                                VoiceBotAvatar(
+                                    if (state.ended != null) BloubState.MUTED else characterState,
+                                    Modifier
+                                        .size(240.dp)
+                                        .semantics { contentDescription = statusLine }
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                            enabled = active && characterState != BloubState.MUTED,
+                                            onClickLabel = orbLabel,
+                                        ) {
+                                            if (characterState == BloubState.LISTENING) input.stop()
+                                            else {
+                                                controller.interrupt()
+                                                controller.setMuted(false)
+                                            }
+                                        },
+                                )
+                                Spacer(Modifier.height(16.dp))
+                                Text(
+                                    statusLine,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    textAlign = TextAlign.Center,
+                                    color = if (characterState == BloubState.ERROR || entryError != null) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        ChatColors.secondaryText
+                                    },
+                                )
+                                state.ended?.let { EndedDetail(it) }
+                            }
                         }
-                        Row(
-                            Modifier.fillMaxWidth().padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (!controller.state.muted) {
-                                MinisOutlinedButton(onClick = { controller.setMuted(true) }) {
-                                    Text(stringResource(R.string.voice_call_mute))
+
+                        TaskWorkSummary(viewModel.agentSession.activeSessionId)
+
+                        // 底部：两个圆形按钮。静音只暂停音频，通话还在；挂断结束音频，
+                        // 已接受的 Agent 任务继续在原会话跑。
+                        Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 16.dp), contentAlignment = Alignment.Center) {
+                            when {
+                                active -> Row(horizontalArrangement = Arrangement.spacedBy(48.dp)) {
+                                    FilledIconButton(
+                                        onClick = { controller.setMuted(!state.muted) },
+                                        modifier = Modifier.size(68.dp),
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = if (state.muted) MaterialTheme.colorScheme.surfaceVariant
+                                            else MaterialTheme.colorScheme.primaryContainer,
+                                            contentColor = if (state.muted) MaterialTheme.colorScheme.onSurfaceVariant
+                                            else MaterialTheme.colorScheme.onPrimaryContainer,
+                                        ),
+                                    ) {
+                                        Icon(
+                                            if (state.muted) Icons.Rounded.MicOff else Icons.Rounded.Mic,
+                                            contentDescription = stringResource(
+                                                if (state.muted) R.string.voice_call_unmute else R.string.voice_call_mute,
+                                            ),
+                                            modifier = Modifier.size(30.dp),
+                                        )
+                                    }
+                                    FilledIconButton(
+                                        onClick = { endAudio() },
+                                        modifier = Modifier.size(68.dp),
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.error,
+                                            contentColor = MaterialTheme.colorScheme.onError,
+                                        ),
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.CallEnd,
+                                            contentDescription = stringResource(R.string.voice_call_end),
+                                            modifier = Modifier.size(30.dp),
+                                        )
+                                    }
+                                }
+                                opening -> Unit
+                                else -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    // 结束页（或入口失败）：回聊天 / 重新通话。聊天里能看到权限确认等细节。
+                                    MinisOutlinedButton(onClick = { endAudio() }) {
+                                        Text(stringResource(R.string.voice_call_leave_to_chat))
+                                    }
+                                    MinisButton(onClick = {
+                                        controller.endCall()
+                                        openCall()
+                                    }) {
+                                        Text(
+                                            stringResource(
+                                                if (state.ended != null) R.string.voice_call_restart else R.string.voice_call_retry,
+                                            ),
+                                        )
+                                    }
                                 }
                             }
-                            MinisButton(onClick = primary.second) { Text(stringResource(primary.first)) }
                         }
-                        FlowRow(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-                        ) {
-                            if (characterState == BloubState.THINKING || characterState == BloubState.SPEAKING) {
-                                MinisTextButton(onClick = {
-                                    controller.listenForFollowUp()
-                                    controller.setMuted(false)
-                                }) { Text(stringResource(R.string.voice_call_follow_up)) }
-                            }
-                            MinisTextButton(
-                                onClick = { input.cancel(); controller.setMuted(true) },
-                                enabled = characterState == BloubState.LISTENING && !controller.state.muted,
-                            ) { Text(stringResource(R.string.voice_cancel_recording)) }
-                            MinisTextButton(onClick = { if (player.isInitialized()) player.value.stop() }) {
-                                Text(stringResource(R.string.voice_stop_playback))
-                            }
-                            MinisTextButton(onClick = { gateway.cancel() }) {
-                                Text(stringResource(R.string.voice_stop_owned_turn))
+                    }
+
+                    // toast：悬在按钮上方，2.5 秒后自行消失。
+                    VoiceToast(toastText, state.toast?.seq) { controller.clearToast() }
+
+                    VoiceChatPanel(
+                        visible = chatOpen,
+                        lines = state.transcript,
+                        onClose = { chatOpen = false },
+                        onLeave = { endAudio() },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EndedDetail(ended: CallEnded) {
+    val context = LocalContext.current
+    val reason = when (ended.reason) {
+        CallEndReason.PERMISSION_DENIED -> context.getString(R.string.voice_call_permission)
+        CallEndReason.RECOGNITION_FAILED ->
+            context.getString(R.string.voice_call_recognition_failed, ended.detail.orEmpty())
+        CallEndReason.TASK_FAILED -> taskIncompleteText(context, ended.detail)
+        CallEndReason.IDLE_TIMEOUT -> context.getString(R.string.voice_call_ended_idle)
+    }
+    Column(
+        Modifier.padding(top = 8.dp).widthIn(max = 320.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(reason, style = MaterialTheme.typography.bodyMedium, color = ChatColors.secondaryText, textAlign = TextAlign.Center)
+        Text(
+            stringResource(R.string.voice_call_ended_footer),
+            style = MaterialTheme.typography.bodySmall,
+            color = ChatColors.secondaryText,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+private fun taskIncompleteText(context: android.content.Context, detail: String?): String =
+    if (detail.isNullOrBlank()) context.getString(R.string.voice_call_task_incomplete_generic)
+    else context.getString(R.string.voice_call_task_incomplete, detail)
+
+private fun toastText(context: android.content.Context, toast: CallToast): String = when (toast.kind) {
+    CallNotice.RECOGNITION_RETRY -> context.getString(R.string.voice_call_toast_retry)
+    CallNotice.TASK_FAILED -> taskIncompleteText(context, toast.detail)
+    CallNotice.IDLE_REMINDER -> context.getString(R.string.voice_call_toast_idle)
+}
+
+@Composable
+private fun BoxScope.VoiceToast(text: String?, seq: Long?, onGone: () -> Unit) {
+    LaunchedEffect(seq) {
+        if (seq != null) {
+            delay(2500)
+            onGone()
+        }
+    }
+    AnimatedVisibility(
+        visible = text != null,
+        modifier = Modifier.align(Alignment.BottomCenter).systemBarsPadding().padding(bottom = 128.dp, start = 24.dp, end = 24.dp),
+        enter = fadeIn(),
+        exit = fadeOut(),
+    ) {
+        // exit 动画期间 text 已为 null，保留最后一句避免闪空。
+        var last by remember { mutableStateOf(text.orEmpty()) }
+        if (text != null) last = text
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.inverseSurface,
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        ) {
+            Text(
+                last,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/** 聊天记录抽屉：本次通话里说过的话，底部「返回聊天」是权限确认被本页遮住时的出口。 */
+@Composable
+private fun BoxScope.VoiceChatPanel(
+    visible: Boolean,
+    lines: List<com.openminis.app.voicecall.model.CallLine>,
+    onClose: () -> Unit,
+    onLeave: () -> Unit,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = Modifier.align(Alignment.BottomCenter),
+        enter = slideInVertically { it } + fadeIn(),
+        exit = slideOutVertically { it } + fadeOut(),
+    ) {
+        Surface(
+            Modifier.fillMaxWidth().fillMaxHeight(0.85f),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 3.dp,
+            shadowElevation = 12.dp,
+        ) {
+            Column(Modifier.navigationBarsPadding().padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.voice_call_chat_title), style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.voice_call_chat_close))
+                    }
+                }
+                val listState = rememberLazyListState()
+                LaunchedEffect(lines.size) {
+                    if (lines.isNotEmpty()) listState.animateScrollToItem(lines.lastIndex)
+                }
+                if (lines.isEmpty()) {
+                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text(
+                            stringResource(R.string.voice_call_chat_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = ChatColors.secondaryText,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        Modifier.weight(1f).fillMaxWidth(),
+                        state = listState,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        items(lines) { line ->
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = if (line.fromUser) Arrangement.End else Arrangement.Start,
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = if (line.fromUser) MaterialTheme.colorScheme.primaryContainer
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.widthIn(max = 300.dp),
+                                ) {
+                                    Text(
+                                        line.text,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    )
+                                }
                             }
                         }
-                    } else {
-                        MinisButton(onClick = { openCall() }, enabled = !opening) { Text(stringResource(R.string.voice_call_retry)) }
                     }
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        // 「查看聊天」是权限确认被本页遮住时的出口；两个入口都结束音频，
-                        // 已接受的 Agent 任务继续在原会话跑。
-                        MinisTextButton(onClick = { endAudio() }) { Text(stringResource(R.string.voice_call_back)) }
-                        Spacer(Modifier.weight(1f))
-                        MinisOutlinedButton(onClick = { endAudio() }) { Text(stringResource(R.string.voice_call_end)) }
-                    }
+                }
+                MinisOutlinedButton(onClick = onLeave, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Text(stringResource(R.string.voice_call_leave_to_chat))
                 }
             }
         }

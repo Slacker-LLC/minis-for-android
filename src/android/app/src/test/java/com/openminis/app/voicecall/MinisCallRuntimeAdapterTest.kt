@@ -9,7 +9,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -18,6 +24,7 @@ import org.junit.Test
  * LISTENING → (final) → THINKING → SPEAKING → 播放完成 → LISTENING，
  * 以及打断/静音/失败时的状态与回调隔离（generation 防串台）。
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class MinisCallRuntimeAdapterTest {
 
     private class FakeInput : CallSpeechInput {
@@ -120,22 +127,6 @@ class MinisCallRuntimeAdapterTest {
     }
 
     @Test
-    fun `model failure stays on error until the user retries`() {
-        val (adapter, input, _) = harness({ Result.failure(RuntimeException("网络断了")) })
-        val states = mutableListOf<BloubState>()
-        val job = CoroutineScope(Dispatchers.Unconfined).launch { adapter.events.collect { if (it is CallEvent.BloubStateChanged) states += it.state } }
-        adapter.start()
-        input.fireFinal("你好")
-        assertTrue("must show ERROR", states.contains(BloubState.ERROR))
-        // 失败后留在 ERROR 等用户显式重试，不自动发起新一轮请求。
-        kotlinx.coroutines.runBlocking { kotlinx.coroutines.delay(1200) }
-        assertEquals("must wait for an explicit retry", BloubState.ERROR, states.lastOrNull())
-        adapter.interrupt()
-        assertEquals("retry resumes LISTENING", BloubState.LISTENING, states.lastOrNull())
-        job.cancel()
-    }
-
-    @Test
     fun `stop cancels everything and does not resurrect state`() {
         val (adapter, input, model) = harness()
         adapter.start()
@@ -144,6 +135,151 @@ class MinisCallRuntimeAdapterTest {
         adapter.stop()
         input.fireFinal("又来了")
         assertEquals(before, model.asked)
+    }
+
+    // ---- 容错与空闲：虚拟时钟下断言上限，避免出错后无声地一直耗电/请求 ----
+
+    private class Timed(modelResult: () -> Result<String> = { Result.success("收到") }) {
+        val scope = TestScope(UnconfinedTestDispatcher())
+        val input = FakeInput()
+        val model = FakeModel(modelResult)
+        val output = FakeOutput()
+        val adapter = MinisCallRuntimeAdapter(input, model, output, scope)
+        val events = mutableListOf<CallEvent>()
+        init { scope.launch { adapter.events.collect { events += it } } }
+        val states get() = events.filterIsInstance<CallEvent.BloubStateChanged>().map { it.state }
+        val notices get() = events.filterIsInstance<CallEvent.Notice>().map { it.kind }
+        val ended get() = events.filterIsInstance<CallEvent.Ended>()
+        fun pass(ms: Long) { scope.advanceTimeBy(ms); scope.runCurrent() }
+    }
+
+    @Test
+    fun `transient recognition errors retry twice then end the call`() {
+        val t = Timed()
+        t.adapter.start()
+        repeat(2) {
+            t.input.fireError(RecognitionError.NETWORK, "offline")
+            t.pass(CallLimits.RETRY_DELAY_MS + 1)
+        }
+        assertEquals("two automatic retries", 3, t.input.started)
+        assertEquals(listOf(CallNotice.RECOGNITION_RETRY, CallNotice.RECOGNITION_RETRY), t.notices)
+        assertTrue(t.states.contains(BloubState.CONFUSED))
+        assertTrue("still in the call", t.ended.isEmpty())
+        t.input.fireError(RecognitionError.NETWORK, "offline")
+        t.pass(CallLimits.RETRY_DELAY_MS + 1)
+        assertEquals(CallEndReason.RECOGNITION_FAILED, t.ended.single().reason)
+        assertEquals("offline", t.ended.single().detail)
+        assertEquals("no fourth attempt after hanging up", 3, t.input.started)
+    }
+
+    @Test
+    fun `missing microphone permission ends immediately without retrying`() {
+        val t = Timed()
+        t.adapter.start()
+        t.input.fireError(RecognitionError.PERMISSION_DENIED, null)
+        t.pass(CallLimits.RETRY_DELAY_MS + 1)
+        assertEquals(CallEndReason.PERMISSION_DENIED, t.ended.single().reason)
+        assertEquals(1, t.input.started)
+        assertTrue(t.notices.isEmpty())
+    }
+
+    @Test
+    fun `silence results never count as failures`() {
+        val t = Timed()
+        t.adapter.start()
+        repeat(10) {
+            t.input.fireError(RecognitionError.NO_MATCH, null)
+            t.pass(CallLimits.RETRY_DELAY_MS + 1)
+        }
+        assertTrue(t.ended.isEmpty())
+        assertTrue(t.notices.isEmpty())
+        assertEquals(11, t.input.started)
+    }
+
+    @Test
+    fun `a heard sentence resets the recognition retry budget`() {
+        val t = Timed()
+        t.adapter.start()
+        repeat(2) {
+            t.input.fireError(RecognitionError.ENGINE, "x")
+            t.pass(CallLimits.RETRY_DELAY_MS + 1)
+        }
+        t.input.fireFinal("你好")
+        t.pass(1)
+        repeat(2) {
+            t.input.fireError(RecognitionError.ENGINE, "x")
+            t.pass(CallLimits.RETRY_DELAY_MS + 1)
+        }
+        assertTrue("budget restored by the successful turn", t.ended.isEmpty())
+    }
+
+    @Test
+    fun `first task failure keeps the call and second consecutive one ends it`() {
+        val t = Timed({ Result.failure(RuntimeException("没有可用模型")) })
+        t.adapter.start()
+        t.input.fireFinal("你好")
+        t.pass(1)
+        assertEquals(BloubState.ERROR, t.states.last())
+        assertEquals(listOf(CallNotice.TASK_FAILED), t.notices)
+        assertTrue(t.ended.isEmpty())
+        t.pass(CallLimits.ERROR_PAUSE_MS + 1)
+        assertEquals("back to listening after the pause", BloubState.LISTENING, t.states.last())
+        t.input.fireFinal("再试一次")
+        t.pass(1)
+        assertEquals(CallEndReason.TASK_FAILED, t.ended.single().reason)
+        assertEquals("没有可用模型", t.ended.single().detail)
+        val asked = t.model.asked
+        t.input.fireFinal("挂断后迟到")
+        t.pass(1)
+        assertEquals("no request after the call ended", asked, t.model.asked)
+    }
+
+    @Test
+    fun `a successful turn between failures keeps the call alive`() {
+        var fail = true
+        val t = Timed({ if (fail) Result.failure(RuntimeException("x")) else Result.success("好的") })
+        t.adapter.start()
+        t.input.fireFinal("一")
+        t.pass(CallLimits.ERROR_PAUSE_MS + 1)
+        fail = false
+        t.input.fireFinal("二")
+        t.pass(1)
+        fail = true
+        t.input.fireFinal("三")
+        t.pass(1)
+        assertTrue("failures were not consecutive", t.ended.isEmpty())
+    }
+
+    @Test
+    fun `idle reminds once then hangs up`() {
+        val t = Timed()
+        t.adapter.start()
+        t.pass(CallLimits.IDLE_REMINDER_MS - 1)
+        assertTrue(t.notices.isEmpty())
+        t.pass(2)
+        assertEquals(listOf(CallNotice.IDLE_REMINDER), t.notices)
+        assertTrue(t.ended.isEmpty())
+        t.pass(CallLimits.IDLE_END_MS)
+        assertEquals(CallEndReason.IDLE_TIMEOUT, t.ended.single().reason)
+        assertEquals(listOf(CallNotice.IDLE_REMINDER), t.notices)
+    }
+
+    @Test
+    fun `idle timer restarts after the user speaks and pauses while muted`() {
+        val t = Timed()
+        t.adapter.start()
+        t.pass(CallLimits.IDLE_REMINDER_MS + 1)
+        t.input.fireFinal("你好")
+        t.pass(1)
+        // 回答播完回到聆听后重新计时：再过 1 个提醒周期才有第二次提醒。
+        t.pass(CallLimits.IDLE_REMINDER_MS - 5)
+        assertEquals(1, t.notices.size)
+        t.pass(10)
+        assertEquals(2, t.notices.size)
+        t.adapter.setMuted(true)
+        t.pass(CallLimits.IDLE_END_MS * 2)
+        assertTrue("muted time is not idle time", t.ended.isEmpty())
+        assertFalse(t.states.isEmpty())
     }
 
     private fun adapterEvent(adapter: MinisCallRuntimeAdapter) {

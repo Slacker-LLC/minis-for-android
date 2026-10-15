@@ -2524,13 +2524,10 @@
     <string name="voice_call_state_success">Done</string>
     <string name="voice_call_state_error">Something went wrong</string>
 
-    <string name="voice_call_model">Current chat model</string>
     <string name="voice_call_preparing">Preparing microphone…</string>
-    <string name="voice_call_listening_hint">Speak to run tasks in this chat.</string>
     <string name="voice_call_recognition_failed">Recognition failed: %1$s. Check the speech service and retry.</string>
     <string name="voice_call_task_incomplete">Task not finished: %1$s</string>
     <string name="voice_call_task_incomplete_generic">Task not finished. Open the chat to see the details.</string>
-    <string name="voice_call_hint">Speak to run tasks in this chat. Tap interrupt to stop this voice turn and speak again. Leaving ends audio; accepted tasks continue in chat.</string>
     <string name="voice_call_mute">Pause audio</string>
     <string name="voice_call_unmute">Resume audio</string>
     <string name="voice_call_retry">Retry</string>
@@ -2538,7 +2535,17 @@
     <string name="voice_call_submit">Send now</string>
     <string name="voice_call_back">View chat</string>
     <string name="voice_call_end">End voice</string>
-    <string name="voice_call_follow_up">Add instructions</string>
+    <string name="voice_call_model">Current chat model</string>
+    <string name="voice_call_toast_retry">Didn\'t catch that, trying again…</string>
+    <string name="voice_call_toast_idle">Still there? I\'ll hang up soon if I hear nothing.</string>
+    <string name="voice_call_chat_title">Chat history</string>
+    <string name="voice_call_chat_empty">Nothing said yet. What you and the assistant say shows up here.</string>
+    <string name="voice_call_chat_close">Close</string>
+    <string name="voice_call_leave_to_chat">Back to chat</string>
+    <string name="voice_call_ended_title">Voice call ended</string>
+    <string name="voice_call_ended_idle">Nobody spoke for a while, so the call was ended.</string>
+    <string name="voice_call_ended_footer">Tasks you already gave keep running in the chat.</string>
+    <string name="voice_call_restart">Call again</string>
     <string name="settings_ralph_limit">Ralph round time limit</string>
     <string name="settings_ralph_limit_subtitle">%1$d min per round · waits for child cleanup</string>
     <string name="settings_ralph_timeout">Per-round time limit (1–30 minutes)</string>
@@ -2580,9 +2587,6 @@
     <string name="outcome_pending_title">Actions needing inspection</string>
     <string name="outcome_inspect_action">Inspect %1$s</string>
     <string name="outcome_kept_unknown">The action is still unresolved. Its record is preserved.</string>
-    <string name="voice_cancel_recording">Cancel recording</string>
-    <string name="voice_stop_playback">Stop speech</string>
-    <string name="voice_stop_owned_turn">Stop this voice request</string>
     <string name="work_task_summary">Tasks and results</string>
     <string name="work_task_select">Use this task for follow-ups</string>
     <string name="work_task_selected">Selected task</string>
