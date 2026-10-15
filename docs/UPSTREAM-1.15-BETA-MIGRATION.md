@@ -1,4 +1,4 @@
-# 上游 OpenMinis 1.15-beta（build 30–33）改动 → 迁移清单
+# 上游 1.15-beta（build 30–33）改动 → 迁移清单
 
 上游 Android 1.15-beta.1–4 的改动逐条对照表。每条给出**上游行为**、**我们现状**（附可复核的 `file:line`）与**建议动作**，用来决定哪些做、按什么顺序做。
 
@@ -6,7 +6,7 @@
 
 | 项 | 值 |
 |---|---|
-| 上游仓库 | `OpenMinis/OpenMinis` |
+| 上游仓库 | 见 `PROVENANCE.md` |
 | 覆盖版本 | `0-beta-build30`…`0-beta-build33` = Android 1.15-beta.1（2026-10-01）→ 1.15-beta.4（2026-10-09） |
 | 上游公开源码 | **只到 1.14**：`1.14` 与四个 beta tag 指向同一 commit（`b4c0661`）；GitHub `compare/1.14...0-beta-build33` 返回 `identical`（0 提交 / 0 文件）。**beta 源码不公开，只发布 APK**。 |
 | 上游证据 | ① 四个 release 的官方更新说明（本清单条目逐条取自说明原文）；② beta APK `MinisApp-1.15-beta.4-build33-arm64-v8a.apk`（43 179 428 字节，sha256 `1b3f12d6ed11ca2f4f1a415cbbc6f8cc…`）的资源名交叉印证功能存在，如 `tool_fold_ran_n_tools`、`chat_share_*`、`update_channel_beta`、`storage_orphan_*`、`retry_badge_a11y`、`read_aloud_volume`、`quota_console_link`、`subagent_detail_steer_*`。 |
