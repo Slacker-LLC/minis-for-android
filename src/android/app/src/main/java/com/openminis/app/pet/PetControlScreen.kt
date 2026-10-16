@@ -162,7 +162,7 @@ internal fun PetControlScreen(state: PetUiState, actions: PetActions) {
             PetSection(
                 title = "对话",
                 footer = "点一下宠物打开独立聊天小窗；点到别的 App、按返回键或键盘返回都会关闭小窗。" +
-                    "语音输入和语音回复直接复用 App 的语音模型与 API 配置。",
+                    "小窗里的麦克风进入 App 的语音通话，宠物自己不录音也不朗读。",
             ) {
                 PetRow(
                     icon = Icons.Outlined.ChatBubbleOutline,
@@ -176,11 +176,11 @@ internal fun PetControlScreen(state: PetUiState, actions: PetActions) {
                     icon = Icons.Outlined.RecordVoiceOver,
                     iconColor = AccentPink,
                     title = "语音对话",
-                    subtitle = "直接跟随 App 的 Voice Input / Voice Output 模型与 API 配置",
+                    subtitle = "小窗麦克风打开 App 的语音通话，识别与朗读沿用 App 的语音模型配置",
                     showDivider = false,
                 ) {
                     Text(
-                        text = "跟随 App",
+                        text = "通话页",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

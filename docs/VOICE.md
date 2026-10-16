@@ -37,7 +37,7 @@ audio playback
 | Read-aloud orchestration | `speech/ReadAloudPlayer.kt` | provider audio playback, queueing, fallback |
 | System TTS | `speech/TextToSpeechManager.kt` | Android `TextToSpeech` |
 | Pet model path | `pet/PetChatEngine.kt` | short conversational model requests |
-| Pet voice entry | `pet/PetOverlayService.kt` | connects ASR, model, and TTS |
+| Pet voice entry | `pet/PetOverlayService.kt` | the pet chat window's mic opens the voice call (`minis://action/voice_chat`); the pet itself records and speaks nothing |
 | Inline chat voice input | `ui/chat/voice/InlineVoiceInputPanel.kt` | writes ASR results into chat input |
 | Voice-conversation call sheet | `voicecall/VoiceConversationHost.kt` | full-screen dialog: character, state line, live subtitle, grouped controls, call timer |
 | Voice-conversation state | `voicecall/controller/CallController.kt` | call state machine fed by runtime events; the subtitle is only ever the runtime's real text |
@@ -116,19 +116,10 @@ earlier builds were removed.
 
 ## Desktop-pet voice flow
 
-```text
-user activates pet voice
-  ↓
-resolve Voice Input
-  ↓
-ASR
-  ↓ final text
-PetChatEngine.ask
-  ↓
-ReadAloudPlayer.speakConversation
-```
-
-The pet path and the full chat Agent Loop intentionally remain separate interaction modes while sharing provider, speech, and persistence infrastructure.
+The pet has no voice loop of its own (the earlier mic → ASR → `PetChatEngine.ask` → `ReadAloudPlayer.speakConversation`
+path was removed so the app keeps one voice-call UI). The pet chat window stays text-only through `PetChatEngine`;
+its mic button opens the same `minis://action/voice_chat` entry as the chat button, the voice shortcut and the
+assistant, so permission, ASR, TTS and the avatar all belong to `VoiceConversationHost`.
 
 ## Runtime design rule
 

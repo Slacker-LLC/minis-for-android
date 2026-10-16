@@ -1,13 +1,11 @@
 package com.openminis.app.pet
 
-import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -25,26 +23,16 @@ import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import com.openminis.app.MinisApp
 import com.openminis.app.R
 import com.openminis.app.service.SessionActivityTracker
-import com.openminis.app.speech.RecognitionError
-import com.openminis.app.speech.RecognitionState
-import com.openminis.app.speech.SpeechRecognitionManager
-import com.openminis.app.speech.SystemSpeechRecognitionEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import kotlin.random.Random
-import com.openminis.app.data.repository.awaitConfigLoaded
-import com.openminis.app.data.repository.ensureDefaultVoiceInputSlot
-import com.openminis.app.data.repository.ensureDefaultVoiceOutputSlot
-import com.openminis.app.data.repository.resolveVoiceInputChoice
 
 class PetOverlayService : Service() {
     companion object {
@@ -73,18 +61,11 @@ class PetOverlayService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val chatEngine by lazy { PetChatEngine(this) }
-    // One player for the service's lifetime. A fresh ReadAloudPlayer per
-    // reply would start TTS initialisation from scratch each time (so the
-    // first sentence is usually lost) and leak the engine it never shuts
-    // down. Its internal queue buffers text until the engine is ready.
-    private val readAloudPlayer by lazy { com.openminis.app.speech.ReadAloudPlayer(this) }
     private var askJob: Job? = null
     private var inputMode = false
     /** Retained across an async sprite decode so a service started on a dark screen
      * never starts animating/timing only because it missed the screen-off broadcast. */
     private var screenAwake = true
-    /** True while a voice-capture start is still resolving; a second tap clears it to cancel. */
-    @Volatile private var voiceStarting = false
     /** Non-null while the spritesheet decode/attach is in flight. */
     private var petLoadJob: Job? = null
     /** Invalidates a stale async decode when reload/hide wins the race. */
@@ -192,8 +173,6 @@ class PetOverlayService : Service() {
         transientReset?.let(main::removeCallbacks)
         askJob?.cancel()
         serviceScope.coroutineContext[Job]?.cancel()
-        stopVoiceCapture()
-        runCatching { readAloudPlayer.shutdown() }
         behavior?.stop()
         hidePet()
         super.onDestroy()
@@ -257,7 +236,7 @@ class PetOverlayService : Service() {
     // ----------------------------------------------------------------- chat
 
     /** Send a question to the model and show the (deliberately short) reply. */
-    private fun ask(question: String, fromVoice: Boolean = false) {
+    private fun ask(question: String) {
         val view = petView ?: return
         askJob?.cancel()
         behavior?.onInteraction()
@@ -284,10 +263,6 @@ class PetOverlayService : Service() {
                 // task. The direct pet chat is lightweight; the agent status
                 // remains the authoritative visual when it is busy.
                 if (baseState == PetState.IDLE) setTransientState(PetState.WAVING, 900L)
-                // A spoken question is a voice-conversation turn. Reuse the
-                // App's Voice Output provider/API selection, but do not require
-                // a second pet-only "read replies" toggle.
-                if (fromVoice) readAloudConversation(reply)
             }.onFailure { error ->
                 val message = error.message ?: "出错了"
                 chatWindow?.setStatus(message)
@@ -297,92 +272,20 @@ class PetOverlayService : Service() {
         }
     }
 
-    private fun readAloudConversation(text: String) {
-        // Voice conversation is best-effort: the provider/system voice is
-        // resolved by ReadAloudPlayer from the same app-wide Voice Output group.
-        runCatching { readAloudPlayer.speakConversation(text) }
-            .onFailure { android.util.Log.w(TAG, "voice conversation output failed: ${it.message}") }
-    }
-
     // ---------------------------------------------------------------- voice
 
-    private fun toggleVoice() {
-        if (SpeechRecognitionManager.state.value != RecognitionState.IDLE) {
-            stopVoiceCapture()
-            return
-        }
-        val window = chatWindow ?: return
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            window.setStatus("需要麦克风权限，请在 App 里授予")
-            return
-        }
-
-        // A second tap while the async start is still resolving counts as cancel.
-        if (voiceStarting) {
-            voiceStarting = false
-            return
-        }
-        voiceStarting = true
-
-        // Resolve the engine/model on EVERY capture from the app's canonical
-        // provider configuration. The pet owns no ASR API key or model setting.
-        serviceScope.launch {
-            runCatching {
-                val app = applicationContext as? MinisApp
-                val repository = app?.providerRepositoryOrNull
-                if (repository == null) {
-                    voiceStarting = false
-                    window.setVoiceActive(false)
-                    window.setStatus("App 模型配置还没有初始化")
-                    return@launch
-                }
-                if (withTimeoutOrNull(8_000L) { repository.awaitConfigLoaded(); true } != true) {
-                    voiceStarting = false
-                    window.setVoiceActive(false)
-                    window.setStatus("语音模型配置加载超时")
-                    return@launch
-                }
-                repository.ensureDefaultVoiceInputSlot()
-                repository.ensureDefaultVoiceOutputSlot()
-                val choice = repository.resolveVoiceInputChoice()
-                SpeechRecognitionManager.selectEngine(if (choice.isSystem) "system" else "provider")
-                (SpeechRecognitionManager.availableEngines()
-                    .firstOrNull { it.id == "system" } as? SystemSpeechRecognitionEngine)
-                    ?.preferOffline = (choice.systemPreferOffline == true)
-                SpeechRecognitionManager.refreshSupportedLocales()
-
-                // Re-check right before recording: a cancel tap cleared the flag.
-                if (!voiceStarting) return@launch
-                window.setVoiceActive(true)
-                SpeechRecognitionManager.startRecording(
-                    onPartialOrFinal = { text, isFinal ->
-                        main.post {
-                            val active = chatWindow ?: return@post
-                            active.setInputText(text)
-                            if (isFinal) {
-                                active.setVoiceActive(false)
-                                if (text.isNotBlank()) ask(text.trim(), fromVoice = true)
-                            }
-                        }
-                    },
-                    onError = { error, message ->
-                        main.post {
-                            chatWindow?.setVoiceActive(false)
-                            chatWindow?.setStatus(voiceErrorText(error, message))
-                            android.util.Log.w(TAG, "speech error=${error.name} msg=$message")
-                        }
-                    },
-                )
-                voiceStarting = false
-            }.onFailure { error ->
-                voiceStarting = false
-                android.util.Log.w(TAG, "voice toggle failed: ${error.message}")
-                chatWindow?.setVoiceActive(false)
-                chatWindow?.setStatus(error.message ?: "语音启动失败")
-            }
-        }
+    /**
+     * The pet records and speaks nothing itself: its mic opens the app's one voice
+     * call (the same `minis://action/voice_chat` entry as the chat button, the voice
+     * shortcut and the assistant), which owns permission, ASR, TTS and the avatar.
+     */
+    private fun startVoiceCall() {
+        setInputMode(false)
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("minis://action/voice_chat"))
+            .setPackage(packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { startActivity(intent) }
+            .onFailure { petView?.showBubble("打不开语音通话", 1_800L) }
     }
 
     /**
@@ -402,32 +305,6 @@ class PetOverlayService : Service() {
         runCatching { windowManager.updateViewLayout(view, lp) }
     }
 
-    private fun voiceErrorText(
-        error: com.openminis.app.speech.RecognitionError,
-        message: String?,
-    ): String = when (error) {
-        RecognitionError.OEM_NO_SERVICE ->
-            "当前 Voice Input 不可用；请在 App 的语音模型设置中选择系统识别或云端 ASR"
-        RecognitionError.PERMISSION_DENIED -> "需要麦克风权限，请在 App 里授予"
-        RecognitionError.NETWORK -> "网络不通，语音识别失败"
-        RecognitionError.NO_MATCH -> "没听清，再说一次"
-        RecognitionError.RECOGNIZER_BUSY -> "识别引擎忙，稍等一下"
-        RecognitionError.TRANSCRIPTION_FAILED -> message ?: "转写失败"
-        RecognitionError.LANGUAGE_UNSUPPORTED -> "识别引擎不支持当前语言"
-        RecognitionError.AUDIO_ERROR -> "录音失败，麦克风被占用了？"
-        RecognitionError.UNKNOWN -> message ?: "语音识别失败"
-    }
-
-    private fun stopVoiceCapture() {
-        voiceStarting = false
-        runCatching {
-            if (SpeechRecognitionManager.state.value != RecognitionState.IDLE) {
-                SpeechRecognitionManager.stopRecording()
-            }
-        }
-        chatWindow?.setVoiceActive(false)
-    }
-
     // ---------------------------------------------------------- chat window
 
     /**
@@ -440,7 +317,6 @@ class PetOverlayService : Service() {
         inputMode = enabled
 
         if (!enabled) {
-            stopVoiceCapture()
             val old = chatWindow
             chatWindow = null
             chatParams = null
@@ -479,8 +355,8 @@ class PetOverlayService : Service() {
         }
 
         val window = PetChatWindowView(this).apply {
-            onSend = { question -> ask(question, fromVoice = false) }
-            onVoiceToggle = { toggleVoice() }
+            onSend = { question -> ask(question) }
+            onVoiceCall = { startVoiceCall() }
             onClose = { setInputMode(false) }
             onFocusLost = { if (inputMode) setInputMode(false) }
             onDragBy = { dx, dy ->
