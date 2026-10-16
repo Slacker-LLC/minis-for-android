@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +27,7 @@ import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.speech.VoiceOutputState
 import com.openminis.app.ui.chat.voice.VoiceInputPickerSheet
 import com.openminis.app.ui.chat.voice.VoiceOutputPickerSheet
+import com.openminis.app.ui.components.MinisModalBottomSheet
 import com.openminis.app.ui.theme.ChatColors
 
 /**
@@ -43,7 +43,7 @@ internal fun CallSettingsSheet(
     var picker by remember { mutableStateOf<Picker?>(null) }
     val speed by VoiceOutputState.speed.collectAsState()
     val earpiece by VoiceOutputState.callEarpiece.collectAsState()
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    MinisModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
