@@ -2207,4 +2207,5 @@
     <string name="scheduled_task_legacy_executor_removed">Cette tâche utilisait un moteur d’exécution supprimé. Vérifiez-la et enregistrez-la avant de la relancer.</string>
     <string name="sub_agent_text_model_required">Choisissez un modèle capable de répondre avec du texte.</string>
     <string name="vscreen_display_busy">L’écran virtuel est actuellement utilisé par une autre session.</string>
+    <string name="chat_plan_exit">Quitter</string>
 </resources>

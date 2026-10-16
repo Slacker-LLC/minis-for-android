@@ -2307,4 +2307,5 @@
     <string name="scheduled_task_legacy_executor_removed">このタスクは削除された実行方式を使用していました。再実行する前に内容を確認して保存してください。</string>
     <string name="sub_agent_text_model_required">テキストで応答できるモデルを選択してください。</string>
     <string name="vscreen_display_busy">仮想ディスプレイは現在、別のセッションで使用されています。</string>
+    <string name="chat_plan_exit">終了</string>
 </resources>

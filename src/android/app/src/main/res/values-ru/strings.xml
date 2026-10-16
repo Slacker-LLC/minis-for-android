@@ -2489,4 +2489,5 @@
     <string name="scheduled_task_legacy_executor_removed">Эта задача использовала больше недоступный режим выполнения. Проверьте её и сохраните перед повторным запуском.</string>
     <string name="sub_agent_text_model_required">Выберите модель, способную отвечать текстом.</string>
     <string name="vscreen_display_busy">Виртуальный экран сейчас используется другой сессией.</string>
+    <string name="chat_plan_exit">Выйти</string>
 </resources>
