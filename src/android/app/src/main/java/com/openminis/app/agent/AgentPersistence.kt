@@ -597,7 +597,7 @@ internal suspend fun AgentSession.buildSystemPrompt(): String? {
         append("- Current date: ").append(dateStr).append(" (").append(tzId).append(")\n")
         append("- Device language: ").append(lang).append("\n")
         append("- minis-model-use models available: ").append(modelUseCount)
-    }
+    }.let { com.openminis.app.voicecall.runtime.withVoiceCallSection(it, voiceConversationActive.value) }
 }
 
 fun AgentSession.executeMemoryWrite(argsJson: String): MemoryTools.ToolResult {

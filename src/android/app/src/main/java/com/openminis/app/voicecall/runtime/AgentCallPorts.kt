@@ -15,6 +15,9 @@ import com.openminis.app.voicecall.ports.ApprovalPrompt
 import com.openminis.app.voicecall.ports.CallApprovals
 import com.openminis.app.voicecall.ports.CallModelGateway
 import com.openminis.app.voicecall.ports.CallSpeechInput
+import com.openminis.app.voicecall.ports.CallTaskUpdate
+import com.openminis.app.voicecall.ports.CallTasks
+import com.openminis.app.voicecall.ports.TaskReply
 import com.openminis.app.voicecall.ports.CallSpeechOutput
 import com.openminis.app.voicecall.ports.RecognitionError
 import kotlinx.coroutines.CancellationException
@@ -35,8 +38,18 @@ internal class AgentCallGateway(
     private val session: AgentSession,
     /** 通话里选好的图片：随下一条真正提交的消息发出；并入正在跑的任务（补充指令）时不带，留给下一轮。 */
     private val takeAttachments: () -> List<com.openminis.app.ui.chat.InputAttachment> = { emptyList() },
+    /** 回答里已经说过某个任务结果时通知任务播报去重（参数是 [taskUpdateKey]）。 */
+    private val onTaskReported: (String) -> Unit = {},
 ) : CallModelGateway {
     private var ownedTurn: AgentTurnHandle? = null
+    private val progressText by lazy { ContextTaskVoiceText(session.context) }
+
+    /** 只在回合真的在跑时，念最新一条助手消息里正在执行的工具；其余情况不编造。 */
+    override fun progress(): String? {
+        if (!session.isStreaming.value) return null
+        val blocks = session.messages.value.lastOrNull { it.role == "assistant" }?.toolBlocks ?: return null
+        return describeProgress(blocks, progressText)
+    }
 
     override suspend fun ask(text: String): Result<String> = withContext(Dispatchers.Main.immediate) {
         try {
@@ -59,6 +72,7 @@ internal class AgentCallGateway(
                         val row = turn.userMessageId?.let { session.chatRepository.dao.getMessageById(it) }
                         val app = session.context.applicationContext as com.openminis.app.MinisApp
                         val task = row?.requestTaskId?.let { app.agentTaskRepository.get(it) }
+                        if (task != null) onTaskReported(taskUpdateKey(task.id, task.status))
                         val brief = if (task == null) reply?.take(1000)?.takeIf { it.isNotBlank() }
                             ?: "本轮已结束，请在聊天中查看结果。"
                         else buildString {
@@ -180,5 +194,90 @@ internal class AgentCallApprovals(
                 ApprovalDecision.DENY -> OffloadPermissionManager.Response.DENY_SESSION
             },
         )
+    }
+}
+
+/** 播报文字读字符串资源，和界面语言一致。 */
+internal class ContextTaskVoiceText(private val context: android.content.Context) : TaskVoiceText {
+    private fun s(id: Int, vararg args: Any) = context.getString(id, *args)
+
+    override fun status(status: String) = context.getString(when (status) {
+        com.openminis.app.data.db.AgentTaskEntity.STATUS_COMPLETED -> com.openminis.app.R.string.agent_task_completed
+        com.openminis.app.data.db.AgentTaskEntity.STATUS_PAUSED -> com.openminis.app.R.string.agent_task_paused
+        com.openminis.app.data.db.AgentTaskEntity.STATUS_NEEDS_USER -> com.openminis.app.R.string.agent_task_needs_user
+        com.openminis.app.data.db.AgentTaskEntity.STATUS_WAITING -> com.openminis.app.R.string.work_task_waiting
+        com.openminis.app.data.db.AgentTaskEntity.STATUS_CANCELLED -> com.openminis.app.R.string.agent_task_cancelled
+        com.openminis.app.data.db.AgentTaskEntity.STATUS_BUDGET_EXHAUSTED -> com.openminis.app.R.string.agent_task_budget_exhausted
+        com.openminis.app.data.db.AgentTaskEntity.STATUS_FAILED -> com.openminis.app.R.string.agent_task_failed
+        else -> com.openminis.app.R.string.agent_task_active
+    })
+    override fun none() = s(com.openminis.app.R.string.voice_task_none)
+    override fun summary(count: Int, items: String) = s(com.openminis.app.R.string.voice_task_summary, count, items)
+    override fun item(title: String, status: String) = s(com.openminis.app.R.string.voice_task_item, title, status)
+    override fun switching(title: String) = s(com.openminis.app.R.string.voice_task_switching, title)
+    override fun notFound(target: String) = s(com.openminis.app.R.string.voice_task_not_found, target)
+    override fun ambiguous(target: String) = s(com.openminis.app.R.string.voice_task_ambiguous, target)
+    override fun back() = s(com.openminis.app.R.string.voice_task_back)
+    override fun noPrevious() = s(com.openminis.app.R.string.voice_task_no_previous)
+    override fun alreadyHere() = s(com.openminis.app.R.string.voice_task_already_here)
+    override fun update(title: String, status: String, progress: String) =
+        s(com.openminis.app.R.string.voice_task_update, title, status, progress).trim()
+    override fun progressRunning(tool: String) = s(com.openminis.app.R.string.voice_progress_running, tool)
+    override fun progressSteps(done: Int, tool: String) = s(com.openminis.app.R.string.voice_progress_steps, done, tool)
+}
+
+/**
+ * 通话里的任务查询与切换，读 [AgentTaskRepository]。切换只是「结束通话并跳到该任务所在会话」，
+ * 不改任务本身，也不替用户启动/取消任何任务。
+ */
+internal class AgentCallTasks(
+    context: android.content.Context,
+    private val repo: com.openminis.app.data.repository.AgentTaskRepository,
+    private val currentSessionId: () -> String?,
+    private val backStack: TaskBackStack = TaskBackStack.shared,
+) : CallTasks {
+    private val text = ContextTaskVoiceText(context)
+    private val reported = java.util.Collections.synchronizedSet(HashSet<String>())
+
+    fun markReported(key: String) { reported += key }
+    override fun isReported(key: String) = key in reported
+
+    /** 进行中的排前面，其次按最近更新；清单和序号切换共用这个顺序。 */
+    private suspend fun ordered(): List<VoiceTask> = repo.observeRecent().first()
+        .map { it.toVoiceTask() }
+        .filter { it.title.isNotBlank() }
+        .sortedWith(compareBy<VoiceTask> { it.status in com.openminis.app.data.db.AgentTaskEntity.TERMINAL_STATUSES }.thenByDescending { it.updatedAt })
+
+    override suspend fun overview() = TaskReply(summarizeTasks(ordered(), text))
+
+    override suspend fun switchTo(target: String): TaskReply = when (val match = matchSpokenTask(ordered(), target)) {
+        is TaskMatch.Found -> {
+            val here = currentSessionId()
+            if (match.task.sessionId == here) TaskReply(text.alreadyHere())
+            else {
+                if (here != null) backStack.push(here)
+                TaskReply(text.switching(match.task.title), match.task.sessionId)
+            }
+        }
+        TaskMatch.None -> TaskReply(text.notFound(target))
+        TaskMatch.Ambiguous -> TaskReply(text.ambiguous(target))
+    }
+
+    override suspend fun back(): TaskReply {
+        val here = currentSessionId()
+        val previous = backStack.pop(here) ?: return TaskReply(text.noPrevious())
+        if (here != null) backStack.push(here)
+        return TaskReply(text.back(), previous)
+    }
+
+    override val updates: kotlinx.coroutines.flow.Flow<CallTaskUpdate> = kotlinx.coroutines.flow.flow {
+        var previous: Map<String, String>? = null
+        repo.observeRecent().collect { rows ->
+            val now = rows.map { it.toVoiceTask() }.filter { it.title.isNotBlank() }
+            previous?.let { before ->
+                detectTaskUpdates(before, now).forEach { emit(CallTaskUpdate(it.key, speakUpdate(it, text))) }
+            }
+            previous = now.associate { it.id to it.status }
+        }
     }
 }

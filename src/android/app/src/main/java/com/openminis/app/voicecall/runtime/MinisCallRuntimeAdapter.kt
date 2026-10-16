@@ -4,11 +4,16 @@ import com.openminis.app.voicecall.model.BloubState
 import com.openminis.app.voicecall.ports.ApprovalPrompt
 import com.openminis.app.voicecall.ports.CallApprovals
 import com.openminis.app.voicecall.ports.CallModelGateway
+import com.openminis.app.voicecall.ports.CallTaskUpdate
+import com.openminis.app.voicecall.ports.CallTasks
 import com.openminis.app.voicecall.ports.NoCallApprovals
+import com.openminis.app.voicecall.ports.NoCallTasks
+import com.openminis.app.voicecall.ports.TaskReply
 import com.openminis.app.voicecall.ports.CallSpeechInput
 import com.openminis.app.voicecall.ports.CallSpeechOutput
 import com.openminis.app.voicecall.ports.RecognitionError
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -22,7 +27,9 @@ import kotlinx.coroutines.launch
  * - 识别出错：瞬时错误（网络/引擎）最多自动重试 [MAX_RECOGNITION_RETRIES] 次，仍失败就挂断；
  *   缺麦克风权限不重试，直接挂断。
  * - 任务失败：连续 [MAX_TASK_FAILURES] 次才挂断，第一次只提示并继续听。
- * - 过渡语：提问后 [WORKING_LINE_DELAY_MS] 还没有结果，念一句「我在处理」，每轮最多一次。
+ * - 进度：提问后 [WORKING_LINE_DELAY_MS] 还没有结果，念一句；之后每 [PROGRESS_INTERVAL_MS] 看一次
+ *   已核实的进度（正在跑的工具），有新内容才念，每轮最多 [MAX_PROGRESS_LINES] 句。没有可核实的进度时
+ *   只念一次「我在处理」，不重复。
  * - 口头授权：权限请求出现后念出来并听回答，连续 [MAX_APPROVAL_MISSES] 次没听懂就不再追问（屏幕对话框仍可点）。
  * - 空闲：持续没人说话 [IDLE_REMINDER_MS] 后提醒一次，[IDLE_END_MS] 后自动挂断。
  */
@@ -35,6 +42,8 @@ object CallLimits {
     const val ERROR_PAUSE_MS = 1_500L
     const val MAX_APPROVAL_MISSES = 3
     const val WORKING_LINE_DELAY_MS = 4_000L
+    const val PROGRESS_INTERVAL_MS = 30_000L
+    const val MAX_PROGRESS_LINES = 5
 }
 
 /** ASR → 完整 Agent → TTS。每次聆听独立代数，重复/晚到回调不能再提交任务。 */
@@ -44,8 +53,12 @@ class MinisCallRuntimeAdapter(
     private val output: CallSpeechOutput,
     private val scope: CoroutineScope,
     private val approvals: CallApprovals = NoCallApprovals,
-    /** 任务较久时念的过渡语；空串表示不念。 */
+    /** 任务较久、又没有可核实进度时念的过渡语；空串表示不念。 */
     private val workingLine: String = "",
+    /** 口头查询/切换任务，以及后台任务状态播报。 */
+    private val tasks: CallTasks = NoCallTasks,
+    /** 口头切换任务成功：念完确认后由宿主结束通话并跳到该会话。 */
+    private val onSwitchSession: (String) -> Unit = {},
 ) : CallRuntime {
     private val _events = MutableSharedFlow<CallEvent>(extraBufferCapacity = 32)
     override val events: SharedFlow<CallEvent> = _events
@@ -62,6 +75,9 @@ class MinisCallRuntimeAdapter(
     private var approvalToken = 0
     private var approvalListening = false
     private var approvalMisses = 0
+    private var updatesWatcher: Job? = null
+    private var updateJob: Job? = null
+    private val pendingUpdates = mutableListOf<CallTaskUpdate>()
 
     override fun start() {
         stop()
@@ -70,7 +86,9 @@ class MinisCallRuntimeAdapter(
         recognitionRetries = 0
         taskFailures = 0
         _events.tryEmit(CallEvent.MuteChanged(false))
+        pendingUpdates.clear()
         approvalWatcher = scope.launch { approvals.pending.collect { onApprovalChanged(it) } }
+        updatesWatcher = scope.launch { tasks.updates.collect { onBackgroundUpdate(it) } }
         armIdle()
         startListening()
     }
@@ -84,13 +102,15 @@ class MinisCallRuntimeAdapter(
         idleJob = null
         approvalWatcher?.cancel()
         approvalWatcher = null
+        updatesWatcher?.cancel()
+        updatesWatcher = null
+        pendingUpdates.clear()
         approvalJob?.cancel()
         approvalJob = null
         approvalToken++
         input.cancel()
         output.stop()
-        responseJob?.cancel()
-        responseJob = null
+        cancelResponse()
         state(BloubState.IDLE)
     }
 
@@ -108,6 +128,8 @@ class MinisCallRuntimeAdapter(
                 input.cancel()
             }
             output.stop()
+            updateJob?.cancel()
+            updateJob = null
             cancelApprovalListening()
         } else if (responseJob?.isActive != true) {
             armIdle()
@@ -123,8 +145,7 @@ class MinisCallRuntimeAdapter(
         input.cancel()
         output.stop()
         model.cancel()
-        responseJob?.cancel()
-        responseJob = null
+        cancelResponse()
         if (!muted) {
             armIdle()
             startListening()
@@ -144,8 +165,7 @@ class MinisCallRuntimeAdapter(
         input.cancel()
         output.stop()
         model.cancel()
-        responseJob?.cancel()
-        responseJob = null
+        cancelResponse()
         acceptText(trimmed, generation, typed = true)
     }
 
@@ -155,12 +175,19 @@ class MinisCallRuntimeAdapter(
         listening = false
         input.cancel()
         output.stop()
-        responseJob?.cancel()
-        responseJob = null
+        cancelResponse()
         if (!muted) {
             armIdle()
             startListening()
         }
+    }
+
+    /** 取消进行中的一轮（含正在念的后台播报）；不动队列里没念的播报。 */
+    private fun cancelResponse() {
+        responseJob?.cancel()
+        responseJob = null
+        updateJob?.cancel()
+        updateJob = null
     }
 
     private fun state(state: BloubState) {
@@ -169,6 +196,11 @@ class MinisCallRuntimeAdapter(
 
     private fun startListening() {
         if (!active || muted) return
+        // 有后台任务的结果还没念：先念完再开麦，不在用户开口的时候插话。
+        if (pendingUpdates.isNotEmpty()) {
+            announce()
+            return
+        }
         val gen = ++generation
         listening = true
         state(BloubState.LISTENING)
@@ -219,27 +251,43 @@ class MinisCallRuntimeAdapter(
         recognitionRetries = 0
         idleJob?.cancel()
         idleJob = null
+        val command = parseTaskCommand(text)
         responseJob = scope.launch {
             state(BloubState.THINKING)
             _events.tryEmit(CallEvent.Transcript(fromUser = true, text = text))
             try {
-                var fillerSpeaking = false
-                val filler = if (workingLine.isBlank()) null else launch {
+                if (command != null && handleTaskCommand(command, gen, typed)) return@launch
+                // 长任务期间的口头汇报：只念已核实的进度；答案一到，正在念的那句念完就让位。
+                var speakingDone: CompletableDeferred<Unit>? = null
+                var answered = false
+                val progress = launch {
                     delay(CallLimits.WORKING_LINE_DELAY_MS)
-                    if (valid(gen) && !muted && approvals.pending.value == null) {
-                        fillerSpeaking = true
-                        try {
-                            state(BloubState.SPEAKING)
-                            output.speak(workingLine)
-                        } finally {
-                            fillerSpeaking = false
+                    var last: String? = null
+                    var count = 0
+                    while (count < CallLimits.MAX_PROGRESS_LINES) {
+                        val line = model.progress() ?: workingLine.takeIf { it.isNotBlank() }
+                        if (line != null && line != last && valid(gen) && !muted && approvals.pending.value == null) {
+                            last = line
+                            count++
+                            val done = CompletableDeferred<Unit>()
+                            speakingDone = done
+                            try {
+                                state(BloubState.SPEAKING)
+                                output.speak(line)
+                            } finally {
+                                speakingDone = null
+                                done.complete(Unit)
+                            }
+                            if (valid(gen) && !answered) state(BloubState.THINKING)
                         }
-                        if (valid(gen)) state(BloubState.THINKING)
+                        delay(CallLimits.PROGRESS_INTERVAL_MS)
                     }
                 }
                 val result = model.ask(text)
-                // 过渡语正念到一半就让它念完，不要和回答抢播放器。
-                if (filler != null) if (fillerSpeaking) filler.join() else filler.cancel()
+                answered = true
+                // 正念到一半的进度句让它念完，不要和回答抢播放器。
+                speakingDone?.await()
+                progress.cancel()
                 if (!valid(gen)) return@launch
                 val reply = result.getOrThrow()
                 taskFailures = 0
@@ -256,6 +304,77 @@ class MinisCallRuntimeAdapter(
                 throw cancelled
             } catch (error: Exception) {
                 if (valid(gen)) onTaskFailed(gen, error.message)
+            }
+        }
+    }
+
+    /**
+     * 口头任务指令。返回 true 表示已经处理（念了回答/切走了）；任务端口没有回应时返回 false，
+     * 让这句话照常交给模型。
+     */
+    private suspend fun handleTaskCommand(command: TaskCommand, gen: Int, typed: Boolean): Boolean {
+        val reply: TaskReply = when (command) {
+            TaskCommand.ListTasks -> tasks.overview()
+            is TaskCommand.Switch -> tasks.switchTo(command.target)
+            TaskCommand.Back -> tasks.back()
+        }
+        if (reply.spoken.isBlank()) return false
+        if (!valid(gen)) return true
+        taskFailures = 0
+        _events.tryEmit(CallEvent.Transcript(fromUser = false, text = reply.spoken))
+        if (!muted || typed) {
+            state(BloubState.SPEAKING)
+            output.speak(reply.spoken)
+        }
+        if (!valid(gen)) return true
+        val target = reply.switchToSessionId
+        if (target != null) onSwitchSession(target)
+        else if (!muted) {
+            armIdle()
+            startListening()
+        }
+        return true
+    }
+
+    /**
+     * 通话期间别处/后台任务的状态变化。静音只记到聊天记录不出声；正在回答、听授权或念别的播报时先排队，
+     * 等回到「等用户开口」时再念；此刻正在听用户说话的，直接收声念出来。
+     */
+    private fun onBackgroundUpdate(update: CallTaskUpdate) {
+        if (!active || tasks.isReported(update.key)) return
+        if (muted) {
+            _events.tryEmit(CallEvent.Transcript(fromUser = false, text = update.spoken))
+            return
+        }
+        pendingUpdates += update
+        val busy = responseJob?.isActive == true || approvalListening || approvals.pending.value != null
+        if (busy || updateJob?.isActive == true) return
+        if (listening) {
+            generation++
+            listening = false
+            input.cancel()
+        }
+        announce()
+    }
+
+    /** 把排队的播报念完，再回到聆听。念的过程中新到的也一并念。 */
+    private fun announce() {
+        if (updateJob?.isActive == true) return
+        val gen = ++generation
+        listening = false
+        idleJob?.cancel()
+        idleJob = null
+        updateJob = scope.launch {
+            while (valid(gen)) {
+                val update = pendingUpdates.removeFirstOrNull() ?: break
+                if (tasks.isReported(update.key)) continue
+                _events.tryEmit(CallEvent.Transcript(fromUser = false, text = update.spoken))
+                state(BloubState.SPEAKING)
+                output.speak(update.spoken)
+            }
+            if (valid(gen) && !muted) {
+                armIdle()
+                startListening()
             }
         }
     }
@@ -304,6 +423,11 @@ class MinisCallRuntimeAdapter(
         }
         idleJob?.cancel()
         idleJob = null
+        if (updateJob?.isActive == true) {
+            updateJob?.cancel()
+            updateJob = null
+            output.stop()
+        }
         approvalListening = true
         askApproval(prompt.question)
     }

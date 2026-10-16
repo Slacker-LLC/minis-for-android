@@ -34,6 +34,12 @@ interface CallModelGateway {
 
     /** 用户明确打断：只取消该通话拥有的 Agent 回合。结束等待本身不取消任务。 */
     fun cancel()
+
+    /**
+     * 正在进行的工作的一句话已核实进度（例如正在跑的工具）；没有可核实的状态返回 null。
+     * 通话据此在长任务期间口头汇报，而不是编一句泛泛的「处理中」。
+     */
+    fun progress(): String? = null
 }
 
 interface CallSpeechOutput {
@@ -60,4 +66,35 @@ interface CallApprovals {
 object NoCallApprovals : CallApprovals {
     override val pending: StateFlow<ApprovalPrompt?> = MutableStateFlow(null)
     override fun respond(decision: ApprovalDecision) = Unit
+}
+
+/** 口头任务指令的结果：[spoken] 念给用户听；[switchToSessionId] 非空表示念完后结束通话并跳到该任务所在会话。 */
+data class TaskReply(val spoken: String, val switchToSessionId: String? = null)
+
+/** 后台任务状态变化。[key] 用于和回答里已经说过的结果去重。 */
+data class CallTaskUpdate(val key: String, val spoken: String)
+
+interface CallTasks {
+    /** 口头任务清单。 */
+    suspend fun overview(): TaskReply
+
+    /** 按名字片段或「第二个」之类的序号切换到某个任务。 */
+    suspend fun switchTo(target: String): TaskReply
+
+    /** 回到切换前的任务。 */
+    suspend fun back(): TaskReply
+
+    /** 通话期间别处（含后台）任务的完成/需要处理/失败播报。 */
+    val updates: kotlinx.coroutines.flow.Flow<CallTaskUpdate>
+
+    /** [key] 对应的结果是否已经在回答里说过。 */
+    fun isReported(key: String): Boolean
+}
+
+object NoCallTasks : CallTasks {
+    override suspend fun overview() = TaskReply("")
+    override suspend fun switchTo(target: String) = TaskReply("")
+    override suspend fun back() = TaskReply("")
+    override val updates: kotlinx.coroutines.flow.Flow<CallTaskUpdate> = kotlinx.coroutines.flow.emptyFlow()
+    override fun isReported(key: String) = false
 }

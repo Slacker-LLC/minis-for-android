@@ -5,11 +5,15 @@ import com.openminis.app.voicecall.ports.ApprovalDecision
 import com.openminis.app.voicecall.ports.ApprovalPrompt
 import com.openminis.app.voicecall.ports.CallApprovals
 import com.openminis.app.voicecall.ports.CallModelGateway
+import com.openminis.app.voicecall.ports.CallTaskUpdate
+import com.openminis.app.voicecall.ports.CallTasks
+import com.openminis.app.voicecall.ports.TaskReply
 import com.openminis.app.voicecall.ports.CallSpeechInput
 import com.openminis.app.voicecall.ports.CallSpeechOutput
 import com.openminis.app.voicecall.ports.RecognitionError
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
@@ -432,6 +436,234 @@ class MinisCallRuntimeAdapterTest {
         input.fireFinal("你好")
         scope.advanceTimeBy(CallLimits.WORKING_LINE_DELAY_MS * 2); scope.runCurrent()
         assertEquals(listOf("收到"), output.spoken)
+    }
+
+    // ---- 进度播报 / 任务指令 / 后台播报 ----
+
+    private class FakeTasks(
+        val overview: TaskReply = TaskReply("现在有两个任务"),
+        val switch: TaskReply = TaskReply("好的，切换到整理相册", "s-2"),
+        val back: TaskReply = TaskReply("回到上一个", "s-1"),
+    ) : CallTasks {
+        val flow = MutableSharedFlow<CallTaskUpdate>(extraBufferCapacity = 8)
+        val reported = mutableSetOf<String>()
+        val calls = mutableListOf<String>()
+        override suspend fun overview(): TaskReply { calls += "overview"; return overview }
+        override suspend fun switchTo(target: String): TaskReply { calls += "switch:$target"; return switch }
+        override suspend fun back(): TaskReply { calls += "back"; return back }
+        override val updates = flow
+        override fun isReported(key: String) = key in reported
+    }
+
+    private class Rig(
+        val scope: TestScope = TestScope(UnconfinedTestDispatcher()),
+        val input: FakeInput = FakeInput(),
+        val output: FakeOutput = FakeOutput(),
+        val tasks: FakeTasks = FakeTasks(),
+        val model: FakeModel = FakeModel(),
+        workingLine: String = "",
+        val switched: MutableList<String> = mutableListOf(),
+        approvals: CallApprovals = com.openminis.app.voicecall.ports.NoCallApprovals,
+    ) {
+        val transcript = mutableListOf<String>()
+        val adapter = MinisCallRuntimeAdapter(input, model, output, scope, approvals, workingLine, tasks, { switched += it })
+        init {
+            scope.launch { adapter.events.collect { if (it is CallEvent.Transcript) transcript += (if (it.fromUser) "我:" else "AI:") + it.text } }
+        }
+    }
+
+    @Test
+    fun `verified progress is spoken when it changes and never repeated`() {
+        val steps = ArrayDeque(listOf("正在读取文件", "正在读取文件", "正在写入结果"))
+        val gate = kotlinx.coroutines.CompletableDeferred<String>()
+        val scope = TestScope(UnconfinedTestDispatcher())
+        val output = FakeOutput()
+        val model = object : CallModelGateway {
+            override suspend fun ask(text: String): Result<String> = Result.success(gate.await())
+            override fun cancel() = Unit
+            override fun progress(): String? = steps.removeFirstOrNull()
+        }
+        val input = FakeInput()
+        val adapter = MinisCallRuntimeAdapter(input, model, output, scope)
+        adapter.start()
+        input.fireFinal("做个很久的任务")
+        scope.advanceTimeBy(CallLimits.WORKING_LINE_DELAY_MS + 1); scope.runCurrent()
+        assertEquals(listOf("正在读取文件"), output.spoken)
+        scope.advanceTimeBy(CallLimits.PROGRESS_INTERVAL_MS); scope.runCurrent()
+        assertEquals("same state is not repeated", listOf("正在读取文件"), output.spoken)
+        scope.advanceTimeBy(CallLimits.PROGRESS_INTERVAL_MS); scope.runCurrent()
+        assertEquals(listOf("正在读取文件", "正在写入结果"), output.spoken)
+        gate.complete("完成")
+        scope.runCurrent()
+        assertEquals("正在读取文件", output.spoken.first())
+        assertEquals("完成", output.spoken.last())
+    }
+
+    @Test
+    fun `no verified progress and no working line means silence`() {
+        val scope = TestScope(UnconfinedTestDispatcher())
+        val output = FakeOutput()
+        val gate = kotlinx.coroutines.CompletableDeferred<String>()
+        val model = object : CallModelGateway {
+            override suspend fun ask(text: String): Result<String> = Result.success(gate.await())
+            override fun cancel() = Unit
+        }
+        val input = FakeInput()
+        MinisCallRuntimeAdapter(input, model, output, scope).also { it.start() }
+        input.fireFinal("慢任务")
+        scope.advanceTimeBy(CallLimits.PROGRESS_INTERVAL_MS * 3); scope.runCurrent()
+        assertTrue(output.spoken.isEmpty())
+    }
+
+    @Test
+    fun `progress stops after the per turn cap`() {
+        var n = 0
+        val gate = kotlinx.coroutines.CompletableDeferred<String>()
+        val scope = TestScope(UnconfinedTestDispatcher())
+        val output = FakeOutput()
+        val model = object : CallModelGateway {
+            override suspend fun ask(text: String): Result<String> = Result.success(gate.await())
+            override fun cancel() = Unit
+            override fun progress(): String? = "第${++n}步"
+        }
+        val input = FakeInput()
+        MinisCallRuntimeAdapter(input, model, output, scope).also { it.start() }
+        input.fireFinal("慢任务")
+        scope.advanceTimeBy(CallLimits.WORKING_LINE_DELAY_MS + CallLimits.PROGRESS_INTERVAL_MS * 20); scope.runCurrent()
+        assertEquals(CallLimits.MAX_PROGRESS_LINES, output.spoken.size)
+    }
+
+    @Test
+    fun `asking for the task list is answered aloud without bothering the model`() {
+        val r = Rig()
+        r.adapter.start()
+        r.input.fireFinal("现在有哪些任务")
+        assertEquals(listOf("现在有两个任务"), r.output.spoken)
+        assertEquals(0, r.model.asked)
+        assertEquals(listOf("overview"), r.tasks.calls)
+        assertEquals(listOf("我:现在有哪些任务", "AI:现在有两个任务"), r.transcript)
+        assertEquals("listening resumes after a status question", 2, r.input.started)
+        assertTrue(r.switched.isEmpty())
+    }
+
+    @Test
+    fun `switching speaks the confirmation then hands over the session`() {
+        val r = Rig()
+        r.adapter.start()
+        r.input.fireFinal("切换到整理相册任务")
+        assertEquals(listOf("好的，切换到整理相册"), r.output.spoken)
+        assertEquals(listOf("switch:整理相册"), r.tasks.calls)
+        assertEquals(listOf("s-2"), r.switched)
+        assertEquals(0, r.model.asked)
+        assertEquals("does not reopen the mic after handing over", 1, r.input.started)
+    }
+
+    @Test
+    fun `going back asks the task port for the previous task`() {
+        val r = Rig()
+        r.adapter.start()
+        r.input.fireFinal("回到上一个任务")
+        assertEquals(listOf("back"), r.tasks.calls)
+        assertEquals(listOf("s-1"), r.switched)
+    }
+
+    @Test
+    fun `a switch that finds nothing stays in the call and keeps listening`() {
+        val r = Rig(tasks = FakeTasks(switch = TaskReply("没找到这个任务")))
+        r.adapter.start()
+        r.input.fireFinal("切换到不存在的任务")
+        assertEquals(listOf("没找到这个任务"), r.output.spoken)
+        assertTrue(r.switched.isEmpty())
+        assertEquals(2, r.input.started)
+    }
+
+    @Test
+    fun `a blank task answer falls through to the model`() {
+        val r = Rig(tasks = FakeTasks(overview = TaskReply("")))
+        r.adapter.start()
+        r.input.fireFinal("现在有哪些任务")
+        assertEquals(1, r.model.asked)
+        assertEquals(listOf("收到"), r.output.spoken)
+    }
+
+    @Test
+    fun `ordinary sentences never reach the task port`() {
+        val r = Rig()
+        r.adapter.start()
+        r.input.fireFinal("帮我新建一个整理照片的任务")
+        assertTrue(r.tasks.calls.isEmpty())
+        assertEquals(1, r.model.asked)
+    }
+
+    @Test
+    fun `a finished background task interrupts the wait and is spoken then listening resumes`() {
+        val r = Rig()
+        r.adapter.start()
+        r.tasks.flow.tryEmit(CallTaskUpdate("t1:COMPLETED", "任务“整理相册”：已完成。"))
+        assertEquals(listOf("任务“整理相册”：已完成。"), r.output.spoken)
+        assertEquals(listOf("AI:任务“整理相册”：已完成。"), r.transcript)
+        assertEquals(2, r.input.started)
+        assertEquals(0, r.model.asked)
+    }
+
+    @Test
+    fun `a background result waits until the current answer is done`() {
+        val gate = kotlinx.coroutines.CompletableDeferred<String>()
+        val scope = TestScope(UnconfinedTestDispatcher())
+        val output = FakeOutput()
+        val tasks = FakeTasks()
+        val model = object : CallModelGateway {
+            override suspend fun ask(text: String): Result<String> = Result.success(gate.await())
+            override fun cancel() = Unit
+        }
+        val input = FakeInput()
+        MinisCallRuntimeAdapter(input, model, output, scope, tasks = tasks).also { it.start() }
+        input.fireFinal("问个问题")
+        tasks.flow.tryEmit(CallTaskUpdate("t1:COMPLETED", "后台完成"))
+        assertTrue("not spoken over the pending answer", output.spoken.isEmpty())
+        gate.complete("回答")
+        scope.runCurrent()
+        assertEquals(listOf("回答", "后台完成"), output.spoken)
+    }
+
+    @Test
+    fun `a result already given in an answer is not announced again`() {
+        val r = Rig()
+        r.adapter.start()
+        r.tasks.reported += "t1:COMPLETED"
+        r.tasks.flow.tryEmit(CallTaskUpdate("t1:COMPLETED", "重复"))
+        assertTrue(r.output.spoken.isEmpty())
+        assertTrue(r.transcript.isEmpty())
+    }
+
+    @Test
+    fun `muted calls log background results but stay silent`() {
+        val r = Rig()
+        r.adapter.start()
+        r.adapter.setMuted(true)
+        r.tasks.flow.tryEmit(CallTaskUpdate("t1:FAILED", "任务失败"))
+        assertTrue(r.output.spoken.isEmpty())
+        assertEquals(listOf("AI:任务失败"), r.transcript)
+    }
+
+    @Test
+    fun `background results after hanging up are ignored`() {
+        val r = Rig()
+        r.adapter.start()
+        r.adapter.stop()
+        r.tasks.flow.tryEmit(CallTaskUpdate("t1:COMPLETED", "太晚了"))
+        assertTrue(r.output.spoken.isEmpty())
+        assertTrue(r.transcript.isEmpty())
+    }
+
+    @Test
+    fun `a pending permission question is never talked over by a background result`() {
+        val approvals = FakeApprovals()
+        val r = Rig(approvals = approvals)
+        r.adapter.start()
+        approvals.flow.value = ApprovalPrompt("要允许吗", "没听清")
+        r.tasks.flow.tryEmit(CallTaskUpdate("t1:COMPLETED", "后台完成"))
+        assertEquals(listOf("要允许吗"), r.output.spoken)
     }
 
     private fun adapterEvent(adapter: MinisCallRuntimeAdapter) {

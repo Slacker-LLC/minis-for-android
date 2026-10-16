@@ -98,6 +98,8 @@ internal fun VoiceConversationHost(
     /** Mirrors `ChatScreen(isChatDestination=…)`; deep-link actions require it. */
     fromChatRoute: Boolean,
     ensureMicPermission: suspend () -> Boolean,
+    /** 口头切换任务：结束通话后把聊天切到该任务所在会话（和聊天里的会话跳转同一个入口）。 */
+    onMoveToSession: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -107,9 +109,22 @@ internal fun VoiceConversationHost(
     }
     // 通话里选的图片：随下一条提交的消息（打字或语音）一起发给 Agent。
     val pendingImages = remember(viewModel) { mutableStateListOf<InputAttachment>() }
-    val gateway = remember(viewModel) {
-        AgentCallGateway(viewModel.agentSession) { pendingImages.toList().also { pendingImages.clear() } }
+    val callTasks = remember(viewModel) {
+        AgentCallTasks(
+            context.applicationContext,
+            (context.applicationContext as com.openminis.app.MinisApp).agentTaskRepository,
+            { viewModel.agentSession.currentSessionId },
+        )
     }
+    val gateway = remember(viewModel) {
+        AgentCallGateway(
+            viewModel.agentSession,
+            takeAttachments = { pendingImages.toList().also { pendingImages.clear() } },
+            onTaskReported = callTasks::markReported,
+        )
+    }
+    // 适配器先于 endAudio 创建，切换回调经这个句柄转过去。
+    val switchSession = remember(viewModel) { arrayOf<(String) -> Unit>({}) }
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(MAX_CALL_IMAGES),
     ) { uris ->
@@ -132,6 +147,8 @@ internal fun VoiceConversationHost(
             scope,
             AgentCallApprovals(context.applicationContext, { viewModel.agentSession.currentSessionId }, scope),
             context.getString(R.string.voice_call_working),
+            callTasks,
+            { id -> switchSession[0](id) },
         )
     }
     val controller = remember(runtime) { CallController(runtime, scope) }
@@ -167,6 +184,12 @@ internal fun VoiceConversationHost(
         controller.endCall()
         viewModel.voiceConversationActive.value = false
         VoiceCallBridge.publish(null)
+    }
+
+    switchSession[0] = { id ->
+        endAudio()
+        DeepLinkCoordinator.setPendingChatAction(DeepLinkCoordinator.ChatAction.START_VOICE, id)
+        onMoveToSession(id)
     }
 
     fun openCall() {
