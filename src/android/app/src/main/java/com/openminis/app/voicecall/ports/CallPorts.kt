@@ -1,5 +1,8 @@
 package com.openminis.app.voicecall.ports
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+
 /**
  * 语音对话端口。生产实现复用主工程的识别、Agent 回合与朗读。
  *
@@ -39,4 +42,22 @@ interface CallSpeechOutput {
 
     /** 停止当前播放（静音/打断/挂断）。 */
     fun stop()
+}
+
+/** 口头回答权限请求的结果。拒绝一律按「本次会话拒绝」处理，和屏幕上的对话框一致。 */
+enum class ApprovalDecision { ALLOW_ONCE, ALLOW_SESSION, DENY }
+
+/** 一条待回答的权限请求：[question] 通话里念出来，[unclear] 是没听懂回答时的追问。 */
+data class ApprovalPrompt(val question: String, val unclear: String)
+
+interface CallApprovals {
+    /** 当前通话所属会话里正在等用户回答的权限请求；没有则为 null。 */
+    val pending: StateFlow<ApprovalPrompt?>
+
+    fun respond(decision: ApprovalDecision)
+}
+
+object NoCallApprovals : CallApprovals {
+    override val pending: StateFlow<ApprovalPrompt?> = MutableStateFlow(null)
+    override fun respond(decision: ApprovalDecision) = Unit
 }

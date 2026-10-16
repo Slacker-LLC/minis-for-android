@@ -2253,6 +2253,9 @@
     <string name="voice_call_input_hint">Nachricht eingeben…</string>
     <string name="voice_call_send">Senden</string>
     <string name="voice_call_show_orb">Zurück zur Sprache</string>
+    <string name="voice_call_approval_question">„%1$s“ erlauben? Sagen Sie erlauben, für diese Sitzung erlauben oder ablehnen.</string>
+    <string name="voice_call_approval_unclear">Das habe ich nicht verstanden. Sagen Sie erlauben, für diese Sitzung erlauben oder ablehnen.</string>
+    <string name="voice_call_working">Einen Moment, ich bin dran.</string>
     <string name="voice_call_model">Aktuelles Chatmodell</string>
     <string name="voice_call_toast_retry">Nicht verstanden, ich versuche es erneut…</string>
     <string name="voice_call_toast_idle">Noch da? Ohne Ton lege ich bald auf.</string>

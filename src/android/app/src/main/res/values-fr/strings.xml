@@ -2149,6 +2149,9 @@
     <string name="voice_call_input_hint">Saisir un message…</string>
     <string name="voice_call_send">Envoyer</string>
     <string name="voice_call_show_orb">Retour à la voix</string>
+    <string name="voice_call_approval_question">Autoriser « %1$s » ? Dites autoriser, autoriser pour cette session ou refuser.</string>
+    <string name="voice_call_approval_unclear">Je n\'ai pas compris. Dites autoriser, autoriser pour cette session ou refuser.</string>
+    <string name="voice_call_working">Un instant, je m\'en occupe.</string>
     <string name="voice_call_model">Modèle du chat actuel</string>
     <string name="voice_call_toast_retry">Je n\'ai pas compris, je réessaie…</string>
     <string name="voice_call_toast_idle">Vous êtes là ? Sans son, je raccrocherai bientôt.</string>

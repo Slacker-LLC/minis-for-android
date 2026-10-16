@@ -1,7 +1,10 @@
 package com.openminis.app.voicecall.runtime
 
 import com.openminis.app.voicecall.model.BloubState
+import com.openminis.app.voicecall.ports.ApprovalPrompt
+import com.openminis.app.voicecall.ports.CallApprovals
 import com.openminis.app.voicecall.ports.CallModelGateway
+import com.openminis.app.voicecall.ports.NoCallApprovals
 import com.openminis.app.voicecall.ports.CallSpeechInput
 import com.openminis.app.voicecall.ports.CallSpeechOutput
 import com.openminis.app.voicecall.ports.RecognitionError
@@ -19,6 +22,8 @@ import kotlinx.coroutines.launch
  * - 识别出错：瞬时错误（网络/引擎）最多自动重试 [MAX_RECOGNITION_RETRIES] 次，仍失败就挂断；
  *   缺麦克风权限不重试，直接挂断。
  * - 任务失败：连续 [MAX_TASK_FAILURES] 次才挂断，第一次只提示并继续听。
+ * - 过渡语：提问后 [WORKING_LINE_DELAY_MS] 还没有结果，念一句「我在处理」，每轮最多一次。
+ * - 口头授权：权限请求出现后念出来并听回答，连续 [MAX_APPROVAL_MISSES] 次没听懂就不再追问（屏幕对话框仍可点）。
  * - 空闲：持续没人说话 [IDLE_REMINDER_MS] 后提醒一次，[IDLE_END_MS] 后自动挂断。
  */
 object CallLimits {
@@ -28,6 +33,8 @@ object CallLimits {
     const val IDLE_END_MS = 300_000L
     const val RETRY_DELAY_MS = 400L
     const val ERROR_PAUSE_MS = 1_500L
+    const val MAX_APPROVAL_MISSES = 3
+    const val WORKING_LINE_DELAY_MS = 4_000L
 }
 
 /** ASR → 完整 Agent → TTS。每次聆听独立代数，重复/晚到回调不能再提交任务。 */
@@ -36,6 +43,9 @@ class MinisCallRuntimeAdapter(
     private val model: CallModelGateway,
     private val output: CallSpeechOutput,
     private val scope: CoroutineScope,
+    private val approvals: CallApprovals = NoCallApprovals,
+    /** 任务较久时念的过渡语；空串表示不念。 */
+    private val workingLine: String = "",
 ) : CallRuntime {
     private val _events = MutableSharedFlow<CallEvent>(extraBufferCapacity = 32)
     override val events: SharedFlow<CallEvent> = _events
@@ -47,6 +57,11 @@ class MinisCallRuntimeAdapter(
     private var idleJob: Job? = null
     private var recognitionRetries = 0
     private var taskFailures = 0
+    private var approvalJob: Job? = null
+    private var approvalWatcher: Job? = null
+    private var approvalToken = 0
+    private var approvalListening = false
+    private var approvalMisses = 0
 
     override fun start() {
         stop()
@@ -55,6 +70,7 @@ class MinisCallRuntimeAdapter(
         recognitionRetries = 0
         taskFailures = 0
         _events.tryEmit(CallEvent.MuteChanged(false))
+        approvalWatcher = scope.launch { approvals.pending.collect { onApprovalChanged(it) } }
         armIdle()
         startListening()
     }
@@ -66,6 +82,11 @@ class MinisCallRuntimeAdapter(
         listening = false
         idleJob?.cancel()
         idleJob = null
+        approvalWatcher?.cancel()
+        approvalWatcher = null
+        approvalJob?.cancel()
+        approvalJob = null
+        approvalToken++
         input.cancel()
         output.stop()
         responseJob?.cancel()
@@ -87,6 +108,7 @@ class MinisCallRuntimeAdapter(
                 input.cancel()
             }
             output.stop()
+            cancelApprovalListening()
         } else if (responseJob?.isActive != true) {
             armIdle()
             startListening()
@@ -116,6 +138,7 @@ class MinisCallRuntimeAdapter(
     override fun sendText(text: String) {
         val trimmed = text.trim()
         if (!active || trimmed.isEmpty()) return
+        approvals.pending.value?.let { handleApprovalReply(trimmed, it); return }
         generation++
         listening = false
         input.cancel()
@@ -187,6 +210,11 @@ class MinisCallRuntimeAdapter(
     private fun acceptText(text: String, gen: Int, typed: Boolean = false) {
         listening = false
         input.cancel()
+        // 有权限请求在等：这句话是对它的回答，不交给模型。
+        approvals.pending.value?.let {
+            handleApprovalReply(text, it)
+            return
+        }
         // 用户确实说了话：重置识别失败计数和空闲计时。
         recognitionRetries = 0
         idleJob?.cancel()
@@ -195,7 +223,23 @@ class MinisCallRuntimeAdapter(
             state(BloubState.THINKING)
             _events.tryEmit(CallEvent.Transcript(fromUser = true, text = text))
             try {
+                var fillerSpeaking = false
+                val filler = if (workingLine.isBlank()) null else launch {
+                    delay(CallLimits.WORKING_LINE_DELAY_MS)
+                    if (valid(gen) && !muted && approvals.pending.value == null) {
+                        fillerSpeaking = true
+                        try {
+                            state(BloubState.SPEAKING)
+                            output.speak(workingLine)
+                        } finally {
+                            fillerSpeaking = false
+                        }
+                        if (valid(gen)) state(BloubState.THINKING)
+                    }
+                }
                 val result = model.ask(text)
+                // 过渡语正念到一半就让它念完，不要和回答抢播放器。
+                if (filler != null) if (fillerSpeaking) filler.join() else filler.cancel()
                 if (!valid(gen)) return@launch
                 val reply = result.getOrThrow()
                 taskFailures = 0
@@ -229,6 +273,92 @@ class MinisCallRuntimeAdapter(
         if (valid(gen) && !muted) {
             armIdle()
             startListening()
+        }
+    }
+
+    /** 权限请求出现/消失。出现：念出问题再听回答；消失（屏幕上点了或已回答）：恢复原来的流程。 */
+    private fun onApprovalChanged(prompt: ApprovalPrompt?) {
+        if (!active) return
+        approvalToken++
+        approvalJob?.cancel()
+        approvalJob = null
+        if (prompt == null) {
+            if (approvalListening) {
+                approvalListening = false
+                input.cancel()
+                if (responseJob?.isActive == true) state(BloubState.THINKING)
+                else if (!muted) {
+                    armIdle()
+                    startListening()
+                }
+            }
+            return
+        }
+        approvalMisses = 0
+        if (muted) return
+        // 此时若在聆听普通一轮，不会有进行中的回合；挂起的回合由 responseJob 持有，代数不能动。
+        if (listening) {
+            generation++
+            listening = false
+            input.cancel()
+        }
+        idleJob?.cancel()
+        idleJob = null
+        approvalListening = true
+        askApproval(prompt.question)
+    }
+
+    private fun askApproval(line: String) {
+        val token = approvalToken
+        approvalJob = scope.launch {
+            state(BloubState.SPEAKING)
+            output.speak(line)
+            if (token == approvalToken && active && !muted) listenForApproval(token)
+        }
+    }
+
+    private fun listenForApproval(token: Int) {
+        state(BloubState.LISTENING)
+        input.start(
+            onPartial = { _ -> },
+            onFinal = { text -> scope.launch { if (token == approvalToken && active) approvals.pending.value?.let { handleApprovalReply(text, it) } } },
+            onError = { _, _ -> scope.launch { if (token == approvalToken && active) approvals.pending.value?.let { missedApproval(it) } } },
+        )
+    }
+
+    private fun handleApprovalReply(text: String, prompt: ApprovalPrompt) {
+        val decision = parseApprovalPhrase(text)
+        if (decision != null) {
+            // pending 变 null 后由 onApprovalChanged 恢复流程。
+            approvalToken++
+            input.cancel()
+            approvals.respond(decision)
+        } else missedApproval(prompt)
+    }
+
+    private fun missedApproval(prompt: ApprovalPrompt) {
+        input.cancel()
+        if (++approvalMisses >= CallLimits.MAX_APPROVAL_MISSES) {
+            // 不再追问；对话框还在屏幕上，用户可以点。
+            cancelApprovalListening()
+            if (responseJob?.isActive != true && !muted) {
+                armIdle()
+                startListening()
+            }
+            return
+        }
+        approvalToken++
+        askApproval(prompt.unclear)
+    }
+
+    private fun cancelApprovalListening() {
+        approvalToken++
+        approvalJob?.cancel()
+        approvalJob = null
+        if (approvalListening) {
+            approvalListening = false
+            input.cancel()
+            if (responseJob?.isActive == true) state(BloubState.THINKING)
         }
     }
 

@@ -10,6 +10,9 @@ import com.openminis.app.speech.SpeechRecognitionManager
 import com.openminis.app.speech.SystemSpeechRecognitionEngine
 import com.openminis.app.agent.AgentSession
 import com.openminis.app.agent.enqueueVoicePrompt
+import com.openminis.app.voicecall.ports.ApprovalDecision
+import com.openminis.app.voicecall.ports.ApprovalPrompt
+import com.openminis.app.voicecall.ports.CallApprovals
 import com.openminis.app.voicecall.ports.CallModelGateway
 import com.openminis.app.voicecall.ports.CallSpeechInput
 import com.openminis.app.voicecall.ports.CallSpeechOutput
@@ -21,6 +24,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import com.openminis.app.offload.OffloadPermissionManager
 
 internal class AgentCallGateway(private val session: AgentSession) : CallModelGateway {
     private var ownedTurn: AgentTurnHandle? = null
@@ -137,4 +146,35 @@ internal class AgentCallSpeechOutput(private val player: Lazy<ReadAloudPlayer>) 
     }
 
     override fun stop() { if (player.isInitialized()) player.value.stop() }
+}
+
+/**
+ * 把「此通话所属会话」里的权限请求变成可口头回答的问题。别的会话的请求不接，
+ * 也不会被通话里的一句话放行。
+ */
+internal class AgentCallApprovals(
+    private val context: android.content.Context,
+    private val sessionId: () -> String?,
+    scope: CoroutineScope,
+) : CallApprovals {
+    override val pending: StateFlow<ApprovalPrompt?> = OffloadPermissionManager.pendingRequest
+        .map { request ->
+            request?.takeIf { it.sessionId == sessionId() }?.let {
+                ApprovalPrompt(
+                    question = context.getString(com.openminis.app.R.string.voice_call_approval_question, it.toolTitle),
+                    unclear = context.getString(com.openminis.app.R.string.voice_call_approval_unclear),
+                )
+            }
+        }
+        .stateIn(scope, SharingStarted.Eagerly, null)
+
+    override fun respond(decision: ApprovalDecision) {
+        OffloadPermissionManager.respondToRequest(
+            when (decision) {
+                ApprovalDecision.ALLOW_ONCE -> OffloadPermissionManager.Response.ALLOW_ONCE
+                ApprovalDecision.ALLOW_SESSION -> OffloadPermissionManager.Response.ALLOW_SESSION
+                ApprovalDecision.DENY -> OffloadPermissionManager.Response.DENY_SESSION
+            },
+        )
+    }
 }

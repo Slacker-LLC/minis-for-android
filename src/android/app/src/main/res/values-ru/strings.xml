@@ -2431,6 +2431,9 @@
     <string name="voice_call_input_hint">Введите сообщение…</string>
     <string name="voice_call_send">Отправить</string>
     <string name="voice_call_show_orb">Назад к голосу</string>
+    <string name="voice_call_approval_question">Разрешить «%1$s»? Скажите: разрешить, разрешить на этот сеанс или отклонить.</string>
+    <string name="voice_call_approval_unclear">Не расслышал. Скажите: разрешить, разрешить на этот сеанс или отклонить.</string>
+    <string name="voice_call_working">Минуту, я этим занимаюсь.</string>
     <string name="voice_call_model">Модель текущего чата</string>
     <string name="voice_call_toast_retry">Не расслышал, пробую ещё раз…</string>
     <string name="voice_call_toast_idle">Вы здесь? Если будет тихо, скоро завершу звонок.</string>

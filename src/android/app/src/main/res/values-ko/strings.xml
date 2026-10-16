@@ -2241,6 +2241,9 @@
     <string name="voice_call_input_hint">메시지 입력…</string>
     <string name="voice_call_send">보내기</string>
     <string name="voice_call_show_orb">음성 화면으로</string>
+    <string name="voice_call_approval_question">“%1$s”을(를) 허용할까요? “허용”, “이번 세션 허용”, “거부” 중 하나로 말씀해 주세요.</string>
+    <string name="voice_call_approval_unclear">잘 못 들었어요. “허용”, “이번 세션 허용”, “거부” 중 하나로 말씀해 주세요.</string>
+    <string name="voice_call_working">잠시만요, 처리하고 있어요.</string>
     <string name="voice_call_model">현재 채팅 모델</string>
     <string name="voice_call_toast_retry">잘 못 들었어요. 다시 들을게요…</string>
     <string name="voice_call_toast_idle">계신가요? 소리가 없으면 곧 통화를 끊을게요.</string>

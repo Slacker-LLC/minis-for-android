@@ -89,6 +89,8 @@ internal fun VoiceConversationHost(
             gateway,
             AgentCallSpeechOutput(player),
             scope,
+            AgentCallApprovals(context.applicationContext, { viewModel.agentSession.currentSessionId }, scope),
+            context.getString(R.string.voice_call_working),
         )
     }
     val controller = remember(runtime) { CallController(runtime, scope) }

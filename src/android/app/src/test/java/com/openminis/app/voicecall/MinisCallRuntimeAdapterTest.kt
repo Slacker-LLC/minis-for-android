@@ -1,12 +1,17 @@
 package com.openminis.app.voicecall.runtime
 
 import com.openminis.app.voicecall.model.BloubState
+import com.openminis.app.voicecall.ports.ApprovalDecision
+import com.openminis.app.voicecall.ports.ApprovalPrompt
+import com.openminis.app.voicecall.ports.CallApprovals
 import com.openminis.app.voicecall.ports.CallModelGateway
 import com.openminis.app.voicecall.ports.CallSpeechInput
 import com.openminis.app.voicecall.ports.CallSpeechOutput
 import com.openminis.app.voicecall.ports.RecognitionError
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -139,12 +144,23 @@ class MinisCallRuntimeAdapterTest {
 
     // ---- 容错与空闲：虚拟时钟下断言上限，避免出错后无声地一直耗电/请求 ----
 
+    private class FakeApprovals : CallApprovals {
+        val flow = MutableStateFlow<ApprovalPrompt?>(null)
+        override val pending: StateFlow<ApprovalPrompt?> = flow
+        val responses = mutableListOf<ApprovalDecision>()
+        override fun respond(decision: ApprovalDecision) {
+            responses += decision
+            flow.value = null
+        }
+    }
+
     private class Timed(modelResult: () -> Result<String> = { Result.success("收到") }) {
         val scope = TestScope(UnconfinedTestDispatcher())
         val input = FakeInput()
         val model = FakeModel(modelResult)
         val output = FakeOutput()
-        val adapter = MinisCallRuntimeAdapter(input, model, output, scope)
+        val approvals = FakeApprovals()
+        val adapter = MinisCallRuntimeAdapter(input, model, output, scope, approvals)
         val events = mutableListOf<CallEvent>()
         init { scope.launch { adapter.events.collect { events += it } } }
         val states get() = events.filterIsInstance<CallEvent.BloubStateChanged>().map { it.state }
@@ -317,6 +333,105 @@ class MinisCallRuntimeAdapterTest {
         t.adapter.stop()
         t.adapter.sendText("挂断后")
         assertEquals(0, t.model.asked)
+    }
+
+    private val askPrompt = ApprovalPrompt("要允许吗", "没听清")
+
+    @Test
+    fun `permission request is read aloud and a spoken allow answers it`() {
+        val t = Timed()
+        t.adapter.start()
+        t.approvals.flow.value = askPrompt
+        assertEquals(listOf("要允许吗"), t.output.spoken)
+        t.input.fireFinal("允许")
+        assertEquals(listOf(ApprovalDecision.ALLOW_ONCE), t.approvals.responses)
+        assertEquals("the answer is not sent to the model", 0, t.model.asked)
+        assertEquals("back to normal listening", BloubState.LISTENING, t.states.last())
+    }
+
+    @Test
+    fun `unclear answers are asked again and never decide`() {
+        val t = Timed()
+        t.adapter.start()
+        t.approvals.flow.value = askPrompt
+        t.input.fireFinal("今天天气怎么样")
+        assertTrue(t.approvals.responses.isEmpty())
+        assertEquals(listOf("要允许吗", "没听清"), t.output.spoken)
+        assertEquals(0, t.model.asked)
+        t.input.fireFinal("不要")
+        assertEquals(listOf(ApprovalDecision.DENY), t.approvals.responses)
+    }
+
+    @Test
+    fun `gives up asking after repeated misses but leaves the request pending`() {
+        val t = Timed()
+        t.adapter.start()
+        t.approvals.flow.value = askPrompt
+        repeat(CallLimits.MAX_APPROVAL_MISSES) { t.input.fireFinal("嗯嗯嗯") }
+        assertTrue(t.approvals.responses.isEmpty())
+        assertEquals("question plus two re-asks", CallLimits.MAX_APPROVAL_MISSES, t.output.spoken.size)
+        assertTrue("dialog still waits for a tap", t.approvals.flow.value != null)
+    }
+
+    @Test
+    fun `typed answer and screen answer both settle the request`() {
+        val t = Timed()
+        t.adapter.start()
+        t.approvals.flow.value = askPrompt
+        t.adapter.sendText("本次会话都允许")
+        assertEquals(listOf(ApprovalDecision.ALLOW_SESSION), t.approvals.responses)
+        assertEquals(0, t.model.asked)
+        // 屏幕上点掉的情况：pending 变空，通话恢复聆听，不会再响应旧回调。
+        t.approvals.flow.value = askPrompt
+        val started = t.input.started
+        t.approvals.flow.value = null
+        assertTrue(t.input.started > started)
+    }
+
+    @Test
+    fun `hanging up drops a pending spoken approval`() {
+        val t = Timed()
+        t.adapter.start()
+        t.approvals.flow.value = askPrompt
+        t.adapter.stop()
+        t.input.fireFinal("允许")
+        assertTrue(t.approvals.responses.isEmpty())
+    }
+
+    @Test
+    fun `slow task gets one spoken working line then the real answer`() {
+        val scope = TestScope(UnconfinedTestDispatcher())
+        val input = FakeInput()
+        val output = FakeOutput()
+        val gate = kotlinx.coroutines.CompletableDeferred<String>()
+        val model = object : CallModelGateway {
+            override suspend fun ask(text: String): Result<String> = Result.success(gate.await())
+            override fun cancel() = Unit
+        }
+        val adapter = MinisCallRuntimeAdapter(input, model, output, scope, workingLine = "稍等")
+        adapter.start()
+        input.fireFinal("做个很久的任务")
+        scope.advanceTimeBy(CallLimits.WORKING_LINE_DELAY_MS - 1); scope.runCurrent()
+        assertTrue(output.spoken.isEmpty())
+        scope.advanceTimeBy(2); scope.runCurrent()
+        assertEquals(listOf("稍等"), output.spoken)
+        scope.advanceTimeBy(CallLimits.WORKING_LINE_DELAY_MS * 3); scope.runCurrent()
+        assertEquals("only once per turn", listOf("稍等"), output.spoken)
+        gate.complete("做完了")
+        scope.runCurrent()
+        assertEquals(listOf("稍等", "做完了"), output.spoken)
+    }
+
+    @Test
+    fun `fast answers never get a working line`() {
+        val scope = TestScope(UnconfinedTestDispatcher())
+        val input = FakeInput()
+        val output = FakeOutput()
+        val adapter = MinisCallRuntimeAdapter(input, FakeModel(), output, scope, workingLine = "稍等")
+        adapter.start()
+        input.fireFinal("你好")
+        scope.advanceTimeBy(CallLimits.WORKING_LINE_DELAY_MS * 2); scope.runCurrent()
+        assertEquals(listOf("收到"), output.spoken)
     }
 
     private fun adapterEvent(adapter: MinisCallRuntimeAdapter) {

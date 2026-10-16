@@ -2421,6 +2421,9 @@
     <string name="voice_call_input_hint">輸入文字…</string>
     <string name="voice_call_send">傳送</string>
     <string name="voice_call_show_orb">回到語音</string>
+    <string name="voice_call_approval_question">要允許「%1$s」嗎？請說「允許」「本次會話都允許」或「拒絕」。</string>
+    <string name="voice_call_approval_unclear">沒聽清。請說「允許」「本次會話都允許」或「拒絕」。</string>
+    <string name="voice_call_working">稍等，我在處理。</string>
     <string name="voice_call_model">目前對話模型</string>
     <string name="voice_call_toast_retry">沒聽清，再試一次…</string>
     <string name="voice_call_toast_idle">還在嗎？一直沒聲音我就要掛斷囉。</string>

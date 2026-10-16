@@ -2538,6 +2538,9 @@
     <string name="voice_call_input_hint">Type a message…</string>
     <string name="voice_call_send">Send</string>
     <string name="voice_call_show_orb">Back to voice</string>
+    <string name="voice_call_approval_question">Allow “%1$s”? Say allow, allow for this session, or deny.</string>
+    <string name="voice_call_approval_unclear">Sorry, I didn\'t get that. Say allow, allow for this session, or deny.</string>
+    <string name="voice_call_working">One moment, I\'m working on it.</string>
     <string name="voice_call_model">Current chat model</string>
     <string name="voice_call_toast_retry">Didn\'t catch that, trying again…</string>
     <string name="voice_call_toast_idle">Still there? I\'ll hang up soon if I hear nothing.</string>

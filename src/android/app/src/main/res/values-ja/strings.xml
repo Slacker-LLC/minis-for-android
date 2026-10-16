@@ -2249,6 +2249,9 @@
     <string name="voice_call_input_hint">メッセージを入力…</string>
     <string name="voice_call_send">送信</string>
     <string name="voice_call_show_orb">音声画面に戻る</string>
+    <string name="voice_call_approval_question">「%1$s」を許可しますか？「許可」「このセッションで許可」「拒否」のいずれかを言ってください。</string>
+    <string name="voice_call_approval_unclear">聞き取れませんでした。「許可」「このセッションで許可」「拒否」のいずれかを言ってください。</string>
+    <string name="voice_call_working">少々お待ちください、対応中です。</string>
     <string name="voice_call_model">現在のチャットモデル</string>
     <string name="voice_call_toast_retry">聞き取れませんでした。もう一度聞きます…</string>
     <string name="voice_call_toast_idle">いらっしゃいますか？声がないと、まもなく切断します。</string>

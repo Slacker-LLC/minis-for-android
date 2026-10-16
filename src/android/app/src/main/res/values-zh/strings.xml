@@ -2446,6 +2446,9 @@
     <string name="voice_call_input_hint">输入文字…</string>
     <string name="voice_call_send">发送</string>
     <string name="voice_call_show_orb">回到语音</string>
+    <string name="voice_call_approval_question">要允许“%1$s”吗？请说“允许”“本次会话都允许”或“拒绝”。</string>
+    <string name="voice_call_approval_unclear">没听清。请说“允许”“本次会话都允许”或“拒绝”。</string>
+    <string name="voice_call_working">稍等，我在处理。</string>
     <string name="voice_call_model">当前会话模型</string>
     <string name="voice_call_toast_retry">没听清，再试一次…</string>
     <string name="voice_call_toast_idle">还在吗？一直没声音我就要挂断啦。</string>
