@@ -80,10 +80,13 @@ internal data class WorkProcess(
     val id: String,
     val blocks: List<AssistantBlock>,
     /**
-     * The turn this run belongs to is still being generated. The row is "running" for the whole turn,
-     * not only while a tool call is in flight: between two calls, and while the model writes its final
-     * answer after the last one, no tool is running but the turn is not over - judging by the tools
-     * alone folded the row at every gap and opened it again at the next call.
+     * The turn this run belongs to is still being generated and the model has not started writing after
+     * it. The row is "running" through that whole stretch, not only while a tool call is in flight:
+     * between two calls no tool is running but the turn is not over - judging by the tools alone folded
+     * the row at every gap and opened it again at the next call. Once the model writes text after the run
+     * it is finished, so the row folds there instead of at the end of the whole message: a fold that
+     * waited for the end of the reply landed on the same frames as the reply's own end-of-stream
+     * re-layout, and a fold at the next run's start played at the same time as that run's expand.
      */
     val turnLive: Boolean = false,
 ) {
@@ -277,7 +280,7 @@ internal fun buildAssistantTurnEntries(
     val lastWorkIndex = blocks.indexOfLast(::counts)
     val entries = mutableListOf<AssistantTurnEntry>()
     var run = mutableListOf<AssistantBlock>()
-    fun flush(last: Boolean) {
+    fun flush(last: Boolean, answering: Boolean = false) {
         if (run.isEmpty()) return
         entries.add(
             AssistantTurnEntry.Process(
@@ -286,7 +289,7 @@ internal fun buildAssistantTurnEntries(
                     // grows, matching the key-stability rule the streaming rows depend on.
                     id = "$messageId:" + run.first().id,
                     blocks = run.toList(),
-                    turnLive = last && turnLive,
+                    turnLive = last && turnLive && !answering,
                 ),
             ),
         )
@@ -299,7 +302,7 @@ internal fun buildAssistantTurnEntries(
             block.kind == THINKING_KIND -> if (index > lastWorkIndex) entries.add(AssistantTurnEntry.Single(index, block))
             else -> {
                 // A run ends where the model wrote something; it is the turn's last run when no work follows.
-                flush(last = index > lastWorkIndex)
+                flush(last = index > lastWorkIndex, answering = block.kind == "text" && block.content.isNotBlank())
                 entries.add(AssistantTurnEntry.Single(index, block))
             }
         }

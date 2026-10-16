@@ -2,6 +2,7 @@ package com.openminis.app.ui.chat
 
 import com.openminis.app.data.StepsPresentation
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -16,11 +17,11 @@ import org.junit.Test
  */
 class TurnWorkRowTest {
 
-    private fun tool(id: String, startTimeMs: Long = 1_000L) = AssistantBlock(
+    private fun tool(id: String, startTimeMs: Long = 1_000L, status: ToolBlockStatus = ToolBlockStatus.SUCCESS) = AssistantBlock(
         id = id,
         kind = TOOL_USE_KIND,
         content = "ok",
-        toolStatus = ToolBlockStatus.SUCCESS,
+        toolStatus = status,
         toolName = "shell_execute",
         startTimeMs = startTimeMs,
         durationMs = 500L,
@@ -62,13 +63,65 @@ class TurnWorkRowTest {
     fun `only the last work row follows the live turn`() {
         val entries = buildAssistantTurnEntries(
             messageId = "m1",
-            blocks = listOf(tool("c1", startTimeMs = 1_000L), text("t2", "再确认一下"), tool("c2", startTimeMs = 2_000L), text("t3", "结论")),
+            blocks = listOf(tool("c1", startTimeMs = 1_000L), text("t2", "再确认一下"), tool("c2", startTimeMs = 2_000L)),
             presentation = StepsPresentation.GROUPED,
             thinkingVisible = true,
             turnLive = true,
         )
         val processes = entries.filterIsInstance<AssistantTurnEntry.Process>().map { it.process }
         assertEquals("an earlier run is finished: the model went on to write after it", listOf(false, true), processes.map { it.turnLive })
+    }
+
+    @Test
+    fun `the last work row finishes when the model starts writing after it`() {
+        val entries = buildAssistantTurnEntries(
+            messageId = "m1",
+            blocks = listOf(tool("c1", startTimeMs = 1_000L), text("t2", "再确认一下"), tool("c2", startTimeMs = 2_000L), text("t3", "结论")),
+            presentation = StepsPresentation.GROUPED,
+            thinkingVisible = true,
+            turnLive = true,
+        )
+        val processes = entries.filterIsInstance<AssistantTurnEntry.Process>().map { it.process }
+        assertEquals("the answer has started: nothing is left to fold at the end of the stream", listOf(false, false), processes.map { it.turnLive })
+    }
+
+    @Test
+    fun `an empty text block after the work row does not end it`() {
+        val entries = buildAssistantTurnEntries(
+            messageId = "m1",
+            blocks = listOf(tool("c1", startTimeMs = 1_000L), text("t2", "")),
+            presentation = StepsPresentation.GROUPED,
+            thinkingVisible = true,
+            turnLive = true,
+        )
+        val processes = entries.filterIsInstance<AssistantTurnEntry.Process>().map { it.process }
+        assertEquals(listOf(true), processes.map { it.turnLive })
+    }
+
+    @Test
+    fun `a tool still running keeps the row open even after the model wrote text`() {
+        val entries = buildAssistantTurnEntries(
+            messageId = "m1",
+            blocks = listOf(tool("c1", startTimeMs = 1_000L, status = ToolBlockStatus.RUNNING), text("t2", "先说一句")),
+            presentation = StepsPresentation.GROUPED,
+            thinkingVisible = true,
+            turnLive = true,
+        )
+        val process = entries.filterIsInstance<AssistantTurnEntry.Process>().single().process
+        assertFalse(process.turnLive)
+        assertTrue(process.isRunning)
+    }
+
+    @Test
+    fun `a finished turn leaves every row finished`() {
+        val entries = buildAssistantTurnEntries(
+            messageId = "m1",
+            blocks = listOf(tool("c1", startTimeMs = 1_000L)),
+            presentation = StepsPresentation.GROUPED,
+            thinkingVisible = true,
+            turnLive = false,
+        )
+        assertFalse(entries.filterIsInstance<AssistantTurnEntry.Process>().single().process.turnLive)
     }
 
     @Test
