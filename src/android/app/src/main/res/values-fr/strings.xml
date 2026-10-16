@@ -923,6 +923,7 @@
     <string name="voice_correction_cleared">Données de correction vocale effacées</string>
     <string name="voice_provider_system">Système</string>
     <string name="add_provider_subtitle_kimi">Kimi Coding Plan — connectez-vous avec votre compte Kimi</string>
+    <string name="add_provider_subtitle_xai">Compatible avec la série de modèles Grok</string>
     <string name="kimi_login_title">Se connecter avec Kimi Code</string>
     <string name="kimi_login_instructions">Ouvrez la page de vérification et saisissez ce code pour autoriser Minis :</string>
     <string name="kimi_login_copy_code">Copier le code</string>

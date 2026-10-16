@@ -1063,6 +1063,7 @@
     <string name="voice_correction_cleared">音声修正データを削除しました</string>
     <string name="voice_provider_system">システム</string>
     <string name="add_provider_subtitle_kimi">Kimi Coding Plan — Kimi アカウントでサインイン</string>
+    <string name="add_provider_subtitle_xai">Grok シリーズのモデルに対応</string>
     <string name="kimi_login_title">Kimi Code でサインイン</string>
     <string name="kimi_login_instructions">認証ページを開き、このコードを入力して Minis を許可してください:</string>
     <string name="kimi_login_copy_code">コードをコピー</string>

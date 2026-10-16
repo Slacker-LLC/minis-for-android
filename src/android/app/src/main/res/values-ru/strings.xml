@@ -1211,6 +1211,7 @@
     <string name="voice_correction_cleared">Данные об исправлениях удалены</string>
     <string name="voice_provider_system">Система</string>
     <string name="add_provider_subtitle_kimi">Kimi Coding Plan — войдите с аккаунтом Kimi</string>
+    <string name="add_provider_subtitle_xai">Поддерживает модели серии Grok</string>
     <string name="kimi_login_title">Войти через Kimi Code</string>
     <string name="kimi_login_instructions">Откройте страницу подтверждения и введите этот код, чтобы авторизовать Minis:</string>
     <string name="kimi_login_copy_code">Скопировать код</string>

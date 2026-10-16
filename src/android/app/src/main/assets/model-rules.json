@@ -630,6 +630,7 @@
         "id": "grok-4.7",
         "displayName": "Grok 4.7",
         "provider": "xAI",
+        "contextWindow": 500000,
         "supportsReasoning": true
       },
       {

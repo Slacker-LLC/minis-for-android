@@ -1056,6 +1056,7 @@
     <string name="voice_correction_cleared">Sprachkorrekturdaten gelöscht</string>
     <string name="voice_provider_system">System</string>
     <string name="add_provider_subtitle_kimi">Kimi Coding Plan — mit Kimi-Konto anmelden</string>
+    <string name="add_provider_subtitle_xai">Unterstützt die Grok-Modellreihe</string>
     <string name="kimi_login_title">Mit Kimi Code anmelden</string>
     <string name="kimi_login_instructions">Öffne die Bestätigungsseite und gib diesen Code ein, um Minis zu autorisieren:</string>
     <string name="kimi_login_copy_code">Code kopieren</string>

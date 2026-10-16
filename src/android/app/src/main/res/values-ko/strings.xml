@@ -1055,6 +1055,7 @@
     <string name="voice_correction_cleared">음성 교정 데이터를 삭제했습니다</string>
     <string name="voice_provider_system">시스템</string>
     <string name="add_provider_subtitle_kimi">Kimi Coding Plan — Kimi 계정으로 로그인</string>
+    <string name="add_provider_subtitle_xai">Grok 시리즈 모델을 지원합니다</string>
     <string name="kimi_login_title">Kimi Code로 로그인</string>
     <string name="kimi_login_instructions">인증 페이지를 열고 이 코드를 입력하여 Minis를 승인하세요:</string>
     <string name="kimi_login_copy_code">코드 복사</string>
