@@ -2330,4 +2330,6 @@
     <string name="scheduled_task_legacy_executor_removed">Diese Aufgabe verwendete einen entfernten Ausführungsmodus. Prüfe sie und speichere sie, bevor du sie erneut startest.</string>
     <string name="sub_agent_text_model_required">Wähle ein Modell, das Text ausgeben kann.</string>
     <string name="vscreen_display_busy">Das virtuelle Display wird derzeit von einer anderen Sitzung verwendet.</string>
+    <string name="voice_call_settings">Spracheinstellungen</string>
+    <string name="voice_call_settings_speed">Sprechgeschwindigkeit</string>
 </resources>

@@ -2479,4 +2479,6 @@
     <string name="work_task_waiting">等待外部結果</string>
     <string name="work_request_review">有待投遞指令；還原後請確認投遞方式。</string>
     <string name="work_task_clear_selection">解除所選任務</string>
+    <string name="voice_call_settings">語音設定</string>
+    <string name="voice_call_settings_speed">朗讀語速</string>
 </resources>

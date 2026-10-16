@@ -2318,4 +2318,6 @@
     <string name="scheduled_task_legacy_executor_removed">이 작업은 삭제된 실행기를 사용했습니다. 다시 실행하기 전에 내용을 검토하고 저장하세요.</string>
     <string name="sub_agent_text_model_required">텍스트로 응답할 수 있는 모델을 선택하세요.</string>
     <string name="vscreen_display_busy">가상 디스플레이가 현재 다른 세션에서 사용 중입니다.</string>
+    <string name="voice_call_settings">음성 설정</string>
+    <string name="voice_call_settings_speed">읽기 속도</string>
 </resources>

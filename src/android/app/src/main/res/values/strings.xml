@@ -2615,4 +2615,6 @@
     <string name="scheduled_task_legacy_executor_removed">This task used a removed executor. Review it and save before running it again.</string>
     <string name="sub_agent_text_model_required">Choose a model that can respond with text.</string>
     <string name="vscreen_display_busy">The virtual display is currently in use by another session.</string>
+    <string name="voice_call_settings">Voice settings</string>
+    <string name="voice_call_settings_speed">Speaking speed</string>
 </resources>

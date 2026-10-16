@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MicOff
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -104,6 +105,7 @@ internal fun VoiceConversationHost(
     var entryError by remember(viewModel) { mutableStateOf<String?>(null) }
     var transcriptMode by remember(viewModel) { mutableStateOf(false) }
     var draft by remember(viewModel) { mutableStateOf("") }
+    var showSettings by remember(viewModel) { mutableStateOf(false) }
     val pending by DeepLinkCoordinator.pendingChatAction.collectAsState()
     val lifecycleState by lifecycle.currentStateAsState()
     val modelName by viewModel.modelName.collectAsState()
@@ -260,7 +262,12 @@ internal fun VoiceConversationHost(
                     ) {
                         // 顶栏：计时居中，右侧在「球」和「文字记录」两种版面间切换。
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Spacer(Modifier.size(48.dp))
+                            IconButton(onClick = { showSettings = true }) {
+                                Icon(
+                                    Icons.Rounded.Tune,
+                                    contentDescription = stringResource(R.string.voice_call_settings),
+                                )
+                            }
                             Spacer(Modifier.weight(1f))
                             if (active) {
                                 Text(
@@ -280,6 +287,9 @@ internal fun VoiceConversationHost(
                             }
                         }
 
+                        if (showSettings) {
+                            CallSettingsSheet(viewModel.providerRepository) { showSettings = false }
+                        }
                         if (transcriptMode) {
                             TranscriptLayout(
                                 lines = state.transcript,
