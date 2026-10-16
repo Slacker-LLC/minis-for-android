@@ -223,6 +223,7 @@ class TextToSpeechManager : TextToSpeech.OnInitListener {
         // flight and no progress callback ever coming — ReadAloudPlayer's
         // completion poll then spun forever and the whole read-aloud queue
         // wedged for the rest of the process.
+        applyPlaybackUsage()
         val rc = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, generateUtteranceId())
         if (rc != TextToSpeech.SUCCESS) {
             Log.w(TAG, "speak rejected by engine (rc=$rc len=${text.length})")
@@ -258,6 +259,7 @@ class TextToSpeechManager : TextToSpeech.OnInitListener {
 
         val params = buildSpeechParams()
         // [T-android-tts-rom-compat] Same rejected-enqueue guard as speak().
+        applyPlaybackUsage()
         val rc = tts?.speak(text, TextToSpeech.QUEUE_ADD, params, generateUtteranceId())
         if (rc != TextToSpeech.SUCCESS) {
             Log.w(TAG, "speakQueued rejected by engine (rc=$rc len=${text.length})")
@@ -344,6 +346,7 @@ class TextToSpeechManager : TextToSpeech.OnInitListener {
                     autoDetectAndSetLanguage(text)
                     val params = buildSpeechParams()
                     val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+                    applyPlaybackUsage()
                     tts?.speak(text, queueMode, params, generateUtteranceId())
                 }
                 _isSpeaking.value = true
@@ -410,6 +413,24 @@ class TextToSpeechManager : TextToSpeech.OnInitListener {
             Locale.US
         }
         tts?.setLanguage(locale)
+    }
+
+    /**
+     * 通话里选「听筒」时为 true：用语音通话用途播放，系统才会按通话路由（听筒）输出。
+     * 每句朗读前套用，所以中途切换从下一句起生效。
+     */
+    @Volatile var communicationUsage: Boolean = false
+
+    private fun applyPlaybackUsage() {
+        tts?.setAudioAttributes(
+            android.media.AudioAttributes.Builder()
+                .setUsage(
+                    if (communicationUsage) android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION
+                    else android.media.AudioAttributes.USAGE_MEDIA,
+                )
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build(),
+        )
     }
 
     private fun buildSpeechParams(): android.os.Bundle {

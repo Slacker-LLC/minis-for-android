@@ -950,6 +950,11 @@ class AgentSession(
      * would land on.
      */
 
+    /** 当前模型能直接看图，或配了 Vision Group 能代看：通话里的「＋」附图只在这时有意义。 */
+    fun canAcceptImages(): Boolean =
+        currentModel?.inputModalities?.any { it.equals("image", ignoreCase = true) } == true ||
+            com.openminis.app.tools.VisionGroupResolver.isConfigured(providerRepository, context)
+
     val currentModelSupportsReasoning: Boolean
         get() = currentModel?.supportsReasoning == true
 

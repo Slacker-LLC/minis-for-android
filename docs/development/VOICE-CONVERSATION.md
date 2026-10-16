@@ -45,3 +45,9 @@
 
 输入栏左侧「＋」打开系统照片选择器（最多 4 张），选中的图片以缩略图排在输入栏上方，可单张移除。图片随下一条真正提交的消息（打字或语音识别结果）一起交给 `AgentRunner.submit`；如果那条话是并入正在运行任务的补充指令，则图片不带走，留给下一轮。挂断时清空。模拟器上验证了选择、缩略图与移除；因无 provider，图片是否被模型正确接收未验证。
 
+**图片给谁看**：通话链路是 语音识别 → Agent 一轮 → 朗读，没有「语音模型」在看图；图片走的是聊天同一条 `submitPrompt` → `UserAttachmentPreparer`。当前模型自带 image 输入就直接带像素；没有但配了 Vision Group，则图片落盘后以占位文字提示模型调 `read_image`，由视觉组里的模型描述（`AgentLoop.visionPlaceholderFor`、`VisionGroupResolver`）；两者都没有时「＋」不显示（`AgentSession.canAcceptImages`，换模型后重新判断）。上游没有语音通话页，无可对照实现。
+
+## 听筒/扬声器（2026-10-16）
+
+设置面板里的「使用听筒播放」开关（`VoiceOutputState.callEarpiece`，存在 `voice_prefs`，默认关）。开启后通话期间 `CallAudioRoute` 把系统切到 `MODE_IN_COMMUNICATION` 并选内置听筒（API 31+ `setCommunicationDevice`，更低版本关扬声器），同时 `ReadAloudPlayer`/系统 TTS 改用 `USAGE_VOICE_COMMUNICATION` 播放，否则系统仍按媒体走扬声器。挂断、关闭开关或离开页面都会还原模式；中途切换从下一句起生效。需要 `MODIFY_AUDIO_SETTINGS`（普通权限）。蓝牙/有线耳机在场时系统路由优先。验证：`emulator-5556` 上开启后通话中 `dumpsys audio` 为 `MODE_IN_COMMUNICATION`，挂断后回 `MODE_NORMAL`（缺该权限时 `setMode` 被拒，已补）。未验证：真机听筒实际出声、蓝牙共存、provider 音频路径的实际路由。
+

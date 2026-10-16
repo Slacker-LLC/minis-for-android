@@ -66,6 +66,7 @@ import com.openminis.app.deeplink.DeepLinkCoordinator
 import com.openminis.app.service.VoiceCallBridge
 import com.openminis.app.service.VoiceCallForegroundService
 import com.openminis.app.speech.ReadAloudPlayer
+import com.openminis.app.speech.VoiceOutputState
 import com.openminis.app.speech.SpeechRecognitionManager
 import com.openminis.app.ui.chat.ChatViewModel
 import com.openminis.app.ui.chat.TaskWorkSummary
@@ -101,7 +102,9 @@ internal fun VoiceConversationHost(
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val scope = rememberCoroutineScope()
-    val player = remember(viewModel) { lazy { ReadAloudPlayer(context.applicationContext) } }
+    val player = remember(viewModel) {
+        lazy { ReadAloudPlayer(context.applicationContext).also { it.communicationUsage = VoiceOutputState.callEarpiece.value } }
+    }
     // 通话里选的图片：随下一条提交的消息（打字或语音）一起发给 Agent。
     val pendingImages = remember(viewModel) { mutableStateListOf<InputAttachment>() }
     val gateway = remember(viewModel) {
@@ -143,6 +146,16 @@ internal fun VoiceConversationHost(
     val lifecycleState by lifecycle.currentStateAsState()
     val modelName by viewModel.modelName.collectAsState()
     val active = controller.state.active
+    // 「＋」附图只在当前模型能看图（或有 Vision Group 代看）时出现；换模型后重新判断。
+    val canAttachImages = remember(modelName, active) { viewModel.agentSession.canAcceptImages() }
+    // 听筒/扬声器：通话期间按设置切换系统路由，挂断或离开页面一律还原。
+    val earpiece by VoiceOutputState.callEarpiece.collectAsState()
+    val audioRoute = remember { CallAudioRoute(context) }
+    LaunchedEffect(active, earpiece) {
+        val useEarpiece = active && earpiece
+        if (player.isInitialized()) player.value.communicationUsage = useEarpiece
+        if (useEarpiece) audioRoute.useEarpiece() else audioRoute.release()
+    }
 
     fun endAudio() {
         requestVersion++
@@ -239,6 +252,7 @@ internal fun VoiceConversationHost(
             lifecycle.removeObserver(observer)
             VoiceCallBridge.onHangUp = null
             VoiceCallBridge.onToggleMute = null
+            audioRoute.release()
             endAudio()
             if (player.isInitialized()) player.value.shutdown()
         }
@@ -394,6 +408,7 @@ internal fun VoiceConversationHost(
                                     onToggleMute = { controller.setMuted(!state.muted) },
                                     onEnd = { endAudio() },
                                     images = pendingImages,
+                                    canAttach = canAttachImages,
                                     onAttach = {
                                         imagePicker.launch(
                                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
@@ -503,6 +518,7 @@ private fun CallInputBar(
     onToggleMute: () -> Unit,
     onEnd: () -> Unit,
     images: List<InputAttachment>,
+    canAttach: Boolean,
     onAttach: () -> Unit,
     onRemoveImage: (InputAttachment) -> Unit,
 ) {
@@ -540,8 +556,10 @@ private fun CallInputBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        IconButton(onClick = onAttach, enabled = images.size < MAX_CALL_IMAGES) {
-            Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.voice_call_attach))
+        if (canAttach) {
+            IconButton(onClick = onAttach, enabled = images.size < MAX_CALL_IMAGES) {
+                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.voice_call_attach))
+            }
         }
         OutlinedTextField(
             value = draft,

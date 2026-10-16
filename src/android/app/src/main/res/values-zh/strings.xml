@@ -2525,6 +2525,7 @@
     <string name="vscreen_display_busy">虚拟屏当前正被另一个会话占用。</string>
     <string name="voice_call_settings">语音设置</string>
     <string name="voice_call_settings_speed">朗读语速</string>
+    <string name="voice_call_settings_earpiece">使用听筒播放</string>
     <string name="voice_call_notif_channel">语音通话</string>
     <string name="voice_call_notif_title">语音通话进行中</string>
     <string name="voice_call_notif_live">麦克风已开启</string>

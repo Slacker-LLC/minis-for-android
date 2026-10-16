@@ -11,6 +11,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -41,6 +42,7 @@ internal fun CallSettingsSheet(
 ) {
     var picker by remember { mutableStateOf<Picker?>(null) }
     val speed by VoiceOutputState.speed.collectAsState()
+    val earpiece by VoiceOutputState.callEarpiece.collectAsState()
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp),
@@ -49,6 +51,18 @@ internal fun CallSettingsSheet(
             Text(stringResource(R.string.voice_call_settings), style = MaterialTheme.typography.titleMedium)
             SettingsRow(stringResource(R.string.voice_input_picker_title)) { picker = Picker.INPUT }
             SettingsRow(stringResource(R.string.tts_capsule_picker_title)) { picker = Picker.OUTPUT }
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.voice_call_settings_earpiece),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = ChatColors.primaryText,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(checked = earpiece, onCheckedChange = { VoiceOutputState.setCallEarpiece(it) })
+            }
             Text(
                 stringResource(R.string.voice_call_settings_speed),
                 style = MaterialTheme.typography.bodyLarge,

@@ -2617,6 +2617,7 @@
     <string name="vscreen_display_busy">The virtual display is currently in use by another session.</string>
     <string name="voice_call_settings">Voice settings</string>
     <string name="voice_call_settings_speed">Speaking speed</string>
+    <string name="voice_call_settings_earpiece">Use earpiece</string>
     <string name="voice_call_notif_channel">Voice call</string>
     <string name="voice_call_notif_title">Voice call in progress</string>
     <string name="voice_call_notif_live">Microphone on</string>

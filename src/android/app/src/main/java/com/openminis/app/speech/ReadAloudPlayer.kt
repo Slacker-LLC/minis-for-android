@@ -558,10 +558,16 @@ class ReadAloudPlayer(context: Context) {
     private val audioManager =
         appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-    private val playbackAttributes = AudioAttributes.Builder()
-        .setUsage(AudioAttributes.USAGE_MEDIA)
-        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-        .build()
+    /** 通话里选「听筒」时为 true：provider 音频和系统 TTS 都改用语音通话用途，才会走听筒。 */
+    var communicationUsage: Boolean
+        get() = system.communicationUsage
+        set(value) { system.communicationUsage = value }
+
+    private val playbackAttributes: AudioAttributes
+        get() = AudioAttributes.Builder()
+            .setUsage(if (communicationUsage) AudioAttributes.USAGE_VOICE_COMMUNICATION else AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build()
 
     private var focusRequest: AudioFocusRequest? = null
 

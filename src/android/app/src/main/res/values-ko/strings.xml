@@ -2320,6 +2320,7 @@
     <string name="vscreen_display_busy">가상 디스플레이가 현재 다른 세션에서 사용 중입니다.</string>
     <string name="voice_call_settings">음성 설정</string>
     <string name="voice_call_settings_speed">읽기 속도</string>
+    <string name="voice_call_settings_earpiece">수화기로 재생</string>
     <string name="voice_call_notif_channel">음성 통화</string>
     <string name="voice_call_notif_title">음성 통화 중</string>
     <string name="voice_call_notif_live">마이크 켜짐</string>
