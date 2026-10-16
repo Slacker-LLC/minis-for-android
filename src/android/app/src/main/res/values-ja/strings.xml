@@ -2341,6 +2341,7 @@
     <string name="vscreen_display_busy">仮想ディスプレイは現在、別のセッションで使用されています。</string>
     <string name="voice_call_settings_speed">読み上げ速度</string>
     <string name="voice_call_settings_earpiece">受話口で再生</string>
+    <string name="voice_call_session_missing">このチャットは存在しません。新しいチャットを開始してからやり直してください。</string>
     <string name="voice_call_settings_title">音声通話</string>
     <string name="voice_call_settings_sub">認識・読み上げモデル、受話口、速度、通話エンジン</string>
     <string name="voice_call_engine">通話エンジン</string>

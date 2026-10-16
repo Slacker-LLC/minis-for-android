@@ -2241,6 +2241,7 @@
     <string name="vscreen_display_busy">L’écran virtuel est actuellement utilisé par une autre session.</string>
     <string name="voice_call_settings_speed">Vitesse de lecture</string>
     <string name="voice_call_settings_earpiece">Utiliser l\'écouteur</string>
+    <string name="voice_call_session_missing">Cette conversation n\'existe plus. Créez-en une nouvelle et réessayez.</string>
     <string name="voice_call_settings_title">Appel vocal</string>
     <string name="voice_call_settings_sub">Modèles de reconnaissance et de lecture, écouteur, vitesse, moteur d’appel</string>
     <string name="voice_call_engine">Moteur d\'appel</string>

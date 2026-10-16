@@ -2345,6 +2345,7 @@
     <string name="vscreen_display_busy">Das virtuelle Display wird derzeit von einer anderen Sitzung verwendet.</string>
     <string name="voice_call_settings_speed">Sprechgeschwindigkeit</string>
     <string name="voice_call_settings_earpiece">Hörer verwenden</string>
+    <string name="voice_call_session_missing">Dieser Chat existiert nicht mehr. Starte einen neuen Chat und versuche es erneut.</string>
     <string name="voice_call_settings_title">Sprachanruf</string>
     <string name="voice_call_settings_sub">Erkennungs- und Vorlesemodelle, Hörmuschel, Tempo, Anruf-Engine</string>
     <string name="voice_call_engine">Anruf-Engine</string>
