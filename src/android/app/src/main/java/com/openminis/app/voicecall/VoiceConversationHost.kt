@@ -3,7 +3,18 @@ package com.openminis.app.voicecall
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import com.openminis.app.ui.chat.InputAttachment
+import com.openminis.app.ui.chat.getFileName
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.text.KeyboardActions
@@ -76,6 +87,9 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 /** 所有入口绑定当前聊天 VM；权限确认仍由 ChatScreen 的原有 Dialog 承接。 */
+/** 一次通话里最多挂几张待发图片。 */
+private const val MAX_CALL_IMAGES = 4
+
 @Composable
 internal fun VoiceConversationHost(
     viewModel: ChatViewModel,
@@ -88,7 +102,24 @@ internal fun VoiceConversationHost(
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val scope = rememberCoroutineScope()
     val player = remember(viewModel) { lazy { ReadAloudPlayer(context.applicationContext) } }
-    val gateway = remember(viewModel) { AgentCallGateway(viewModel.agentSession) }
+    // 通话里选的图片：随下一条提交的消息（打字或语音）一起发给 Agent。
+    val pendingImages = remember(viewModel) { mutableStateListOf<InputAttachment>() }
+    val gateway = remember(viewModel) {
+        AgentCallGateway(viewModel.agentSession) { pendingImages.toList().also { pendingImages.clear() } }
+    }
+    val imagePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_CALL_IMAGES),
+    ) { uris ->
+        uris.forEach { uri ->
+            if (pendingImages.size >= MAX_CALL_IMAGES) return@forEach
+            pendingImages += InputAttachment(
+                fileName = getFileName(context, uri) ?: "image.jpg",
+                uri = uri,
+                mimeType = context.contentResolver.getType(uri) ?: "image/jpeg",
+                kind = InputAttachment.Kind.IMAGE,
+            )
+        }
+    }
     val input = remember(viewModel) { AgentCallSpeechInput(viewModel.providerRepository) }
     val runtime = remember(viewModel) {
         MinisCallRuntimeAdapter(
@@ -119,6 +150,7 @@ internal fun VoiceConversationHost(
         visible = false
         transcriptMode = false
         draft = ""
+        pendingImages.clear()
         controller.endCall()
         viewModel.voiceConversationActive.value = false
         VoiceCallBridge.publish(null)
@@ -361,6 +393,13 @@ internal fun VoiceConversationHost(
                                     muted = state.muted,
                                     onToggleMute = { controller.setMuted(!state.muted) },
                                     onEnd = { endAudio() },
+                                    images = pendingImages,
+                                    onAttach = {
+                                        imagePicker.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                        )
+                                    },
+                                    onRemoveImage = { pendingImages.remove(it) },
                                 )
                                 opening -> Unit
                                 else -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -463,12 +502,47 @@ private fun CallInputBar(
     muted: Boolean,
     onToggleMute: () -> Unit,
     onEnd: () -> Unit,
+    images: List<InputAttachment>,
+    onAttach: () -> Unit,
+    onRemoveImage: (InputAttachment) -> Unit,
 ) {
+    Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+    if (images.isNotEmpty()) {
+        LazyRow(
+            Modifier.padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(images, key = { it.id }) { image ->
+                Box(Modifier.size(64.dp)) {
+                    AsyncImage(
+                        model = image.uri,
+                        contentDescription = image.fileName,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                    )
+                    IconButton(
+                        onClick = { onRemoveImage(image) },
+                        modifier = Modifier.align(Alignment.TopEnd).size(24.dp),
+                    ) {
+                        Icon(
+                            Icons.Rounded.Close,
+                            contentDescription = stringResource(R.string.voice_call_attach_remove),
+                            modifier = Modifier.size(16.dp).background(Color.Black.copy(alpha = 0.55f), CircleShape),
+                            tint = Color.White,
+                        )
+                    }
+                }
+            }
+        }
+    }
     Row(
-        Modifier.fillMaxWidth().padding(bottom = 4.dp),
+        Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        IconButton(onClick = onAttach, enabled = images.size < MAX_CALL_IMAGES) {
+            Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.voice_call_attach))
+        }
         OutlinedTextField(
             value = draft,
             onValueChange = onDraft,
@@ -509,6 +583,7 @@ private fun CallInputBar(
         ) {
             Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.voice_call_end))
         }
+    }
     }
 }
 

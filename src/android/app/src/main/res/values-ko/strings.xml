@@ -2324,4 +2324,6 @@
     <string name="voice_call_notif_title">음성 통화 중</string>
     <string name="voice_call_notif_live">마이크 켜짐</string>
     <string name="voice_call_notif_muted">마이크 일시정지됨</string>
+    <string name="voice_call_attach">사진 추가</string>
+    <string name="voice_call_attach_remove">사진 제거</string>
 </resources>

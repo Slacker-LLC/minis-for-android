@@ -2232,4 +2232,6 @@
     <string name="voice_call_notif_title">Appel vocal en cours</string>
     <string name="voice_call_notif_live">Micro activé</string>
     <string name="voice_call_notif_muted">Micro en pause</string>
+    <string name="voice_call_attach">Ajouter des photos</string>
+    <string name="voice_call_attach_remove">Retirer la photo</string>
 </resources>

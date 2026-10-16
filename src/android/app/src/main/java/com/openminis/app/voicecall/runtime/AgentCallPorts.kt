@@ -31,7 +31,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import com.openminis.app.offload.OffloadPermissionManager
 
-internal class AgentCallGateway(private val session: AgentSession) : CallModelGateway {
+internal class AgentCallGateway(
+    private val session: AgentSession,
+    /** 通话里选好的图片：随下一条真正提交的消息发出；并入正在跑的任务（补充指令）时不带，留给下一轮。 */
+    private val takeAttachments: () -> List<com.openminis.app.ui.chat.InputAttachment> = { emptyList() },
+) : CallModelGateway {
     private var ownedTurn: AgentTurnHandle? = null
 
     override suspend fun ask(text: String): Result<String> = withContext(Dispatchers.Main.immediate) {
@@ -46,7 +50,7 @@ internal class AgentCallGateway(private val session: AgentSession) : CallModelGa
                 return@withContext Result.success(if (row?.requestState == "NEEDS_REVIEW")
                     "补充指令已保存；当前回合已经结束，请在聊天中确认投递方式。" else "补充指令已保存，会在当前任务的下一步读取。")
             }
-            val turn = AgentRunner.submit(session, text, userInput = true)
+            val turn = AgentRunner.submit(session, text, takeAttachments(), userInput = true)
             ownedTurn = turn
             try {
                 when (val outcome = turn.result.await()) {

@@ -2621,4 +2621,6 @@
     <string name="voice_call_notif_title">Voice call in progress</string>
     <string name="voice_call_notif_live">Microphone on</string>
     <string name="voice_call_notif_muted">Microphone muted</string>
+    <string name="voice_call_attach">Add photos</string>
+    <string name="voice_call_attach_remove">Remove photo</string>
 </resources>

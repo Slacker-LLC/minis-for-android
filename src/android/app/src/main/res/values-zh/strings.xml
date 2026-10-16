@@ -2529,4 +2529,6 @@
     <string name="voice_call_notif_title">语音通话进行中</string>
     <string name="voice_call_notif_live">麦克风已开启</string>
     <string name="voice_call_notif_muted">麦克风已暂停</string>
+    <string name="voice_call_attach">添加图片</string>
+    <string name="voice_call_attach_remove">移除图片</string>
 </resources>

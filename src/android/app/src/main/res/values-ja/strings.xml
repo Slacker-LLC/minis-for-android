@@ -2332,4 +2332,6 @@
     <string name="voice_call_notif_title">音声通話中</string>
     <string name="voice_call_notif_live">マイクはオンです</string>
     <string name="voice_call_notif_muted">マイクは一時停止中です</string>
+    <string name="voice_call_attach">写真を追加</string>
+    <string name="voice_call_attach_remove">写真を削除</string>
 </resources>

@@ -2514,4 +2514,6 @@
     <string name="voice_call_notif_title">Идёт голосовой звонок</string>
     <string name="voice_call_notif_live">Микрофон включён</string>
     <string name="voice_call_notif_muted">Микрофон приостановлен</string>
+    <string name="voice_call_attach">Добавить фото</string>
+    <string name="voice_call_attach_remove">Убрать фото</string>
 </resources>

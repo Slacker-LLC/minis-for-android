@@ -2485,4 +2485,6 @@
     <string name="voice_call_notif_title">語音通話進行中</string>
     <string name="voice_call_notif_live">麥克風已開啟</string>
     <string name="voice_call_notif_muted">麥克風已暫停</string>
+    <string name="voice_call_attach">新增圖片</string>
+    <string name="voice_call_attach_remove">移除圖片</string>
 </resources>

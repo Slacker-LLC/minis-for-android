@@ -2336,4 +2336,6 @@
     <string name="voice_call_notif_title">Sprachanruf läuft</string>
     <string name="voice_call_notif_live">Mikrofon an</string>
     <string name="voice_call_notif_muted">Mikrofon pausiert</string>
+    <string name="voice_call_attach">Fotos hinzufügen</string>
+    <string name="voice_call_attach_remove">Foto entfernen</string>
 </resources>
