@@ -383,6 +383,7 @@ suspend fun ProviderRepository.refreshModels(instance: ProviderInstance): Boolea
                     apiKey,
                     baseURL ?: "https://api.x.ai/v1",
                     customUserAgent = instance.customUserAgent,
+                    providerLabel = "xAI",
                 ).ifEmpty { com.openminis.app.provider.xai.XAIModelsApi.fetchModelsOAuth() }
                 // [T-kimi-oauth] Kimi Code: unlike Codex OAuth, the Kimi
                 // OAuth token CAN call the models endpoint — real fetch
@@ -393,6 +394,7 @@ suspend fun ProviderRepository.refreshModels(instance: ProviderInstance): Boolea
                     apiKey,
                     baseURL ?: "${com.openminis.app.auth.KimiDeviceFlow.CODING_API_BASE}/v1",
                     customUserAgent = instance.customUserAgent,
+                    providerLabel = "Kimi",
                 )
                 // [T-android-provider-type-parity] No models endpoint to
                 // query for a type this build cannot drive; the instance

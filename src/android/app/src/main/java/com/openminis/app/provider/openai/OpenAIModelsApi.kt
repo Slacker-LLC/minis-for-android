@@ -162,6 +162,10 @@ object OpenAIModelsApi {
         // [T-provider-custom-user-agent] Per-provider UA override; null/blank
         // keeps the default UA. Threaded from ProviderRepository.refreshModels.
         customUserAgent: String? = null,
+        // First-party vendor that happens to speak the OpenAI wire format
+        // (xAI, Kimi Code). Becomes `LLMModel.provider` so ModelsDevApi looks
+        // the models up under that vendor instead of scanning every reseller.
+        providerLabel: String? = null,
     ): List<LLMModel> = withContext(Dispatchers.IO) {
         val isCustomBase = baseURL != null && !isOfficialOpenAI(baseURL)
         // For third-party endpoints (vLLM, Ollama, etc.), return empty on failure
@@ -224,7 +228,7 @@ object OpenAIModelsApi {
                     com.openminis.app.provider.rules.ModelRulesProvider.applyCapabilities(LLMModel(
                         id = id,
                         displayName = displayName,
-                        provider = if (isCustomBase) "Custom" else "OpenAI",
+                        provider = providerLabel ?: if (isCustomBase) "Custom" else "OpenAI",
                         inputModalities = inputModalities,
                         outputModalities = outputModalities,
                     ))
