@@ -65,8 +65,6 @@ import com.openminis.app.ui.settings.UsageStatsScreen
 import com.openminis.app.ui.settings.MinisSkillsBrowserScreen
 import com.openminis.app.ui.settings.MountDetailScreen
 import com.openminis.app.ui.settings.MountedFoldersScreen
-import com.openminis.app.ui.settings.SharedFolderDetailScreen
-import com.openminis.app.ui.settings.SharedFoldersScreen
 import com.openminis.app.ui.settings.SkillsManagementScreen
 import com.openminis.app.data.repository.EnvVarRepository
 import com.openminis.app.data.repository.MemoryRepository
@@ -598,42 +596,6 @@ fun AppNavigation(
                     onScheduledTasksClick = { navController.safeNavigate(Routes.SCHEDULED_TASKS) },
                 )
             }
-        }
-
-        composable(Routes.SHARED_FOLDERS) {
-            SharedFoldersScreen(
-                onBack = { navController.safePopBackStack() },
-                onFolderClick = { folderId ->
-                    navController.safeNavigate(Routes.sharedFoldersDetail(folderId))
-                },
-            )
-        }
-
-        composable(
-            route = Routes.SHARED_FOLDERS_DETAIL,
-            arguments = listOf(navArgument("folderId") { type = NavType.StringType }),
-        ) { backStackEntry ->
-            val folderId = backStackEntry.arguments?.getString("folderId") ?: return@composable
-            val ctx = androidx.compose.ui.platform.LocalContext.current
-            SharedFolderDetailScreen(
-                folderId = folderId,
-                onBack = { navController.safePopBackStack() },
-                onBrowseFiles = {
-                    val label = when (folderId) {
-                        "shared" -> ctx.getString(com.openminis.app.R.string.shared_folder_name_shared)
-                        "skills" -> ctx.getString(com.openminis.app.R.string.shared_folder_name_skills)
-                        "memory" -> ctx.getString(com.openminis.app.R.string.shared_folder_name_memory)
-                        else -> folderId
-                    }
-                    FilePreviewHolder.fileBrowserViewModel = FileBrowserViewModel(
-                        rootPath = java.io.File(ctx.cacheDir, "guest-file-browser"),
-                        rootLabel = label,
-                        appContext = ctx.applicationContext,
-                        guestRootPath = "/var/minis/$folderId",
-                    )
-                    navController.safeNavigate(Routes.FILE_BROWSER)
-                },
-            )
         }
 
         composable(Routes.MOUNTED_FOLDERS) {

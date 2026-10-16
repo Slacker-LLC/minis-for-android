@@ -43,7 +43,7 @@ Current recognized routes include:
 | `minis://settings/memory` | Memory |
 | `minis://settings/storage` | Storage |
 | `minis://settings/mount-external` | External mounted folders |
-| `minis://settings/shared-folders` | Shared folders |
+| `minis://settings/shared-folders` | Files (the shared folder is its first entry) |
 | `minis://settings/logs?tab=...` | Logs |
 | `minis://settings/appearance` | Appearance |
 | `minis://settings/background` | Background |

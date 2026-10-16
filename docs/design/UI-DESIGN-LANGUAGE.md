@@ -161,7 +161,7 @@ T153 有意提亮的一组值（`#26262A`/`#2C2C30`/`#3A3A3F`），不回退成 
 
 | 旧 | 新 | 说明 |
 |---|---|---|
-| 存储、共享文件夹、挂载文件夹、备份分散在「运行时与存储」 | 这些是「文件」入口的内容，不在设置里；抽屉的「文件」入口打开它（重做前暂由隐藏的 `SettingsCategory.FILES` 页承载） | 旧路由（`STORAGE`、`SHARED_FOLDERS`、`MOUNTED_FOLDERS`、`BACKUP`）全部保留，只是入口位置变了；「备份与恢复」同时出现在「数据与关于」 |
+| 存储、共享文件夹、挂载文件夹、备份分散在「运行时与存储」 | 这些是「文件」入口的内容，不在设置里；抽屉的「文件」入口打开它（重做前暂由隐藏的 `SettingsCategory.FILES` 页承载） | 旧路由（`STORAGE`、`MOUNTED_FOLDERS`、`BACKUP`）保留，只是入口位置变了；`SHARED_FOLDERS` 及其详情页已删除（深链 `shared-folders` 改开文件页）；「备份与恢复」同时出现在「数据与关于」 |
 | 会话设置分散：会话配置面板 + 菜单里的「Token 用量」+ 一个无入口的「会话信息」面板（自动压缩、快速模式） | 合并进同一个「会话配置」面板；菜单里独立的「Token 用量」项移除，`SessionInfoSheet` 删除 | 自动压缩与快速模式此前在聊天界面里没有入口，合并后可达 |
 | 设置 6 类（模型/助手/外观/运行时/系统/关于）；#14 曾改成 7 类（含「文件」） | **以设计稿为准的 7 类**：模型 / Agent / 对话与输入 / 外观 / 运行环境 / 系统与权限 / 数据与关于。首页顶部在有待处理项时显示「N 项需要处理」横幅；「系统与权限」页顶部是就绪检查（Root、所有文件访问、无障碍、后台运行、通知，无障碍为可选项不计数）。终端、文件、定时任务不在设置里，是抽屉入口 | 「对话与输入」是从「外观」拆出的新页（回车键、回复后聚焦、思考展开、会话标题、工具预览、启动时打开、自动归类、屏幕常亮、语音纠错）；桌宠并入「外观」；「运行环境」= Rootfs、环境变量、终端与浏览文件入口 |
 | 终端固定深色 | 跟随主题 | 见第 3 节代码块规则 |
@@ -182,7 +182,7 @@ T153 有意提亮的一组值（`#26262A`/`#2C2C30`/`#3A3A3F`），不回退成 
 | 会话管理（分组/多选状态来源） | `ui/sessions/SessionListScreen.kt`、`SessionListViewModel.kt`、`GroupPickerSheet.kt` |
 | 设置 | `SETTINGS` / `ui/settings/SettingsCategoryScreen.kt` 及各设置页 |
 | 模型与提供商 | `PROVIDER_LIST`、`MODELS` |
-| 文件（存储/共享/挂载/浏览） | `STORAGE`、`SHARED_FOLDERS`、`MOUNTED_FOLDERS`、`FILE_BROWSER` |
+| 文件（存储/共享/挂载/浏览） | `STORAGE`、`MOUNTED_FOLDERS`、`FILE_BROWSER` |
 | 定时任务 | `SCHEDULED_TASKS` |
 | 技能 / MCP / 记忆 / Soul / 权限 | `SKILLS`、`MCP`、`MEMORY`、`SOUL`、`PERMISSIONS` |
 | 运行时（rootfs、环境变量、日志） | `ROOTFS_MANAGEMENT`、`ENV_VARS`、`LOGS` |
