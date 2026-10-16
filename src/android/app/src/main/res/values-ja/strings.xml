@@ -2341,13 +2341,14 @@
     <string name="vscreen_display_busy">仮想ディスプレイは現在、別のセッションで使用されています。</string>
     <string name="voice_call_settings_speed">読み上げ速度</string>
     <string name="voice_call_settings_earpiece">受話口で再生</string>
+    <string name="chat_settings_return_key">Return キー</string>
+    <string name="chat_settings_launch">起動時の表示</string>
     <string name="chat_settings_group_input">入力</string>
     <string name="chat_settings_group_reply">返信の表示</string>
     <string name="chat_settings_group_session">セッション</string>
     <string name="chat_settings_group_voice">音声</string>
     <string name="voice_bot_section">キャラクター</string>
     <string name="voice_bot_follow">テーマカラーに合わせる</string>
-    <string name="voice_bot_follow_sub">本体にアプリのアクセントカラーを使います</string>
     <string name="voice_bot_color">色</string>
     <string name="voice_bot_shape">形</string>
     <string name="voice_bot_react">イベントに反応</string>

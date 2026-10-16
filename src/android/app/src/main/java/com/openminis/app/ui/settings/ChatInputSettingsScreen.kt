@@ -85,24 +85,23 @@ fun ChatInputSettingsScreen(onBack: () -> Unit, onOpenVoiceCall: () -> Unit = {}
     ) {
         // 输入：回车键（0=换行，1=发送；实体键盘 Shift+Enter 永远换行）+ 回复后自动聚焦（默认开）。
         SettingsSection(header = stringResource(R.string.chat_settings_group_input)) {
-            val returnRows = listOf(
-                stringResource(R.string.appearance_return_key_newline) to 0,
-                stringResource(R.string.appearance_return_key_send) to 1,
+            SettingsRow(
+                icon = Icons.AutoMirrored.Outlined.KeyboardReturn,
+                iconColor = tilePurple,
+                title = stringResource(R.string.chat_settings_return_key),
+                subtitle = stringResource(R.string.appearance_return_key_footer),
+                showDivider = false,
             )
-            returnRows.forEachIndexed { idx, (label, value) ->
-                SettingsChoiceRow(
-                    title = label,
-                    selected = returnKeyBehavior == value,
+            SettingsCardBlock {
+                SettingsSegmented(
+                    options = listOf(
+                        stringResource(R.string.appearance_return_key_newline),
+                        stringResource(R.string.appearance_return_key_send),
+                    ),
+                    selectedIndex = returnKeyBehavior.coerceIn(0, 1),
                     onSelect = {
-                        returnKeyBehavior = value
-                        prefs.edit().putInt(KEY_RETURN_KEY_BEHAVIOR, value).apply()
-                    },
-                    leading = {
-                        androidx.compose.material3.Icon(
-                            if (idx == 0) Icons.AutoMirrored.Outlined.KeyboardReturn else Icons.AutoMirrored.Outlined.Send,
-                            contentDescription = null,
-                            tint = if (idx == 0) tilePurple else tileGreen,
-                        )
+                        returnKeyBehavior = it
+                        prefs.edit().putInt(KEY_RETURN_KEY_BEHAVIOR, it).apply()
                     },
                 )
             }
@@ -185,23 +184,25 @@ fun ChatInputSettingsScreen(onBack: () -> Unit, onOpenVoiceCall: () -> Unit = {}
 
         // 会话：启动时进哪里、自动归类（借标题生成请求，不多花一次调用）、任务期间保持亮屏（默认关，费电）。
         SettingsSection(header = stringResource(R.string.chat_settings_group_session)) {
-            data class LaunchRow(val label: String, val icon: ImageVector, val tint: Color)
-            val launchRows = listOf(
-                LaunchRow(stringResource(R.string.appearance_launch_auto), Icons.Outlined.Bolt, tileBlue),
-                LaunchRow(stringResource(R.string.appearance_launch_last), Icons.Outlined.History, tileTeal),
-                LaunchRow(stringResource(R.string.appearance_launch_new), Icons.Outlined.ChatBubbleOutline, tileGreen),
-                LaunchRow(stringResource(R.string.appearance_launch_home), Icons.Outlined.Home, tileBlue),
+            SettingsRow(
+                icon = Icons.Outlined.Bolt,
+                iconColor = tileBlue,
+                title = stringResource(R.string.chat_settings_launch),
+                subtitle = stringResource(R.string.appearance_launch_footer),
+                showDivider = false,
             )
-            launchRows.forEachIndexed { idx, row ->
-                SettingsChoiceRow(
-                    title = row.label,
-                    selected = launchSession == idx,
+            SettingsCardBlock {
+                SettingsSegmented(
+                    options = listOf(
+                        stringResource(R.string.appearance_launch_auto),
+                        stringResource(R.string.appearance_launch_last),
+                        stringResource(R.string.appearance_launch_new),
+                        stringResource(R.string.appearance_launch_home),
+                    ),
+                    selectedIndex = launchSession.coerceIn(0, 3),
                     onSelect = {
-                        launchSession = idx
-                        prefs.edit().putInt(KEY_LAUNCH_SESSION, idx).apply()
-                    },
-                    leading = {
-                        androidx.compose.material3.Icon(row.icon, contentDescription = null, tint = row.tint)
+                        launchSession = it
+                        prefs.edit().putInt(KEY_LAUNCH_SESSION, it).apply()
                     },
                 )
             }
@@ -246,15 +247,18 @@ fun ChatInputSettingsScreen(onBack: () -> Unit, onOpenVoiceCall: () -> Unit = {}
                     com.openminis.app.speech.correction.VoiceCorrectionConsent.setEnabled(context, on)
                     com.openminis.app.speech.correction.VoiceCorrectionConsent.setPrompted(context, true)
                 },
+                showDivider = correctionEnabled,
             )
-            SettingsRow(
-                icon = Icons.Outlined.DeleteSweep,
-                iconColor = MaterialTheme.colorScheme.error,
-                title = stringResource(R.string.voice_correction_clear),
-                titleColor = MaterialTheme.colorScheme.error,
-                onClick = { showClearCorrectionConfirm = true },
-                showDivider = false,
-            )
+            if (correctionEnabled) {
+                SettingsRow(
+                    icon = Icons.Outlined.DeleteSweep,
+                    iconColor = MaterialTheme.colorScheme.error,
+                    title = stringResource(R.string.voice_correction_clear),
+                    titleColor = MaterialTheme.colorScheme.error,
+                    onClick = { showClearCorrectionConfirm = true },
+                    showDivider = false,
+                )
+            }
         }
 
         Spacer(Modifier.height(24.dp))

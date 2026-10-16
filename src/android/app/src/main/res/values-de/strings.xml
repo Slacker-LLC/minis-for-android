@@ -2345,13 +2345,14 @@
     <string name="vscreen_display_busy">Das virtuelle Display wird derzeit von einer anderen Sitzung verwendet.</string>
     <string name="voice_call_settings_speed">Sprechgeschwindigkeit</string>
     <string name="voice_call_settings_earpiece">Hörer verwenden</string>
+    <string name="chat_settings_return_key">Eingabetaste</string>
+    <string name="chat_settings_launch">Beim Start</string>
     <string name="chat_settings_group_input">Eingabe</string>
     <string name="chat_settings_group_reply">Antwortanzeige</string>
     <string name="chat_settings_group_session">Sitzung</string>
     <string name="chat_settings_group_voice">Sprache</string>
     <string name="voice_bot_section">Figur</string>
     <string name="voice_bot_follow">Designfarbe verwenden</string>
-    <string name="voice_bot_follow_sub">Der Körper nutzt die Akzentfarbe der App</string>
     <string name="voice_bot_color">Farbe</string>
     <string name="voice_bot_shape">Form</string>
     <string name="voice_bot_react">Auf Ereignisse reagieren</string>

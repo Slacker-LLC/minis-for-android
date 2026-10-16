@@ -2333,13 +2333,14 @@
     <string name="vscreen_display_busy">가상 디스플레이가 현재 다른 세션에서 사용 중입니다.</string>
     <string name="voice_call_settings_speed">읽기 속도</string>
     <string name="voice_call_settings_earpiece">수화기로 재생</string>
+    <string name="chat_settings_return_key">엔터 키</string>
+    <string name="chat_settings_launch">시작 시 표시</string>
     <string name="chat_settings_group_input">입력</string>
     <string name="chat_settings_group_reply">답변 표시</string>
     <string name="chat_settings_group_session">세션</string>
     <string name="chat_settings_group_voice">음성</string>
     <string name="voice_bot_section">캐릭터</string>
     <string name="voice_bot_follow">테마 색상 따르기</string>
-    <string name="voice_bot_follow_sub">캐릭터 몸체에 앱 강조 색상을 사용합니다</string>
     <string name="voice_bot_color">색상</string>
     <string name="voice_bot_shape">모양</string>
     <string name="voice_bot_react">이벤트 반응</string>

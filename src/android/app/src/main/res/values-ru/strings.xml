@@ -2523,13 +2523,14 @@
     <string name="vscreen_display_busy">Виртуальный экран сейчас используется другой сессией.</string>
     <string name="voice_call_settings_speed">Скорость речи</string>
     <string name="voice_call_settings_earpiece">Воспроизводить через динамик для разговора</string>
+    <string name="chat_settings_return_key">Клавиша Enter</string>
+    <string name="chat_settings_launch">При запуске</string>
     <string name="chat_settings_group_input">Ввод</string>
     <string name="chat_settings_group_reply">Отображение ответов</string>
     <string name="chat_settings_group_session">Сеанс</string>
     <string name="chat_settings_group_voice">Голос</string>
     <string name="voice_bot_section">Персонаж</string>
     <string name="voice_bot_follow">Цвет темы</string>
-    <string name="voice_bot_follow_sub">Тело персонажа окрашено в акцентный цвет приложения</string>
     <string name="voice_bot_color">Цвет</string>
     <string name="voice_bot_shape">Форма</string>
     <string name="voice_bot_react">Реакция на события</string>

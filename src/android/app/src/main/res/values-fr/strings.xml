@@ -2241,13 +2241,14 @@
     <string name="vscreen_display_busy">L’écran virtuel est actuellement utilisé par une autre session.</string>
     <string name="voice_call_settings_speed">Vitesse de lecture</string>
     <string name="voice_call_settings_earpiece">Utiliser l\'écouteur</string>
+    <string name="chat_settings_return_key">Touche Entrée</string>
+    <string name="chat_settings_launch">Au lancement</string>
     <string name="chat_settings_group_input">Saisie</string>
     <string name="chat_settings_group_reply">Affichage des réponses</string>
     <string name="chat_settings_group_session">Session</string>
     <string name="chat_settings_group_voice">Voix</string>
     <string name="voice_bot_section">Personnage</string>
     <string name="voice_bot_follow">Suivre la couleur du thème</string>
-    <string name="voice_bot_follow_sub">Le corps utilise la couleur d\'accent de l\'app</string>
     <string name="voice_bot_color">Couleur</string>
     <string name="voice_bot_shape">Forme</string>
     <string name="voice_bot_react">Réagir aux événements</string>

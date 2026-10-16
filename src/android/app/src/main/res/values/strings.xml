@@ -2631,13 +2631,14 @@
     <string name="vscreen_display_busy">The virtual display is currently in use by another session.</string>
     <string name="voice_call_settings_speed">Speaking speed</string>
     <string name="voice_call_settings_earpiece">Use earpiece</string>
+    <string name="chat_settings_return_key">Return key</string>
+    <string name="chat_settings_launch">On launch</string>
     <string name="chat_settings_group_input">Input</string>
     <string name="chat_settings_group_reply">Reply display</string>
     <string name="chat_settings_group_session">Session</string>
     <string name="chat_settings_group_voice">Voice</string>
     <string name="voice_bot_section">Character</string>
     <string name="voice_bot_follow">Follow theme color</string>
-    <string name="voice_bot_follow_sub">The body uses the app accent color</string>
     <string name="voice_bot_color">Color</string>
     <string name="voice_bot_shape">Shape</string>
     <string name="voice_bot_react">React to events</string>

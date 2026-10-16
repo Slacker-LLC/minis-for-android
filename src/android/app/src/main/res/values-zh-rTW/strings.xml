@@ -2495,13 +2495,14 @@
     <string name="work_task_clear_selection">解除所選任務</string>
     <string name="voice_call_settings_speed">朗讀語速</string>
     <string name="voice_call_settings_earpiece">使用聽筒播放</string>
+    <string name="chat_settings_return_key">Enter 鍵</string>
+    <string name="chat_settings_launch">啟動時顯示</string>
     <string name="chat_settings_group_input">輸入</string>
     <string name="chat_settings_group_reply">回覆顯示</string>
     <string name="chat_settings_group_session">工作階段</string>
     <string name="chat_settings_group_voice">語音</string>
     <string name="voice_bot_section">角色</string>
     <string name="voice_bot_follow">跟隨主題色</string>
-    <string name="voice_bot_follow_sub">角色身體使用應用程式的強調色</string>
     <string name="voice_bot_color">顏色</string>
     <string name="voice_bot_shape">形狀</string>
     <string name="voice_bot_react">事件反應</string>
