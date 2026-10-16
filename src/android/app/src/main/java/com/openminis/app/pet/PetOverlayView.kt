@@ -42,7 +42,6 @@ class PetOverlayView(context: Context) : LinearLayout(context) {
     private val bubble = TextView(context)
     private val inputBar = LinearLayout(context)
     private val input = EditText(context)
-    private val micButton = TextView(context)
     private val sendButton = TextView(context)
     private val menuBar = LinearLayout(context)
     private val main = Handler(Looper.getMainLooper())
@@ -50,9 +49,6 @@ class PetOverlayView(context: Context) : LinearLayout(context) {
 
     /** Invoked with the trimmed, non-empty question the user submitted. */
     var onSend: ((String) -> Unit)? = null
-
-    /** Invoked when the mic button is tapped; the service owns recording state. */
-    var onVoiceToggle: (() -> Unit)? = null
 
     /** Invoked when a long-press menu entry is chosen. */
     var onMenuAction: ((PetMenuAction) -> Unit)? = null
@@ -206,14 +202,6 @@ class PetOverlayView(context: Context) : LinearLayout(context) {
             }
         }
 
-        micButton.apply {
-            text = "🎤"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            setPadding(dp(6), dp(4), dp(6), dp(4))
-            setOnClickListener { onVoiceToggle?.invoke() }
-        }
-        inputBar.addView(micButton, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
-
         input.apply {
             hint = "跟我说点什么…"
             setHintTextColor(0x80FFFFFF.toInt())
@@ -327,12 +315,6 @@ class PetOverlayView(context: Context) : LinearLayout(context) {
     fun setInputText(text: String) {
         input.setText(text)
         input.setSelection(input.text?.length ?: 0)
-    }
-
-    /** Recording feedback: the mic turns red while the engine is listening. */
-    fun setVoiceActive(active: Boolean) {
-        micButton.text = if (active) "⏹" else "🎤"
-        micButton.setTextColor(if (active) 0xFFFF5A5A.toInt() else Color.WHITE)
     }
 
     fun setBusy(busy: Boolean) {

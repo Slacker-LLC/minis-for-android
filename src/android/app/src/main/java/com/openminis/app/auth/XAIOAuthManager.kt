@@ -3,50 +3,35 @@ package com.openminis.app.auth
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import androidx.browser.customtabs.CustomTabsIntent
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ProcessLifecycleOwner
+import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.data.repository.saveApiKey
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.security.SecureRandom
+import java.io.IOException
 import java.util.Base64
-import kotlin.coroutines.resume
-import com.openminis.app.data.repository.saveApiKey
 
 /**
- * xAI (Grok) OAuth manager.
+ * xAI (Grok) OAuth manager —— RFC 8628 设备码授权（Device Authorization Grant）。
  *
- * Two material differences from a vanilla [OAuthManager]:
+ * 为什么不再用回环回调（127.0.0.1:56121 + Custom Tab + PKCE）：
+ * - 旧 `/oauth/authorize`、`/oauth/token` 已下线（403）；当前端点来自 OIDC discovery。
+ * - 回环流程靠 Custom Tab 关闭检测、前台门、固定端口，脆弱；上游 openclaw 因大量用户反馈已整体移除，
+ *   只保留设备码（`extensions/xai/xai-oauth.ts` 的 `requestXaiDeviceCode` / `pollXaiDeviceCodeToken`）。
  *
- * 1. **OIDC discovery**: authorization / token endpoints aren't constants but
- *    are fetched from `https://auth.x.ai/.well-known/openid-configuration`
- *    on first use and cached in [EncryptedSharedPreferences] (the base class's
- *    `oauth_<key>_<instance>` keyspace). Both endpoints are validated to
- *    live under `*.x.ai` before being honoured, matching the OpenClaw
- *    `xai-oauth.ts` security check — the spec calls this out explicitly.
+ * 流程：discovery → `POST device_authorization_endpoint`（client_id + scope）→ 界面展示用户码与验证页
+ * → 轮询 `token_endpoint`（device_code grant）。app 退到浏览器时网络可能被系统拒绝，轮询对
+ * IOException 容忍到截止时间，回到前台自然恢复。
  *
- * 2. **Token exchange echoes `code_challenge`**: xAI's token endpoint
- *    requires the `code_challenge` + `code_challenge_method` pair on the
- *    exchange request, not just the verifier. This is non-standard PKCE
- *    behavior verified from OpenClaw source — see [buildTokenParams].
+ * 客户端沿用上游同一个 Grok CLI 公共 client id（同意页会显示 Grok Build）；这是共享客户端，xAI 可随时收紧。
  *
- * PKCE is hex-encoded (32 random bytes → 64 hex chars) per OpenClaw —
- * [generateHexPKCE] on the base class produces exactly that form.
- *
- * Authorization URL additionally carries `nonce` (OIDC required), `plan=generic`,
- * and `referrer=minis` (xAI consumer attribution).
- *
- * Redirect URI uses a fixed loopback port `56121/callback` — xAI's
- * server-side allowlist rejects any other port, per the spec.
+ * 端点解析、信任校验、令牌包整理在 [XAIOAuthEndpoints]（纯函数，有单测）。
  */
 class XAIOAuthManager(context: Context, instanceId: String) : OAuthManager(context, instanceId) {
 
@@ -54,55 +39,44 @@ class XAIOAuthManager(context: Context, instanceId: String) : OAuthManager(conte
         private const val TAG = "XAIOAuth"
 
         const val OAUTH_CLIENT_ID = "b1a00492-073a-47ea-816f-4c329264a828"
-        const val DISCOVERY_URL = "https://auth.x.ai/.well-known/openid-configuration"
-        const val CALLBACK_PORT = 56121
-        const val CALLBACK_PATH = "/callback"
+        const val DISCOVERY_URL = XAIOAuthEndpoints.DISCOVERY_URL
+        const val OAUTH_SCOPES = "openid profile email offline_access grok-cli:access api:access"
+
+        private const val DEVICE_CODE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
+        private const val KEY_TOKEN_ENDPOINT = "token_endpoint"
+
+        /** 每实例刷新互斥，单飞（同 KimiOAuthManager）：并发请求不会各拿一个旧 refresh_token 去换。 */
+        private val refreshMutexes = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
+        private fun mutexFor(instanceId: String): Mutex = refreshMutexes.getOrPut(instanceId) { Mutex() }
 
         /**
-         * Static helper: perform the full login flow, persist the bearer
-         * token via [ProviderRepository.saveApiKey] so the existing
-         * `Authorization: Bearer …` request path in OpenAIProvider can
-         * pick it up. Mirrors `OpenAIOAuthManager.login`.
+         * 完整设备码登录。[onDeviceCode] 在设备码签发后立刻回调（界面展示用户码与验证页）；
+         * 此时登录尚未完成，随后挂起轮询直到用户授权或终态失败。令牌经
+         * [ProviderRepository.saveApiKey] 写入，沿用现有 `Authorization: Bearer …` 请求路径。
          */
         suspend fun login(
             context: Context,
             instanceId: String,
-            providerRepository: com.openminis.app.data.repository.ProviderRepository,
+            providerRepository: ProviderRepository,
+            onDeviceCode: (KimiDeviceFlow.DeviceAuthorization) -> Unit,
         ): String {
             val manager = XAIOAuthManager(context, instanceId)
-            val token = manager.performLogin(context)
+            val token = manager.performDeviceLogin(onDeviceCode)
             providerRepository.saveApiKey(instanceId, token)
             return token
         }
     }
 
-    // ── Static OAuthManager surface ────────────────────────────────────
-
-    // Endpoints are resolved dynamically from discovery; the abstract
-    // fields are kept non-blank only so the base class doesn't choke on
-    // them — buildAuthorizationUrl + buildTokenParams + refreshToken
-    // all bypass these and read the cached/discovered endpoints instead.
-    override val authURL = "https://auth.x.ai/oauth/authorize"
-    override val tokenURL = "https://auth.x.ai/oauth/token"
+    // 基类抽象面：设备码流程不用重定向 / PKCE，只放不会被读到的占位。
+    override val authURL = XAIOAuthEndpoints.ISSUER
+    override val tokenURL = "${XAIOAuthEndpoints.ISSUER}/oauth2/token"
     override val clientId = OAUTH_CLIENT_ID
     override val clientSecret: String? = null
-    override val callbackPort = CALLBACK_PORT
-    override val redirectPath = CALLBACK_PATH
-    override val scopes = "openid profile email offline_access grok-cli:access api:access"
+    override val callbackPort = 0
+    override val redirectPath = ""
+    override val scopes = OAUTH_SCOPES
 
-    // [T-android-xai-oauth-redirect-uri-127] xAI's server-side allow-list
-    // registers the redirect as http://127.0.0.1:56121/callback, NOT the
-    // base class's http://localhost:… spelling. OAuth redirect_uri is an
-    // exact string match, so localhost ≠ 127.0.0.1 makes xAI reject the
-    // authorize request with "redirect_uri does not match any registered
-    // URI". iOS hard-codes 127.0.0.1 for the same reason (XAIOAuthManager
-    // .swift). Both the authorize URL and the token exchange read this one
-    // property, so overriding it here fixes both. The local callback server
-    // still binds the loopback interface and receives the redirect either
-    // way — only the string sent to xAI matters.
-    override val redirectUri: String get() = "http://127.0.0.1:$callbackPort$redirectPath"
-
-    // xAI ID-token derived account info, persisted alongside the token bundle.
+    // id_token 解出的账号信息，与令牌包一并保存。
     var accountId: String?
         get() = loadOAuthString("account_id")
         private set(value) { value?.let { saveOAuthString("account_id", it) } }
@@ -115,200 +89,142 @@ class XAIOAuthManager(context: Context, instanceId: String) : OAuthManager(conte
         get() = loadOAuthString("display_name")
         private set(value) { value?.let { saveOAuthString("display_name", it) } }
 
-    private var loginCallbackServer: OAuthCallbackServer? = null
+    // ── HTTP ──────────────────────────────────────────────────────────
 
-    /**
-     * In-flight login flag — protects against re-entrant
-     * [performLogin] calls. A SwiftUI-equivalent on Android: a double
-     * button tap (or a Compose recomposition that re-launches the
-     * `scope.launch { performLogin… }`) can fire two coroutines in
-     * rapid succession. Each would generate its own PKCE+state,
-     * race to bind port 56121 (SO_REUSEPORT on Linux happily allows
-     * both), and then xAI's eventual callback would be resolved
-     * against ONE coroutine's state but routed into the OTHER's
-     * continuation — manifesting as "state mismatch" even though the
-     * received state is byte-identical to one of them
-     * (T-xai-oauth-double-fire, port iOS 84067d0a).
-     */
-    @Volatile private var isAuthenticating: Boolean = false
-
-    // ── PKCE: hex form per OpenClaw ───────────────────────────────────
-
-    override fun generateAndSavePKCE(): Pair<String, String> {
-        val (verifier, challenge) = generateHexPKCE()
-        saveOAuthString("verifier", verifier)
-        saveOAuthString("challenge", challenge)
-        return verifier to challenge
+    /** 表单 POST，返回 (HTTP 状态, JSON)；响应不是 JSON（例如 Cloudflare 挑战页）时 JSON 为空对象。 */
+    private fun postForm(url: String, params: Map<String, String>): Pair<Int, JSONObject> {
+        val formBody = params.entries.joinToString("&") { "${it.key}=${Uri.encode(it.value)}" }
+        val request = Request.Builder()
+            .url(url)
+            .post(formBody.toRequestBody("application/x-www-form-urlencoded".toMediaType()))
+            .build()
+        httpClient.newCall(request).execute().use { response ->
+            val body = response.body?.string() ?: ""
+            val json = try { JSONObject(body) } catch (_: Exception) { JSONObject() }
+            return response.code to json
+        }
     }
 
-    // ── Discovery + endpoint resolution ───────────────────────────────
+    // ── Discovery ─────────────────────────────────────────────────────
 
-    /**
-     * Fetch the OIDC discovery document and cache the resolved
-     * authorization + token endpoints. Validates both endpoints live
-     * under `*.x.ai` before honouring them — mirrors OpenClaw and the
-     * spec's "abort immediately if the discovery endpoint domain is not *.x.ai" rule.
-     */
-    private suspend fun fetchDiscoveryEndpoints(): Pair<String, String> = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(DISCOVERY_URL).get().build()
-        val resp = httpClient.newCall(req).execute()
-        val code = resp.code
-        val body = resp.body?.string() ?: ""
-        resp.close()
+    /** 拉取 discovery，校验后缓存令牌端点（刷新用）。 */
+    private suspend fun fetchDiscovery(): XAIOAuthEndpoints.Discovery = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(XAIOAuthEndpoints.DISCOVERY_URL).get().build()
+        val (code, body) = httpClient.newCall(request).execute().use { it.code to (it.body?.string() ?: "") }
         if (code !in 200..299 || body.isEmpty()) {
             throw IllegalStateException("xAI OIDC discovery failed: HTTP $code")
         }
-        val json = JSONObject(body)
-        val authEndpoint = json.optString("authorization_endpoint", "")
-        val tokenEndpoint = json.optString("token_endpoint", "")
-        if (authEndpoint.isEmpty() || tokenEndpoint.isEmpty()) {
-            throw IllegalStateException("xAI OIDC discovery missing endpoints")
-        }
-        // Open-redirect guard — both endpoints must be under *.x.ai.
-        require(Uri.parse(authEndpoint).host?.endsWith(".x.ai") == true) {
-            "xAI OAuth discovery returned untrusted authorization endpoint: $authEndpoint"
-        }
-        require(Uri.parse(tokenEndpoint).host?.endsWith(".x.ai") == true) {
-            "xAI OAuth discovery returned untrusted token endpoint: $tokenEndpoint"
-        }
-        saveOAuthString("auth_endpoint", authEndpoint)
-        saveOAuthString("token_endpoint", tokenEndpoint)
-        authEndpoint to tokenEndpoint
-    }
-
-    /** Read cached endpoint or fetch fresh discovery. */
-    private suspend fun resolveAuthEndpoint(): String =
-        loadOAuthString("auth_endpoint")?.takeIf { it.isNotEmpty() }
-            ?: fetchDiscoveryEndpoints().first
-
-    private suspend fun resolveTokenEndpoint(): String =
-        loadOAuthString("token_endpoint")?.takeIf { it.isNotEmpty() }
-            ?: fetchDiscoveryEndpoints().second
-
-    // ── Authorization URL ─────────────────────────────────────────────
-
-    private fun generateNonce(): String {
-        val bytes = ByteArray(32)
-        SecureRandom().nextBytes(bytes)
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+        val discovery = XAIOAuthEndpoints.parseDiscovery(JSONObject(body))
+        saveOAuthString(KEY_TOKEN_ENDPOINT, discovery.tokenEndpoint)
+        discovery
     }
 
     /**
-     * NOT overriding [OAuthManager.buildAuthorizationUrl] (suspendless
-     * shape) — this manager runs its own [performLogin] which can
-     * await discovery before building the URL. The base-class
-     * `startLogin` path is unreachable for xAI.
+     * 刷新用的令牌端点。缓存缺失、不可信、或仍是已下线的 `/oauth/token`（老版本登录留下的）
+     * 都重新发现，并把当前端点写回缓存——否则老登录的刷新会一直撞 403。
      */
-    private suspend fun buildXAIAuthorizationUrl(): String {
-        val (_, challenge) = generateAndSavePKCE()
-        val state = generateState()
-        saveOAuthString("state", state)
-        val nonce = generateNonce()
-        val authEndpoint = resolveAuthEndpoint()
-        return "$authEndpoint?" + listOf(
-            "response_type=code",
-            "client_id=$clientId",
-            "redirect_uri=${Uri.encode(redirectUri)}",
-            "scope=${Uri.encode(scopes)}",
-            "state=$state",
-            "nonce=$nonce",
-            "code_challenge=$challenge",
-            "code_challenge_method=S256",
-            "plan=generic",
-            "referrer=minis",
-        ).joinToString("&")
+    private suspend fun resolveTokenEndpoint(): String {
+        val cached = loadOAuthString(KEY_TOKEN_ENDPOINT)
+        if (XAIOAuthEndpoints.isUsableCachedTokenEndpoint(cached)) return cached!!
+        return fetchDiscovery().tokenEndpoint
     }
 
-    // ── Token exchange (xAI: echoes code_challenge) ───────────────────
+    // ── 设备码登录 ────────────────────────────────────────────────────
 
-    override fun buildTokenParams(code: String): Map<String, String> {
-        return mapOf(
-            "grant_type" to "authorization_code",
-            "code" to code,
-            "redirect_uri" to redirectUri,
-            "client_id" to clientId,
-            "code_verifier" to (loadOAuthString("verifier") ?: ""),
-            // xAI-specific: token endpoint requires the challenge pair on
-            // exchange, not just the verifier.
-            "code_challenge" to (loadOAuthString("challenge") ?: ""),
-            "code_challenge_method" to "S256",
-        )
-    }
+    /** 第 1 步：discovery 之后申请设备码；验证页不在 x.ai 下则拒绝。 */
+    suspend fun requestDeviceAuthorization(): Pair<KimiDeviceFlow.DeviceAuthorization, String> =
+        withContext(Dispatchers.IO) {
+            val discovery = fetchDiscovery()
+            val (status, json) = postForm(
+                discovery.deviceAuthorizationEndpoint,
+                mapOf("client_id" to clientId, "scope" to scopes),
+            )
+            if (status !in 200..299) {
+                val desc = json.optString("error_description", "")
+                    .ifEmpty { json.optString("error", "device authorization failed") }
+                Log.e(TAG, "device authorization failed: $status ${sanitizeBody(json.toString())}")
+                throw IllegalStateException("xAI device authorization failed ($status): $desc")
+            }
+            val parsed = KimiDeviceFlow.parseDeviceAuthorization(json)
+                ?: throw IllegalStateException("xAI device authorization response is missing required fields")
+            val auth = XAIOAuthEndpoints.trustedAuthorization(parsed)
+                ?: throw IllegalStateException("xAI device authorization returned an untrusted verification URL")
+            auth to discovery.tokenEndpoint
+        }
 
     /**
-     * Mirror the base-class exchange but POST to the discovered token
-     * endpoint instead of the static [tokenURL] constant. Persists the
-     * token bundle via the base class's `saveTokens`-equivalent path
-     * ("oauth_tokens" inside [onTokensReceived]) and parses the ID
-     * token for `email` / `accountId` for display in ProviderDetailScreen.
+     * 第 2 步：轮询令牌端点直到授权 / 终态失败。网络错误（app 在浏览器时被系统限网）容忍到截止时间，
+     * 但连续失败超过 [OAuthForegroundGate.MAX_WAIT_MS] 说明确实断网，按网络不可达报错。
      */
-    private suspend fun exchangeCodeForToken(code: String): String = withContext(Dispatchers.IO) {
-        val tokenEndpoint = resolveTokenEndpoint()
-        val params = buildTokenParams(code)
-        val formBody = params.entries.joinToString("&") { "${it.key}=${Uri.encode(it.value)}" }
-        val req = Request.Builder()
-            .url(tokenEndpoint)
-            .post(formBody.toRequestBody("application/x-www-form-urlencoded".toMediaType()))
-            .build()
-        val resp = httpClient.newCall(req).execute()
-        val code0 = resp.code
-        val body = resp.body?.string() ?: ""
-        resp.close()
-        if (code0 !in 200..299) {
-            Log.e(TAG, "xAI token exchange failed: $code0 ${OAuthManager.sanitizeBody(body)}")
-            throw Exception("xAI token exchange failed ($code0): $body")
+    private suspend fun pollForToken(auth: KimiDeviceFlow.DeviceAuthorization, tokenEndpoint: String): String =
+        withContext(Dispatchers.IO) {
+            val deadline = System.currentTimeMillis() + auth.expiresInSeconds * 1000
+            var interval = auth.intervalSeconds.coerceAtLeast(1)
+            var firstFailureAt = 0L
+            while (System.currentTimeMillis() < deadline) {
+                delay(interval * 1000)
+                val (status, json) = try {
+                    postForm(
+                        tokenEndpoint,
+                        mapOf(
+                            "grant_type" to DEVICE_CODE_GRANT,
+                            "client_id" to clientId,
+                            "device_code" to auth.deviceCode,
+                        ),
+                    ).also { firstFailureAt = 0L }
+                } catch (e: IOException) {
+                    val now = System.currentTimeMillis()
+                    if (firstFailureAt == 0L) firstFailureAt = now
+                    if (now - firstFailureAt > OAuthForegroundGate.MAX_WAIT_MS) {
+                        throw OAuthNetworkUnreachableException(e)
+                    }
+                    Log.w(TAG, "device poll failed, retrying: ${e.message}")
+                    continue
+                }
+                when (val result = KimiDeviceFlow.classifyPoll(json, status in 200..299)) {
+                    is KimiDeviceFlow.PollResult.Success -> {
+                        val bundle = XAIOAuthEndpoints.buildTokenBundle(
+                            json,
+                            nowMs = System.currentTimeMillis(),
+                            requireRefreshToken = true,
+                        )
+                        saveOAuthString("tokens", bundle.toString())
+                        onTokensReceived(bundle)
+                        Log.i(TAG, "xAI device login OK, expires in ${result.expiresInSeconds}s (instance: $instanceId)")
+                        return@withContext result.accessToken
+                    }
+                    KimiDeviceFlow.PollResult.Pending -> Unit
+                    KimiDeviceFlow.PollResult.SlowDown -> {
+                        interval = KimiDeviceFlow.bumpedInterval(interval)
+                        Log.d(TAG, "slow_down — interval now ${interval}s")
+                    }
+                    is KimiDeviceFlow.PollResult.Denied ->
+                        throw IllegalStateException("xAI login denied: ${result.description}")
+                    is KimiDeviceFlow.PollResult.Expired ->
+                        throw IllegalStateException("xAI login code expired: ${result.description}")
+                    is KimiDeviceFlow.PollResult.Fatal ->
+                        throw IllegalStateException("xAI login failed (HTTP $status): ${result.description}")
+                }
+            }
+            throw IllegalStateException("xAI login timed out")
         }
-        val json = JSONObject(body)
-        val accessToken = json.optString("access_token", "")
-        if (accessToken.isEmpty()) {
-            throw Exception("xAI token exchange: no access_token in response")
-        }
-        // Cache token bundle via the same key used by validAccessToken /
-        // refreshToken in the base class.
-        val expiresIn = json.optLong("expires_in", 0)
-        if (expiresIn > 0) {
-            json.put("expire_at", System.currentTimeMillis() + expiresIn * 1000)
-        }
-        saveTokensJson(json)
-        onTokensReceived(json)
-        Log.i(TAG, "xAI token exchange OK, expires in ${expiresIn}s, has refresh: ${json.has("refresh_token")}")
-        accessToken
+
+    /** 两步串联；[onDeviceCode] 把用户码 / 验证页交给界面（主线程）。 */
+    suspend fun performDeviceLogin(onDeviceCode: (KimiDeviceFlow.DeviceAuthorization) -> Unit): String {
+        val (auth, tokenEndpoint) = requestDeviceAuthorization()
+        Log.i(TAG, "device code issued — interval=${auth.intervalSeconds}s expires=${auth.expiresInSeconds}s")
+        withContext(Dispatchers.Main) { onDeviceCode(auth) }
+        return pollForToken(auth, tokenEndpoint)
     }
 
-    /**
-     * Persist token bundle. Mirrors the base class's private `saveTokens`
-     * — same prefs key namespace ("oauth_tokens_<instance>") so the
-     * inherited `validAccessToken` / `refreshToken` / `isAuthenticated`
-     * helpers pick the bundle up automatically.
-     */
-    private fun saveTokensJson(json: JSONObject) {
-        // Stash under the base class's own key. We can't call the
-        // private member directly, so re-implement the single-line write
-        // with the same key format.
-        val pref = context.getSharedPreferences("dummy", Context.MODE_PRIVATE)
-        // Falls back to using the base class's saveOAuthString helper,
-        // but the canonical key the base reads from is "oauth_tokens_<id>".
-        // The helper saves under "oauth_<key>_<id>" — so key="tokens"
-        // → prefs key "oauth_tokens_<id>", which is what we want.
-        saveOAuthString("tokens", json.toString())
-    }
+    // ── id_token ──────────────────────────────────────────────────────
 
     override suspend fun onTokensReceived(json: JSONObject) {
-        // Parse the id_token JWT payload for the user-visible email /
-        // display name and the xAI account id. All optional — failure
-        // leaves them unset and the ProviderDetailScreen falls back to
-        // a plain "Signed in" pill.
-        val idToken = json.optString("id_token", "")
+        // email / 显示名 / 账号 id 都是可选信息，解析失败只影响设置页的展示。
+        val idToken = json.optString("id_token", "").ifEmpty { json.optString("access_token", "") }
         if (idToken.isNotEmpty()) parseIdToken(idToken)
-        // Cache the discovered token endpoint so refreshes don't have
-        // to repeat the discovery round-trip.
-        runCatching { resolveTokenEndpoint() }
     }
 
-    /**
-     * Parse the JWT id_token payload (Base64URL middle segment) and
-     * extract any of `email`, `name`, `sub`, `account_id` we recognise.
-     */
     private fun parseIdToken(idToken: String) {
         try {
             val parts = idToken.split(".")
@@ -317,9 +233,7 @@ class XAIOAuthManager(context: Context, instanceId: String) : OAuthManager(conte
             val json = JSONObject(payload)
             json.optString("email").takeIf { it.isNotEmpty() }?.let { email = it }
             json.optString("name").takeIf { it.isNotEmpty() }?.let { displayName = it }
-            // xAI's id_token uses `sub` for user id; `account_id` is the
-            // workspace/org. Persist whichever is present so the UI has
-            // an identifier to show in the worst case.
+            // `account_id` 是工作区 / 组织，`sub` 是用户 id；有哪个存哪个。
             (json.optString("account_id").takeIf { it.isNotEmpty() }
                 ?: json.optString("sub").takeIf { it.isNotEmpty() })?.let { accountId = it }
         } catch (e: Exception) {
@@ -327,257 +241,51 @@ class XAIOAuthManager(context: Context, instanceId: String) : OAuthManager(conte
         }
     }
 
-    // ── Refresh ───────────────────────────────────────────────────────
+    // ── 刷新（单飞） ──────────────────────────────────────────────────
 
     /**
-     * xAI refresh: form-urlencoded against the cached / re-discovered
-     * token endpoint. No client_secret (public client). Per the spec, a
-     * response without `refresh_token` retains the original.
-     *
-     * Also handles HTTP 403 specially: the spec says a `403` after
-     * refresh means the account isn't on a tier that exposes API
-     * access, not that the token is bad — preserve the bundle in that
-     * case so a manual API-key fallback or a later subscription bump
-     * can pick up where we left off without re-OAuthing.
+     * 表单 POST 到（必要时重新发现的）令牌端点，公共客户端不带 client_secret。
+     * 响应省略 `refresh_token` 时沿用旧的。裸 403（订阅层级无 API 权限，响应没有 OAuth 错误码）
+     * 不算撤销，保留令牌包；只有明确的 invalid_grant 之类才会被基类判为撤销并清除。
      */
     override suspend fun refreshToken(): Boolean = withContext(Dispatchers.IO) {
-        val stored = JSONObject(
-            loadOAuthString("tokens").takeUnless { it.isNullOrEmpty() }
-                ?: return@withContext false,
-        )
-        val refresh = stored.optString("refresh_token", "").ifEmpty { return@withContext false }
-        try {
-            val tokenEndpoint = resolveTokenEndpoint()
-            val params = mapOf(
-                "grant_type" to "refresh_token",
-                "refresh_token" to refresh,
-                "client_id" to clientId,
-            )
-            val formBody = params.entries.joinToString("&") { "${it.key}=${Uri.encode(it.value)}" }
-            val req = Request.Builder()
-                .url(tokenEndpoint)
-                .post(formBody.toRequestBody("application/x-www-form-urlencoded".toMediaType()))
-                .build()
-            val resp = httpClient.newCall(req).execute()
-            val code = resp.code
-            val body = resp.body?.string() ?: ""
-            resp.close()
-            if (code == 403) {
-                Log.w(TAG, "xAI refresh returned 403 — preserving token (subscription tier issue)")
-                return@withContext false
+        lastRefreshRevoked = false
+        val seenExpireAt = loadStoredTokens()?.optLong("expire_at", 0) ?: 0
+        mutexFor(instanceId).withLock {
+            val stored = loadStoredTokens() ?: return@withLock false
+            val refresh = stored.optString("refresh_token", "").ifEmpty { return@withLock false }
+            // 等锁期间别的刷新者已换到更新的令牌：不再重复请求。
+            val currentExpireAt = stored.optLong("expire_at", 0)
+            if (currentExpireAt > seenExpireAt && currentExpireAt > System.currentTimeMillis()) {
+                Log.d(TAG, "refresh skipped — fresher token already present (coalesced)")
+                return@withLock true
             }
-            if (code !in 200..299) {
-                Log.e(TAG, "xAI refresh failed: $code")
-                return@withContext false
-            }
-            val json = JSONObject(body)
-            if (!json.has("refresh_token")) json.put("refresh_token", refresh)
-            val expiresIn = json.optLong("expires_in", 0)
-            if (expiresIn > 0) {
-                json.put("expire_at", System.currentTimeMillis() + expiresIn * 1000)
-            }
-            if (!storedRefreshTokenIs(refresh)) {
-                Log.w(TAG, "xAI refresh result discarded: the stored credential changed meanwhile")
-                return@withContext loadOAuthString("tokens") != null
-            }
-            saveTokensJson(json)
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "xAI refresh error", e)
-            false
-        }
-    }
-
-    // ── Login orchestration ───────────────────────────────────────────
-
-    /**
-     * Perform the full OAuth login flow. Mirrors
-     * [OpenAIOAuthManager.performLogin]: spin up the callback server,
-     * open a Chrome Custom Tab against the authorization endpoint, wait
-     * for the code, then exchange. Throws on failure.
-     */
-    suspend fun performLogin(context: Context): String {
-        // Re-entrancy guard. A double Compose recomposition / button tap
-        // can launch two performLogin coroutines on the same instanceId
-        // before either has resolved. Each would generate its own
-        // PKCE+state, race to bind port 56121, then xAI's callback would
-        // resolve against ONE coroutine's expected state but the OTHER
-        // coroutine's continuation — surfacing as "state mismatch"
-        // even though the wire state value was byte-identical. Collapse
-        // re-entries to a no-op (T-xai-oauth-double-fire, port iOS
-        // 84067d0a).
-        if (isAuthenticating) {
-            Log.w(TAG, "xAI login already in progress — ignoring re-entrant call (instance: $instanceId)")
-            // Wait for the in-flight login to finish and surface its
-            // resulting token so the caller's `providerRepository.saveApiKey`
-            // path still has a value to persist when a second tap races.
-            // Suspending here is cheaper than throwing and forcing the
-            // caller into retry logic.
-            while (isAuthenticating) {
-                kotlinx.coroutines.delay(100)
-            }
-            return loadOAuthString("tokens")?.let { JSONObject(it).optString("access_token", "") }
-                ?.takeIf { it.isNotEmpty() }
-                ?: throw Exception("xAI login: prior re-entrant call finished without a token")
-        }
-        isAuthenticating = true
-        try {
-            Log.i(TAG, "=== xAI OAuth login started (instance: $instanceId) ===")
-
-            loginCallbackServer?.stop()
-            loginCallbackServer = null
-
-            val authUrl = buildXAIAuthorizationUrl()
-            val expectedState = loadOAuthString("state") ?: ""
-
-            val accessToken = withContext(Dispatchers.IO) {
-                val (code, state) = suspendCancellableCoroutine<Pair<String, String?>> { cont ->
-                    val server = OAuthCallbackServer(callbackPort) { receivedCode, receivedState ->
-                        if (cont.isActive) {
-                            // Successful redirect — clear the
-                            // external-cancel hook before the callback
-                            // server's own onCode→stop() chain runs, so
-                            // the resulting stop() doesn't fire a
-                            // spurious cancel after we've already
-                            // resumed the continuation with the code.
-                            loginCallbackServer?.onExternalCancel = null
-                            cont.resume(receivedCode to receivedState)
-                        }
-                    }
-                    // [T-xai-oauth-stop-resume, port iOS d1dbdd5d]
-                    // If the user dismisses the Custom Tab before xAI
-                    // redirects, externalCancel() resumes us with a
-                    // CancellationException so the surrounding try /
-                    // finally resets isAuthenticating immediately —
-                    // instead of hanging until the socket accept() loop
-                    // notices stop() (which on Android only happens
-                    // when a future client connects).
-                    server.onExternalCancel = {
-                        if (cont.isActive) {
-                            cont.cancel(kotlinx.coroutines.CancellationException("xAI OAuth callback cancelled"))
-                        }
-                    }
-                    loginCallbackServer = server
-                    server.start()
-                    Log.i(TAG, "Callback server started on port $callbackPort")
-
-                    cont.invokeOnCancellation {
-                        server.stop()
-                        loginCallbackServer = null
-                    }
-
-                    // Same Chrome Custom Tab pattern as OpenAIOAuthManager —
-                    // don't set FLAG_ACTIVITY_NEW_TASK or the IME on the
-                    // hosting MainActivity (singleTask) gets dismissed every
-                    // time the authorize page focuses an input.
-                    val customTabsIntent = CustomTabsIntent.Builder()
-                        .setShowTitle(true)
-                        .build()
-                    customTabsIntent.launchUrl(context, Uri.parse(authUrl))
-                    Log.i(TAG, "Opened Custom Tab for xAI authorization")
-
-                    // [T-xai-oauth-stop-resume, port iOS d1dbdd5d
-                    //  SFSafariViewControllerDelegate]
-                    //
-                    // Android Custom Tabs don't expose a reliable
-                    // "user dismissed" callback like iOS's
-                    // SFSafariViewControllerDelegate.didFinish, so we
-                    // detect dismissal through ProcessLifecycleOwner:
-                    // when MainActivity is foregrounded again WITHOUT
-                    // the loopback callback having fired, the user
-                    // backed out of the auth page. A 1.5s grace period
-                    // covers the race window where the redirect arrives
-                    // a beat after the Tab dismisses; if no callback
-                    // resolves the continuation in that window we
-                    // stop() the server, which fires onExternalCancel
-                    // → cont.cancel and the surrounding try/finally
-                    // clears isAuthenticating so the next tap works.
-                    armDismissalDetector()
+            try {
+                val (status, json) = postForm(
+                    resolveTokenEndpoint(),
+                    mapOf("grant_type" to "refresh_token", "refresh_token" to refresh, "client_id" to clientId),
+                )
+                if (status !in 200..299) {
+                    Log.e(TAG, "xAI refresh failed: $status ${sanitizeBody(json.toString())}")
+                    lastRefreshRevoked = OAuthRefreshPolicy.isRevoked(status, json.toString())
+                    return@withLock false
                 }
-
-                loginCallbackServer?.stop()
-                loginCallbackServer = null
-                Log.i(TAG, "xAI callback received — code length: ${code.length}")
-
-                if (expectedState.isNotEmpty() && state != null && state != expectedState) {
-                    throw Exception("xAI OAuth state mismatch — possible CSRF, refusing to exchange")
+                val bundle = XAIOAuthEndpoints.buildTokenBundle(
+                    json,
+                    nowMs = System.currentTimeMillis(),
+                    requireRefreshToken = false,
+                    previousRefreshToken = refresh,
+                )
+                if (!storedRefreshTokenIs(refresh)) {
+                    Log.w(TAG, "xAI refresh result discarded: the stored credential changed meanwhile")
+                    return@withLock loadStoredTokens() != null
                 }
-
-                // [T-android-oauth-foreground-exchange] See OAuthForegroundGate.
-                OAuthForegroundGate.awaitForeground(TAG)
-                exchangeCodeForToken(code)
-            }
-
-            Log.i(TAG, "=== xAI OAuth login complete (instance: $instanceId) ===")
-            return accessToken
-        } finally {
-            isAuthenticating = false
-            disarmDismissalDetector()
-        }
-    }
-
-    // ── Custom Tab dismissal detector ─────────────────────────────────
-
-    /**
-     * Observer that fires when the app returns to the foreground. We
-     * install this RIGHT BEFORE opening the Custom Tab, then wait a
-     * single ON_RESUME event: that means MainActivity has come back
-     * (either because the loopback callback brought it back, OR because
-     * the user dismissed the Tab without completing auth). We can't
-     * tell those two cases apart from lifecycle alone — but if a
-     * successful callback fired, [loginCallbackServer] is already null
-     * (the server self-stops after onCode), so checking that state in
-     * a short grace window after ON_RESUME tells us whether to treat
-     * this as a dismissal.
-     */
-    private var dismissalObserver: DefaultLifecycleObserver? = null
-
-    private fun armDismissalDetector() {
-        disarmDismissalDetector()
-        val observer = object : DefaultLifecycleObserver {
-            // Track that we've already seen the Tab consume foreground
-            // (CCS launch → ON_PAUSE on MainActivity → ON_RESUME). The
-            // first ON_RESUME after install fires immediately for the
-            // currently-foregrounded activity (when the lifecycle
-            // observer is added on the main thread); we ignore that
-            // synthetic event by gating on a "have we seen a stop yet"
-            // flag set by ON_STOP / ON_PAUSE.
-            @Volatile var sawBackgrounded = false
-
-            override fun onPause(owner: LifecycleOwner) { sawBackgrounded = true }
-            override fun onStop(owner: LifecycleOwner) { sawBackgrounded = true }
-
-            override fun onResume(owner: LifecycleOwner) {
-                if (!sawBackgrounded) return
-                // Give the loopback callback up to 1.5s to land —
-                // covers the race where xAI's redirect arrives a beat
-                // after the Custom Tab dismisses.
-                GlobalScope.launch {
-                    delay(1500)
-                    val server = loginCallbackServer ?: return@launch
-                    Log.w(TAG, "App resumed without OAuth callback — treating as user dismissal, stopping server")
-                    server.stop()
-                }
+                saveOAuthString("tokens", bundle.toString())
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "xAI refresh error", e)
+                false
             }
         }
-        dismissalObserver = observer
-        // ProcessLifecycleOwner observer ops are main-thread only.
-        try {
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                ProcessLifecycleOwner.get().lifecycle.addObserver(observer)
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "armDismissalDetector failed to attach observer: ${e.message}")
-        }
-    }
-
-    private fun disarmDismissalDetector() {
-        val observer = dismissalObserver ?: return
-        dismissalObserver = null
-        try {
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                ProcessLifecycleOwner.get().lifecycle.removeObserver(observer)
-            }
-        } catch (_: Exception) {}
     }
 }

@@ -2,7 +2,7 @@ package com.openminis.app.ui.chat
 
 // [T-android-split-chat] Composer/input widgets + tool preview/status bar
 // extracted verbatim from ChatScreen.kt: AttachmentChip, InputCircleButton,
-// MicButton, ToolPreviewThumbnail, FloatingToolStatusBar, ThinkingLevelPicker.
+// ToolPreviewThumbnail, FloatingToolStatusBar, ThinkingLevelPicker.
 // Full import block copied (unused=warnings); externally-called ones internal.
 
 import android.content.Intent
@@ -384,64 +384,6 @@ internal fun InputCircleButton(
         contentAlignment = Alignment.Center,
     ) {
         content()
-    }
-}
-
-/**
- * Mic button with a two-state appearance — mirrors iOS `MicButton`.
- *
- * Idle: outlined mic, neutral bg.
- * Recording: filled mic, red-tinted bg, optional 2-letter locale badge
- * overlayed on the top-right (e.g. "EN", "ZH").
- */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-@Composable
-internal fun MicButton(
-    isRecording: Boolean,
-    localeBadge: String?,
-    onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
-    // [T-android-voice-panel] While the inline voice panel is active the same
-    // slot switches back to text input — keyboard glyph (mirrors iOS "T").
-    isVoiceActive: Boolean = false,
-) {
-    val bg = if (isRecording) Color.Red.copy(alpha = 0.15f)
-             else ChatColors.inputIconBg
-    val tint = if (isRecording) Color.Red
-               else MaterialTheme.colorScheme.onSurfaceVariant
-    val borderColor = if (isRecording) Color.Transparent else ChatColors.inputIconBorder
-    Box(
-        modifier = Modifier
-            .size(38.dp)
-            .background(bg, CircleShape)
-            .border(0.5.dp, borderColor, CircleShape)
-            .clip(CircleShape)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            if (isVoiceActive) Icons.Default.Keyboard else Icons.Default.Mic,
-            contentDescription = if (isVoiceActive) stringResource(R.string.chat_switch_to_keyboard)
-            else if (isRecording) stringResource(R.string.chat_stop_recording) else stringResource(R.string.chat_voice_input),
-            tint = tint,
-            modifier = Modifier.size(20.dp),
-        )
-        if (!localeBadge.isNullOrEmpty()) {
-            Text(
-                text = localeBadge,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Red,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 2.dp, end = 2.dp)
-                    .background(Color.White, CircleShape)
-                    .padding(horizontal = 3.dp, vertical = 1.dp),
-            )
-        }
     }
 }
 

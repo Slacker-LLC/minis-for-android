@@ -59,7 +59,7 @@ Android app（:app）
 | `agent/` | 17 | Agent 循环、检查点、上下文预算 |
 | `roleplay/` | 16 | 角色卡解析、世界书、会话绑定 |
 | `browser/` | 15 | 内置浏览器、标签池、动作执行 |
-| `pet/` | 13 | 桌面宠物（浮窗、小窗对话、语音） |
+| `pet/` | 13 | 桌面宠物（浮窗、小窗对话；麦克风进入语音通话） |
 | 其余 | — | `backup/`、`scheduled/`、`notification(s)/`、`accessibility/`、`offload/`、`remote/`、`webapp/`、`terminal/`、`voicecall/` 等 |
 
 合计 `src/android/` 主源码 **860** 个 Kotlin 文件、**348** 个测试文件（`:app:testDebugUnitTest` 当前

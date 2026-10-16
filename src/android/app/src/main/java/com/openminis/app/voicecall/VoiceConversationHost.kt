@@ -238,7 +238,6 @@ internal fun VoiceConversationHost(
                 SpeechRecognitionManager.init(context)
                 SpeechRecognitionManager.cancelRecording()
                 SpeechRecognitionManager.clearDegradationAndRefresh()
-                com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive = false
                 viewModel.replyPlayer?.stop()
                 val sid = try {
                     viewModel.agentSession.ensureSessionForSettings()

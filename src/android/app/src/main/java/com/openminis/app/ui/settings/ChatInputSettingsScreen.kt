@@ -8,7 +8,6 @@ import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
@@ -32,10 +31,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import android.widget.Toast
 import com.openminis.app.R
-import com.openminis.app.ui.components.MinisAlertDialog
-import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.theme.ChatColors
 
 /**
@@ -61,10 +57,6 @@ fun ChatInputSettingsScreen(onBack: () -> Unit, onOpenVoiceCall: () -> Unit = {}
     var autoExpandThinking by remember { mutableStateOf(prefs.getBoolean(KEY_AUTO_EXPAND_THINKING, true)) }
     var showChatTitle by remember { mutableStateOf(prefs.getBoolean(KEY_SHOW_CHAT_TITLE, true)) }
     var autoGrouping by remember { mutableStateOf(prefs.getBoolean(KEY_AUTO_GROUPING, true)) }
-    var correctionEnabled by remember {
-        mutableStateOf(com.openminis.app.speech.correction.VoiceCorrectionConsent.isEnabled(context))
-    }
-    var showClearCorrectionConfirm by remember { mutableStateOf(false) }
 
     // [T-android-work-process] Collected, not remembered: the value lives in a
     // process-wide StateFlow so the toggle and ChatScreen stay in sync.
@@ -331,58 +323,6 @@ fun ChatInputSettingsScreen(onBack: () -> Unit, onOpenVoiceCall: () -> Unit = {}
             )
         }
 
-        // [T-android-settings-hierarchy] Voice-correction learning is a chat-input behaviour.
-        SettingsSection(
-            header = stringResource(R.string.voice_correction_section),
-        ) {
-            SettingsSwitchRow(
-                icon = Icons.Outlined.RecordVoiceOver,
-                title = stringResource(R.string.voice_correction_toggle),
-                checked = correctionEnabled,
-                onCheckedChange = { on ->
-                    correctionEnabled = on
-                    com.openminis.app.speech.correction.VoiceCorrectionConsent.setEnabled(context, on)
-                    com.openminis.app.speech.correction.VoiceCorrectionConsent.setPrompted(context, true)
-                },
-            )
-            SettingsRow(
-                icon = Icons.Outlined.DeleteSweep,
-                iconColor = MaterialTheme.colorScheme.error,
-                title = stringResource(R.string.voice_correction_clear),
-                titleColor = MaterialTheme.colorScheme.error,
-                onClick = { showClearCorrectionConfirm = true },
-                showDivider = false,
-            )
-        }
-
         Spacer(Modifier.height(24.dp))
-    }
-
-    if (showClearCorrectionConfirm) {
-        MinisAlertDialog(
-            onDismissRequest = { showClearCorrectionConfirm = false },
-            title = { Text(stringResource(R.string.voice_correction_clear_title)) },
-            confirmButton = {
-                MinisTextButton(onClick = {
-                    showClearCorrectionConfirm = false
-                    com.openminis.app.speech.correction.VoiceCorrection.clearAllData(context)
-                    Toast.makeText(
-                        context,
-                        context.getString(R.string.voice_correction_cleared),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }) {
-                    Text(
-                        stringResource(R.string.voice_correction_clear),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            },
-            dismissButton = {
-                MinisTextButton(onClick = { showClearCorrectionConfirm = false }) {
-                    Text(stringResource(R.string.voice_correction_consent_not_now))
-                }
-            },
-        )
     }
 }

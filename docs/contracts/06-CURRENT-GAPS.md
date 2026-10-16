@@ -280,9 +280,14 @@ PR2/PR3 只把运行配置迁移到固定 Model Slots，并保留旧表作为迁
 
 ## 设备完整性保护（Issue #182，2026-10-10）
 
-只有 JVM 单测、编译和 lint 的证据；`ProtectedView` 生成的脚本、mount namespace、能力裁剪、存储水位冻结都**没有在真机上跑过**，不得据此声称设备结论。需要在小米 24129PN74C / HyperOS（KernelSU）上确认：
+2026-10-17 在小米 24129PN74C / HyperOS（KernelSU，Android 17）上手工回放过 `ProtectedView.wrap` 生成的完整命令（adb `su` 直接执行，不经 App），发现并修掉三个会让特权命令全部返回 `DEVICE_PROTECTION_UNAVAILABLE` 或改坏全机状态的缺陷：
+1. 对 `/apex` 做非递归 `bind` 会盖住所有 APEX 模块（含 `linker64`），之后任何 Android 二进制都报 `No such file`；改为 `--rbind`。
+2. 传播隔离无效：toybox 把目录对目录的 `mount -o rprivate,bind / /` 自动识别为普通 bind（上游 `toys/lsb/mount.c:113`、`:189-197`），内核对 bind 忽略传播标志，视图里的挂载（空 `/dev/block`、桩文件）会外泄；改用 rootfs `mount --make-rslave /`。
+3. toybox `mount -o remount,bind,ro` 从 `/proc/mounts` 取设备与类型并丢掉 bind 标志（`:318-355`），变成整个文件系统的 remount：对可写分区会把它在全机范围改成只读（实测 `/metadata`，已手工恢复），对 `/data` 因有写者返回 EBUSY 才没出事；改用 rootfs `mount -o remount,bind,ro`。
+另外 KernelSU 的 `/system/bin/su` 是虚拟路径（`[ -e ]` 为真、`mount(2)` 返回 ENOENT），su 桩无法覆盖，旧实现因此在此处直接失败；现在只放行 ENOENT。
 
-- `unshare -m` 在 `su` 起的进程里可用，`mount -o rprivate,bind / /`、`/dev/block` 换 tmpfs、对 `/data/adb`、`/apex` 等目录的只读 bind 与 `remount,bind,ro` 都能成功；任何一步失败会让特权命令返回 `DEVICE_PROTECTION_UNAVAILABLE`（失败关闭）；
+修复后在同一台设备上确认：完整视图可建起并退出码 0；视图里 `/system` `/data/adb` 只读，`/dev/block` 为空，`/data/adb/minis` 可写，`/sdcard` 可写；`CapBnd` 去掉了 `CAP_SYS_ADMIN`/`CAP_MKNOD`/`CAP_SYS_MODULE`/`CAP_SYS_RAWIO`，视图内 `mount -t tmpfs` 返回 EPERM；`pm list packages`、`settings get`、`dumpsys battery`、`am get-current-user` 正常；运行前后 `/data`、`/metadata`、`/system` 等超级块读写状态不变，全局命名空间无泄漏。**仍没有验证**：经 App 的 `root.shell` / `android-root-cli` 真实调用；视图内 `su -c` 仍能起 root 进程（留在视图命名空间里，`/system` 仍只读，但它的能力集没测）；`partition read`、存储水位冻结、其余 OEM。以下清单中未被上面覆盖的条目仍需真机确认：
+
 - rootfs 里的 `setpriv` 经 `ld-linux-aarch64.so.1 --library-path` 在 chroot 之外能运行，`--bounding-set` 去掉 `CAP_SYS_ADMIN` 后 `pm`/`cmd`/`settings`/`am`/`dumpsys`/`input`/`wm`/`appops` 与现有 `android-root-cli` 子命令没有回归；
 - 视图里 `mount -o remount,rw /system`、`dd of=/dev/block/…`、`rm -rf /data/system` 确实失败，`su` 桩生效；
 - KernelSU 的 `/data/adb/ksu/bin/su` 被桩覆盖后，视图外的 App 自身 `su` 不受影响；

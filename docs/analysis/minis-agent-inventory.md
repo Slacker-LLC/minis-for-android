@@ -82,7 +82,7 @@ flowchart TD
 | MCP 扩展与对外调用 | MCP client 连接外部服务器并注册工具；MCP server 提供受鉴权和调用方策略控制的本机工具 | 使用外部服务，也可让其他客户端调用部分手机能力 | `mcp/client/`、`mcp/server/`、`data/repository/MCPRepository.kt` |
 | 自身配置 | `minis-config` 注册式读取/修改、审计与回退；模型、环境变量、提示词等配置入口 | Agent 能按已有授权调整自己的运行配置 | `config/`、`runtime/guest/ConfigOffloadHandler.kt` |
 | 辅助模型与图像 | `minis-model-use` 列表/搜索/调用用户披露的模型；读图、视觉转述、图像结果落盘 | 让脚本使用模型处理资料，查看或生成图像 | `runtime/guest/ModelUseOffloadHandler*.kt`、`tools/ReadImageTool.kt` |
-| 语音与交互外壳 | 系统/Provider ASR 与 TTS、聊天语音输入/朗读、桌宠轻量对话；工作树已接通连续语音工具任务 | 语音对话复用完整 Agent；桌宠仍为轻量对话 | `speech/`、`pet/PetChatEngine.kt`、`voicecall/` |
+| 语音与交互外壳 | 系统/Provider ASR 与 TTS、聊天语音输入/朗读、桌宠轻量文字对话（麦克风进入语音通话）；工作树已接通连续语音工具任务 | 语音对话复用完整 Agent；桌宠仍为轻量对话 | `speech/`、`pet/PetChatEngine.kt`、`voicecall/` |
 | 文件交付与管理 | 每会话目录、全局共享/技能/记忆、授权外部目录、minis:// 预览、系统文件 Provider、备份/恢复 | 把做出来的内容交付给用户并长期保存 | `runtime/ubuntu/UbuntuPaths.kt`、`data/MountedFoldersStore.kt`、`providers/MinisDocumentsProvider.kt`、`backup/` |
 | HTML 小应用与快捷方式 | 生成 HTML 的预览、固定到桌面、路径/会话归属记录与深链打开 | 从 Agent 产物进入可重复打开的小工具 | `ui/preview/`、`webapp/ShortcutPinner.kt`、`data/repository/WebAppShortcutRepository.kt` |
 | 产品入口与偏好 | 助手首页、会话列表/分组、Bot 团队、八类设置、用量统计、系统助理入口、分享/深链 | 进入任务、管理配置和查看已有工作 | `ui/navigation/`、`ui/home/`、`ui/settings/`、`deeplink/` |

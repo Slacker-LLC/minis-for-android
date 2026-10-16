@@ -21,11 +21,18 @@ import com.openminis.app.util.shellQuote
  * `CAP_SYS_RAWIO` removed from the bounding set, so none of this can be remounted, unmounted,
  * re-created or loaded around.
  *
- * Android's toybox has no `setpriv`; the Ubuntu rootfs one is run through the rootfs dynamic loader
- * without chroot. If any part of the view cannot be built the command does not run (exit 125,
- * `DEVICE_PROTECTION_UNAVAILABLE`): protection fails closed, and the user can turn it off.
+ * Android's toybox has no `setpriv`, and its `mount` cannot do the propagation change or a read-only
+ * bind remount: `-o rprivate,bind / /` is autodetected as a plain bind that leaves propagation shared
+ * (toys/lsb/mount.c:113, :189-197), and `-o remount` takes the mount's device and type from
+ * /proc/mounts (:318-355), so the bind flag is dropped and the whole filesystem is remounted. That
+ * flips a writable partition such as /metadata to read-only for the entire device. The Ubuntu rootfs
+ * `setpriv` and `mount` (util-linux) are therefore run through the rootfs dynamic loader without
+ * chroot; toybox `mount` only makes fresh tmpfs mounts and the su stub binds. If any part of the view
+ * cannot be built the command does not run (exit 125, `DEVICE_PROTECTION_UNAVAILABLE`): protection
+ * fails closed, and the user can turn it off.
  *
- * Nothing here has been run on a device; see `06-CURRENT-GAPS.md`.
+ * Device evidence (Xiaomi 24129PN74C, KernelSU): the mount steps were replayed by hand on 2026-10-17,
+ * see `06-CURRENT-GAPS.md`. The capability drop and the full wrapped command have not been run.
  */
 internal object ProtectedView {
     const val EXIT_UNAVAILABLE = 125
@@ -61,21 +68,33 @@ internal object ProtectedView {
             append("LOADER=\"\$RF/$LOADER_REL\"; ")
             append("[ -x \"\$LOADER\" ] || fail 'rootfs loader not found'; ")
             append("[ -x \"\$RF/usr/bin/setpriv\" ] || fail 'rootfs setpriv not found'; ")
-            append("/system/bin/mount -o rprivate,bind / / || fail 'cannot make mounts private'; ")
+            append("[ -x \"\$RF/usr/bin/mount\" ] || fail 'rootfs mount not found'; ")
+            append("um() { \"\$LOADER\" --library-path \"\$RF/$LIBDIR_REL:\$RF/$LIBDIR2_REL\" \"\$RF/usr/bin/mount\" \"\$@\"; }; ")
+            // Everything below must stay inside this namespace: slave propagation keeps what we mount
+            // from reaching the host (an empty /dev/block, stubs over system binaries).
+            append("um --make-rslave / || fail 'cannot make mounts private'; ")
             // Block nodes: swap the directory for an empty nodev tmpfs before anything else needs it.
             append("/system/bin/mount -t tmpfs -o nodev,noexec,mode=755 tmpfs /dev/block || fail '/dev/block'; ")
             // The su stub lives on a second tmpfs, so /dev/block stays empty.
             append("mkdir -p /dev/.minis-guard && /system/bin/mount -t tmpfs -o nodev,mode=755 tmpfs /dev/.minis-guard || fail 'guard tmpfs'; ")
             append("printf '%s\\n' '#!/system/bin/sh' 'echo \"DEVICE_PROTECTED: su is not available inside the protected view\" >&2' 'exit 126' > /dev/.minis-guard/su || fail 'su stub'; ")
             append("chmod 755 /dev/.minis-guard/su; ")
+            // KernelSU shows root processes a /system/bin/su that has no entry in the filesystem
+            // (`[ -e ]` says yes, mount(2) says ENOENT, init does not see it), so there is nothing to
+            // cover. Only that error is let through; any other failure still fails closed.
             append("for s in ${SU_PATHS.joinToString(" ") { shellQuote(it) }}; do ")
-            append("[ -e \"\$s\" ] && { /system/bin/mount -o bind /dev/.minis-guard/su \"\$s\" || fail \"su \$s\"; }; done; ")
+            append("[ -e \"\$s\" ] || continue; ")
+            append("e=\$(/system/bin/mount -o bind /dev/.minis-guard/su \"\$s\" 2>&1) && continue; ")
+            append("case \"\$e\" in *'No such file'*) continue;; esac; fail \"su \$s\"; done; ")
             append("for d in ${READ_ONLY_DIRS.joinToString(" ")}; do ")
             append("[ -d \"\$d\" ] || continue; ")
-            append("/system/bin/mount -o bind \"\$d\" \"\$d\" && /system/bin/mount -o remount,bind,ro \"\$d\" || fail \"\$d\"; done; ")
+            // `--rbind`, not a plain bind: a plain bind copies only the top mount and hides everything
+            // mounted below it. On /apex that hides the APEX modules and the runtime linker every
+            // Android binary needs, so the next command fails with "No such file".
+            append("um --rbind \"\$d\" \"\$d\" && um -o remount,bind,ro \"\$d\" || fail \"\$d\"; done; ")
             append("if [ -d ${shellQuote(minisDir)} ]; then ")
-            append("/system/bin/mount -o bind ${shellQuote(minisDir)} ${shellQuote(minisDir)} && ")
-            append("/system/bin/mount -o remount,bind,rw ${shellQuote(minisDir)} || fail 'minis dir'; fi; ")
+            append("um --rbind ${shellQuote(minisDir)} ${shellQuote(minisDir)} && ")
+            append("um -o remount,bind,rw ${shellQuote(minisDir)} || fail 'minis dir'; fi; ")
             append("exec \"\$LOADER\" --library-path \"\$RF/$LIBDIR_REL:\$RF/$LIBDIR2_REL\" \"\$RF/usr/bin/setpriv\" ")
             append("--bounding-set=$DROPPED_CAPS --inh-caps=$DROPPED_CAPS -- /system/bin/sh -c ${shellQuote(script)}")
         }

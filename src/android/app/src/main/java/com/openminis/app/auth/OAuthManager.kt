@@ -87,12 +87,7 @@ abstract class OAuthManager(
     abstract val redirectPath: String
     abstract val scopes: String
 
-    // `open` so a provider whose server-side allow-list pins a different
-    // loopback spelling can override it (xAI registered 127.0.0.1, not
-    // localhost — see [XAIOAuthManager]). The default stays `localhost`,
-    // which OpenAI/Codex, Gemini, Antigravity and Claude all register, so
-    // this change is override-only and leaves every other provider untouched.
-    open val redirectUri: String get() = "http://localhost:$callbackPort$redirectPath"
+    val redirectUri: String get() = "http://localhost:$callbackPort$redirectPath"
 
     // PKCE
     private var codeVerifier: String? = null

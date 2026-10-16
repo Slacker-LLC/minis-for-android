@@ -117,6 +117,21 @@ fun AgentSession.updateTitleAndCategory(title: String, category: String?) {
     }
 }
 
+/** 非草稿会话的数据库行已不存在（被删除）。消息仍是 `session_deleted`，调用方可据此区分。 */
+internal class SessionDeletedException : IllegalStateException("session_deleted")
+
+/**
+ * 给“顺手持久化”的后台写（记忆开关、思考档位、模型默认值）用：会话行没了就跳过，
+ * 不让异常冒到协程作用域里把进程带崩。发送路径仍用会抛错的 [ensureSession]。
+ */
+internal suspend fun AgentSession.ensureSessionOrNull(): String? =
+    try {
+        ensureSession()
+    } catch (e: SessionDeletedException) {
+        android.util.Log.w("AgentSession", "session row missing, skip background persist: $realSessionId")
+        null
+    }
+
 /** Ensure the session exists in the database. Called before first message. */
 internal suspend fun AgentSession.ensureSession(): String = withContext(Dispatchers.IO) {
     pendingMediaCommitJob?.join()
@@ -128,7 +143,7 @@ internal suspend fun AgentSession.ensureSession(): String = withContext(Dispatch
             return@withContext realSessionId
         }
     }
-    check(isDraft) { "session_deleted" }
+    if (!isDraft) throw SessionDeletedException()
     val modelId = currentModel?.id ?: providerRepository.allVisibleEntries().firstOrNull()?.model?.id ?: "unknown"
     // [T-memory-global-toggle-settings-ui-android] Snapshot the
     // current in-memory `_memoryEnabled` into the new row. For a
@@ -879,7 +894,7 @@ internal fun AgentSession.applyEntrySessionDefaults(entryId: String) {
         return
     }
     sessionScope.launch {
-        val sid = ensureSession()
+        val sid = ensureSessionOrNull() ?: return@launch
         chatRepository.dao.updateThinkingOverride(sid, level.name)
     }
 }

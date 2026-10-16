@@ -662,7 +662,7 @@ private fun ColumnScope.OAuthConfigSection(
         ProviderType.unsupported -> "Sign in"
     }
 
-    // [T-kimi-oauth] Device-code dialog state: non-null while a Kimi login is
+    // [T-kimi-oauth] Device-code dialog state: non-null while a Kimi / xAI login is
     // waiting for the user to authorize on auth.kimi.com. Set by the login
     // coroutine's onDeviceCode callback and RENDERED below — the iOS lesson
     // was a write-only state nobody displayed ("button does nothing").
@@ -671,9 +671,14 @@ private fun ColumnScope.OAuthConfigSection(
     }
     var kimiLoginJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     kimiDeviceAuth?.let { auth ->
+        val isXai = providerType == ProviderType.xAI
         KimiDeviceLoginDialog(
             userCode = auth.userCode,
             verificationUrl = auth.openUrl,
+            title = stringResource(if (isXai) R.string.xai_login_title else R.string.kimi_login_title),
+            instructions = stringResource(
+                if (isXai) R.string.xai_login_instructions else R.string.kimi_login_instructions,
+            ),
             onCancel = {
                 kimiLoginJob?.cancel()
                 kimiDeviceAuth = null
@@ -768,7 +773,12 @@ private fun ColumnScope.OAuthConfigSection(
                                         maskedToken = maskOAuthToken(key)
                                     }
                                     ProviderType.xAI -> {
-                                        val key = com.openminis.app.auth.XAIOAuthManager.login(context, pendingInstanceId, providerRepository)
+                                        // Device-code flow, same dialog as Kimi.
+                                        val key = com.openminis.app.auth.XAIOAuthManager.login(
+                                            context, pendingInstanceId, providerRepository,
+                                            onDeviceCode = { auth -> kimiDeviceAuth = auth },
+                                        )
+                                        kimiDeviceAuth = null
                                         maskedToken = maskOAuthToken(key)
                                     }
                                     ProviderType.antigravity -> {

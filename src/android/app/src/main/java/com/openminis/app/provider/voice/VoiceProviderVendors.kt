@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
@@ -49,14 +50,68 @@ class AlibabaVoiceProvider(providerId: String, baseURL: String, apiKey: String?)
     override fun defaultVoiceOutputVoice() = "longxiaochun"
 }
 
-// -- xAI (ASR endpoint path differs: /v1/stt) ---------------------------------
+// -- xAI (own STT / TTS endpoints and request shapes) -------------------------
 
+/**
+ * xAI voice API, per docs.x.ai/developers/model-capabilities/audio:
+ * - STT `POST /v1/stt` (multipart): model `grok-voice-transcribe-2.0`; `file` MUST be the LAST
+ *   form field (fields after it may be ignored); there is no `response_format` / `prompt`.
+ * - TTS `POST /v1/tts` (JSON): `text`, `voice_id`, `language` (REQUIRED — BCP-47 or `auto`),
+ *   `output_format` {codec}, `speed` 0.7–1.5; the response body is raw audio bytes.
+ *
+ * Real-account behaviour is unverified; the request shapes are pinned by XAIVoiceProviderTest.
+ */
 class XAIVoiceProvider(providerId: String, baseURL: String, apiKey: String?) :
     VoiceProvider(providerId, baseURL, apiKey) {
+
+    companion object {
+        const val STT_MODEL = "grok-voice-transcribe-2.0"
+        const val TTS_VOICE = "eve"
+        const val TTS_SPEED_MIN = 0.7f
+        const val TTS_SPEED_MAX = 1.5f
+    }
+
     override fun voiceInputEndpointPath() = "/v1/stt"
-    override fun defaultVoiceInputModel() = "grok-stt"
-    override fun defaultVoiceOutputModel() = "grok-tts-1"
-    override fun defaultVoiceOutputVoice() = "eve"
+    override fun voiceOutputEndpointPath() = "/v1/tts"
+    override fun defaultVoiceInputModel() = STT_MODEL
+    override fun defaultVoiceOutputModel() = "" // /v1/tts has no model field
+    override fun defaultVoiceOutputVoice() = TTS_VOICE
+
+    override fun buildVoiceInputRequest(request: VoiceInputRequest): Request {
+        val multipart = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("model", request.model ?: defaultVoiceInputModel())
+        iso6391(request.language)?.let { multipart.addFormDataPart("language", it) }
+        // `file` last: xAI may ignore any field that follows it. OpenAI-style
+        // response_format / prompt are not part of the xAI contract and are not sent.
+        multipart.addFormDataPart(
+            "file", "voice.wav",
+            request.audioData.toRequestBody("audio/wav".toMediaType()),
+        )
+        val builder = Request.Builder().url(composedUrlString(voiceInputEndpointPath())).post(multipart.build())
+        applyVoiceAuth(builder)
+        return builder.build()
+    }
+
+    override fun buildVoiceOutputRequest(request: VoiceOutputRequest): Request {
+        val body = JSONObject().apply {
+            put("text", request.input)
+            put("voice_id", request.voice ?: defaultVoiceOutputVoice())
+            // Required by the API; VoiceOutputRequest carries no language, so let xAI detect it.
+            put("language", "auto")
+            // xAI codecs are mp3 / wav / pcm / mulaw / alaw — anything but WAV is sent as mp3.
+            put(
+                "output_format",
+                JSONObject().put("codec", if (request.responseFormat == VoiceOutputFormat.WAV) "wav" else "mp3"),
+            )
+            request.speed?.let { put("speed", it.coerceIn(TTS_SPEED_MIN, TTS_SPEED_MAX).toDouble()) }
+        }
+        val builder = Request.Builder()
+            .url(composedUrlString(voiceOutputEndpointPath()))
+            .post(body.toString().toRequestBody("application/json".toMediaType()))
+        applyVoiceAuth(builder)
+        return builder.build()
+    }
 }
 
 // -- MiniMax (TTS only, distinct body, base64-nested response) ----------------
@@ -718,11 +773,19 @@ class MimoVoiceProvider(providerId: String, baseURL: String, apiKey: String?) :
     // ASR ----------------------------------------------------------------------
 
     override suspend fun transcribe(request: VoiceInputRequest): VoiceInputResponse {
+        val modelId = request.model ?: defaultVoiceInputModel()
+        // `asr_options` only belongs to the dedicated ASR model. Audio-capable chat
+        // models (mimo-v2.x) take plain audio understanding; sending them the ASR
+        // envelope leaves the request without a usable transcript.
+        if (!modelId.contains("asr", ignoreCase = true)) {
+            Log.i(TAG, "chat-based ASR via $modelId")
+            return transcribeChatBased(request)
+        }
         val url = composedUrlString("/v1/chat/completions")
         val audioBase64 = Base64.encodeToString(request.audioData, Base64.NO_WRAP)
         val lang = iso6391(request.language) ?: "auto"
         val body = JSONObject().apply {
-            put("model", request.model ?: defaultVoiceInputModel())
+            put("model", modelId)
             put(
                 "messages",
                 JSONArray().put(

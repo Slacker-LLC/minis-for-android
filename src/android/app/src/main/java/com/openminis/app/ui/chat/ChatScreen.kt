@@ -275,24 +275,6 @@ fun ChatScreen(
     // cleared inputText. Drop those late commits during a short window.
     val lastSendTimeMs_st = remember { mutableStateOf(0L) }
     var lastSendTimeMs by lastSendTimeMs_st
-    // [T-voice-mode-memory-refine-android] True when a voice recording started
-    // since the composer was last cleared. The SEND is what commits the mode:
-    // mic-start no longer writes "voice" (an accidental mic tap with no send
-    // must not flip the default) — instead this flag is consulted on send.
-    val voiceUsedSinceClear_st = remember { mutableStateOf(false) }
-    var voiceUsedSinceClear by voiceUsedSinceClear_st
-    // Shared by both send paths (send button / Enter): commit the composer
-    // mode at send time — "voice" if this composition used voice, otherwise
-    // "text" — then reset the tracker for the now-cleared composer.
-    val noteSendForInputModePref: () -> Unit = {
-        ComposerInputModePrefs.save(context, voice = voiceUsedSinceClear)
-        voiceUsedSinceClear = false
-        // [T-android-voice-correction] A send is the natural moment to mine
-        // typed vocabulary: the message is committed, and the builder's own
-        // hourly throttle makes the common case a no-op. Consent-gated and
-        // fire-and-forget inside.
-        com.openminis.app.speech.correction.VoiceCorrection.mineVocabularyIfNeeded(context)
-    }
     // [T-android-send-no-autoscroll-behind-preview] Timestamp of the most
     // recent USER message append, stamped in LE(messages.size) so it covers
     // every origin (send button, Enter, RPC, enqueue-while-streaming). Used
@@ -708,7 +690,6 @@ fun ChatScreen(
     val performSendOrEnqueue = rememberPerformSendOrEnqueue(
         viewModel = viewModel,
         lastSendTimeMsState = lastSendTimeMs_st,
-        noteSendForInputModePref = noteSendForInputModePref,
         coroutineScope = coroutineScope,
         tracedScrollToItem = tracedScrollToItem,
         isNearBottom = isNearBottom,
@@ -1309,8 +1290,6 @@ fun ChatScreen(
                 inputTextState = inputText_st,
                 inputFieldValue_st = inputFieldValue_st,
                 lastSendTimeMs_st = lastSendTimeMs_st,
-                voiceUsedSinceClear_st = voiceUsedSinceClear_st,
-                noteSendForInputModePref = noteSendForInputModePref,
                 inputFocusRequester = inputFocusRequester,
                 inputFocused_st = inputFocused_st,
                 sendSwipeProgress_st = sendSwipeProgress_st,

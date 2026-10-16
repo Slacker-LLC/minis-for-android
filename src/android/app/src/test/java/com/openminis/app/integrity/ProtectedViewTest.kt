@@ -19,6 +19,38 @@ class ProtectedViewTest {
         assertTrue(view.contains("remount,bind,ro"))
     }
 
+    @Test fun `mounts are made non-propagating before anything is mounted so nothing leaks to the host`() {
+        val privatize = "um --make-rslave / || fail "
+        assertTrue(view.contains(privatize))
+        // toybox `-o rprivate,bind / /` is a plain bind and leaves propagation shared.
+        assertFalse(view.contains("rprivate"))
+        assertTrue(view.indexOf(privatize) < view.indexOf("-t tmpfs -o nodev,noexec,mode=755 tmpfs /dev/block"))
+        assertTrue(view.indexOf(privatize) < view.indexOf("remount,bind,ro"))
+    }
+
+    @Test fun `read-only bind remounts use the rootfs mount because toybox remount touches the whole filesystem`() {
+        // toybox `mount -o remount` takes device and type from /proc/mounts and drops the bind flag, which
+        // would remount a writable partition such as /metadata read-only for the whole device.
+        assertFalse(view.contains("/system/bin/mount -o remount"))
+        assertFalse(view.contains("/system/bin/mount -o rbind"))
+        assertTrue(view.contains("um -o remount,bind,ro "))
+        assertTrue(view.contains("um -o remount,bind,rw "))
+        assertTrue(view.contains("rootfs mount not found"))
+    }
+
+    @Test fun `su stubs that cannot be mounted because the path is virtual are skipped but other failures fail closed`() {
+        assertTrue(view.contains("No such file"))
+        assertTrue(view.contains("fail \"su \$s\""))
+    }
+
+    @Test fun `protected directories are bound recursively so nested mounts like the apex modules stay visible`() {
+        // A plain bind hides /apex/com.android.runtime, the linker every Android binary needs.
+        assertTrue(view.contains("um --rbind \"\$d\" \"\$d\""))
+        assertTrue(view.contains("um --rbind '\"'\"'/data/adb/minis"))
+        assertFalse(view.contains("-o bind \"\$d\""))
+        assertTrue(ProtectedView.READ_ONLY_DIRS.contains("/apex"))
+    }
+
     @Test fun `block nodes are swapped for an empty nodev tmpfs`() {
         assertTrue(view.contains("-t tmpfs -o nodev,noexec,mode=755 tmpfs /dev/block"))
     }

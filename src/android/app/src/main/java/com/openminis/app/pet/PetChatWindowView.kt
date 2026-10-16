@@ -36,7 +36,8 @@ class PetChatWindowView(context: Context) : LinearLayout(context) {
     }
 
     var onSend: ((String) -> Unit)? = null
-    var onVoiceToggle: (() -> Unit)? = null
+    /** Opens the one Grok voice call; the pet owns no recording of its own. */
+    var onVoiceCall: (() -> Unit)? = null
     var onClose: (() -> Unit)? = null
     var onFocusLost: (() -> Unit)? = null
     var onDragBy: ((Int, Int) -> Unit)? = null
@@ -170,7 +171,7 @@ class PetChatWindowView(context: Context) : LinearLayout(context) {
 
         mic.apply {
             text = "🎙"
-            contentDescription = "语音输入"
+            contentDescription = "语音通话"
             textSize = 16f
             minWidth = 0
             minimumWidth = 0
@@ -179,7 +180,7 @@ class PetChatWindowView(context: Context) : LinearLayout(context) {
             setTextColor(textPrimary)
             background = rounded(Color.TRANSPARENT, 10f)
             setPadding(dp(4), dp(2), dp(4), dp(2))
-            setOnClickListener { onVoiceToggle?.invoke() }
+            setOnClickListener { onVoiceCall?.invoke() }
         }
         row.addView(mic, LayoutParams(dp(42), dp(42)))
 
@@ -242,11 +243,6 @@ class PetChatWindowView(context: Context) : LinearLayout(context) {
     fun setBusy(busy: Boolean) {
         send.isEnabled = !busy
         status.text = if (busy) "Minis 正在思考…" else IDLE_STATUS
-    }
-
-    fun setVoiceActive(active: Boolean) {
-        mic.text = if (active) "■" else "🎙"
-        status.text = if (active) "正在听…" else if (send.isEnabled) IDLE_STATUS else "Minis 正在思考…"
     }
 
     fun setStatus(message: String) {

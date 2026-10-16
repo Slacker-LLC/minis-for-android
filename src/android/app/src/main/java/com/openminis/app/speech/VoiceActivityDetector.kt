@@ -157,6 +157,7 @@ class VoiceActivityDetector(
 
         /** VAD frame size. 512 @ 48 kHz ≈ 10 ms, matching the library's frame. */
         private const val FRAME_SAMPLES = 512
+        private const val STALE_MODEL_COPY_MS = 10 * 60 * 1000L
 
         /** Level mapping for the waveform (iOS computeWaveformLevels :1158-1180). */
         private const val LEVEL_GAIN = 14f
@@ -217,6 +218,9 @@ class VoiceActivityDetector(
      * [captureLoop] for the crash this prevents.
      */
     private val vadLock = Any()
+
+    /** 回调线程上的 release 延后到 processAudio 返回后，见 [NativeReleaseGate]。须在 [vadLock] 内使用。 */
+    private val releaseGate = NativeReleaseGate<VADWrapper> { it.release() }
 
     /**
      * [T-android-vad] Optional tap on the RAW captured PCM16, before AGC.
@@ -291,6 +295,7 @@ class VoiceActivityDetector(
         segmentSamples = 0
         isSpeaking = false
 
+        sweepStaleModelCopies()
         val wrapper = try {
             VADWrapper(context).also {
                 it.setVADModel(VADWrapper.SileroModelVersion.V5)
@@ -337,6 +342,20 @@ class VoiceActivityDetector(
 
         captureJob = scope.launch { captureLoop(rec) }
         return null
+    }
+
+    /**
+     * VADWrapper.setVADModel 每次都把 silero 模型（约 2.3 MB）拷到 cacheDir 的随机名
+     * `<uuid>.onnx` 里且从不删除，用一次堆一份。只清理一段时间之前的副本，
+     * 避免误删另一路检测器刚拷出来、还在加载的那份。
+     */
+    private fun sweepStaleModelCopies() {
+        runCatching {
+            val cutoff = System.currentTimeMillis() - STALE_MODEL_COPY_MS
+            context.cacheDir.listFiles { f -> f.isFile && f.extension == "onnx" }
+                ?.filter { it.lastModified() < cutoff }
+                ?.forEach { it.delete() }
+        }
     }
 
     private fun applyThresholds(w: VADWrapper) {
@@ -461,7 +480,9 @@ class VoiceActivityDetector(
                 when {
                     w == null -> false // torn down; the stopper owns the state
                     else -> {
+                        releaseGate.enter()
                         try { w.processAudio(frame) } catch (t: Throwable) { failure = t }
+                        releaseGate.exit()
                         true
                     }
                 }
@@ -547,6 +568,7 @@ class VoiceActivityDetector(
             lastSpeechAtMs = System.currentTimeMillis()
             val reason = pendingReason ?: SegmentEndReason.SILENCE_DETECTED
             pendingReason = null
+            Log.i(TAG, "onVoiceEnd wavBytes=${wav?.size ?: -1} reason=$reason")
             if (wav == null || wav.isEmpty()) return
             // Duration from the payload, NOT wall-clock: the interval between
             // speech-start and this callback necessarily contains the ~5 s
@@ -591,7 +613,7 @@ class VoiceActivityDetector(
         synchronized(vadLock) {
             val w = vad
             vad = null
-            w?.let { runCatching { it.release() } }
+            if (w != null) releaseGate.release(w)
         }
     }
 }

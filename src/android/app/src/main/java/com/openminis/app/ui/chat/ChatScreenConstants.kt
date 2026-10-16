@@ -209,7 +209,7 @@ internal data class ScrollFollowKey(
 // [T-android-split-chat] ToolDetailSheet + helpers (extractShellCommand,
 // extractPartialJsonString, chunkToolOutput, initialRevealChunks,
 // LazyRevealToolText, EditorCard) moved verbatim to ChatToolDetailUI.kt.
-// [T-android-split-chat] AttachmentChip / InputCircleButton / MicButton /
+// [T-android-split-chat] AttachmentChip / InputCircleButton /
 // ToolPreviewThumbnail / FloatingToolStatusBar / ThinkingLevelPicker moved
 // verbatim to ChatComposerWidgets.kt.
 
