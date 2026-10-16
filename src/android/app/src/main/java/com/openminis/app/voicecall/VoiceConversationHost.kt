@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -37,10 +38,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
+import android.view.WindowManager
 import android.widget.Toast
 import com.openminis.app.agent.ensureSessionForSettings
 import com.openminis.app.R
@@ -190,7 +194,23 @@ internal fun VoiceConversationHost(
     }
 
     if (visible) {
-        Dialog(onDismissRequest = { endAudio() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Dialog(
+            onDismissRequest = { endAudio() },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            // 键盘高度只由 imePadding 处理；窗口自己不再平移/缩放，否则会算两遍。
+            val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+            val darkTheme = ChatColors.isDark
+            SideEffect {
+                dialogWindow?.let { window ->
+                    window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
+                    // 状态栏/导航栏在页面背景上要可读：浅色主题用深色图标。
+                    WindowCompat.getInsetsController(window, window.decorView).apply {
+                        isAppearanceLightStatusBars = !darkTheme
+                        isAppearanceLightNavigationBars = !darkTheme
+                    }
+                }
+            }
             Surface(Modifier.fillMaxSize(), color = minisPageBackground(ChatColors.isDark)) {
                 val state = controller.state
                 val characterState = state.effectiveBloubState
