@@ -242,7 +242,13 @@ internal fun VoiceConversationHost(
                 SpeechRecognitionManager.clearDegradationAndRefresh()
                 com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive = false
                 viewModel.replyPlayer?.stop()
-                val sid = viewModel.agentSession.ensureSessionForSettings()
+                val sid = try {
+                    viewModel.agentSession.ensureSessionForSettings()
+                } catch (e: com.openminis.app.agent.SessionDeletedException) {
+                    // 历史里点开的会话行已不存在：提示即可，别让异常冒出 scope 把进程带崩。
+                    entryError = context.getString(R.string.voice_call_session_missing)
+                    return@launch
+                }
                 com.openminis.app.data.AssistantHomePrefs.rememberVoiceSession(context, sid)
                 viewModel.voiceConversationActive.value = true
                 controller.startCall(CallMode.VOICE)

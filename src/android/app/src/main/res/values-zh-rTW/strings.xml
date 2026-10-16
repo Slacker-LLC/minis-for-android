@@ -2399,6 +2399,7 @@
     </plurals>
     <string name="voice_call_title">語音對話</string>
     <string name="voice_call_permission">需要麥克風權限，授權後可重試。</string>
+    <string name="voice_call_session_missing">這個對話已不存在，請新建對話後重試。</string>
     <string name="voice_call_paused">錄音與播報已暫停</string>
     <string name="voice_call_state_idle">待機</string>
     <string name="voice_call_state_listening">我在聽</string>

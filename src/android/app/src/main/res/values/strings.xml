@@ -2515,6 +2515,7 @@
 
     <string name="voice_call_title">Voice conversation</string>
     <string name="voice_call_permission">Microphone permission is required. Grant permission and retry.</string>
+    <string name="voice_call_session_missing">This chat no longer exists. Start a new chat and try again.</string>
     <string name="voice_call_paused">Audio paused</string>
     <string name="voice_call_state_idle">Ready</string>
     <string name="voice_call_state_listening">Listening</string>
