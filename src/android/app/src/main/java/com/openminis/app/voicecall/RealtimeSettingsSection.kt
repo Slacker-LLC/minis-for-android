@@ -37,7 +37,7 @@ import com.openminis.app.voicecall.realtime.resolveRealtime
 @Composable
 internal fun RealtimeEngineSection(providerRepository: ProviderRepository) {
     val context = LocalContext.current
-    remember { RealtimeCallSettings.init(context) }
+    RealtimeCallSettings.init(context) // 幂等；必须在读 state 之前完成
     val selection by RealtimeCallSettings.state.collectAsState()
     val config by providerRepository.config.collectAsState()
     val profile = RealtimeProfiles.byId(selection.profileId) ?: RealtimeProfiles.OPENAI
