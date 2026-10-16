@@ -2334,6 +2334,17 @@
     <string name="voice_call_settings">음성 설정</string>
     <string name="voice_call_settings_speed">읽기 속도</string>
     <string name="voice_call_settings_earpiece">수화기로 재생</string>
+    <string name="voice_call_engine">통화 엔진</string>
+    <string name="voice_call_engine_classic">기본 파이프라인</string>
+    <string name="voice_call_engine_realtime">실시간 모델</string>
+    <string name="voice_call_rt_provider">제공자(키는 \'제공자 관리\'에서)</string>
+    <string name="voice_call_rt_model">모델(비우면 기본값)</string>
+    <string name="voice_call_rt_voice">음성(비우면 기본값)</string>
+    <string name="voice_call_rt_workspace">워크스페이스 ID</string>
+    <string name="voice_call_rt_url">WebSocket 주소(wss://, {model} 포함 가능)</string>
+    <string name="voice_call_rt_incomplete">설정이 완전하지 않아 기본 파이프라인으로 통화해요.</string>
+    <string name="voice_call_rt_no_provider">적합한 제공자가 없어요. 먼저 \'제공자 관리\'에서 API 키와 함께 추가하세요.</string>
+    <string name="voice_call_rt_unverified">벤더 문서로 검증되지 않아 작동하지 않을 수 있어요.</string>
     <string name="voice_call_notif_channel">음성 통화</string>
     <string name="voice_call_notif_title">음성 통화 중</string>
     <string name="voice_call_notif_live">마이크 켜짐</string>

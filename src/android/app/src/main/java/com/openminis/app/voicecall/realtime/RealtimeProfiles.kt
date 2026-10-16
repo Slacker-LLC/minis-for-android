@@ -78,7 +78,7 @@ object RealtimeProfiles {
     )
 
     val QWEN = RealtimeProfile(
-        id = "qwen", label = "阿里千问 Omni-Realtime",
+        id = "qwen", label = "Alibaba Qwen Omni-Realtime",
         protocol = RealtimeProtocol.OPENAI_STYLE,
         urlTemplate = "wss://{workspace}.cn-beijing.maas.aliyuncs.com/api-ws/v1/realtime?model={model}",
         auth = RealtimeAuth.BEARER_HEADER,
@@ -90,7 +90,7 @@ object RealtimeProfiles {
 
     /** 任何遵循 OpenAI Realtime 协议的端点：填地址、key、模型即可。 */
     val CUSTOM_OPENAI = RealtimeProfile(
-        id = "custom_openai", label = "自定义（OpenAI Realtime 协议）",
+        id = "custom_openai", label = "Custom (OpenAI Realtime protocol)",
         protocol = RealtimeProtocol.OPENAI_STYLE,
         urlTemplate = "",
         auth = RealtimeAuth.BEARER_HEADER,

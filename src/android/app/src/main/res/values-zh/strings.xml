@@ -2539,6 +2539,17 @@
     <string name="voice_call_settings">语音设置</string>
     <string name="voice_call_settings_speed">朗读语速</string>
     <string name="voice_call_settings_earpiece">使用听筒播放</string>
+    <string name="voice_call_engine">通话引擎</string>
+    <string name="voice_call_engine_classic">经典流水线</string>
+    <string name="voice_call_engine_realtime">实时模型</string>
+    <string name="voice_call_rt_provider">提供商（key 来自「管理提供商」）</string>
+    <string name="voice_call_rt_model">模型（留空用默认）</string>
+    <string name="voice_call_rt_voice">音色（留空用默认）</string>
+    <string name="voice_call_rt_workspace">业务空间 ID</string>
+    <string name="voice_call_rt_url">WebSocket 地址（wss://，可含 {model}）</string>
+    <string name="voice_call_rt_incomplete">还没设置完整，通话会使用经典流水线。</string>
+    <string name="voice_call_rt_no_provider">没有合适的提供商。请先在「管理提供商」里添加并填入 API key。</string>
+    <string name="voice_call_rt_unverified">尚未对照厂商文档验证，可能无法使用。</string>
     <string name="voice_call_notif_channel">语音通话</string>
     <string name="voice_call_notif_title">语音通话进行中</string>
     <string name="voice_call_notif_live">麦克风已开启</string>

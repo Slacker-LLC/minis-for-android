@@ -2342,6 +2342,17 @@
     <string name="voice_call_settings">音声設定</string>
     <string name="voice_call_settings_speed">読み上げ速度</string>
     <string name="voice_call_settings_earpiece">受話口で再生</string>
+    <string name="voice_call_engine">通話エンジン</string>
+    <string name="voice_call_engine_classic">従来のパイプライン</string>
+    <string name="voice_call_engine_realtime">リアルタイムモデル</string>
+    <string name="voice_call_rt_provider">プロバイダ（キーは「プロバイダ管理」から）</string>
+    <string name="voice_call_rt_model">モデル（空欄で既定）</string>
+    <string name="voice_call_rt_voice">音声（空欄で既定）</string>
+    <string name="voice_call_rt_workspace">ワークスペース ID</string>
+    <string name="voice_call_rt_url">WebSocket URL（wss://、{model} 可）</string>
+    <string name="voice_call_rt_incomplete">設定が不完全なため、従来のパイプラインで通話します。</string>
+    <string name="voice_call_rt_no_provider">適切なプロバイダがありません。先に「プロバイダ管理」で API キーを追加してください。</string>
+    <string name="voice_call_rt_unverified">ベンダーのドキュメントで未検証のため、動作しない可能性があります。</string>
     <string name="voice_call_notif_channel">音声通話</string>
     <string name="voice_call_notif_title">音声通話中</string>
     <string name="voice_call_notif_live">マイクはオンです</string>

@@ -61,6 +61,14 @@ import android.widget.Toast
 import com.openminis.app.agent.ensureSessionForSettings
 import com.openminis.app.R
 import com.openminis.app.data.repository.ensureDefaultVoiceInputSlot
+import com.openminis.app.data.repository.loadApiKey
+import com.openminis.app.voicecall.realtime.AndroidRealtimeAudio
+import com.openminis.app.voicecall.realtime.EngineSwitchingCallRuntime
+import com.openminis.app.voicecall.realtime.OkHttpRealtimeTransport
+import com.openminis.app.voicecall.realtime.RealtimeCallRuntime
+import com.openminis.app.voicecall.realtime.RealtimeCallSettings
+import com.openminis.app.voicecall.realtime.realtimeInstructions
+import com.openminis.app.voicecall.realtime.resolveRealtime
 import com.openminis.app.data.repository.ensureDefaultVoiceOutputSlot
 import com.openminis.app.deeplink.DeepLinkCoordinator
 import com.openminis.app.service.VoiceCallBridge
@@ -139,17 +147,39 @@ internal fun VoiceConversationHost(
         }
     }
     val input = remember(viewModel) { AgentCallSpeechInput(viewModel.providerRepository) }
+    val approvals = remember(viewModel) {
+        AgentCallApprovals(context.applicationContext, { viewModel.agentSession.currentSessionId }, scope)
+    }
     val runtime = remember(viewModel) {
-        MinisCallRuntimeAdapter(
+        val classic = MinisCallRuntimeAdapter(
             input,
             gateway,
             AgentCallSpeechOutput(player),
             scope,
-            AgentCallApprovals(context.applicationContext, { viewModel.agentSession.currentSessionId }, scope),
+            approvals,
             context.getString(R.string.voice_call_working),
             callTasks,
             { id -> switchSession[0](id) },
         )
+        RealtimeCallSettings.init(context)
+        EngineSwitchingCallRuntime(classic, {
+            val repo = viewModel.providerRepository
+            val selection = RealtimeCallSettings.state.value
+            val instance = repo.config.value.instances.firstOrNull { it.id == selection.instanceId }
+            resolveRealtime(selection, instance, instance?.let { repo.loadApiKey(it.id) })?.let { connection ->
+                RealtimeCallRuntime(
+                    connection = connection,
+                    instructions = realtimeInstructions(connection.profile.supportsTools),
+                    transport = OkHttpRealtimeTransport(),
+                    audio = AndroidRealtimeAudio(context.applicationContext),
+                    model = gateway,
+                    scope = scope,
+                    approvals = approvals,
+                    tasks = callTasks,
+                    onSwitchSession = { id -> switchSession[0](id) },
+                )
+            }
+        }, scope)
     }
     val controller = remember(runtime) { CallController(runtime, scope) }
     var visible by remember(viewModel) { mutableStateOf(false) }

@@ -2631,6 +2631,17 @@
     <string name="voice_call_settings">Voice settings</string>
     <string name="voice_call_settings_speed">Speaking speed</string>
     <string name="voice_call_settings_earpiece">Use earpiece</string>
+    <string name="voice_call_engine">Call engine</string>
+    <string name="voice_call_engine_classic">Classic pipeline</string>
+    <string name="voice_call_engine_realtime">Realtime model</string>
+    <string name="voice_call_rt_provider">Provider (key from Manage providers)</string>
+    <string name="voice_call_rt_model">Model (blank = default)</string>
+    <string name="voice_call_rt_voice">Voice (blank = default)</string>
+    <string name="voice_call_rt_workspace">Workspace ID</string>
+    <string name="voice_call_rt_url">WebSocket URL (wss://, may contain {model})</string>
+    <string name="voice_call_rt_incomplete">Not fully set up, so calls will use the classic pipeline.</string>
+    <string name="voice_call_rt_no_provider">No suitable provider. Add one in Manage providers with an API key first.</string>
+    <string name="voice_call_rt_unverified">Not verified against the vendor docs; may not work.</string>
     <string name="voice_call_notif_channel">Voice call</string>
     <string name="voice_call_notif_title">Voice call in progress</string>
     <string name="voice_call_notif_live">Microphone on</string>

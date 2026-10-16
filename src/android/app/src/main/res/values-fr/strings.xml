@@ -2242,6 +2242,17 @@
     <string name="voice_call_settings">Réglages vocaux</string>
     <string name="voice_call_settings_speed">Vitesse de lecture</string>
     <string name="voice_call_settings_earpiece">Utiliser l\'écouteur</string>
+    <string name="voice_call_engine">Moteur d\'appel</string>
+    <string name="voice_call_engine_classic">Pipeline classique</string>
+    <string name="voice_call_engine_realtime">Modèle temps réel</string>
+    <string name="voice_call_rt_provider">Fournisseur (clé issue de Gérer les fournisseurs)</string>
+    <string name="voice_call_rt_model">Modèle (vide = par défaut)</string>
+    <string name="voice_call_rt_voice">Voix (vide = par défaut)</string>
+    <string name="voice_call_rt_workspace">ID de l\'espace de travail</string>
+    <string name="voice_call_rt_url">URL WebSocket (wss://, peut contenir {model})</string>
+    <string name="voice_call_rt_incomplete">Configuration incomplète : l\'appel utilisera le pipeline classique.</string>
+    <string name="voice_call_rt_no_provider">Aucun fournisseur adapté. Ajoutez-en un avec une clé API dans Gérer les fournisseurs.</string>
+    <string name="voice_call_rt_unverified">Non vérifié avec la documentation du fournisseur ; peut ne pas fonctionner.</string>
     <string name="voice_call_notif_channel">Appel vocal</string>
     <string name="voice_call_notif_title">Appel vocal en cours</string>
     <string name="voice_call_notif_live">Micro activé</string>

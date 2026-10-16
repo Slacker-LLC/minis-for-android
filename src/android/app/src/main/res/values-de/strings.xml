@@ -2346,6 +2346,17 @@
     <string name="voice_call_settings">Spracheinstellungen</string>
     <string name="voice_call_settings_speed">Sprechgeschwindigkeit</string>
     <string name="voice_call_settings_earpiece">Hörer verwenden</string>
+    <string name="voice_call_engine">Anruf-Engine</string>
+    <string name="voice_call_engine_classic">Klassische Pipeline</string>
+    <string name="voice_call_engine_realtime">Echtzeitmodell</string>
+    <string name="voice_call_rt_provider">Anbieter (Schlüssel aus Anbieter verwalten)</string>
+    <string name="voice_call_rt_model">Modell (leer = Standard)</string>
+    <string name="voice_call_rt_voice">Stimme (leer = Standard)</string>
+    <string name="voice_call_rt_workspace">Workspace-ID</string>
+    <string name="voice_call_rt_url">WebSocket-URL (wss://, darf {model} enthalten)</string>
+    <string name="voice_call_rt_incomplete">Nicht vollständig eingerichtet, daher nutzt der Anruf die klassische Pipeline.</string>
+    <string name="voice_call_rt_no_provider">Kein passender Anbieter. Fügen Sie zuerst unter Anbieter verwalten einen mit API-Schlüssel hinzu.</string>
+    <string name="voice_call_rt_unverified">Nicht anhand der Herstellerdokumentation geprüft; funktioniert eventuell nicht.</string>
     <string name="voice_call_notif_channel">Sprachanruf</string>
     <string name="voice_call_notif_title">Sprachanruf läuft</string>
     <string name="voice_call_notif_live">Mikrofon an</string>

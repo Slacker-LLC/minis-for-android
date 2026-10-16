@@ -2524,6 +2524,17 @@
     <string name="voice_call_settings">Настройки голоса</string>
     <string name="voice_call_settings_speed">Скорость речи</string>
     <string name="voice_call_settings_earpiece">Воспроизводить через динамик для разговора</string>
+    <string name="voice_call_engine">Движок звонка</string>
+    <string name="voice_call_engine_classic">Классический конвейер</string>
+    <string name="voice_call_engine_realtime">Модель реального времени</string>
+    <string name="voice_call_rt_provider">Провайдер (ключ из «Управление провайдерами»)</string>
+    <string name="voice_call_rt_model">Модель (пусто = по умолчанию)</string>
+    <string name="voice_call_rt_voice">Голос (пусто = по умолчанию)</string>
+    <string name="voice_call_rt_workspace">ID рабочего пространства</string>
+    <string name="voice_call_rt_url">URL WebSocket (wss://, может содержать {model})</string>
+    <string name="voice_call_rt_incomplete">Настройка неполная, поэтому звонок пойдёт через классический конвейер.</string>
+    <string name="voice_call_rt_no_provider">Нет подходящего провайдера. Сначала добавьте его с API-ключом в «Управление провайдерами».</string>
+    <string name="voice_call_rt_unverified">Не проверено по документации вендора; может не работать.</string>
     <string name="voice_call_notif_channel">Голосовой звонок</string>
     <string name="voice_call_notif_title">Идёт голосовой звонок</string>
     <string name="voice_call_notif_live">Микрофон включён</string>

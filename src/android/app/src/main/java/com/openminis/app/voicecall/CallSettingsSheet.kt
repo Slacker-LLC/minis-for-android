@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -45,7 +47,7 @@ internal fun CallSettingsSheet(
     val earpiece by VoiceOutputState.callEarpiece.collectAsState()
     MinisModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp),
+            Modifier.fillMaxWidth().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(stringResource(R.string.voice_call_settings), style = MaterialTheme.typography.titleMedium)
@@ -63,6 +65,7 @@ internal fun CallSettingsSheet(
                 )
                 Switch(checked = earpiece, onCheckedChange = { VoiceOutputState.setCallEarpiece(it) })
             }
+            RealtimeEngineSection(providerRepository)
             Text(
                 stringResource(R.string.voice_call_settings_speed),
                 style = MaterialTheme.typography.bodyLarge,

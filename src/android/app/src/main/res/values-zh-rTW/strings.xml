@@ -2495,6 +2495,17 @@
     <string name="voice_call_settings">語音設定</string>
     <string name="voice_call_settings_speed">朗讀語速</string>
     <string name="voice_call_settings_earpiece">使用聽筒播放</string>
+    <string name="voice_call_engine">通話引擎</string>
+    <string name="voice_call_engine_classic">經典流水線</string>
+    <string name="voice_call_engine_realtime">即時模型</string>
+    <string name="voice_call_rt_provider">提供者（金鑰來自「管理提供者」）</string>
+    <string name="voice_call_rt_model">模型（留空使用預設）</string>
+    <string name="voice_call_rt_voice">音色（留空使用預設）</string>
+    <string name="voice_call_rt_workspace">工作區 ID</string>
+    <string name="voice_call_rt_url">WebSocket 位址（wss://，可含 {model}）</string>
+    <string name="voice_call_rt_incomplete">尚未設定完整，通話會使用經典流水線。</string>
+    <string name="voice_call_rt_no_provider">沒有合適的提供者。請先在「管理提供者」新增並填入 API 金鑰。</string>
+    <string name="voice_call_rt_unverified">尚未對照廠商文件驗證，可能無法使用。</string>
     <string name="voice_call_notif_channel">語音通話</string>
     <string name="voice_call_notif_title">語音通話進行中</string>
     <string name="voice_call_notif_live">麥克風已開啟</string>
