@@ -2,7 +2,11 @@ package com.openminis.app.voicecall
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -39,6 +43,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -111,6 +117,8 @@ internal fun VoiceConversationHost(
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val player = remember(viewModel) {
         lazy { ReadAloudPlayer(context.applicationContext).also { it.communicationUsage = VoiceOutputState.callEarpiece.value } }
     }
@@ -221,6 +229,9 @@ internal fun VoiceConversationHost(
     }
 
     fun openCall() {
+        // 首页键盘开着时先收起：否则通话页盖上来、键盘又跟着收放，一次点击看到两段硬切。
+        focusManager.clearFocus()
+        keyboard?.hide()
         visible = true
         if (active || opening) return
         val version = ++requestVersion
@@ -316,7 +327,10 @@ internal fun VoiceConversationHost(
         }
     }
 
-    if (visible) {
+    // 通话页淡入/淡出：窗口要等退场动画播完才摘掉，否则挂断时整页一下子消失。
+    var windowShown by remember { mutableStateOf(false) }
+    if (visible) windowShown = true
+    if (windowShown) {
         Dialog(
             onDismissRequest = { endAudio() },
             properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -327,6 +341,10 @@ internal fun VoiceConversationHost(
             SideEffect {
                 dialogWindow?.let { window ->
                     window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
+                    // 过渡由下面的 AnimatedVisibility 负责，关掉系统自带的窗口动画，免得叠两层。
+                    window.setWindowAnimations(0)
+                    // 系统对话框自带的变暗遮罩不跟着淡入淡出，会在开/关的第一帧闪一下灰。
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
                     // 状态栏/导航栏在页面背景上要可读：浅色主题用深色图标。
                     WindowCompat.getInsetsController(window, window.decorView).apply {
                         isAppearanceLightStatusBars = !darkTheme
@@ -334,6 +352,16 @@ internal fun VoiceConversationHost(
                     }
                 }
             }
+            val pageState = remember { MutableTransitionState(false) }
+            pageState.targetState = visible
+            LaunchedEffect(visible, pageState.isIdle) {
+                if (!visible && pageState.isIdle) windowShown = false
+            }
+            AnimatedVisibility(
+                visibleState = pageState,
+                enter = fadeIn(tween(CALL_PAGE_ENTER_MS)) + scaleIn(tween(CALL_PAGE_ENTER_MS), initialScale = 0.96f),
+                exit = fadeOut(tween(CALL_PAGE_EXIT_MS)) + scaleOut(tween(CALL_PAGE_EXIT_MS), targetScale = 0.98f),
+            ) {
             Surface(Modifier.fillMaxSize(), color = minisPageBackground(ChatColors.isDark)) {
                 val state = controller.state
                 val characterState = state.effectiveBloubState
@@ -488,9 +516,13 @@ internal fun VoiceConversationHost(
                     VoiceToast(toastText, state.toast?.seq) { controller.clearToast() }
                 }
             }
+            }
         }
     }
 }
+
+private const val CALL_PAGE_ENTER_MS = 240
+private const val CALL_PAGE_EXIT_MS = 180
 
 /** 文字记录版面：用户灰底气泡，助手纯文字；球缩小到底部，旁边是状态词。 */
 @Composable
