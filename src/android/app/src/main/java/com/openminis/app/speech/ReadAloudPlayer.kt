@@ -209,8 +209,9 @@ class ReadAloudPlayer(context: Context) {
      * Speak a turn that explicitly came from voice conversation.
      *
      * The user pressing the microphone is already opting into audio for this
-     * turn, so this bypasses only the global "read every reply" enable switch.
-     * It still respects temporary mute, mic-capture suppression, speed, the
+     * turn, so this bypasses the global "read every reply" enable switch and the
+     * capsule's temporary mute (calls have their own mute).
+     * It still respects mic-capture suppression, speed, the
      * configured Voice Output model/API key, and all normal provider fallback.
      * This gives the pet voice mode one app-wide voice configuration instead of
      * inventing a second pet-specific TTS setting.
@@ -244,9 +245,9 @@ class ReadAloudPlayer(context: Context) {
         // isEnabled && !isMuted` gates production. Dropping here rather than at
         // playback keeps a long mute from piling up a backlog that would all
         // blurt out on un-mute.
-        if (explicitVoiceTurn) {
-            if (VoiceOutputState.isMuted.value) return
-        } else if (!VoiceOutputState.canPlay) {
+        // 通话 / 宠物语音是用户主动开口的一轮：它们各自有静音开关，不该被胶囊上遗留的
+        // 临时静音（会持久化）悄悄吞掉回复——那样通话里就是「能听写、没声音」。
+        if (!explicitVoiceTurn && !VoiceOutputState.canPlay) {
             return
         }
         // [T-android-tts-scope-align] Mic-capture suppression, from iOS
@@ -385,6 +386,7 @@ class ReadAloudPlayer(context: Context) {
             (appContext as? MinisApp)?.providerRepository?.resolveVoiceOutputEntry()
         }.getOrNull()
 
+        AppLogger.info(TAG, "speakOne via ${entry?.second?.model?.id ?: "system engine"}")
         if (entry != null) {
             val (instance, modelEntry) = entry
             // [T-android-tts-capsule] Surface the ACTUALLY-synthesizing model

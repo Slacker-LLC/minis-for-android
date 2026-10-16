@@ -209,8 +209,14 @@ open class VoiceProvider(
     }
 
     suspend fun executeRequest(request: Request): ByteArray = withContext(Dispatchers.IO) {
+        val startedAt = System.currentTimeMillis()
         httpClient.newCall(request).execute().use { response ->
             val body = response.body?.bytes()
+            Log.i(
+                TAG,
+                "voice ${request.url.encodedPath} → HTTP ${response.code} " +
+                    "${body?.size ?: 0}B in ${System.currentTimeMillis() - startedAt}ms",
+            )
             if (!response.isSuccessful) {
                 if (response.code == 401 || response.code == 403) {
                     Log.e(TAG, "Voice auth failed: HTTP ${response.code}")

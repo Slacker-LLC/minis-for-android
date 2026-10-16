@@ -547,6 +547,7 @@ class VoiceActivityDetector(
             lastSpeechAtMs = System.currentTimeMillis()
             val reason = pendingReason ?: SegmentEndReason.SILENCE_DETECTED
             pendingReason = null
+            Log.i(TAG, "onVoiceEnd wavBytes=${wav?.size ?: -1} reason=$reason")
             if (wav == null || wav.isEmpty()) return
             // Duration from the payload, NOT wall-clock: the interval between
             // speech-start and this callback necessarily contains the ~5 s
