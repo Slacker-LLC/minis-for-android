@@ -2339,9 +2339,10 @@
     <string name="scheduled_task_legacy_executor_removed">このタスクは削除された実行方式を使用していました。再実行する前に内容を確認して保存してください。</string>
     <string name="sub_agent_text_model_required">テキストで応答できるモデルを選択してください。</string>
     <string name="vscreen_display_busy">仮想ディスプレイは現在、別のセッションで使用されています。</string>
-    <string name="voice_call_settings">音声設定</string>
     <string name="voice_call_settings_speed">読み上げ速度</string>
     <string name="voice_call_settings_earpiece">受話口で再生</string>
+    <string name="voice_call_settings_title">音声通話</string>
+    <string name="voice_call_settings_sub">認識・読み上げモデル、受話口、速度、通話エンジン</string>
     <string name="voice_call_engine">通話エンジン</string>
     <string name="voice_call_engine_classic">従来のパイプライン</string>
     <string name="voice_call_engine_realtime">リアルタイムモデル</string>

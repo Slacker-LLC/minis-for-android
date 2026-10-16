@@ -48,7 +48,7 @@ import com.openminis.app.ui.theme.ChatColors
  * keys and accessors are unchanged and still defined in AppearanceScreen.kt.
  */
 @Composable
-fun ChatInputSettingsScreen(onBack: () -> Unit) {
+fun ChatInputSettingsScreen(onBack: () -> Unit, onOpenVoiceCall: () -> Unit = {}) {
     val context = LocalContext.current
     val prefs = remember { getAppearancePrefs(context) }
 
@@ -320,6 +320,16 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
             )
         }
 
+
+        SettingsSection {
+            SettingsRow(
+                icon = Icons.Outlined.RecordVoiceOver,
+                title = stringResource(R.string.voice_call_settings_title),
+                subtitle = stringResource(R.string.voice_call_settings_sub),
+                onClick = onOpenVoiceCall,
+                showDivider = false,
+            )
+        }
 
         // [T-android-settings-hierarchy] Voice-correction learning is a chat-input behaviour.
         SettingsSection(

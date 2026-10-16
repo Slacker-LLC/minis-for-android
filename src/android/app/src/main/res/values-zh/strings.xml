@@ -2537,9 +2537,10 @@
     <string name="scheduled_task_legacy_executor_removed">此任务以前绑定的执行者已移除。重新运行前请检查并保存任务。</string>
     <string name="sub_agent_text_model_required">请选择能够输出文字的模型。</string>
     <string name="vscreen_display_busy">虚拟屏当前正被另一个会话占用。</string>
-    <string name="voice_call_settings">语音设置</string>
     <string name="voice_call_settings_speed">朗读语速</string>
     <string name="voice_call_settings_earpiece">使用听筒播放</string>
+    <string name="voice_call_settings_title">语音通话</string>
+    <string name="voice_call_settings_sub">识别与朗读模型、听筒、语速、通话引擎</string>
     <string name="voice_call_engine">通话引擎</string>
     <string name="voice_call_engine_classic">经典流水线</string>
     <string name="voice_call_engine_realtime">实时模型</string>

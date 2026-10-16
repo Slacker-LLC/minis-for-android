@@ -21,6 +21,7 @@ object Routes {
     const val ASSISTANT_HOME = "assistant_home"
     const val CHAT = "chat/{sessionId}"
     const val SETTINGS = "settings"
+    const val VOICE_CALL_SETTINGS = "settings_voice_call"
     // [T-android-settings-hierarchy] Level 2: the settings of one category (see SettingsCategory).
     const val SETTINGS_CATEGORY = "settings_category/{category}"
     fun settingsCategory(category: String) = "settings_category/$category"

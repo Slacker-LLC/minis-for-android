@@ -32,7 +32,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MicOff
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -188,7 +187,6 @@ internal fun VoiceConversationHost(
     var entryError by remember(viewModel) { mutableStateOf<String?>(null) }
     var transcriptMode by remember(viewModel) { mutableStateOf(false) }
     var draft by remember(viewModel) { mutableStateOf("") }
-    var showSettings by remember(viewModel) { mutableStateOf(false) }
     val pending by DeepLinkCoordinator.pendingChatAction.collectAsState()
     val lifecycleState by lifecycle.currentStateAsState()
     val modelName by viewModel.modelName.collectAsState()
@@ -244,8 +242,10 @@ internal fun VoiceConversationHost(
                 viewModel.replyPlayer?.stop()
                 val sid = try {
                     viewModel.agentSession.ensureSessionForSettings()
-                } catch (e: com.openminis.app.agent.SessionDeletedException) {
-                    // 历史里点开的会话行已不存在：提示即可，别让异常冒出 scope 把进程带崩。
+                } catch (e: IllegalStateException) {
+                    // 历史里点开的会话行已不存在（SessionDeletedException，消息 session_deleted）：
+                    // 提示即可，别让异常冒出 scope 把进程带崩；其它状态错误照常抛。
+                    if (e.message != "session_deleted") throw e
                     entryError = context.getString(R.string.voice_call_session_missing)
                     return@launch
                 }
@@ -384,12 +384,8 @@ internal fun VoiceConversationHost(
                     ) {
                         // 顶栏：计时居中，右侧在「球」和「文字记录」两种版面间切换。
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { showSettings = true }) {
-                                Icon(
-                                    Icons.Rounded.Tune,
-                                    contentDescription = stringResource(R.string.voice_call_settings),
-                                )
-                            }
+                            // 通话页不放设置：模型、听筒、语速、引擎都在 设置 › 对话与输入 › 语音通话。
+                            Spacer(Modifier.size(48.dp))
                             Spacer(Modifier.weight(1f))
                             if (active) {
                                 Text(
@@ -409,9 +405,6 @@ internal fun VoiceConversationHost(
                             }
                         }
 
-                        if (showSettings) {
-                            CallSettingsSheet(viewModel.providerRepository) { showSettings = false }
-                        }
                         if (transcriptMode) {
                             TranscriptLayout(
                                 lines = state.transcript,

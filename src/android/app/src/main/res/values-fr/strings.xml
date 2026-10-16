@@ -2239,9 +2239,10 @@
     <string name="scheduled_task_legacy_executor_removed">Cette tâche utilisait un moteur d’exécution supprimé. Vérifiez-la et enregistrez-la avant de la relancer.</string>
     <string name="sub_agent_text_model_required">Choisissez un modèle capable de répondre avec du texte.</string>
     <string name="vscreen_display_busy">L’écran virtuel est actuellement utilisé par une autre session.</string>
-    <string name="voice_call_settings">Réglages vocaux</string>
     <string name="voice_call_settings_speed">Vitesse de lecture</string>
     <string name="voice_call_settings_earpiece">Utiliser l\'écouteur</string>
+    <string name="voice_call_settings_title">Appel vocal</string>
+    <string name="voice_call_settings_sub">Modèles de reconnaissance et de lecture, écouteur, vitesse, moteur d’appel</string>
     <string name="voice_call_engine">Moteur d\'appel</string>
     <string name="voice_call_engine_classic">Pipeline classique</string>
     <string name="voice_call_engine_realtime">Modèle temps réel</string>
