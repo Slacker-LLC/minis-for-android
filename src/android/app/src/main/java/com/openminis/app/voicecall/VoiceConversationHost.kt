@@ -52,6 +52,8 @@ import com.openminis.app.R
 import com.openminis.app.data.repository.ensureDefaultVoiceInputSlot
 import com.openminis.app.data.repository.ensureDefaultVoiceOutputSlot
 import com.openminis.app.deeplink.DeepLinkCoordinator
+import com.openminis.app.service.VoiceCallBridge
+import com.openminis.app.service.VoiceCallForegroundService
 import com.openminis.app.speech.ReadAloudPlayer
 import com.openminis.app.speech.SpeechRecognitionManager
 import com.openminis.app.ui.chat.ChatViewModel
@@ -119,6 +121,7 @@ internal fun VoiceConversationHost(
         draft = ""
         controller.endCall()
         viewModel.voiceConversationActive.value = false
+        VoiceCallBridge.publish(null)
     }
 
     fun openCall() {
@@ -172,6 +175,16 @@ internal fun VoiceConversationHost(
             endAudio()
         }
     }
+    // 通话期间挂一个 microphone 前台服务：切后台/锁屏后麦克风继续工作，通知栏上有静音和挂断。
+    val callStartedAt = remember(active) { if (active) System.currentTimeMillis() else 0L }
+    LaunchedEffect(active, controller.state.muted) {
+        if (active) {
+            VoiceCallBridge.onHangUp = { endAudio() }
+            VoiceCallBridge.onToggleMute = { controller.setMuted(!controller.state.muted) }
+            VoiceCallBridge.publish(VoiceCallBridge.Call(controller.state.muted, callStartedAt))
+            if (!VoiceCallBridge.serviceRunning.value) VoiceCallForegroundService.start(context.applicationContext)
+        }
+    }
     LaunchedEffect(active) {
         while (controller.state.active) {
             delay(1000)
@@ -181,15 +194,19 @@ internal fun VoiceConversationHost(
     DisposableEffect(lifecycle, controller) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
-                // 前台交互第一版：切后台/锁屏立即暂停，不通过 Root 偷开麦克风。
                 requestVersion++
                 opening = false
-                controller.setMuted(true)
+                // 前台服务在跑（通知栏看得见、可静音可挂断）时通话继续；否则不在用户不知情时采集，立即暂停。
+                if (!(controller.state.active && VoiceCallBridge.serviceRunning.value)) {
+                    controller.setMuted(true)
+                }
             }
         }
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)
+            VoiceCallBridge.onHangUp = null
+            VoiceCallBridge.onToggleMute = null
             endAudio()
             if (player.isInitialized()) player.value.shutdown()
         }

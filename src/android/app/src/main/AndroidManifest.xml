@@ -20,6 +20,8 @@
     <!-- Generic agent/shell execution uses a truthful specialUse FGS on API 34+.
          It is neither media playback nor data synchronization. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- 语音通话期间让麦克风在后台/锁屏继续工作；只在通话进行中由 VoiceCallForegroundService 使用。 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <!-- Retained for genuine audio/media playback surfaces that may require a
          dedicated mediaPlayback FGS. AgentForegroundService does not declare or
          request this type. -->
@@ -495,6 +497,15 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Interactive terminal sessions with a live shell process started by the user or the agent" />
         </service>
+
+        <!-- 语音通话：通话进行中才存在，通知栏常驻并带静音/挂断按钮。microphone 类型要求通话在前台启动。 -->
+        <service
+            android:name=".service.VoiceCallForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+        <receiver
+            android:name=".service.VoiceCallActionReceiver"
+            android:exported="false" />
 
         <!-- Alarm broadcast receiver (also handles BOOT_COMPLETED for re-scheduling).
              exported=false: BOOT_COMPLETED is a protected broadcast that the

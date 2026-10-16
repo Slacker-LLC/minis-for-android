@@ -2510,4 +2510,8 @@
     <string name="vscreen_display_busy">Виртуальный экран сейчас используется другой сессией.</string>
     <string name="voice_call_settings">Настройки голоса</string>
     <string name="voice_call_settings_speed">Скорость речи</string>
+    <string name="voice_call_notif_channel">Голосовой звонок</string>
+    <string name="voice_call_notif_title">Идёт голосовой звонок</string>
+    <string name="voice_call_notif_live">Микрофон включён</string>
+    <string name="voice_call_notif_muted">Микрофон приостановлен</string>
 </resources>
