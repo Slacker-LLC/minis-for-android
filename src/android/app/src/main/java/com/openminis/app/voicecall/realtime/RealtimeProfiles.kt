@@ -1,8 +1,8 @@
 package com.openminis.app.voicecall.realtime
 
-enum class RealtimeProtocol { OPENAI_STYLE, GEMINI_LIVE }
+enum class RealtimeProtocol { OPENAI_STYLE, GEMINI_LIVE, DOUBAO_DUPLEX }
 
-enum class RealtimeAuth { BEARER_HEADER, KEY_IN_QUERY }
+enum class RealtimeAuth { BEARER_HEADER, KEY_IN_QUERY, API_KEY_HEADER }
 
 /**
  * 一家全双工实时语音厂商。接入新厂商 = 加一份档案；用户只需要填 API key
@@ -34,6 +34,7 @@ data class RealtimeProfile(
         RealtimeProtocol.OPENAI_STYLE ->
             OpenAiStyleCodec(requireNotNull(dialect) { "OpenAI-style profile $id needs a dialect" }, inputSampleRate, outputSampleRate)
         RealtimeProtocol.GEMINI_LIVE -> GeminiLiveCodec(inputSampleRate, outputSampleRate)
+        RealtimeProtocol.DOUBAO_DUPLEX -> DoubaoDuplexCodec()
     }
 }
 
@@ -65,7 +66,7 @@ object RealtimeProfiles {
         auth = RealtimeAuth.BEARER_HEADER,
         defaultModel = "gpt-realtime-2.1", defaultVoice = "marin",
         inputSampleRate = 24_000, outputSampleRate = 24_000,
-        dialect = OpenAiStyleCodec.Dialect(gaSessionShape = true, transcriptionModel = "gpt-4o-transcribe"),
+        dialect = OpenAiStyleCodec.Dialect(shape = OpenAiStyleCodec.SessionShape.GA, transcriptionModel = "gpt-4o-transcribe"),
     )
 
     val GEMINI = RealtimeProfile(
@@ -84,7 +85,7 @@ object RealtimeProfiles {
         auth = RealtimeAuth.BEARER_HEADER,
         defaultModel = "qwen3.8-omni-flash-realtime", defaultVoice = "longanlingxin",
         inputSampleRate = 16_000, outputSampleRate = 24_000,
-        dialect = OpenAiStyleCodec.Dialect(gaSessionShape = false, transcriptionModel = "qwen3-asr-flash-realtime"),
+        dialect = OpenAiStyleCodec.Dialect(shape = OpenAiStyleCodec.SessionShape.QWEN, transcriptionModel = "qwen3-asr-flash-realtime"),
         needsWorkspace = true,
     )
 
@@ -96,11 +97,53 @@ object RealtimeProfiles {
         auth = RealtimeAuth.BEARER_HEADER,
         defaultModel = "", defaultVoice = null,
         inputSampleRate = 24_000, outputSampleRate = 24_000,
-        dialect = OpenAiStyleCodec.Dialect(gaSessionShape = true, transcriptionModel = null),
+        dialect = OpenAiStyleCodec.Dialect(shape = OpenAiStyleCodec.SessionShape.GA, transcriptionModel = null),
         customUrl = true, docsChecked = false,
     )
 
-    val ALL: List<RealtimeProfile> = listOf(OPENAI, GEMINI, QWEN, CUSTOM_OPENAI)
+    val XAI = RealtimeProfile(
+        id = "xai", label = "xAI Grok Voice",
+        protocol = RealtimeProtocol.OPENAI_STYLE,
+        urlTemplate = "wss://api.x.ai/v1/realtime?model={model}",
+        auth = RealtimeAuth.BEARER_HEADER,
+        defaultModel = "grok-voice-latest", defaultVoice = "eve",
+        inputSampleRate = 24_000, outputSampleRate = 24_000,
+        dialect = OpenAiStyleCodec.Dialect(shape = OpenAiStyleCodec.SessionShape.XAI, transcriptionModel = "grok-transcribe"),
+    )
+
+    val ZHIPU = RealtimeProfile(
+        id = "zhipu", label = "Zhipu GLM-Realtime",
+        protocol = RealtimeProtocol.OPENAI_STYLE,
+        urlTemplate = "wss://open.bigmodel.cn/api/paas/v4/realtime",
+        auth = RealtimeAuth.BEARER_HEADER,
+        defaultModel = "glm-realtime", defaultVoice = "tongtong",
+        inputSampleRate = 16_000, outputSampleRate = 24_000,
+        dialect = OpenAiStyleCodec.Dialect(shape = OpenAiStyleCodec.SessionShape.ZHIPU, transcriptionModel = null),
+        docsChecked = false,
+    )
+
+    val STEPFUN = RealtimeProfile(
+        id = "stepfun", label = "StepFun StepAudio Realtime",
+        protocol = RealtimeProtocol.OPENAI_STYLE,
+        urlTemplate = "wss://api.stepfun.com/v1/realtime?model={model}",
+        auth = RealtimeAuth.BEARER_HEADER,
+        defaultModel = "stepaudio-3-realtime-preview", defaultVoice = "elegantgentle-female",
+        inputSampleRate = 24_000, outputSampleRate = 24_000,
+        dialect = OpenAiStyleCodec.Dialect(shape = OpenAiStyleCodec.SessionShape.STEPFUN, transcriptionModel = null),
+        docsChecked = false,
+    )
+
+    val DOUBAO = RealtimeProfile(
+        id = "doubao", label = "Doubao Realtime 3.0 (Seeduplex)",
+        protocol = RealtimeProtocol.DOUBAO_DUPLEX,
+        urlTemplate = "wss://openspeech.bytedance.com/api/v3/duplex/realtime/dialogue",
+        auth = RealtimeAuth.API_KEY_HEADER,
+        defaultModel = "1.2.6.1", defaultVoice = "zh_female_vv_uranus_bigtts",
+        inputSampleRate = 16_000, outputSampleRate = 24_000,
+        docsChecked = false,
+    )
+
+    val ALL: List<RealtimeProfile> = listOf(OPENAI, GEMINI, QWEN, XAI, ZHIPU, STEPFUN, DOUBAO, CUSTOM_OPENAI)
 
     fun byId(id: String?): RealtimeProfile? = ALL.firstOrNull { it.id == id }
 
@@ -126,7 +169,12 @@ object RealtimeProfiles {
             .replace("{workspace}", config.workspace.trim())
         // API key 会随连接发出，只接受加密连接。
         if (!url.startsWith("wss://")) return null
-        val headers = if (profile.auth == RealtimeAuth.BEARER_HEADER) mapOf("Authorization" to "Bearer ${config.apiKey.trim()}") else emptyMap()
+        val key = config.apiKey.trim()
+        val headers = when (profile.auth) {
+            RealtimeAuth.BEARER_HEADER -> mapOf("Authorization" to "Bearer $key")
+            RealtimeAuth.API_KEY_HEADER -> mapOf("X-Api-Key" to key)
+            RealtimeAuth.KEY_IN_QUERY -> emptyMap()
+        }
         return RealtimeConnection(url, headers, model, config.voice.ifBlank { profile.defaultVoice.orEmpty() }.ifBlank { null }, profile)
     }
 }

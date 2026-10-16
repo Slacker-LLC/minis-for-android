@@ -75,7 +75,7 @@ class RealtimeCallRuntime(
     @Volatile private var micOpen = false
     private val notes = ArrayDeque<Note>()
 
-    private class Note(val text: String, val urgent: Boolean)
+    private class Note(val text: String, val urgent: Boolean, val spoken: String = text)
 
     override fun start() {
         stop()
@@ -110,6 +110,7 @@ class RealtimeCallRuntime(
     }
 
     override fun stop() {
+        val wasReady = active && ready
         active = false
         micOpen = false
         ready = false
@@ -125,6 +126,7 @@ class RealtimeCallRuntime(
         idleJob?.cancel(); idleJob = null
         approvalWatcher?.cancel(); approvalWatcher = null
         updatesWatcher?.cancel(); updatesWatcher = null
+        if (wasReady) send(codec.closeSession())
         transport.close()
         audio.stop()
         state(BloubState.IDLE)
@@ -139,7 +141,9 @@ class RealtimeCallRuntime(
             micOpen = false
             idleJob?.cancel(); idleJob = null
             audio.flush()
+            if (ready) send(codec.muteSignal(true))
         } else if (ready) {
+            send(codec.muteSignal(false))
             micOpen = true
             if (delegationJob?.isActive != true && !modelBusy) {
                 state(BloubState.LISTENING)
@@ -218,6 +222,7 @@ class RealtimeCallRuntime(
         ready = true
         connectJob?.cancel(); connectJob = null
         micOpen = !muted
+        if (muted) send(codec.muteSignal(true))
         state(BloubState.LISTENING)
         armIdle()
         approvals.pending.value?.let { onApprovalChanged(it) }
@@ -306,7 +311,7 @@ class RealtimeCallRuntime(
                     if (line != null && line != last && gen == delegationGen && !modelBusy && !muted) {
                         last = line
                         count++
-                        sendNote(Note("Progress: $line", urgent = true))
+                        sendNote(Note("Progress: $line", urgent = true, spoken = line))
                     }
                     delay(CallLimits.PROGRESS_INTERVAL_MS)
                 }
@@ -368,7 +373,7 @@ class RealtimeCallRuntime(
         approvalMisses = 0
         if (prompt == null) return
         // 实时模型自己念出问题；用户的回答由转写解析，不交给 Agent。
-        sendNote(Note("Permission needed from the user: ${prompt.question} Ask them aloud and wait for a yes or no.", urgent = true))
+        sendNote(Note("Permission needed from the user: ${prompt.question} Ask them aloud and wait for a yes or no.", urgent = true, spoken = prompt.question))
     }
 
     private fun handleApprovalReply(text: String, prompt: ApprovalPrompt) {
@@ -379,7 +384,7 @@ class RealtimeCallRuntime(
             return
         }
         if (++approvalMisses < CallLimits.MAX_APPROVAL_MISSES) {
-            sendNote(Note("The answer was not clear. Ask again: ${prompt.unclear}", urgent = true))
+            sendNote(Note("The answer was not clear. Ask again: ${prompt.unclear}", urgent = true, spoken = prompt.unclear))
         }
     }
 
@@ -410,7 +415,7 @@ class RealtimeCallRuntime(
         notes.remove(next)
         idleJob?.cancel(); idleJob = null
         modelBusy = true
-        send(codec.backendItem(backendOutput(next.text)))
+        send(codec.speak(next.spoken) ?: codec.backendItem(backendOutput(next.text)))
     }
 
     // ---- 工具 ----

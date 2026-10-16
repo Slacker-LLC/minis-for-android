@@ -423,4 +423,37 @@ class RealtimeCallRuntimeTest {
         assertEquals("f1", resp.getString("id"))
         assertFalse(h.ended() != null)
     }
+
+    @Test
+    fun `doubao drives the runtime with mute keep alive, direct speech and a graceful close`() {
+        val h = H(profile = RealtimeProfiles.DOUBAO)
+        h.begin()
+        assertEquals(listOf("session.create"), h.transport.types())
+        h.incoming("""{"type":"session.created"}""")
+        h.incoming("""{"type":"response.function_call_arguments.done","items":[{"call_id":"d1","name":"$DELEGATE_TOOL_NAME","arguments":"{\"request\":\"查天气\"}"}]}""")
+        assertEquals(listOf("查天气"), h.model.asked)
+        val item = h.transport.ofType("conversation.item.create").single().getJSONArray("items").getJSONObject(0)
+        assertEquals("d1", item.getString("call_id"))
+        assertTrue(h.transport.ofType("response.create").isEmpty())
+        h.incoming("""{"type":"response.done"}""")
+        h.runtime.setMuted(true)
+        assertEquals("input_audio_mute.commit", h.transport.types().last())
+        h.runtime.setMuted(false)
+        assertEquals("input_audio_unmute.commit", h.transport.types().last())
+        h.approvals.pending.value = ApprovalPrompt("要允许删除文件吗", "没听清")
+        h.scope.runCurrent()
+        assertEquals("要允许删除文件吗", h.transport.ofType("speech_text_buffer.commit").single().getString("text"))
+        val closedBefore = h.transport.closed
+        h.runtime.stop()
+        assertEquals("session.close", h.transport.types().last())
+        assertEquals(closedBefore + 1, h.transport.closed)
+    }
+
+    @Test
+    fun `no close event is sent when the session never became ready`() {
+        val h = H(profile = RealtimeProfiles.DOUBAO)
+        h.begin()
+        h.runtime.stop()
+        assertTrue(h.transport.ofType("session.close").isEmpty())
+    }
 }

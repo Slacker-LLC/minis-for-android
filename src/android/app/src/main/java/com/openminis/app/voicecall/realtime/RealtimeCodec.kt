@@ -76,6 +76,18 @@ interface RealtimeCodec {
 
     /** 取消正在进行的回复（用户明确打断/挂断前）。 */
     fun cancelResponse(): List<String>
+
+    /**
+     * 让模型直接念出一句面向用户的话（权限询问、任务播报）。返回 null 表示该协议没有这种事件，
+     * 调用方改用 [backendItem] 注入带说明的条目。
+     */
+    fun speak(text: String): List<String>? = null
+
+    /** 麦克风停送/恢复音频时要发的保活事件（豆包要求，其余协议不需要）。 */
+    fun muteSignal(muted: Boolean): List<String> = emptyList()
+
+    /** 挂断前要发的收尾事件（豆包要求先 `session.close` 再断开）。 */
+    fun closeSession(): List<String> = emptyList()
 }
 
 /** 回传给实时模型的后端输出：加前缀并按预算截断。 */

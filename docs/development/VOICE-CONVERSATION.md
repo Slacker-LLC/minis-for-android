@@ -105,11 +105,32 @@
 - 回声消除（`AndroidRealtimeAudio` 用 VOICE_COMMUNICATION 音源 + 系统 AEC/降噪/增益）各机型效果未测；扬声器外放最可能出现自我打断。
 - 打断后遗留的未应答函数调用，服务端是否容忍未验证；用户插话时的音频截断（OpenAI `conversation.item.truncate`）未做。
 - 工具模式下口头任务指令与模型自动回复可能抢跑（转写晚于回复开始时）。
-- 千问工具调用字段、豆包/xAI/阶跃星辰/智谱协议尚未读文档。
+- 千问工具调用字段尚未对照文档；xAI/智谱/阶跃/豆包见下节。
 
 ### 第三阶段：设置与接线
 
 - **不另存 API key**：实时模型直接使用「管理提供商」里已有的提供商和它的 key（`loadApiKey`）。通话设置只存非敏感选择（提供商、协议档案、模型/音色/业务空间/自定义地址），见 `RealtimeSelection.kt`。
-- key 只发给它所属的厂商：OpenAI/Gemini 档案只接受官方端点的提供商（自定义 base URL、Azure 的 key 不会被发往官方地址），千问和自定义档案接受任意 API key 提供商；OAuth、已停用、`unsupported` 一律拒绝（`providerFits`，有否定用例）。
+- key 只发给它所属的厂商：OpenAI/Gemini 档案只接受官方端点的提供商（自定义 base URL、Azure 的 key 不会被发往官方地址），xAI 档案只接受官方 xAI 提供商（无自定义 base URL）；千问、智谱、阶跃、豆包和自定义档案接受任意 API key 提供商（由用户自己对应）；OAuth、已停用、`unsupported` 一律拒绝（`providerFits`，有否定用例）。
 - `EngineSwitchingCallRuntime`：默认经典流水线；选了实时模型且设置完整才用实时运行时，否则安静回退到经典流水线。
 - `CallSettingsSheet` 新增「通话引擎」区（8 种语言）。
+
+### 第四阶段：xAI / 智谱 / 阶跃星辰 / 豆包（2026-10-16）
+
+档案内置了地址、默认模型、音色、采样率，用户只需在「管理提供商」里有对应的 key。前三家是 OpenAI 风格协议的不同会话形态（`OpenAiStyleCodec.SessionShape`），豆包是独立编解码器（`DoubaoDuplexCodec`）。
+
+| 厂商 | 地址 / 鉴权 | 默认 | 与 OpenAI 的主要差异 | 来源 |
+|---|---|---|---|---|
+| xAI | `wss://api.x.ai/v1/realtime?model=` / Bearer | `grok-voice-latest`、`eve`、24k/24k | 音色和 `turn_detection` 在 session 根上；`audio.input.transcription.model=grok-transcribe`；工具是扁平 function | https://docs.x.ai/developers/model-capabilities/audio/voice-agent |
+| 智谱 | `wss://open.bigmodel.cn/api/paas/v4/realtime` / Bearer | `glm-realtime`、`tongtong`、16k 入/24k 出 | `input_audio_format=pcm16`、`output_audio_format=pcm`；`beta_fields.chat_mode=audio`；**函数调用事件没有 call_id**（用 `response_id:output_index` 本地配对），结果回传项也不带 call_id | https://docs.bigmodel.cn/cn/api/realtime/ |
+| 阶跃星辰 | `wss://api.stepfun.com/v1/realtime?model=` / Bearer | `stepaudio-3-realtime-preview`、`elegantgentle-female`、24k | `pcm16` 入出；工具嵌套在 `function` 下；`turn_detection` 无 `create_response` | https://platform.stepfun.com/docs/zh/api-reference/realtime 与 `/guides/audio/realtime` |
+| 豆包 3.0（Seeduplex） | `wss://openspeech.bytedance.com/api/v3/duplex/realtime/dialogue` / `X-Api-Key` 头 | `model=1.2.6.1`、`zh_female_vv_uranus_bigtts`（Vivi 2.0）、16k 入/24k `pcm_s16le` 出 | 纯 JSON 文本帧；`session.create`；函数调用在 `items[]`，结果以 `role=tool` 条目回传且不需要 `response.create`；**麦克风停送必须发 `input_audio_mute.commit`/`unmute`**；结束前先 `session.close`；没有注入条目的事件，权限询问/任务播报改用 `speech_text_buffer.commit` 直接合成 | https://www.volcengine.com/docs/6561/2549732 、https://www.volcengine.com/docs/6561/2549778 、音色 https://docs.volcengine.com/docs/6561/1257544 |
+
+豆包旧版二进制协议（文档 1594356）是另一套，**不实现**，只支持新版 JSON 协议。
+
+为此运行时新增三个可选编解码钩子：`speak`（让模型直接念一句话）、`muteSignal`（静音保活）、`closeSession`（挂断收尾）；其余协议默认不用。
+
+**未验证（没有真实 key 和连接）**：以下均只对照文档，档案在界面上标「未验证」（`docsChecked=false`）：
+- 智谱：Bearer 鉴权是否接受直接 API Key（文档写 JWT 或 API Key）；工具调用是否要求 client VAD（文档只在 client VAD 流程图里画了 Function call）；回传结果后是否需要 `response.create`。
+- 阶跃：输入采样率（文档未写，假设 24k）；转写事件是否默认开启；`stepaudio-3-realtime-preview` 限免期结束后会下线。
+- xAI：`create_response` 在 server VAD 下的默认行为；转写 `.completed` 是否在未配置转写模型时也发出（我们配了 `grok-transcribe`）。
+- 豆包：就绪事件取 `session.created`；`transcription.completed` 的文本字段（我们依次试 `transcript`/`text`）；`response.output_text.done` 字段；下行 `error` 的结构；`session.close` 回复未等待就断开（文档要求等回复，否则服务端记 `ContextCanceled`）；`speech_text_buffer.commit` 当作口播的效果与是否触发 `response.done`。

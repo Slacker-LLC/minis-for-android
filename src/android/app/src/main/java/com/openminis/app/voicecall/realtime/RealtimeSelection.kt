@@ -23,9 +23,9 @@ data class RealtimeSelection(
 )
 
 /**
- * 这个提供商的 key 能不能用在该协议档案上。OpenAI/Gemini 的实时端点是官方固定地址，
+ * 这个提供商的 key 能不能用在该协议档案上。OpenAI/Gemini/xAI 的实时端点是官方固定地址，
  * 所以只接受官方端点的提供商（自定义 base URL 或 Azure 的 key 发给官方地址是错的）；
- * 千问和自定义档案接受任意 API key 类型的提供商，由用户自己对应。
+ * 其余档案（千问、智谱、阶跃、豆包、自定义）接受任意 API key 类型的提供商，由用户自己对应。
  */
 internal fun providerFits(profile: RealtimeProfile, instance: ProviderInstance): Boolean {
     if (!instance.isEnabled || instance.credentialType != ProviderCredential.apiKey) return false
@@ -33,6 +33,7 @@ internal fun providerFits(profile: RealtimeProfile, instance: ProviderInstance):
         RealtimeProfiles.OPENAI.id ->
             instance.providerType == ProviderType.openAI && instance.customBaseURL.isNullOrBlank() && !instance.azureMode
         RealtimeProfiles.GEMINI.id -> instance.providerType == ProviderType.gemini && instance.customBaseURL.isNullOrBlank()
+        RealtimeProfiles.XAI.id -> instance.providerType == ProviderType.xAI && instance.customBaseURL.isNullOrBlank()
         else -> !instance.providerType.isUnsupported()
     }
 }

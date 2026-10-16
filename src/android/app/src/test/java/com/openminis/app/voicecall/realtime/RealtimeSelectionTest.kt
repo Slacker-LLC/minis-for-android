@@ -46,6 +46,18 @@ class RealtimeSelectionTest {
     }
 
     @Test
+    fun `xai key only goes to the official xai endpoint, other vendors accept any api key provider`() {
+        val xai = on.copy(profileId = "xai")
+        assertNotNull(resolveRealtime(xai, instance(ProviderType.xAI), "k"))
+        assertNull(resolveRealtime(xai, instance(ProviderType.xAI, baseUrl = "https://relay.example.com"), "k"))
+        assertNull(resolveRealtime(xai, instance(ProviderType.openAI), "k"))
+        for (id in listOf("zhipu", "stepfun", "doubao")) {
+            assertNotNull(id, resolveRealtime(on.copy(profileId = id), instance(ProviderType.openRouter), "k"))
+            assertNull(id, resolveRealtime(on.copy(profileId = id), instance(ProviderType.openRouter, credential = ProviderCredential.oauth), "k"))
+        }
+    }
+
+    @Test
     fun `engine off, missing provider or missing key never resolves`() {
         assertNull(resolveRealtime(on.copy(enabled = false), instance(), "k"))
         assertNull(resolveRealtime(on, null, "k"))
