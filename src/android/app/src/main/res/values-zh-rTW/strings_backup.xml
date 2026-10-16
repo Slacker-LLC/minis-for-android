@@ -31,7 +31,6 @@
     <string name="backup_encrypt_footer_off_creds">此備份包含你的 API 金鑰、OAuth 令牌和環境變數的值，且未加密 —— 任何拿到該檔案的人都能讀取。開啟加密可保護它。</string>
     <string name="backup_encrypt_footer_off">未加密時備份不受保護——任何拿到該檔案的人都能讀取其中的內容。</string>
     <string name="backup_start">開始備份</string>
-    <string name="backup_working">處理中…</string>
     <string name="backup_manage_destinations">管理目的地…</string>
     <string name="backup_section_destinations">儲存目的地</string>
     <string name="backup_destinations_footer">新備份會發送到這裡列出的所有目的地。</string>
@@ -54,7 +53,6 @@
     <string name="backup_history_summary">概要</string>
     <string name="backup_history_log">過程日誌</string>
     <string name="backup_history_no_log">本次執行沒有日誌。</string>
-    <string name="backup_history_skipped">%1$d 個檔案因大小限制被排除</string>
     <string name="backup_history_remove">刪除記錄</string>
     <string name="backup_history_status">狀態</string>
     <string name="backup_history_started">開始時間</string>
@@ -82,11 +80,6 @@
     <string name="backup_local_removed">已刪除本機副本——釋放 %1$s</string>
     <string name="backup_local_kept">保留本機副本——並非所有目的地都已校驗</string>
     <string name="backup_result_delivered_cleaned">已投遞到全部 %1$d 個目的地並校驗透過。本機副本已刪除以節省空間。</string>
-    <string name="backup_ready_footer">大小 %1$s。</string>
-    <string name="backup_ready_footer_excluded">大小 %1$s · %2$d 個檔案因大小限制被排除。</string>
-    <string name="backup_share">分享…</string>
-    <string name="backup_share_chooser">分享備份</string>
-    <string name="backup_save_to_files">儲存到檔案…</string>
     <string name="backup_choose_file">選擇備份檔案…</string>
     <string name="backup_choose_file_footer">從「檔案」、雲盤或任意已連線的儲存中選擇一個 .minisbak 檔案。</string>
     <string name="backup_restore_destinations">備份目的地</string>
@@ -94,7 +87,6 @@
     <string name="backup_restore_other_sources">其他來源</string>
     <string name="backup_choose_server">從伺服器選擇…</string>
     <string name="backup_server_title">從伺服器恢復</string>
-    <string name="backup_server_empty">尚未配置伺服器。請在「管理目的地」中新增。</string>
     <string name="backup_server_no_packages">該伺服器上未找到備份。</string>
     <string name="backup_server_row">%1$s · /%2$s</string>
     <string name="backup_restore_servers_footer">選擇一個伺服器以檢視其中儲存的備份。</string>

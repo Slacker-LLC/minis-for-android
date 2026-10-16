@@ -24,7 +24,7 @@ import com.openminis.app.data.model.ModelSlot
  *   minis://settings/storage                    → Storage management
  *   minis://settings/mount-external             → Mount External Folders list
  *   minis://settings/mounts                     → alias for mount-external
- *   minis://settings/shared-folders             → Shared Folders list (T235)
+ *   minis://settings/shared-folders             → Files (the shared folder is its first entry)
  *   minis://settings/shared_folders             → alias for shared-folders
  *   minis://settings/logs                       → Log management
  *   minis://settings/appearance                 → Appearance
@@ -189,7 +189,7 @@ object DeepLinkHandler {
             "mount-external", "mount_external", "mounts", "mounted-folders", "mounted_folders" ->
                 DeepLinkAction.OpenSettingsScreen(Routes.MOUNTED_FOLDERS)
             "shared-folders", "shared_folders" ->
-                DeepLinkAction.OpenSettingsScreen(Routes.SHARED_FOLDERS)
+                DeepLinkAction.OpenSettingsScreen(Routes.settingsCategory("files"))
             "logs" -> {
                 // Optional ?tab=… selects the segmented control on the
                 // Logs screen. Currently recognized: "logs" (default),
@@ -199,7 +199,7 @@ object DeepLinkHandler {
                 DeepLinkCoordinator.setPendingLogsTab(uri.getQueryParameter("tab"))
                 DeepLinkAction.OpenSettingsScreen(Routes.LOGS)
             }
-            "appearance" -> DeepLinkAction.OpenSettingsScreen(Routes.APPEARANCE)
+            "appearance" -> DeepLinkAction.OpenSettingsScreen(Routes.settingsCategory("appearance"))
             "background" -> DeepLinkAction.OpenSettingsScreen(Routes.BACKGROUND)
             "about" -> DeepLinkAction.OpenSettingsScreen(Routes.ABOUT)
             "permissions" -> DeepLinkAction.OpenPermissionSettings

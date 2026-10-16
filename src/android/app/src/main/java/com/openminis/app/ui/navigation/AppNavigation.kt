@@ -65,8 +65,6 @@ import com.openminis.app.ui.settings.UsageStatsScreen
 import com.openminis.app.ui.settings.MinisSkillsBrowserScreen
 import com.openminis.app.ui.settings.MountDetailScreen
 import com.openminis.app.ui.settings.MountedFoldersScreen
-import com.openminis.app.ui.settings.SharedFolderDetailScreen
-import com.openminis.app.ui.settings.SharedFoldersScreen
 import com.openminis.app.ui.settings.SkillsManagementScreen
 import com.openminis.app.data.repository.EnvVarRepository
 import com.openminis.app.data.repository.MemoryRepository
@@ -585,8 +583,6 @@ fun AppNavigation(
                     onMcpClick = { navController.safeNavigate(Routes.MCP) },
                     onEnvVarsClick = { navController.safeNavigate(Routes.ENV_VARS) },
                     onRootfsManagementClick = { navController.safeNavigate(Routes.ROOTFS_MANAGEMENT) },
-                    onOpenBackground = { navController.safeNavigate(Routes.BACKGROUND) },
-                    onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
                     onSystemEnhanceClick = { navController.safeNavigate(Routes.SYSTEM_ENHANCE) },
                     onPermissionsClick = { navController.safeNavigate(Routes.SYSTEM_PERMISSIONS) },
                     // [T-android-settings-hierarchy] The tool-permission and Root screens
@@ -600,42 +596,6 @@ fun AppNavigation(
                     onScheduledTasksClick = { navController.safeNavigate(Routes.SCHEDULED_TASKS) },
                 )
             }
-        }
-
-        composable(Routes.SHARED_FOLDERS) {
-            SharedFoldersScreen(
-                onBack = { navController.safePopBackStack() },
-                onFolderClick = { folderId ->
-                    navController.safeNavigate(Routes.sharedFoldersDetail(folderId))
-                },
-            )
-        }
-
-        composable(
-            route = Routes.SHARED_FOLDERS_DETAIL,
-            arguments = listOf(navArgument("folderId") { type = NavType.StringType }),
-        ) { backStackEntry ->
-            val folderId = backStackEntry.arguments?.getString("folderId") ?: return@composable
-            val ctx = androidx.compose.ui.platform.LocalContext.current
-            SharedFolderDetailScreen(
-                folderId = folderId,
-                onBack = { navController.safePopBackStack() },
-                onBrowseFiles = {
-                    val label = when (folderId) {
-                        "shared" -> ctx.getString(com.openminis.app.R.string.shared_folder_name_shared)
-                        "skills" -> ctx.getString(com.openminis.app.R.string.shared_folder_name_skills)
-                        "memory" -> ctx.getString(com.openminis.app.R.string.shared_folder_name_memory)
-                        else -> folderId
-                    }
-                    FilePreviewHolder.fileBrowserViewModel = FileBrowserViewModel(
-                        rootPath = java.io.File(ctx.cacheDir, "guest-file-browser"),
-                        rootLabel = label,
-                        appContext = ctx.applicationContext,
-                        guestRootPath = "/var/minis/$folderId",
-                    )
-                    navController.safeNavigate(Routes.FILE_BROWSER)
-                },
-            )
         }
 
         composable(Routes.MOUNTED_FOLDERS) {
@@ -1248,6 +1208,7 @@ fun AppNavigation(
                 onBack = { navController.safePopBackStack() },
                 onOpenRoot = { navController.safeNavigate(Routes.ROOT) },
                 onOpenSystemPermissions = { navController.safeNavigate(Routes.SYSTEM_PERMISSIONS) },
+                onOpenVirtualScreen = { navController.safeNavigate(Routes.VIRTUAL_SCREEN_SETTINGS) },
             )
         }
 
@@ -1274,10 +1235,7 @@ fun AppNavigation(
         // LSPosed module reads, and what each of them unlocks. The former "module settings"
         // screen is this page's switch section now.
         composable(Routes.SYSTEM_ENHANCE) {
-            SystemEnhanceScreen(
-                onBack = { navController.safePopBackStack() },
-                onOpenSystemPermissions = { navController.safeNavigate(Routes.SYSTEM_PERMISSIONS) },
-            )
+            SystemEnhanceScreen(onBack = { navController.safePopBackStack() })
         }
 
         composable(Routes.USAGE_STATS) {
@@ -1290,12 +1248,6 @@ fun AppNavigation(
             UsageStatsScreen(
                 chatDao = chatRepository.dao,
                 providerConfig = providerConfigState,
-                onBack = { navController.safePopBackStack() },
-            )
-        }
-
-        composable(Routes.APPEARANCE) {
-            AppearanceScreen(
                 onBack = { navController.safePopBackStack() },
             )
         }

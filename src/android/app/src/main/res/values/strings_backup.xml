@@ -35,7 +35,6 @@
     <string name="backup_encrypt_footer_off">Without encryption the backup is not protected — anyone with the file can read its contents.</string>
     <!-- Actions -->
     <string name="backup_start">Start Backup</string>
-    <string name="backup_working">Working…</string>
     <string name="backup_manage_destinations">Manage Destinations…</string>
     <string name="backup_section_destinations">Destinations</string>
     <string name="backup_destinations_footer">New backups are sent to every destination listed here.</string>
@@ -58,7 +57,6 @@
     <string name="backup_history_summary">SUMMARY</string>
     <string name="backup_history_log">LOG</string>
     <string name="backup_history_no_log">No log for this run.</string>
-    <string name="backup_history_skipped">%1$d file(s) excluded by the size limit</string>
     <string name="backup_history_remove">Remove Record</string>
     <string name="backup_history_status">Status</string>
     <string name="backup_history_started">Started</string>
@@ -86,11 +84,6 @@
     <string name="backup_local_removed">Local copy removed — %1$s freed on this device</string>
     <string name="backup_local_kept">Local copy kept — not every destination was verified</string>
     <string name="backup_result_delivered_cleaned">Delivered to all %1$d destination(s) and verified. The copy on this device was removed to save space.</string>
-    <string name="backup_ready_footer">Size %1$s.</string>
-    <string name="backup_ready_footer_excluded">Size %1$s · %2$d file(s) excluded by the size limit.</string>
-    <string name="backup_share">Share…</string>
-    <string name="backup_share_chooser">Share backup</string>
-    <string name="backup_save_to_files">Save to Files…</string>
     <!-- Restore -->
     <string name="backup_choose_file">Choose Backup File…</string>
     <string name="backup_choose_file_footer">Pick a .minisbak file from Files, Drive, or any connected storage.</string>
@@ -99,7 +92,6 @@
     <string name="backup_restore_other_sources">Other Sources</string>
     <string name="backup_choose_server">Choose from Server…</string>
     <string name="backup_server_title">Restore from Server</string>
-    <string name="backup_server_empty">No servers configured. Add one under Manage Destinations.</string>
     <string name="backup_server_no_packages">No backups found on this server.</string>
     <string name="backup_server_row">%1$s · /%2$s</string>
     <string name="backup_restore_servers_footer">Pick a server to see the backups stored on it.</string>

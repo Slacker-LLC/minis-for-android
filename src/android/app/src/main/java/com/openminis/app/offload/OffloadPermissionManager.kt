@@ -506,6 +506,16 @@ object OffloadPermissionManager {
         setLevel(toolName, if (allowed) PermissionLevel.BYPASS else PermissionLevel.NOT_ALLOWED)
     }
 
+    /** The virtual screen's five tools are one permission for the user: all of them or none. */
+    private val virtualScreenTools: List<String> =
+        toolRegistry.map { it.toolName }.filter { it.startsWith("android.vscreen.") }
+
+    fun isVirtualScreenAllowed(): Boolean = virtualScreenTools.all { isAllowed(it) }
+
+    fun setVirtualScreenAllowed(allowed: Boolean) {
+        virtualScreenTools.forEach { setAllowed(it, allowed) }
+    }
+
     fun getLevel(toolName: String): PermissionLevel {
         val info = toolRegistry.find { it.toolName == toolName }
             ?: return PermissionLevel.BYPASS // Unknown tools are bypassed

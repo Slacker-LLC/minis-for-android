@@ -10,7 +10,6 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,8 +19,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -49,9 +46,7 @@ import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -61,14 +56,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.window.Dialog
@@ -122,8 +115,7 @@ fun SettingsScreen(
         largeTitle = true,
     ) {
         // Level 1 lists subjects, not screens (design: Settings home): a readiness banner while
-        // something needs attention, then the seven categories in two cards. Terminal, files and
-        // scheduled tasks are daily entries in the session drawer, not settings.
+        // something needs attention, then every [SettingsCategory] in two cards.
         ReadinessBanner(items = readiness, onClick = { onOpenCategory(SettingsCategory.SYSTEM) })
         SettingsCategory.rootGroups.forEachIndexed { groupIndex, group ->
             SettingsSection(
@@ -145,33 +137,6 @@ fun SettingsScreen(
                 }
             }
         }
-    }
-}
-@Composable
-internal fun FeedbackSheetItem(
-    icon: ImageVector,
-    title: String,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(22.dp),
-        )
-        Spacer(Modifier.width(16.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
     }
 }
 

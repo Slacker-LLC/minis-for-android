@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Keyboard
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.ScreenLockPortrait
@@ -74,53 +75,28 @@ fun ChatInputSettingsScreen(onBack: () -> Unit, onOpenVoiceCall: () -> Unit = {}
         backLabel = stringResource(R.string.settings_title),
         largeTitle = true,
     ) {
-
-        // -- Return Key (mirrors iOS AppearanceSettingsView stringResource(R.string.appearance_section_return_key) section) --
-        // 0=Newline (default), 1=Send. Hardware Shift+Enter always inserts a
-        // newline regardless of this setting — matches iOS behavior and
-        // overrides the read in ChatScreen's onKeyEvent handler.
-        SettingsSection(
-            header = stringResource(R.string.appearance_section_return_key),
-        ) {
-            data class ReturnRow(val label: String, val value: Int)
-            val returnRows = listOf(
-                ReturnRow(stringResource(R.string.appearance_return_key_newline), 0),
-                ReturnRow(stringResource(R.string.appearance_return_key_send), 1),
+        // 输入：回车键（0=换行，1=发送；实体键盘 Shift+Enter 永远换行）+ 回复后自动聚焦（默认开）。
+        SettingsSection(header = stringResource(R.string.chat_settings_group_input)) {
+            SettingsRow(
+                icon = Icons.AutoMirrored.Outlined.KeyboardReturn,
+                iconColor = tilePurple,
+                title = stringResource(R.string.chat_settings_return_key),
+                subtitle = stringResource(R.string.appearance_return_key_footer),
+                showDivider = false,
             )
-            returnRows.forEachIndexed { idx, row ->
-                SettingsChoiceRow(
-                    title = row.label,
-                    selected = returnKeyBehavior == row.value,
+            SettingsCardBlock {
+                SettingsSegmented(
+                    options = listOf(
+                        stringResource(R.string.appearance_return_key_newline),
+                        stringResource(R.string.appearance_return_key_send),
+                    ),
+                    selectedIndex = returnKeyBehavior.coerceIn(0, 1),
                     onSelect = {
-                        returnKeyBehavior = row.value
-                        prefs.edit().putInt(KEY_RETURN_KEY_BEHAVIOR, row.value).apply()
+                        returnKeyBehavior = it
+                        prefs.edit().putInt(KEY_RETURN_KEY_BEHAVIOR, it).apply()
                     },
-                    leading = {
-                        if (idx == 0) {
-                            androidx.compose.material3.Icon(
-                                Icons.AutoMirrored.Outlined.KeyboardReturn,
-                                contentDescription = null,
-                                tint = tilePurple,
-                            )
-                        } else {
-                            androidx.compose.material3.Icon(
-                                Icons.AutoMirrored.Outlined.Send,
-                                contentDescription = null,
-                                tint = tileGreen,
-                            )
-                        }
-                    },
-                    showDivider = idx < returnRows.size - 1,
                 )
             }
-        }
-
-        // [T-keyboard-auto-pop default flip] -- Auto-Focus After Reply --
-        // Default ON — most users want the composer ready for a follow-up
-        // immediately after the model finishes.
-        SettingsSection(
-            header = stringResource(R.string.appearance_section_auto_focus_after_reply),
-        ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.Keyboard,
                 iconColor = tileBlue,
@@ -134,14 +110,8 @@ fun ChatInputSettingsScreen(onBack: () -> Unit, onOpenVoiceCall: () -> Unit = {}
             )
         }
 
-        // [T-thinking-auto-expand-toggle] -- Deep Thinking --
-        // Whether a NEW streaming thinking block opens expanded (historical
-        // behavior, default ON) or stays collapsed. Only affects the streaming
-        // auto-expand; manual taps always work either way. Mirrors iOS
-        // AppearanceSettingsView "Deep Thinking" section.
-        SettingsSection(
-            header = stringResource(R.string.appearance_section_deep_thinking),
-        ) {
+        // 回复显示：思考块、顶部标题条、工具预览/状态栏、工作过程折叠。
+        SettingsSection(header = stringResource(R.string.chat_settings_group_reply)) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.Psychology,
                 iconColor = tilePurple,
@@ -151,17 +121,7 @@ fun ChatInputSettingsScreen(onBack: () -> Unit, onOpenVoiceCall: () -> Unit = {}
                     autoExpandThinking = it
                     prefs.edit().putBoolean(KEY_AUTO_EXPAND_THINKING, it).apply()
                 },
-                showDivider = false,
             )
-        }
-
-        // -- Chat Title (T-chat-title-pill) --
-        // Sticky session-title pill that appears at the top of the chat
-        // when the user scrolls back through history. Default ON; toggle
-        // also reachable via `minis-config set appearance.show_chat_title`.
-        SettingsSection(
-            header = stringResource(R.string.appearance_section_chat_title),
-        ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.ChatBubbleOutline,
                 iconColor = tileBlue,
@@ -172,14 +132,7 @@ fun ChatInputSettingsScreen(onBack: () -> Unit, onOpenVoiceCall: () -> Unit = {}
                     showChatTitle = it
                     prefs.edit().putBoolean(KEY_SHOW_CHAT_TITLE, it).apply()
                 },
-                showDivider = false,
             )
-        }
-
-        // -- Tool Status Bar --
-        SettingsSection(
-            header = stringResource(R.string.appearance_section_tool_preview),
-        ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.Visibility,
                 iconColor = tileTeal,
@@ -200,83 +153,51 @@ fun ChatInputSettingsScreen(onBack: () -> Unit, onOpenVoiceCall: () -> Unit = {}
                     toolStatusBar = it
                     prefs.edit().putBoolean(KEY_TOOL_STATUS_BAR, it).apply()
                 },
-                showDivider = false,
             )
-        }
-
-        // [T-android-work-process] -- Work Process --
-        // Whether a turn's consecutive thinking + tool steps collapse into one
-        // expandable row (default, mirrors Eta's AgentWorkProcess) or keep the
-        // historical one-row-per-step layout with its long-press menus.
-        SettingsSection(
-            header = stringResource(R.string.appearance_section_work_process),
-        ) {
+            val grouped = stepsPresentation == com.openminis.app.data.StepsPresentation.GROUPED
             SettingsSwitchRow(
                 icon = Icons.Outlined.Build,
                 iconColor = tileOrange,
                 title = stringResource(R.string.appearance_steps_presentation_title),
                 subtitle = stringResource(
-                    if (stepsPresentation == com.openminis.app.data.StepsPresentation.GROUPED) {
-                        R.string.appearance_steps_presentation_on
-                    } else {
-                        R.string.appearance_steps_presentation_off
-                    },
+                    if (grouped) R.string.appearance_steps_presentation_on else R.string.appearance_steps_presentation_off,
                 ),
-                checked = stepsPresentation == com.openminis.app.data.StepsPresentation.GROUPED,
-                onCheckedChange = { grouped ->
+                checked = grouped,
+                onCheckedChange = { on ->
                     com.openminis.app.data.StepsPresentationPrefs.set(
                         context,
-                        if (grouped) {
-                            com.openminis.app.data.StepsPresentation.GROUPED
-                        } else {
-                            com.openminis.app.data.StepsPresentation.PER_TOOL
-                        },
+                        if (on) com.openminis.app.data.StepsPresentation.GROUPED
+                        else com.openminis.app.data.StepsPresentation.PER_TOOL,
                     )
                 },
                 showDivider = false,
             )
         }
 
-        // -- Launch Session --
-        // Same per-row icon treatment as the Theme section. Bolt = Auto
-        // (system picks), History = Last Session (revisit), ChatBubble =
-        // New Chat (compose), Home = Home screen.
-        SettingsSection(
-            header = stringResource(R.string.appearance_section_launch),
-        ) {
-            data class LaunchRow(val label: String, val icon: ImageVector, val tint: Color)
-            val launchRows = listOf(
-                LaunchRow(stringResource(R.string.appearance_launch_auto), Icons.Outlined.Bolt, tileBlue),
-                LaunchRow(stringResource(R.string.appearance_launch_last), Icons.Outlined.History, tileTeal),
-                LaunchRow(stringResource(R.string.appearance_launch_new), Icons.Outlined.ChatBubbleOutline, tileGreen),
-                LaunchRow(stringResource(R.string.appearance_launch_home), Icons.Outlined.Home, tileBlue),
+        // 会话：启动时进哪里、自动归类（借标题生成请求，不多花一次调用）、任务期间保持亮屏（默认关，费电）。
+        SettingsSection(header = stringResource(R.string.chat_settings_group_session)) {
+            SettingsRow(
+                icon = Icons.Outlined.Bolt,
+                iconColor = tileBlue,
+                title = stringResource(R.string.chat_settings_launch),
+                subtitle = stringResource(R.string.appearance_launch_footer),
+                showDivider = false,
             )
-            launchRows.forEachIndexed { idx, row ->
-                SettingsChoiceRow(
-                    title = row.label,
-                    selected = launchSession == idx,
+            SettingsCardBlock {
+                SettingsSegmented(
+                    options = listOf(
+                        stringResource(R.string.appearance_launch_auto),
+                        stringResource(R.string.appearance_launch_last),
+                        stringResource(R.string.appearance_launch_new),
+                        stringResource(R.string.appearance_launch_home),
+                    ),
+                    selectedIndex = launchSession.coerceIn(0, 3),
                     onSelect = {
-                        launchSession = idx
-                        prefs.edit().putInt(KEY_LAUNCH_SESSION, idx).apply()
+                        launchSession = it
+                        prefs.edit().putInt(KEY_LAUNCH_SESSION, it).apply()
                     },
-                    leading = {
-                        androidx.compose.material3.Icon(
-                            row.icon,
-                            contentDescription = null,
-                            tint = row.tint,
-                        )
-                    },
-                    showDivider = idx < launchRows.size - 1,
                 )
             }
-        }
-
-        // -- Auto-Grouping (T-android-auto-grouping) --
-        // Rides the title-generation call, so enabling it costs no extra
-        // request. Port of iOS ContentView's "Grouping" section.
-        SettingsSection(
-            header = stringResource(R.string.appearance_section_grouping),
-        ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.Folder,
                 iconColor = tileBlue,
@@ -287,18 +208,7 @@ fun ChatInputSettingsScreen(onBack: () -> Unit, onOpenVoiceCall: () -> Unit = {}
                     autoGrouping = it
                     prefs.edit().putBoolean(KEY_AUTO_GROUPING, it).apply()
                 },
-                showDivider = false,
             )
-        }
-
-        // -- Keep Screen Awake --
-        // Holds FLAG_KEEP_SCREEN_ON on the activity window while any session
-        // has an active task (mirrors iOS UIApplication.isIdleTimerDisabled
-        // pattern in KeepScreenAwakeController). Default off — battery cost
-        // is real and most users don't need it.
-        SettingsSection(
-            header = stringResource(R.string.appearance_section_keep_awake),
-        ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.ScreenLockPortrait,
                 iconColor = tileGreen,
@@ -312,14 +222,13 @@ fun ChatInputSettingsScreen(onBack: () -> Unit, onOpenVoiceCall: () -> Unit = {}
             )
         }
 
-
-        SettingsSection {
+        // 语音：通话设置入口 + 听写纠正学习。
+        SettingsSection(header = stringResource(R.string.chat_settings_group_voice)) {
             SettingsRow(
                 icon = Icons.Outlined.RecordVoiceOver,
                 title = stringResource(R.string.voice_call_settings_title),
                 subtitle = stringResource(R.string.voice_call_settings_sub),
                 onClick = onOpenVoiceCall,
-                showDivider = false,
             )
         }
 
