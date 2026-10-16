@@ -282,6 +282,43 @@ class MinisCallRuntimeAdapterTest {
         assertFalse(t.states.isEmpty())
     }
 
+    @Test
+    fun `typed text interrupts the current turn and is answered aloud`() {
+        val t = Timed()
+        t.adapter.start()
+        t.adapter.sendText("  打字问一句  ")
+        assertEquals("打字问一句", t.model.lastText)
+        assertEquals(listOf("收到"), t.output.spoken)
+        assertTrue("back to listening after the reply", t.states.last() == BloubState.LISTENING)
+        // 播报/思考期间再打字：旧一轮被取消，新的一轮照常回答。
+        val cancelledBefore = t.model.cancelled
+        t.adapter.sendText("再问")
+        assertEquals(cancelledBefore + 1, t.model.cancelled)
+        assertEquals(2, t.model.asked)
+    }
+
+    @Test
+    fun `typed text while muted is spoken but does not reopen the microphone`() {
+        val t = Timed()
+        t.adapter.start()
+        t.adapter.setMuted(true)
+        val started = t.input.started
+        t.adapter.sendText("静音时打字")
+        assertEquals(listOf("收到"), t.output.spoken)
+        assertEquals("microphone stays closed", started, t.input.started)
+    }
+
+    @Test
+    fun `blank typed text and typing after hang up are ignored`() {
+        val t = Timed()
+        t.adapter.start()
+        t.adapter.sendText("   ")
+        assertEquals(0, t.model.asked)
+        t.adapter.stop()
+        t.adapter.sendText("挂断后")
+        assertEquals(0, t.model.asked)
+    }
+
     private fun adapterEvent(adapter: MinisCallRuntimeAdapter) {
         CoroutineScope(Dispatchers.Unconfined).launch { adapter.events.collect {} }
     }

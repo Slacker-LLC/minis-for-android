@@ -25,7 +25,7 @@ object CallLimits {
     const val MAX_RECOGNITION_RETRIES = 2
     const val MAX_TASK_FAILURES = 2
     const val IDLE_REMINDER_MS = 15_000L
-    const val IDLE_END_MS = 120_000L
+    const val IDLE_END_MS = 300_000L
     const val RETRY_DELAY_MS = 400L
     const val ERROR_PAUSE_MS = 1_500L
 }
@@ -109,9 +109,21 @@ class MinisCallRuntimeAdapter(
         }
     }
 
+    /**
+     * 键入的文字和语音识别结果走同一条路径，且随时可发：它会打断正在进行的一轮，
+     * 回答照样用语音播报。静音只关麦克风，所以静音时发文字也会朗读回答，但回答后不重新开麦。
+     */
     override fun sendText(text: String) {
-        if (!active || muted || !listening || text.isBlank()) return
-        acceptText(text, generation)
+        val trimmed = text.trim()
+        if (!active || trimmed.isEmpty()) return
+        generation++
+        listening = false
+        input.cancel()
+        output.stop()
+        model.cancel()
+        responseJob?.cancel()
+        responseJob = null
+        acceptText(trimmed, generation, typed = true)
     }
 
     override fun listenForFollowUp() {
@@ -172,7 +184,7 @@ class MinisCallRuntimeAdapter(
         if (valid(gen) && !muted) startListening()
     }
 
-    private fun acceptText(text: String, gen: Int) {
+    private fun acceptText(text: String, gen: Int, typed: Boolean = false) {
         listening = false
         input.cancel()
         // 用户确实说了话：重置识别失败计数和空闲计时。
@@ -188,7 +200,7 @@ class MinisCallRuntimeAdapter(
                 val reply = result.getOrThrow()
                 taskFailures = 0
                 _events.tryEmit(CallEvent.Transcript(fromUser = false, text = reply))
-                if (!muted) {
+                if (!muted || typed) {
                     state(BloubState.SPEAKING)
                     output.speak(reply)
                 }
