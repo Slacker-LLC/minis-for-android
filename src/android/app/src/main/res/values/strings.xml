@@ -28,7 +28,6 @@
     <string name="memory_save_toast">Saved</string>
     <string name="memory_edit_load_failed">Could not read this file, so editing is off to avoid overwriting it</string>
     <string name="memory_edit_changed_elsewhere">This file changed while you were editing. Go back and reopen it to see the latest version; your text was not saved</string>
-    <string name="memory_save_error">Save failed: %1$s</string>
     <string name="memory_global_footer">Persistent instructions and preferences visible to the agent in every session. The agent cannot modify this file.</string>
 
     <!-- Check Update -->
@@ -50,9 +49,6 @@
     <string name="check_update_install_launch_failed">Failed to launch installer. Check \"install unknown apps\" permission or open the downloaded APK manually.</string>
     <string name="check_update_install_hint">Tip: If installation gives no feedback, the signature may not match — uninstall the previous version first, then download again.</string>
     <string name="check_update_open_install_settings">Open Settings</string>
-
-    <!-- Permissions (Settings → Permissions) -->
-    <string name="permissions_category_media">Media</string>
 
     <!-- T4: @ file-mention picker -->
     <string name="mention_scanning">Scanning files…</string>
@@ -77,7 +73,6 @@
     <!-- T50: Background & notifications -->
     <string name="bg_section_header">Background &amp; notifications</string>
     <string name="bg_section_subtitle">Battery optimisation and OEM autostart</string>
-    <string name="bg_section_footer">Long-running agent tasks need permission to keep the CPU awake while the screen is off. Without these settings, the system may pause inference after a few minutes in the background.</string>
     <string name="bg_service_channel_name">Agent Status</string>
     <string name="bg_service_channel_description">Shows status of running agent sessions.</string>
     <!-- T-bg-overlay phase 2 fix — permission nudge for the SAW grant -->
@@ -119,29 +114,22 @@
         <item quantity="other">%d sessions</item>
     </plurals>
     <string name="battery_opt_section_title">Battery optimisation</string>
-    <string name="battery_opt_section_footer">When exempted, Android won\'t put the app to sleep mid-task. Re-checked on each return to this screen.</string>
     <string name="battery_opt_row_title">Allow background work</string>
     <string name="battery_opt_already_exempt">Already allowed</string>
     <string name="battery_opt_request_subtitle">Tap to allow Minis to run uninterrupted</string>
     <string name="rom_autostart_section_title">Autostart permission</string>
-    <string name="rom_autostart_section_footer">Some Android skins (%1$s) require an extra autostart permission on top of the standard system settings. Without it, Minis can be killed within minutes of going to background.</string>
     <string name="rom_autostart_row_title">Open autostart settings</string>
     <string name="rom_autostart_row_subtitle">Enable Minis on %1$s</string>
 
     <!-- T68: Browser settings — UA list "Not set" placeholder for empty Custom UA -->
     <string name="browser_settings_ua_not_set">Not set</string>
     <!-- T135 — Settings + About i18n keys -->
-    <string name="settings_back">Back</string>
     <string name="settings_title">Settings</string>
-    <string name="settings_section_llm_providers">LLM Providers</string>
     <string name="settings_section_llm_providers_footer">Configure which models the agent uses, manage API keys &amp; OAuth for each provider, and assign entries to fixed model slots.</string>
     <string name="settings_manage_providers">Manage Providers</string>
     <string name="settings_manage_providers_subtitle">API keys and OAuth sign-in</string>
     <string name="settings_token_usage">Token Usage</string>
     <string name="settings_token_usage_subtitle">Track API usage across providers</string>
-    <string name="settings_section_appearance">Appearance</string>
-    <string name="settings_appearance_subtitle">Theme, font size, and display</string>
-    <string name="settings_section_agent_runtime">Agent Runtime</string>
     <string name="settings_skills">Skills</string>
     <string name="settings_skills_subtitle">Manage AI agent skills and instructions</string>
     <string name="settings_memory">Memory</string>
@@ -153,7 +141,6 @@
     <string name="mcp_add">Add MCP Server</string>
     <string name="mcp_edit">Edit MCP Server</string>
     <string name="mcp_section_servers">Servers</string>
-    <string name="mcp_section_footer">MCP servers let the agent call external tools via minis-mcp-cli. Configs are stored in /var/minis/mcp-servers/servers.json (Claude Desktop compatible).</string>
     <string name="mcp_empty_title">No MCP servers</string>
     <string name="mcp_empty_action">Add a server with the + button.</string>
     <string name="mcp_transport_http">HTTP</string>
@@ -180,7 +167,6 @@
     <string name="mcp_form_startup_timeout_placeholder">Default 60</string>
     <!-- [T-android-provider-voice] Voice Services (shadow voice providers) -->
     <string name="voice_services_section">Voice Services</string>
-    <string name="voice_services_duplicate_hint">A voice service is configured more than once. Voice is merged into a single row here; you can delete the extra provider above if you want.</string>
     <string name="voice_services_stt_count">%1$d speech-to-text</string>
     <string name="voice_services_tts_count">%1$d text-to-speech</string>
     <string name="voice_service_source">Source</string>
@@ -192,7 +178,6 @@
     <string name="voice_service_shared_credential_note">This voice service shares the API key and endpoint of its provider. To change them, edit that provider.</string>
     <string name="voice_service_hidden_badge">Hidden</string>
     <string name="add_provider_voice_chat_providers">Voice Chat Providers</string>
-    <string name="add_provider_voice_templates_footer">Speech-to-text and text-to-speech vendors. The provider type and base URL are prefilled — just add your API key.</string>
     <string name="add_provider_voice_capability_tts">Speech synthesis (TTS)</string>
     <string name="add_provider_voice_capability_asr">Speech recognition (ASR)</string>
     <string name="add_provider_voice_capability_both">Recognition + synthesis</string>
@@ -246,7 +231,6 @@
     <!-- T-system-prompt-modules - editable system prompt modules -->
     <string name="settings_system_prompt">System prompt</string>
     <string name="settings_system_prompt_subtitle">Write your own system prompt (highest priority)</string>
-    <string name="system_prompt_intro">The agent prompt has three parts: the SOUL identity layer (Settings - Soul), the modules below, and per-turn runtime data (skills, MCP, memory, date and language). Editing a module writes a local override; Reset to default restores the wording shipped with the app.</string>
     <string name="system_prompt_badge_custom">customized</string>
     <string name="system_prompt_badge_default">default</string>
     <string name="system_prompt_gate_memory_on">memory on only</string>
@@ -260,7 +244,6 @@
     <string name="system_prompt_reset_all_confirm_body">All custom text and switches are cleared; every module returns to the wording shipped with the app.</string>
     <string name="system_prompt_custom_section">Custom system prompt</string>
     <string name="system_prompt_custom_hint">Write your system prompt here ...</string>
-    <string name="system_prompt_custom_footer">Saved text is injected at the top of every conversation with an explicit precedence header: where it conflicts with the personality (Soul), response style, presets or a session Soul, this text wins. Leave it empty to inject nothing.</string>
     <string name="system_prompt_custom_clear">Clear</string>
     <string name="system_prompt_custom_clear_confirm_title">Clear the custom system prompt?</string>
     <string name="system_prompt_custom_clear_confirm_body">The box is emptied and nothing is injected from it. Other settings are not affected.</string>
@@ -277,7 +260,6 @@
     <string name="soul_section_preview">Preview</string>
     <string name="soul_section_identity">Identity</string>
     <string name="soul_section_personality">Personality Prompt</string>
-    <string name="soul_personality_footer">Edited as the Markdown body of SOUL.md. Length cap is language-aware: Chinese ≤ 1600 characters OR English ≤ 1000 words (the rule is picked by the majority language). Over-limit bodies are rejected on save and ignored at prompt-build time.</string>
     <string name="soul_field_name">Name</string>
     <string name="soul_field_style">Style</string>
     <string name="soul_field_lang">Language</string>
@@ -299,13 +281,8 @@
     <string name="soul_save_error_title">Couldn\'t save</string>
     <string name="settings_env_vars">Environment Variables</string>
     <string name="settings_env_vars_subtitle">Variables injected into the sandbox</string>
-    <string name="settings_section_storage">Storage</string>
-    <string name="settings_storage_subtitle">Manage Ubuntu Linux rootfs and browse files</string>
-    <string name="settings_section_permissions">Permissions</string>
-    <string name="settings_permissions_subtitle">Control agent access to privacy-sensitive features</string>
     <string name="settings_section_logs">Logs</string>
     <string name="settings_logs_subtitle">View and export app logs</string>
-    <string name="settings_section_about">About</string>
     <string name="settings_about_minis">About Minis</string>
     <string name="settings_about_subtitle">Version and project info</string>
     <string name="settings_privacy_policy">Privacy Policy</string>
@@ -384,7 +361,6 @@
     <!-- T172 — components / onboarding / preview i18n -->
     <string name="common_close">Close</string>
     <string name="common_skip">Skip</string>
-    <string name="common_next">Next</string>
     <string name="onboarding_welcome_title">Welcome to Minis</string>
     <string name="onboarding_welcome_subtitle">Your AI agent with terminal, browser, and native device access.</string>
     <string name="onboarding_get_started">Get Started</string>
@@ -396,9 +372,7 @@
     <string name="onboarding_select_models_title">Select Models</string>
     <string name="onboarding_select_models_subtitle">Choose up to 3 models. The first selected becomes Main; the rest are not added as automatic fallbacks.</string>
     <string name="onboarding_search_models">Search models</string>
-    <string name="onboarding_filter_models">Filter models</string>
     <string name="onboarding_done_count">Done (%1$d/3)</string>
-    <string name="onboarding_loading_models">Loading models…</string>
     <string name="webpreview_close">Close</string>
     <string name="webpreview_stop">Stop loading</string>
     <string name="webpreview_reload">Reload</string>
@@ -532,7 +506,6 @@
     <string name="characters_entry_content">What the entry says</string>
     <string name="characters_entry_before">Insert before the character block</string>
     <string name="characters_entry_constant">Always active</string>
-    <string name="characters_entry_delete">Delete this entry</string>
     <string name="characters_entry_unnamed">Unnamed entry</string>
     <string name="characters_import_failed">The card could not be imported.</string>
     <string name="characters_export_failed">The character could not be exported.</string>
@@ -600,14 +573,11 @@
     <string name="browser_history_clear_dialog_message">This will remove all browsing history. This cannot be undone.</string>
     <string name="terminal_title">Minis Shell</string>
     <string name="terminal_clear">Clear</string>
-    <string name="terminal_show_keyboard">Show</string>
-    <string name="terminal_hide_keyboard">Hide</string>
 
     <!-- T172 — settings detail screen i18n keys (Appearance, EnvVars, Logs,
          Memory, Permissions, Skills, MinisSkillsBrowser, Storage, Usage,
          MirrorSettings, RootfsManagement). Background uses pre-existing
          T127 battery_opt_* / rom_autostart_* keys. -->
-    <string name="common_back">Back</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_delete">Delete</string>
     <string name="common_save">Save</string>
@@ -658,39 +628,25 @@
     <string name="appearance_theme_system">System</string>
     <string name="appearance_theme_light">Light</string>
     <string name="appearance_theme_dark">Dark</string>
-    <string name="appearance_section_launch">Launch Session</string>
     <string name="appearance_launch_footer">Choose what to show when the app starts. \"Auto\" opens a new chat if the last session is older than 15 minutes.</string>
     <string name="appearance_launch_auto">Auto</string>
     <string name="appearance_launch_last">Last Session</string>
     <string name="appearance_launch_new">New Chat</string>
     <string name="appearance_launch_home">Home</string>
-    <string name="appearance_section_return_key">Return Key</string>
     <string name="appearance_return_key_footer">Choose whether the Return key in the chat input inserts a newline or sends the message. Hardware Shift+Return always inserts a newline.</string>
     <string name="appearance_return_key_newline">Newline</string>
     <string name="appearance_return_key_send">Send</string>
-    <string name="appearance_section_keep_awake">Keep Screen Awake</string>
-    <string name="appearance_keep_awake_footer">Prevent the screen from sleeping while any session is running a task. May increase battery drain.</string>
     <string name="appearance_keep_awake_title">Keep Screen Awake</string>
-    <string name="appearance_section_chat_title">Chat Title</string>
     <string name="appearance_show_chat_title">Show chat title</string>
     <string name="appearance_show_chat_title_subtitle">Show a sticky title pill while scrolling</string>
-    <string name="appearance_show_chat_title_footer">Display the current session title as a floating pill at the top of the chat while scrolling through history.</string>
     <string name="chat_title_pill_session_default">Untitled</string>
-    <string name="appearance_section_grouping">Grouping</string>
     <string name="appearance_auto_grouping">Auto-Grouping</string>
     <string name="appearance_auto_grouping_subtitle">File new chats into a matching group</string>
-    <string name="appearance_auto_grouping_footer">When a chat\'s title is first generated, also file it into a matching existing group. Runs once per chat, only uses groups you already created, and leaves the chat ungrouped when nothing matches.</string>
-    <string name="appearance_section_tool_preview">Tool Status Bar</string>
-    <string name="appearance_tool_preview_footer">Show a live preview thumbnail alongside the tool status bar during agent execution.</string>
     <string name="appearance_tool_preview_title">Tool Preview Window</string>
-    <string name="appearance_section_auto_focus_after_reply">Auto-Focus Input After Reply</string>
     <string name="appearance_auto_focus_after_reply_title">Auto-Focus Input After Reply</string>
-    <string name="appearance_auto_focus_after_reply_footer">When on, the keyboard pops up automatically after the model finishes replying so the input is ready for a follow-up. On by default; turn off if you prefer to read the response without an unexpected keyboard.</string>
     <string name="appearance_section_deep_thinking">Deep Thinking</string>
     <string name="appearance_auto_expand_thinking_title">Expand Thinking While Streaming</string>
-    <string name="appearance_auto_expand_thinking_footer">When on, a new thinking block expands automatically while the model is reasoning and collapses when it finishes. When off, thinking blocks stay collapsed — tap one to read it.</string>
     <string name="appearance_section_font_size">Font Size</string>
-    <string name="appearance_font_size_footer">Scale fonts for chat input, message content, and general app text. Changes apply immediately.</string>
     <string name="appearance_font_scale_title">Font Scale</string>
     <string name="appearance_font_scale_subtitle">Adjust sizes below</string>
     <string name="appearance_font_chat_input">Chat Input</string>
@@ -698,10 +654,8 @@
     <string name="appearance_font_app_base">App Base</string>
     <string name="appearance_font_reset">Reset to Defaults</string>
     <string name="appearance_section_language">Language</string>
-    <string name="appearance_language_footer">Override the display language for this app. \"System\" follows your device language.</string>
     <!-- T-android-dynamic-app-icon: launcher-icon picker section. -->
     <string name="appearance_section_app_icon">App Icon</string>
-    <string name="appearance_app_icon_footer">Change the launcher icon. The home-screen icon may take a few seconds to refresh after a tap.</string>
     <string name="appearance_app_icon_auto">Automatic</string>
     <string name="appearance_app_icon_light">Light</string>
     <string name="appearance_app_icon_dark">Dark</string>
@@ -709,9 +663,7 @@
     <string name="env_var_add">Add</string>
     <string name="env_var_privacy_header">Privacy</string>
     <string name="env_var_privacy_toggle">Privacy Mode</string>
-    <string name="env_var_privacy_footer">When enabled, any environment variable value that appears in shell-execute output is replaced with a masked form (e.g. `sk-1********ajhks`) before reaching the model. Values shorter than 8 characters become all `*`. The user-visible output in chat is unchanged.</string>
     <string name="env_var_section_header">Variables</string>
-    <string name="env_var_section_footer">Environment variables are injected into the sandbox shell at session start. Names are uppercased and must match POSIX shell variable rules.</string>
     <string name="env_var_empty_title">No Environment Variables</string>
     <string name="env_var_empty_action">Tap + to add one.</string>
     <string name="env_var_toggle_visibility">Toggle visibility</string>
@@ -745,13 +697,11 @@
     <string name="log_share_chooser">Share Log</string>
     <string name="memory_title">Memory</string>
     <string name="settings_memory_global_header">Default</string>
-    <string name="settings_memory_global_footer">Per-session toggles (set via the /memory slash command or the Session Memory sheet) override this default. Existing sessions are not affected when you flip this switch.</string>
     <string name="settings_memory_global_enabled_title">Memory enabled by default</string>
     <string name="settings_memory_global_enabled_subtitle">When off, new sessions skip GLOBAL.md and daily memory by default</string>
     <string name="memory_empty_title">No Memory Files</string>
     <string name="memory_empty_description">Memory files store persistent knowledge across sessions. Edit GLOBAL.md to add instructions visible to the agent.</string>
     <string name="memory_section_files">Files</string>
-    <string name="memory_section_footer">GLOBAL.md contains persistent instructions visible to the agent. Daily logs are created automatically during conversations.</string>
     <string name="memory_delete_confirm_title">Delete %1$s?</string>
     <string name="memory_delete_confirm_text">This will permanently remove this memory log.</string>
     <string name="memory_editor_placeholder">Enter content…</string>
@@ -791,14 +741,12 @@
     <string name="perm_tool_root_cli">android-root-cli</string>
     <string name="perm_tool_apt_cli">minis-apt</string>
     <string name="perm_section_a11y">Accessibility</string>
-    <string name="perm_a11y_section_footer">android-a11y-cli lets the agent read on-screen UI structure, perform taps and gestures, and watch system events. Both rows below must be set: pick an Agent permission and enable the Accessibility service in system Settings.</string>
     <string name="perm_a11y_cli_description">Lets the agent read screen UI, tap, type, and watch events</string>
     <string name="perm_a11y_open_settings">Open Accessibility Settings</string>
     <string name="perm_root_not_granted">Not granted</string>
     <string name="perm_a11y_system_ready">Service enabled</string>
     <string name="perm_a11y_system_disabled">Service not enabled</string>
     <string name="perm_allow_minis_config">Allow minis-config</string>
-    <string name="perm_minis_config_desc">When disabled, the agent cannot read or modify any settings via minis-config. The change history at Logs → Config Changes remains accessible. The agent will receive a permission_denied error and can guide you via deep links instead.</string>
     <string name="perm_section_privacy">Privacy</string>
     <string name="perm_section_media">Media</string>
     <string name="perm_section_system">System</string>
@@ -826,7 +774,6 @@
     <string name="skill_title">Skills</string>
     <string name="skill_add">Add Skill</string>
     <string name="skill_section_installed">Installed</string>
-    <string name="skill_section_footer">Skills extend the AI agent with specialized instructions and workflows. They are loaded into the system prompt when enabled.</string>
     <string name="skill_empty_title">No Skills Installed</string>
     <string name="skill_empty_action">Tap + to import a SKILL.md, .zip, or .skill file, or browse Minis Skills.</string>
     <string name="skill_import_modal_title">Import Skill</string>
@@ -885,12 +832,6 @@
     <string name="storage_overview_sessions">Session Files</string>
     <string name="storage_section_sessions">Sessions</string>
     <string name="storage_no_sessions">No sessions</string>
-    <string name="storage_section_minis_files">Minis Files</string>
-    <string name="storage_no_minis_files">No minis files</string>
-    <string name="storage_section_media">Media Files</string>
-    <string name="storage_no_media_files">No media files</string>
-    <string name="storage_clear_session_footer">Removes all files generated by this session. The conversation itself will be preserved.</string>
-    <string name="storage_browse_files">Browse Files</string>
     <string name="storage_clearing_status">Clearing…</string>
     <string name="storage_clear_incomplete">Some media files could not be deleted. The sizes shown are what is left.</string>
     <string name="storage_clear_session_button">Clear Session Files</string>
@@ -911,7 +852,6 @@
     <string name="usage_detail_attribution_estimated">Estimated for %1$d legacy rows</string>
     <string name="usage_detail_sessions">Sessions</string>
     <string name="usage_detail_active_days">Active Days</string>
-    <string name="mirror_back">Back</string>
     <string name="mirror_current_section">Current</string>
     <string name="mirror_use_mirror_toggle">Use Mirror</string>
     <string name="mirror_official_default">Official (default)</string>
@@ -927,8 +867,6 @@
     <string name="rootfs_installed_label">Installed</string>
     <string name="rootfs_size_label">Size</string>
     <string name="rootfs_path_label">Path</string>
-    <string name="rootfs_browse_section">Browse</string>
-    <string name="rootfs_browse_files_label">Browse Files</string>
     <string name="rootfs_mirrors_section">Mirrors</string>
     <string name="rootfs_actions_section">Actions</string>
     <string name="rootfs_install_label">Install Rootfs</string>
@@ -973,7 +911,6 @@
     <string name="provider_detail_chat_completions">Chat Completions</string>
     <string name="provider_detail_responses_api">Responses API</string>
     <string name="provider_detail_azure_openai">Azure OpenAI</string>
-    <string name="provider_detail_azure_openai_footer">Use Azure OpenAI authentication (api-key header). Paste your full Azure endpoint into Custom API Base above, including the ?api-version=… query. Works with both API formats.</string>
     <string name="provider_detail_status">Status</string>
     <string name="provider_detail_enabled">Enabled</string>
     <string name="provider_detail_refresh_models">Refresh Models</string>
@@ -992,23 +929,16 @@
     <string name="common_remove">Remove</string>
     <string name="provider_detail_set_manual_bearer_token">Set Manual Bearer Token</string>
     <string name="add_provider_choose_provider">Choose Provider</string>
-    <string name="add_provider_you_can_add_multiple_instances_of_the_sa">You can add multiple instances of the same provider (e.g. work and personal accounts). OpenAI and Anthropic also work with compatible third-party endpoints — set a custom API Base URL after choosing the matching protocol.</string>
-    <string name="add_provider_auth_method">Auth Method</string>
-    <string name="add_provider_choose_authentication">Choose Authentication</string>
-    <string name="add_provider_pick_the_auth_method_that_matches_your_a">Pick the auth method that matches your account. OAuth signs in via the provider\'s web flow; API Key uses a key from your account dashboard.</string>
     <string name="add_provider_identity">Identity</string>
     <string name="add_provider_the_label_is_shown_in_the_provider_list_">The label is shown in the provider list and model picker.</string>
     <string name="add_provider_credential">Credential</string>
-    <string name="add_provider_your_key_is_stored_securely_in_encrypted">Your key is stored securely in encrypted storage and never leaves the device.</string>
     <string name="add_provider_endpoint">Endpoint</string>
     <string name="add_provider_endpoint_anthropic_hint">Use the official Anthropic endpoint as-is. For third-party Anthropic-compatible services (e.g. Mimo), the base URL may need a path suffix such as \"/anthropic\" — check your provider\'s docs. The URL is used verbatim with \"/v1/messages\" appended.</string>
     <string name="add_provider_custom_api_base_optional">Custom API Base (Optional)</string>
     <string name="add_provider_authentication">Authentication</string>
-    <string name="add_provider_sign_in_succeeded_the_token_is_stored_in">Sign-in succeeded. The token is stored in encrypted storage. Tap Save to add the provider.</string>
     <string name="add_provider_authenticated">Authenticated</string>
     <string name="add_provider_token">Token</string>
     <string name="add_provider_save_provider">Save Provider</string>
-    <string name="add_provider_opens_the_provider_s_web_sign_in_flow_af">Opens the provider\'s web sign-in flow. After signing in, the token is captured here automatically.</string>
     <string name="add_provider_signing_in">Signing in…</string>
     <!-- T-android-codex-oauth-dns: shown when token-exchange POST to the
          OAuth provider fails with DNS / timeout. -->
@@ -1017,7 +947,6 @@
     <string name="oauth_completing_sign_in">Completing sign-in…</string>
     <string name="oauth_sign_in_failed">Sign-in failed: %1$s</string>
     <string name="add_provider_or_configure_manually">Or Configure Manually</string>
-    <string name="add_provider_for_third_party_coding_plans_e_g_minimax">For third-party Coding Plans (e.g. MiniMax, Kimi) or compatible proxy endpoints, enter the API base URL and bearer token manually.</string>
     <string name="add_provider_bearer_token">Bearer Token</string>
     <string name="add_custom_model_model_id">Model ID</string>
     <string name="add_custom_model_display_name_optional">Display Name (optional)</string>
@@ -1028,7 +957,6 @@
     <string name="model_entry_visibility">Visibility</string>
     <string name="model_entry_hidden_models_won_t_appear_in_the_model_">Hidden models won\'t appear in the model picker.</string>
     <string name="model_entry_hidden">Hidden</string>
-    <string name="model_entry_restores_the_provider_reported_display_n">Restores the provider-reported display name and token limits, and un-hides the model.</string>
     <string name="model_entry_reset_to_default">Reset to Default</string>
     <!-- T210: ModelEntryDetailScreen sections (iOS parity). -->
     <string name="modeldetail_identity_footer_custom">This is a custom model. The Model ID is editable.</string>
@@ -1036,7 +964,6 @@
     <string name="modeldetail_section_capabilities">Capabilities</string>
     <string name="modeldetail_context_window">Context Window</string>
     <string name="modeldetail_thinking">Thinking</string>
-    <string name="modeldetail_capabilities_footer">Context window and max output tokens (in tokens). Leave empty to use provider defaults. Enable Thinking for models that support extended reasoning.</string>
     <string name="modeldetail_provider_default">Provider default</string>
     <string name="modeldetail_max_tokens_exceeds_warning">Exceeds provider-reported limit (%1$d). The value is saved but may cause errors.</string>
     <string name="modeldetail_section_input_modality">Input Modality</string>
@@ -1044,12 +971,10 @@
     <string name="modeldetail_pdf_input">PDF Input</string>
     <string name="modeldetail_audio_input">Audio Input</string>
     <string name="modeldetail_video_input">Video Input</string>
-    <string name="modeldetail_input_modality_footer">Text input is always supported. Disable modalities the model cannot accept to avoid sending unsupported attachments.</string>
     <string name="modeldetail_section_output_modality">Output Modality</string>
     <string name="modeldetail_image_output">Image Output</string>
     <string name="modeldetail_audio_output">Audio Output</string>
     <string name="modeldetail_video_output">Video Output</string>
-    <string name="modeldetail_output_modality_footer">Enable for models that generate images or audio (e.g. gpt-image-1, TTS). Text output is always available.</string>
     <!-- [T-android-model-quick-test] Quick Test sheet -->
     <string name="quicktest_title">Quick Test</string>
     <string name="quicktest_button">Quick Test</string>
@@ -1065,10 +990,6 @@
     <string name="quicktest_image_unsupported">This model\'s provider doesn\'t support image generation via Quick Test.</string>
     <string name="quicktest_no_image">No image was returned.</string>
     <string name="quicktest_speech_unavailable">Speech output/transcription testing isn\'t available on Android yet.</string>
-    <string name="modelgroup_speech_output">Speech output</string>
-    <string name="modelgroup_speech_transcription">Speech transcription</string>
-    <string name="modelgroup_text_generation">Text generation</string>
-    <string name="common_default">Default</string>
     <string name="settings_agent_loop_models">Agent Models</string>
 
     <!-- T172-A parameterized strings -->
@@ -1086,8 +1007,6 @@
     <string name="provider_detail_models_count_header">Models (%1$d)</string>
     <string name="provider_detail_delete_provider_confirm">Are you sure you want to delete \"%1$s\"? This cannot be undone.</string>
     <string name="provider_detail_delete_model_confirm">Are you sure you want to delete \"%1$s\"? This action cannot be undone.</string>
-    <string name="agent_loop_models_model_count_singular">1 model</string>
-    <string name="agent_loop_models_model_count_plural">%1$d models</string>
     <!-- [T-disabled-provider-via-group-android] Badge shown on the group
          summary row when every member belongs to a currently-disabled
          provider — clarifies why the group appears empty in chat. -->
@@ -1098,7 +1017,6 @@
          EnhancedBackgroundSettingsView + BackgroundKeepAliveManager. -->
     <string name="settings_section_notifications">Notifications</string>
     <string name="settings_task_notifications">Task Notifications</string>
-    <string name="settings_task_notifications_footer">Notify when an agent task finishes while the app is in the background. Shows progress in the notification shade and on the lock screen.</string>
     <string name="notif_one_task_running">1 task running</string>
     <string name="notif_n_tasks_running">%1$d tasks running</string>
     <string name="notif_in_session">In session</string>
@@ -1120,8 +1038,6 @@
     <string name="read_aloud_group">Read Aloud</string>
    <!-- T-minis-textkit selection menu actions (Copy / Copy Markdown / Copy Rich Text) -->
    <string name="selection_copy">Copy</string>
-   <string name="selection_copy_markdown">Copy Markdown</string>
-   <string name="selection_copy_rich_text">Copy Rich Text</string>
     <string name="selection_copy_full_markdown">Copy Full Markdown</string>
     <string name="selection_copy_full_rich_text">Copy Full Rich Text</string>
     <string name="selection_copy_full_plain_text">Copy Full Plain Text</string>
@@ -1139,30 +1055,22 @@
 
     <!-- T-bg-overlay phase 2 — floating tool-status overlay toggle. -->
     <string name="settings_bg_overlay">In-app task overlay</string>
-    <string name="settings_bg_overlay_footer">Show a small floating capsule with the current tool while Minis is in the background. Requires permission to display over other apps. Tap the capsule to bring Minis to the foreground; drag to move it.</string>
     <string name="settings_bg_overlay_permission_needed">Allow drawing over other apps to enable</string>
     <!-- [T-android-dynamic-island] Android 16 Live Updates / dynamic-island toggle. -->
     <string name="settings_dynamic_island">Dynamic Island (Live Updates)</string>
-    <string name="settings_dynamic_island_footer">Show live agent status on the Android 16 status chip. When on, this replaces the floating overlay so you don\'t see two status indicators at once.</string>
     <string name="settings_dynamic_island_unsupported">Your current system version doesn\'t support Live Updates yet (requires Android 16+ with the feature enabled).</string>
 
     <!-- T182 agent loop section i18n -->
-    <string name="agent_loop_section_title">Available Models in Agent Loop</string>
-    <string name="agent_loop_section_add_models">Add Models</string>
     <string name="agent_loop_section_add_models_title">Add Models</string>
     <string name="agent_loop_section_no_available_models">All eligible models are already added.</string>
-    <string name="agent_loop_section_remove">Remove from agent loop</string>
     <!-- T184-chatmenu-i18n — ChatScreen overflow ⋮ menu, longpress, attach -->
     <string name="chat_menu_new_chat">New Chat</string>
     <string name="chat_new_chat_stop_dialog_body">A task is running in this chat. Starting a new chat will stop it.</string>
     <string name="chat_new_chat_stop_dialog_confirm">Stop &amp; New Chat</string>
     <string name="chat_menu_clear_chat">Clear Chat</string>
-    <string name="chat_menu_open_terminal">Open Terminal</string>
     <string name="chat_menu_open_browser">Open Browser</string>
     <string name="chat_menu_browse_chat_files">Browse Chat Files</string>
     <string name="chat_menu_enhanced_cache">Enhanced Cache</string>
-    <string name="chat_menu_fast_mode">Enable Fast Mode</string>
-    <string name="chat_menu_auto_compact">Auto Compact</string>
     <string name="context_near_capacity_title">Context Near Capacity</string>
     <string name="context_near_capacity_message">Conversation context is nearly full. Compact the history to free up space before sending. Enabling auto-compact will do this automatically from now on.</string>
     <string name="context_compact_and_send">Compact &amp; Send</string>
@@ -1195,24 +1103,14 @@
    <string name="chat_edit_exit_button">Exit Edit Mode</string>
     <string name="chat_show_sidebar">Show session list</string>
     <string name="chat_hide_sidebar">Hide session list</string>
-    <string name="split_no_conversation_title">No Conversation Selected</string>
     <string name="split_no_conversation_subtitle">Select a conversation or start a new one</string>
    <string name="chat_clear_dialog_body">Remove all messages from this session? Files in workspace, attachments, and offloads are kept.</string>
     <string name="chat_clear_dialog_confirm">Clear</string>
 
     <!-- T235 — Shared Folders (fixed: Shared / Skills / Memory) -->
-    <string name="settings_shared_folders">Shared Folders</string>
-    <string name="settings_shared_folders_subtitle">Browse /var/minis shared, skills, and memory</string>
-    <string name="shared_folders_title">Shared Folders</string>
-    <string name="shared_folders_info_banner">These directories are visible inside the Linux sandbox. Skills and Memory are maintained by AI agent tools — do not edit manually.</string>
     <string name="shared_folder_name_shared">Shared</string>
-    <string name="shared_folder_name_skills">Skills</string>
-    <string name="shared_folder_name_memory">Memory</string>
-    <string name="shared_folder_detail_title">Folder Details</string>
-    <string name="shared_folder_browse_files">Browse Files</string>
 
     <!-- T219-2 — Mount External Folders settings UI -->
-    <string name="settings_mount_external_folders">Mount External Folders</string>
     <string name="settings_mount_external_folders_subtitle">Bind picked folders into /var/minis/mounts/</string>
     <string name="mount_folders_title">Mounted Folders</string>
     <string name="mount_folders_info_banner">Picked folders are bind-mounted at /var/minis/mounts/&lt;name&gt;. Up to 10 folders can be mounted at a time.</string>
@@ -1243,7 +1141,6 @@
     <string name="mount_detail_browse_files">Browse Files</string>
     <string name="mount_detail_name_invalid">Mount name must not be empty, contain \'/\', or be \'.\' or \'..\'</string>
     <string name="mount_path_unavailable">Path unavailable</string>
-    <string name="mount_add_failed">Could not add mount. Name may be taken or invalid.</string>
 
     <!-- T241: slash command panel + Choose Model sheet -->
     <string name="slash_compact_subtitle">Compress conversation history into summary</string>
@@ -1266,10 +1163,7 @@
     <string name="model_picker_done">Done</string>
     <string name="model_picker_search_placeholder">Search models</string>
     <string name="model_picker_search_clear">Clear</string>
-    <string name="model_picker_default_badge">Default</string>
     <string name="model_picker_active_badge">Active</string>
-    <string name="model_picker_no_linked_models">No models linked to this group.</string>
-    <string name="model_picker_models_count_unlinked">%d models (unlinked)</string>
     <string name="model_picker_no_results">No results</string>
     <string name="model_picker_no_models">No models available</string>
     <string name="model_picker_configure_hint">Configure providers in Settings to see models here.</string>
@@ -1357,13 +1251,6 @@
     <string name="system_permissions_a11y_row">Minis Accessibility Service</string>
     <string name="system_permissions_a11y_enabled">Enabled — android-a11y-cli is ready</string>
     <string name="system_permissions_a11y_disabled">Disabled — tap to enable in system Settings</string>
-    <string name="system_permissions_a11y_footer">Required by android-a11y-cli for UI-tree reads, gesture injection, and event monitoring. Without this, AI agents cannot drive other apps. Toggle the switch under Minis on the next screen.</string>
-    <string name="system_permissions_a11y_oem_header">Service keeps getting killed?</string>
-    <string name="system_permissions_a11y_oem_footer">%1$s may show \"this service has failed\" and stop the accessibility service in the background. Whitelist autostart and remove the battery restriction so it stays connected.</string>
-    <string name="system_permissions_a11y_oem_autostart">Add to autostart whitelist</string>
-    <string name="system_permissions_a11y_oem_autostart_sub">Open the autostart manager and enable Minis</string>
-    <string name="system_permissions_a11y_oem_battery">Remove background / battery restriction</string>
-    <string name="system_permissions_a11y_oem_battery_sub">Set battery usage to \"No restrictions\"</string>
     <string name="a11y_service_label">Minis Accessibility</string>
     <string name="a11y_service_description">Lets Minis read on-screen UI structure, perform taps and gestures, and receive system events on behalf of AI agents invoking android-a11y-cli.</string>
     <string name="a11y_service_summary">UI-layer automation backend for Minis</string>
@@ -1467,7 +1354,6 @@
     <string name="scheduled_task_edit">Edit scheduled task</string>
     <string name="scheduled_task_field_label">Label</string>
     <string name="scheduled_task_field_time">Trigger time</string>
-    <string name="scheduled_task_field_repeat">Repeat</string>
     <string name="scheduled_task_field_prompt">Prompt</string>
     <string name="scheduled_task_field_prompt_hint">What should the assistant do when this fires?</string>
     <string name="scheduled_task_target_new_session_note">Each fire creates a new chat session and posts a notification when finished. Tap the notification to view the result.</string>
@@ -1496,7 +1382,6 @@
     <string name="scheduled_task_pick_message">Choose a message…</string>
     <string name="scheduled_task_field_model">Model</string>
     <string name="scheduled_task_model_default">App default</string>
-    <string name="scheduled_task_field_active_window">Active window (optional)</string>
     <string name="scheduled_task_field_start_date">Start</string>
     <string name="scheduled_task_field_end_date">End</string>
     <string name="scheduled_task_date_any">Any</string>
@@ -1516,7 +1401,6 @@
     <string name="scheduled_tasks_footer">Each trigger creates a new chat and sends a notification when it finishes. Tap the notification to see the result.</string>
     <string name="scheduled_task_runs_title">Run records</string>
     <string name="scheduled_task_runs_empty">No runs yet. This task hasn\'t fired — runs will appear here after it does.</string>
-    <string name="scheduled_task_runs_open_session">Open session</string>
     <string name="image_action_copy">Copy</string>
     <string name="image_action_share">Share</string>
     <string name="image_action_save">Save</string>
@@ -1552,13 +1436,10 @@
     <string name="voice_correction_button_a11y">Correct transcript with AI</string>
     <string name="voice_correction_none_needed">No corrections needed</string>
     <string name="voice_correction_failed">Correction failed, original kept</string>
-    <string name="voice_correction_section">Voice Correction Learning</string>
     <string name="voice_correction_toggle">Collect voice correction data</string>
-    <string name="voice_correction_footer">When enabled, your manual fixes to voice transcripts (original → corrected pairs), accepted AI corrections, and frequently typed terms are stored in a local on-device database to make future voice corrections smarter. Nothing is uploaded. Default is off; existing data stays until you clear it.</string>
     <string name="voice_correction_clear_title">Clear all collected voice correction data?</string>
     <string name="voice_correction_clear">Clear All</string>
     <string name="voice_correction_cleared">Voice correction data cleared</string>
-    <string name="voice_provider_system">System</string>
     <string name="add_provider_subtitle_kimi">Kimi Coding Plan — sign in with your Kimi account</string>
     <string name="kimi_login_title">Sign in with Kimi Code</string>
     <string name="kimi_login_instructions">Open the verification page and enter this code to authorize Minis:</string>
@@ -1633,20 +1514,15 @@
     <string name="compact_progress_split">Compacting… %1$d s · summarizing in segments (%2$d/%3$d)</string>
 
     <!-- [T-android-work-process] Collapsed work-process row (thinking + tool steps). -->
-    <string name="work_process_running_step">Running step %1$d · %2$s</string>
-    <string name="work_process_running_thinking">Thinking…</string>
     <plurals name="work_process_completed_steps">
         <item quantity="one">%d step completed</item>
         <item quantity="other">%d steps completed</item>
     </plurals>
-    <string name="work_process_completed_thinking">Thinking finished</string>
     <string name="work_process_expand">Expand work process</string>
     <string name="work_process_collapse">Collapse work process</string>
-    <string name="appearance_section_work_process">Work process</string>
     <string name="appearance_steps_presentation_title">Collapse thinking and tool steps</string>
     <string name="appearance_steps_presentation_on">Consecutive thinking blocks and tool calls collapse into one expandable row.</string>
     <string name="appearance_steps_presentation_off">Every thinking block and tool call keeps its own row.</string>
-    <string name="appearance_steps_presentation_footer">A collapsed row auto-expands while steps are running and folds back when they finish; a failed step writes its reason on the collapsed row. Turn this off for one row per step with the unchanged long-press menu (re-run, copy, stop).</string>
 
     <!-- [T-android-assistant-home] Assistant home page + its quick action cards. -->
     <string name="assistant_home_title">Assistant home</string>
@@ -1684,8 +1560,6 @@
     <string name="system_permissions_module_a11y_toggle">Keep the accessibility service enabled</string>
     <string name="system_permissions_module_a11y_unavailable">The Minis module is not installed or not active</string>
 
-    <string name="module_settings_title">Module settings</string>
-    <string name="module_settings_row_subtitle">Switches the LSPosed module reads</string>
     <string name="module_settings_section_switches">Gestures</string>
     <string name="module_settings_gesture_bar">Gesture-bar long press opens system search</string>
     <string name="module_settings_gesture_bar_sub">Routes the navigation bar\'s screen search to the system\'s own contextual search.</string>
@@ -1694,16 +1568,10 @@
     <string name="module_settings_hotword">Keep hotword detection alive after screen-off</string>
     <string name="module_settings_hotword_sub">Restarts the assistant\'s software hotword session when a screen-off tears it down.</string>
     <string name="module_settings_section_assistant">Power-key assistant</string>
-    <string name="module_settings_assistant_footer">Only the long press of the power key is taken over; every other shortcut keeps its own behaviour.</string>
     <string name="module_settings_target_oem">The device\'s own assistant</string>
     <string name="module_settings_target_minis">Minis</string>
     <string name="module_settings_not_connected">Not connected to the Xposed framework, so these switches cannot be written yet. Enable Minis in the framework manager, then restart Minis: the framework hands its connection over only when the app starts.</string>
     <string name="module_settings_write_failed">The framework did not accept the change</string>
-    <string name="module_settings_assistant_role">System default assistant</string>
-    <string name="module_settings_assistant_role_held">Minis is this device\'s assistant</string>
-    <string name="module_settings_assistant_role_needed">Required before Minis can take over the power key</string>
-    <string name="module_settings_assistant_role_unavailable">This device has no default-assistant setting</string>
-    <string name="module_settings_footer">These switches are read by the Minis LSPosed module: install it and enable Minis in its scope. A change takes effect at the next interception, with no restart.</string>
 
     <string name="modeldetail_hosted_web_search">Server-side web search</string>
     <string name="modeldetail_hosted_web_search_sub">Let the model call the search the provider runs itself. Sources come back as citations; this spends the provider\'s quota, and only the Responses API has it.</string>
@@ -1719,7 +1587,6 @@
 
     <string name="system_enhance_title">Modules</string>
     <string name="system_enhance_row_subtitle">LSPosed module switches</string>
-    <string name="system_enhance_section_status">Status</string>
     <string name="system_enhance_root">Root</string>
     <string name="system_enhance_root_checking">Checking…</string>
     <string name="system_enhance_root_granted">Granted</string>
@@ -1729,27 +1596,13 @@
     <string name="system_enhance_root_timeout">The su prompt timed out</string>
     <string name="system_enhance_root_unknown">su answered without an identity</string>
     <string name="system_enhance_root_action">Check</string>
-    <string name="system_enhance_protection">Accessibility keep-alive</string>
-    <string name="system_enhance_protection_on">On — the module re-binds the service</string>
-    <string name="system_enhance_protection_off">Off — nothing re-binds the service</string>
-    <string name="system_enhance_hooks">Module switches</string>
-    <string name="system_enhance_hooks_subtitle">Takeovers the module reads from this app</string>
     <string name="system_enhance_root_section">What needs root</string>
-    <string name="system_enhance_root_footer">Root is what the Linux runtime needs: the Ubuntu 24.04 chroot, its mount namespace and the guest processes inside it. Device control and the private-data reads go through the same controlled path; nothing here hands the agent a general root shell.</string>
     <string name="system_enhance_root_feature_runtime">Ubuntu 24.04 runtime (chroot, mount namespace)</string>
     <string name="system_enhance_root_feature_device">Device control (structured, controlled argv)</string>
     <string name="system_enhance_root_feature_data">Private data reads (clock, clipboard, health, notes)</string>
-    <string name="system_enhance_module_section">What needs the module</string>
-    <string name="system_enhance_module_footer">The module runs inside other processes and reaches the entries this app cannot: the vendors\' assistant and screen-search gestures, Google\'s eligibility checks, the accessibility keep-alive and hotword self-heal. It only reads the switches you set on the module settings page.</string>
-    <string name="system_enhance_module_feature_entries">Vendor entries (assistant, screen search, gestures)</string>
-    <string name="system_enhance_module_feature_google">Google eligibility (Gemini entry, device spoofing)</string>
-    <string name="system_enhance_module_feature_accessibility">Accessibility keep-alive and hotword self-heal</string>
 
     <string name="system_enhance_root_hidden">su is not visible to this app; %1$s is installed - allow this app there (or turn off su hiding)</string>
-    <string name="settings_terminal_subtitle">Open the Ubuntu shell (starts the Linux runtime)</string>
-    <string name="settings_section_runtime">Runtime</string>
     <string name="settings_section_system">System &amp; permissions</string>
-    <string name="settings_section_diagnostics">Diagnostics &amp; about</string>
     <string name="settings_auto_compact">Auto-compact context</string>
     <string name="settings_auto_compact_subtitle">Compact history when the token threshold is reached</string>
     <string name="settings_pet">Desktop pet</string>
@@ -1760,16 +1613,9 @@
     <string name="settings_assistant_role_unavailable">Choose Minis in the system\'s default-assistant settings</string>
     <string name="settings_assistant_role_held_toast">Already the default assistant</string>
     <string name="settings_assistant_role_missing_toast">This device has no default-assistant setting</string>
-    <string name="settings_system_enhance_footer">Root, the LSPosed module and the switches it reads are all here.</string>
     <string name="chat_new_session">New chat</string>
-    <string name="settings_category_models_sub">Providers, model slots, usage and auto-compact</string>
-    <string name="settings_category_agent_sub">Skills, characters, persona, prompt, memory and MCP</string>
-    <string name="settings_category_appearance_sub">Appearance and the desktop pet</string>
-    <string name="settings_category_runtime_sub">Terminal and environment variables</string>
     <string name="settings_section_files">File management</string>
     <string name="settings_category_files_sub">Storage, shared folders, mounts, session files, backup and restore</string>
-    <string name="settings_category_system_sub">Root, the module, permissions and background access</string>
-    <string name="settings_category_about_sub">Logs, about and feedback</string>
     <string name="settings_cat_models">Models</string>
     <string name="settings_cat_agent">Agent</string>
     <string name="settings_cat_chat">Chat &amp; input</string>
@@ -1785,7 +1631,6 @@
     <string name="settings_root_footer">The terminal is in the session drawer; the team and scheduled tasks are under Agent.</string>
     <string name="settings_attention_count">%1$d need attention</string>
     <string name="settings_ready_header">Readiness check</string>
-    <string name="settings_ready_footer">What the Agent needs to work normally is gathered here. Optional items are not counted as not ready.</string>
     <string name="settings_ready_root_title">Root</string>
     <string name="settings_ready_root_ok">Granted · the Ubuntu runtime is available</string>
     <string name="settings_ready_root_bad">Not granted: the Ubuntu runtime cannot start</string>
@@ -1812,14 +1657,8 @@
     <string name="settings_agent_section_delegation">Delegation</string>
     <string name="settings_runtime_rootfs_title">Rootfs</string>
     <string name="settings_runtime_rootfs_sub">Ubuntu 24.04 chroot · install, reset and restore</string>
-    <string name="settings_runtime_section_tools">Tools</string>
-    <string name="settings_runtime_browse_files">Browse files</string>
-    <string name="settings_runtime_footer">The sandbox is an Ubuntu 24.04 chroot and needs Root. The grants it depends on are checked under System &amp; permissions.</string>
     <string name="settings_data_section_app">Application</string>
     <string name="settings_permissions_category_sub">Accessibility, overlay and notification access</string>
-    <string name="settings_system_footer">What this app may do on this device, and where each grant is changed.</string>
-    <string name="settings_assistant_role_footer">The Home / power-key assistant gesture opens whichever app holds this role.</string>
-    <string name="module_settings_assistant_role_hint">Minis takes over the power key only once it is the default assistant of the system - set that under Permissions.</string>
     <string name="settings_tool_permissions">Agent permissions</string>
     <string name="settings_tool_permissions_sub">What the agent may do on its own</string>
     <string name="settings_root_sub">Root status and what it unlocks</string>
@@ -1827,7 +1666,6 @@
     <string name="system_permissions_overlay_row">Display over other apps</string>
     <string name="system_permissions_overlay_granted">Granted</string>
     <string name="system_permissions_overlay_missing">Not granted - tap to open system settings</string>
-    <string name="system_permissions_overlay_footer">The desktop pet needs this to float above other apps.</string>
     <plurals name="work_item_command">
         <item quantity="one">%1$d command</item>
         <item quantity="other">%1$d commands</item>
@@ -1861,7 +1699,6 @@
         <item quantity="other">%1$d delegations</item>
     </plurals>
     <string name="work_process_duration">Took %1$s</string>
-    <string name="work_process_elapsed">Working for %1$s</string>
     <string name="appearance_tool_status_bar_title">Tool status bar</string>
     <string name="appearance_tool_status_bar_sub">The strip above the composer that reports the running tool and its result.</string>
     <string name="appearance_section_accent">Accent colour</string>
@@ -1883,19 +1720,15 @@
     <string name="mount_add_failed_commit">The mount could not be saved. Try again.</string>
     <string name="mount_detail_change_failed">The change could not be applied. The name may already be in use.</string>
     <string name="mount_add_grant_action">Grant access</string>
-    <string name="common_menu">Menu</string>
     <string name="common_more">More</string>
     <string name="common_loading">Loading…</string>
     <string name="common_previous">Previous</string>
     <string name="common_next_item">Next</string>
     <string name="common_stop">Stop</string>
     <string name="common_attach">Attach</string>
-    <string name="common_search">Search</string>
     <string name="common_play">Play</string>
     <string name="common_pause">Pause</string>
     <string name="common_revert">Revert</string>
-    <string name="common_copied_preview">Copied: %1$s</string>
-    <string name="chat_scroll_to_previous">Scroll to previous message</string>
     <string name="chat_scroll_to_bottom">Scroll to bottom</string>
     <string name="chat_read_image">Read image</string>
     <string name="chat_switch_to_keyboard">Switch to keyboard</string>
@@ -2030,7 +1863,6 @@
     <string name="drawer_recent">Recent</string>
     <string name="drawer_no_search_match">No matching conversations</string>
     <string name="drawer_search_results">%1$d results</string>
-    <string name="settings_agent_team_sub">Members, their roles, models and routines</string>
     <string name="settings_agent_tasks_sub">Recurring runs, their history and who runs them</string>
     <string name="chat_quick_battery_title">Check the battery</string>
     <string name="chat_quick_battery_sub">Level, charging and temperature</string>
@@ -2063,17 +1895,12 @@
     <string name="files_hub_used_by">Minis usage</string>
     <string name="files_section_sandbox">Directories in the sandbox</string>
     <string name="files_shared_title">Shared</string>
-    <string name="files_sandbox_footer">These directories are visible inside the Linux sandbox. The AI reads and writes skills and memory; you can view and edit them here too.</string>
     <string name="files_section_external">External folders</string>
     <string name="files_mounted_title">Mounted folders</string>
     <string name="files_section_generated">Generated files</string>
     <string name="files_section_backup">Backup</string>
     <string name="files_session_files_title">Session files</string>
     <string name="files_session_files_sub">View and clear by conversation</string>
-    <string name="files_section_advanced">Advanced</string>
-    <string name="files_browse_rootfs">Browse the whole Rootfs</string>
-    <string name="files_open_in_terminal">Open in terminal</string>
-    <string name="files_advanced_footer">Rootfs installation, reset and mirrors are managed under Settings → Runtime environment.</string>
     <string name="drawer_select_done">Done</string>
     <string name="drawer_move_n">Move %1$d</string>
     <string name="chat_empty_greeting_morning">Good morning</string>
@@ -2128,7 +1955,6 @@
     <string name="model_slot_voice_output">Voice Output</string>
     <string name="model_slot_empty">No entries assigned</string>
     <string name="model_slot_main_options">Main slot options</string>
-    <string name="model_slot_fallback_help">Try models in declared order. Fallback advances according to this setting.</string>
     <string name="model_slot_fallback_title">Fallback on errors</string>
     <string name="model_slot_fallback_always">On any error</string>
     <string name="model_slot_fallback_default">On rate limits and server errors</string>
@@ -2138,7 +1964,6 @@
     <string name="model_slot_order_footer">Entries are tried in this order. Move entries to change priority.</string>
     <string name="model_slot_legacy_unresolved">Unavailable entry retained from existing configuration</string>
     <string name="model_slot_available_models">Available models</string>
-    <string name="model_slot_available_footer">Hidden models and models without the required slot capability are excluded.</string>
     <string name="model_slot_no_candidates">No compatible models available</string>
     <string name="model_slot_system_entry">Built-in device voice engine</string>
     <string name="model_slot_provider_disabled">Provider disabled</string>
@@ -2199,7 +2024,6 @@
     <string name="vscreen_preview_failed">Could not capture a preview. Secure or blank screens are not shown.</string>
     <string name="vscreen_probe_failed">Some checks did not pass. The virtual display stays off.</string>
     <string name="vscreen_probe_passed">All required checks passed. You can enable the virtual display.</string>
-    <string name="vscreen_probe_running">Checking…</string>
     <string name="vscreen_reason_android_old">Android 10 or later is required; update the device before trying again.</string>
     <string name="vscreen_reason_android_ready">This Android version meets the minimum requirement.</string>
     <string name="vscreen_reason_app_moved">The app left the virtual display. Stop the action; Minis will not continue on the physical screen.</string>
@@ -2283,12 +2107,7 @@
     <string name="first_run_step_chat_locked">Finish the steps above first</string>
     <string name="first_run_done">Done</string>
     <string name="settings_agent_loop_models_subtitle">Sub agents and minis-model-use can use these</string>
-    <string name="settings_thinking_rules">Thinking rules</string>
-    <string name="settings_thinking_rules_subtitle">How each provider\'s thinking parameters map</string>
     <string name="settings_models_stats_header">Statistics</string>
-    <string name="thinking_rules_hub_footer">Thinking rules are edited per provider because they depend on its protocol.</string>
-    <string name="thinking_rules_hub_custom">Custom rules supported</string>
-    <string name="thinking_rules_hub_official">Official protocol, no custom rules</string>
     <string name="scheduled_tasks_empty_title">No scheduled tasks</string>
     <string name="scheduled_run_ok">Succeeded</string>
     <string name="scheduled_run_failed">Failed</string>

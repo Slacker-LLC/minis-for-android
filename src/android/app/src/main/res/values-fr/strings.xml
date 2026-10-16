@@ -26,7 +26,6 @@
     <string name="memory_save_toast">Enregistré</string>
     <string name="memory_edit_load_failed">Impossible de lire ce fichier ; la modification est désactivée pour éviter de l’écraser</string>
     <string name="memory_edit_changed_elsewhere">Ce fichier a changé pendant votre modification. Revenez en arrière et rouvrez-le pour voir la dernière version ; votre texte n’a pas été enregistré</string>
-    <string name="memory_save_error">Échec de l\'enregistrement : %1$s</string>
     <string name="memory_global_footer">Instructions et préférences persistantes visibles par l\'agent dans chaque session. L\'agent ne peut pas modifier ce fichier.</string>
     <string name="check_update_section_header">Mise à jour de l\'application</string>
     <string name="check_update_current_version">Version actuelle : %1$s</string>
@@ -45,7 +44,6 @@
     <string name="check_update_install_launch_failed">Échec du lancement de l\'installateur. Vérifiez l\'autorisation \"installer des applications inconnues\" ou ouvrez l\'APK téléchargé manuellement.</string>
     <string name="check_update_install_hint">Astuce : si l\'installation ne donne aucun retour, la signature peut ne pas correspondre — désinstallez d\'abord la version précédente, puis téléchargez à nouveau.</string>
     <string name="check_update_open_install_settings">Ouvrir les paramètres</string>
-    <string name="permissions_category_media">Médias</string>
     <string name="mention_scanning">Analyse des fichiers…</string>
     <string name="mention_no_match">Aucun fichier correspondant</string>
     <string name="resume_action">Reprendre</string>
@@ -58,7 +56,6 @@
     <string name="mic_permission_cancel">Annuler</string>
     <string name="bg_section_header">Arrière-plan et notifications</string>
     <string name="bg_section_subtitle">Optimisation de la batterie et démarrage auto OEM</string>
-    <string name="bg_section_footer">Les tâches longues de l\'agent ont besoin d\'autorisation pour garder le CPU réveillé pendant que l\'écran est éteint. Sans ces réglages, le système peut suspendre l\'inférence après quelques minutes en arrière-plan.</string>
     <string name="bg_service_channel_name">État de l\'agent</string>
     <string name="bg_service_channel_description">Affiche l\'état des sessions d\'agent en cours.</string>
     <string name="a11y_repair_dialog_title">Accessibilité désactivée</string>
@@ -83,27 +80,20 @@
         <item quantity="other">%d sessions</item>
     </plurals>
     <string name="battery_opt_section_title">Optimisation de la batterie</string>
-    <string name="battery_opt_section_footer">Une fois exemptée, Android ne mettra pas l\'application en veille pendant une tâche. Revérifié à chaque retour sur cet écran.</string>
     <string name="battery_opt_row_title">Autoriser le travail en arrière-plan</string>
     <string name="battery_opt_already_exempt">Déjà autorisé</string>
     <string name="battery_opt_request_subtitle">Appuyez pour permettre à Minis de fonctionner sans interruption</string>
     <string name="rom_autostart_section_title">Autorisation de démarrage automatique</string>
-    <string name="rom_autostart_section_footer">Certaines surcouches Android (%1$s) requièrent une autorisation de démarrage automatique en plus des réglages système standards. Sans elle, Minis peut être arrêtée quelques minutes après être passée en arrière-plan.</string>
     <string name="rom_autostart_row_title">Ouvrir les réglages de démarrage auto</string>
     <string name="rom_autostart_row_subtitle">Activer Minis sur %1$s</string>
     <string name="browser_settings_ua_not_set">Non défini</string>
     <!-- T135 — Settings + About i18n keys -->
-    <string name="settings_back">Retour</string>
     <string name="settings_title">Réglages</string>
-    <string name="settings_section_llm_providers">Fournisseurs LLM</string>
     <string name="settings_section_llm_providers_footer">Configurez les modèles utilisés par l’agent, gérez les clés API et OAuth de chaque fournisseur, et affectez les entrées aux emplacements de modèle fixes.</string>
     <string name="settings_manage_providers">Gérer les fournisseurs</string>
     <string name="settings_manage_providers_subtitle">Clés API et connexion OAuth</string>
     <string name="settings_token_usage">Consommation de tokens</string>
     <string name="settings_token_usage_subtitle">Suivi de l\'utilisation de l\'API entre fournisseurs</string>
-    <string name="settings_section_appearance">Apparence</string>
-    <string name="settings_appearance_subtitle">Thème, taille de police et affichage</string>
-    <string name="settings_section_agent_runtime">Runtime de l\'agent</string>
     <string name="settings_skills">Compétences</string>
     <string name="settings_skills_subtitle">Gérer les compétences et instructions de l\'agent IA</string>
     <string name="settings_memory">Mémoire</string>
@@ -111,7 +101,6 @@
     <!-- T-system-prompt-modules - modules d'invite système modifiables -->
     <string name="settings_system_prompt">Invite système</string>
     <string name="settings_system_prompt_subtitle">Ecrire votre propre invite systeme (priorite maximale)</string>
-    <string name="system_prompt_intro">L\'invite de l\'agent se compose de trois parties : la couche d\'identité SOUL (Réglages - Soul), les modules ci-dessous et les données ajoutées à chaque tour (compétences, MCP, mémoire, date et langue). Modifier un module enregistre une surcharge locale ; « Rétablir par défaut » restaure le texte fourni avec l\'application.</string>
     <string name="system_prompt_badge_custom">personnalisé</string>
     <string name="system_prompt_badge_default">par défaut</string>
     <string name="system_prompt_gate_memory_on">mémoire activée uniquement</string>
@@ -125,7 +114,6 @@
     <string name="system_prompt_reset_all_confirm_body">Tous les textes personnalisés et tous les interrupteurs sont effacés ; chaque module revient au texte fourni avec l\'application.</string>
     <string name="system_prompt_custom_section">Invite systeme personnalisee</string>
     <string name="system_prompt_custom_hint">Ecrivez votre invite systeme ici ...</string>
-    <string name="system_prompt_custom_footer">Le texte enregistre est injecte en tete de chaque conversation avec une declaration de priorite explicite : en cas de conflit avec la personnalite (Soul), le style de reponse, les prereglages ou un Soul de session, c\'est ce texte qui prime. Laissez vide pour ne rien injecter.</string>
     <string name="system_prompt_custom_clear">Vider</string>
     <string name="system_prompt_custom_clear_confirm_title">Vider l\'invite systeme personnalisee ?</string>
     <string name="system_prompt_custom_clear_confirm_body">Le champ est vide et rien n\'en est injecte. Les autres reglages ne changent pas.</string>
@@ -138,13 +126,8 @@
     <string name="system_prompt_modules_title">Modules d\'invite integres</string>
     <string name="settings_env_vars">Variables d\'environnement</string>
     <string name="settings_env_vars_subtitle">Variables injectées dans le bac à sable</string>
-    <string name="settings_section_storage">Stockage</string>
-    <string name="settings_storage_subtitle">Gérer le rootfs Ubuntu 24.04 et parcourir les fichiers</string>
-    <string name="settings_section_permissions">Autorisations</string>
-    <string name="settings_permissions_subtitle">Contrôler l\'accès de l\'agent aux fonctions sensibles</string>
     <string name="settings_section_logs">Journaux</string>
     <string name="settings_logs_subtitle">Voir et exporter les journaux de l\'application</string>
-    <string name="settings_section_about">À propos</string>
     <string name="settings_about_minis">À propos de Minis</string>
     <string name="settings_about_subtitle">Version et informations sur le projet</string>
     <string name="settings_privacy_policy">Politique de confidentialité</string>
@@ -225,24 +208,17 @@
     <string name="appearance_theme_system">Système</string>
     <string name="appearance_theme_light">Clair</string>
     <string name="appearance_theme_dark">Sombre</string>
-    <string name="appearance_section_launch">Lancer la session</string>
     <string name="appearance_launch_footer">Choisissez ce qui s\'affiche au lancement. « Automatique » ouvre un nouveau chat si la dernière session date de plus de 15 minutes.</string>
     <string name="appearance_launch_auto">Automatique</string>
     <string name="appearance_launch_last">Dernière session</string>
     <string name="appearance_launch_new">Nouvelle conversation</string>
     <string name="appearance_launch_home">Accueil</string>
-    <string name="appearance_section_return_key">Touche Entrée</string>
     <string name="appearance_return_key_footer">Choisissez si la touche Entrée du champ de saisie insère un saut de ligne ou envoie le message. Le matériel Shift+Entrée insère toujours un saut de ligne.</string>
     <string name="appearance_return_key_newline">Saut de ligne</string>
     <string name="appearance_return_key_send">Envoyer</string>
-    <string name="appearance_section_keep_awake">Garder l\'écran allumé</string>
-    <string name="appearance_keep_awake_footer">Empêche l\'écran de se mettre en veille pendant qu\'une session exécute une tâche. Peut augmenter la consommation de batterie.</string>
     <string name="appearance_keep_awake_title">Garder l\'écran allumé</string>
-    <string name="appearance_section_tool_preview">Barre d\'état des outils</string>
-    <string name="appearance_tool_preview_footer">Afficher une miniature en direct à côté de la barre d\'état des outils pendant l\'exécution de l\'agent.</string>
     <string name="appearance_tool_preview_title">Fenêtre de prévisualisation des outils</string>
     <string name="appearance_section_font_size">Taille de police</string>
-    <string name="appearance_font_size_footer">Ajuste la taille des polices pour la saisie, le contenu des messages et le texte général de l\'application. Les changements s\'appliquent immédiatement.</string>
     <string name="appearance_font_scale_title">Échelle de la police</string>
     <string name="appearance_font_scale_subtitle">Ajustez les tailles ci-dessous</string>
     <string name="appearance_font_chat_input">Saisie du chat</string>
@@ -250,14 +226,11 @@
     <string name="appearance_font_app_base">Application</string>
     <string name="appearance_font_reset">Réinitialiser</string>
     <string name="appearance_section_language">Langue</string>
-    <string name="appearance_language_footer">Changer la langue d\'affichage de l\'app. « Système » suit la langue de l\'appareil.</string>
     <string name="env_var_title">Variables d\'environnement</string>
     <string name="env_var_add">Ajouter</string>
     <string name="env_var_privacy_header">Confidentialité</string>
     <string name="env_var_privacy_toggle">Mode confidentiel</string>
-    <string name="env_var_privacy_footer">Lorsque cette option est activée, toute valeur de variable d\'environnement détectée dans la sortie de shell-execute est masquée (p. ex. `sk-1********ajhks`) avant d\'être transmise au modèle. Les valeurs de moins de 8 caractères sont entièrement remplacées par des `*`. La sortie visible dans le chat reste inchangée.</string>
     <string name="env_var_section_header">Variables</string>
-    <string name="env_var_section_footer">Les variables d\'environnement sont injectées dans le shell sandbox au démarrage de la session. Les noms sont en majuscules et doivent respecter les règles POSIX.</string>
     <string name="env_var_empty_title">Aucune variable d\'environnement</string>
     <string name="env_var_empty_action">Appuyez sur + pour en ajouter une.</string>
     <string name="env_var_toggle_visibility">Basculer la visibilité</string>
@@ -293,7 +266,6 @@
     <string name="memory_empty_title">Aucun fichier mémoire</string>
     <string name="memory_empty_description">Les fichiers mémoire stockent des connaissances persistantes. Modifiez GLOBAL.md pour ajouter des instructions visibles à l\'agent.</string>
     <string name="memory_section_files">Fichiers</string>
-    <string name="memory_section_footer">GLOBAL.md contient des instructions persistantes visibles à l\'agent. Les logs quotidiens sont créés automatiquement.</string>
     <string name="memory_delete_confirm_title">Supprimer %1$s ?</string>
     <string name="memory_delete_confirm_text">Cela supprimera définitivement ce log mémoire.</string>
     <string name="memory_editor_placeholder">Saisir le contenu…</string>
@@ -328,14 +300,12 @@
     <string name="perm_tool_root_cli">android-root-cli</string>
     <string name="perm_tool_apt_cli">minis-apt</string>
     <string name="perm_section_a11y">Accessibilité</string>
-    <string name="perm_a11y_section_footer">android-a11y-cli permet à l\'agent de lire la structure de l\'UI à l\'écran, d\'effectuer des appuis et gestes, et d\'observer les événements système. Les deux lignes ci-dessous doivent être configurées : choisissez une permission d\'agent et activez le service d\'accessibilité dans les paramètres système.</string>
     <string name="perm_a11y_cli_description">L\'agent lit l\'UI à l\'écran, tape, écrit, observe les événements</string>
     <string name="perm_a11y_open_settings">Ouvrir les paramètres d\'accessibilité</string>
     <string name="perm_root_not_granted">Non accordé</string>
     <string name="perm_a11y_system_ready">Service activé</string>
     <string name="perm_a11y_system_disabled">Service non activé</string>
     <string name="perm_allow_minis_config">Autoriser minis-config</string>
-    <string name="perm_minis_config_desc">Lorsque désactivé, l\'agent ne peut ni lire ni modifier les paramètres via minis-config. L\'historique des modifications dans Journaux → Modifications de configuration reste accessible. L\'agent recevra une erreur permission_denied et pourra vous guider via des liens profonds.</string>
     <string name="perm_section_privacy">Confidentialité</string>
     <string name="perm_section_media">Média</string>
     <string name="perm_section_system">Système</string>
@@ -359,7 +329,6 @@
     <string name="skill_title">Compétences</string>
     <string name="skill_add">Ajouter un Skill</string>
     <string name="skill_section_installed">Installé</string>
-    <string name="skill_section_footer">Les Skills étendent l\'agent IA avec des instructions et des workflows spécialisés. Ils sont chargés dans le prompt système lorsqu\'ils sont activés.</string>
     <string name="skill_empty_title">Aucun Skill installé</string>
     <string name="skill_empty_action">Appuyez sur + pour importer un SKILL.md ou parcourir Minis Skills.</string>
     <string name="skill_import_modal_title">Importer un skill</string>
@@ -418,12 +387,6 @@
     <string name="storage_overview_sessions">Fichiers de session</string>
     <string name="storage_section_sessions">Sessions</string>
     <string name="storage_no_sessions">Aucune session</string>
-    <string name="storage_section_minis_files">Fichiers Minis</string>
-    <string name="storage_no_minis_files">Aucun fichier Minis</string>
-    <string name="storage_section_media">Fichiers multimédias</string>
-    <string name="storage_no_media_files">Aucun fichier multimédia</string>
-    <string name="storage_clear_session_footer">Supprime tous les fichiers générés par cette session. La conversation elle-même sera conservée.</string>
-    <string name="storage_browse_files">Parcourir les fichiers</string>
     <string name="storage_clearing_status">Suppression…</string>
     <string name="storage_clear_incomplete">Certains fichiers multimédias n\'ont pas pu être supprimés. Les tailles affichées correspondent à ce qui reste.</string>
     <string name="storage_clear_session_button">Effacer les fichiers de session</string>
@@ -444,7 +407,6 @@
     <string name="usage_detail_attribution_estimated">Estimé pour %1$d anciennes lignes</string>
     <string name="usage_detail_sessions">Sessions</string>
     <string name="usage_detail_active_days">Jours actifs</string>
-    <string name="mirror_back">Retour</string>
     <string name="mirror_current_section">Actuel</string>
     <string name="mirror_use_mirror_toggle">Utiliser le miroir</string>
     <string name="mirror_official_default">Officiel (par défaut)</string>
@@ -460,8 +422,6 @@
     <string name="rootfs_installed_label">Installé</string>
     <string name="rootfs_size_label">Taille</string>
     <string name="rootfs_path_label">Chemin</string>
-    <string name="rootfs_browse_section">Parcourir</string>
-    <string name="rootfs_browse_files_label">Parcourir les fichiers</string>
     <string name="rootfs_mirrors_section">Miroirs</string>
     <string name="rootfs_actions_section">Actions</string>
     <string name="rootfs_install_label">Installer le rootfs</string>
@@ -475,10 +435,8 @@
     <string name="rootfs_reset_confirm_message">Réinstalle le système Ubuntu depuis l\'application. L\'espace de travail, le dossier personnel, les compétences, la mémoire, les fichiers partagés et de session sont conservés. Les paquets installés avec apt et les autres modifications du système sont supprimés.</string>
 
     <!-- T172 — components / onboarding / preview i18n -->
-    <string name="common_back">Retour</string>
     <string name="common_close">Fermer</string>
     <string name="common_skip">Passer</string>
-    <string name="common_next">Suivant</string>
     <string name="onboarding_welcome_title">Bienvenue dans Minis</string>
     <string name="onboarding_welcome_subtitle">Votre agent IA avec terminal, navigateur et accès natif à l\'appareil.</string>
     <string name="onboarding_get_started">Commencer</string>
@@ -490,9 +448,7 @@
     <string name="onboarding_select_models_title">Sélectionner les modèles</string>
     <string name="onboarding_select_models_subtitle">Choisissez jusqu’à 3 modèles. Le premier choisi devient le modèle principal ; les autres ne sont pas ajoutés automatiquement comme solutions de repli.</string>
     <string name="onboarding_search_models">Rechercher des modèles</string>
-    <string name="onboarding_filter_models">Filtrer les modèles</string>
     <string name="onboarding_done_count">Terminé (%1$d/3)</string>
-    <string name="onboarding_loading_models">Chargement des modèles…</string>
     <string name="webpreview_close">Fermer</string>
     <string name="webpreview_stop">Arrêter le chargement</string>
     <string name="webpreview_reload">Recharger</string>
@@ -529,7 +485,6 @@
     <string name="provider_detail_chat_completions">Chat Completions</string>
     <string name="provider_detail_responses_api">Responses API</string>
     <string name="provider_detail_azure_openai">Azure OpenAI</string>
-    <string name="provider_detail_azure_openai_footer">Utilise l’authentification Azure OpenAI (en-tête api-key). Collez votre point de terminaison Azure complet dans Custom API Base ci-dessus, y compris la requête ?api-version=…. Fonctionne avec les deux formats d’API.</string>
     <string name="provider_detail_status">Statut</string>
     <string name="provider_detail_enabled">Activé</string>
     <string name="provider_detail_refresh_models">Actualiser les modèles</string>
@@ -546,25 +501,17 @@
     <string name="common_remove">Supprimer</string>
     <string name="provider_detail_set_manual_bearer_token">Définir un jeton Bearer manuel</string>
     <string name="add_provider_choose_provider">Choisir un fournisseur AI</string>
-    <string name="add_provider_you_can_add_multiple_instances_of_the_sa">Vous pouvez ajouter plusieurs instances du même fournisseur (par ex. comptes professionnel et personnel). OpenAI et Anthropic fonctionnent également avec des points de terminaison tiers compatibles — définissez une URL d\'API personnalisée après avoir choisi le protocole correspondant.</string>
-    <string name="add_provider_auth_method">Méthode d\'authentification</string>
-    <string name="add_provider_choose_authentication">Choisir l\'authentification</string>
-    <string name="add_provider_pick_the_auth_method_that_matches_your_a">Choisissez la méthode d\'authentification correspondant à votre compte. OAuth se connecte via le flux web du fournisseur ; API Key utilise une clé depuis votre tableau de bord.</string>
     <string name="add_provider_identity">Identité</string>
     <string name="add_provider_the_label_is_shown_in_the_provider_list_">L\'étiquette apparaît dans la liste des fournisseurs et le sélecteur de modèles.</string>
     <string name="add_provider_credential">Identifiant</string>
-    <string name="add_provider_your_key_is_stored_securely_in_encrypted">Votre clé est stockée de manière sécurisée dans un coffre chiffré et ne quitte jamais l\'appareil.</string>
     <string name="add_provider_endpoint">Point de terminaison</string>
     <string name="add_provider_custom_api_base_optional">Base API personnalisée (optionnel)</string>
     <string name="add_provider_authentication">Authentification</string>
-    <string name="add_provider_sign_in_succeeded_the_token_is_stored_in">Connexion réussie. Le jeton est stocké dans un coffre chiffré. Appuyez sur Enregistrer pour ajouter le fournisseur.</string>
     <string name="add_provider_authenticated">Authentifié</string>
     <string name="add_provider_token">Token</string>
     <string name="add_provider_save_provider">Enregistrer le fournisseur AI</string>
-    <string name="add_provider_opens_the_provider_s_web_sign_in_flow_af">Ouvre le flux de connexion web du fournisseur. Après la connexion, le jeton est automatiquement renseigné ici.</string>
     <string name="add_provider_signing_in">Connexion en cours…</string>
     <string name="add_provider_or_configure_manually">Ou configurer manuellement</string>
-    <string name="add_provider_for_third_party_coding_plans_e_g_minimax">For third-party Coding Plans (e.g. MiniMax, Kimi) or compatible proxy endpoints, enter the API base URL and bearer token manually.</string>
     <string name="add_provider_bearer_token">Jeton Bearer</string>
     <string name="add_custom_model_model_id">ID du modèle</string>
     <string name="add_custom_model_display_name_optional">Nom affiché (facultatif)</string>
@@ -575,7 +522,6 @@
     <string name="model_entry_visibility">Visibilité</string>
     <string name="model_entry_hidden_models_won_t_appear_in_the_model_">Les modèles masqués n\'apparaîtront pas dans le sélecteur.</string>
     <string name="model_entry_hidden">Masqué</string>
-    <string name="model_entry_restores_the_provider_reported_display_n">Restaure le nom affiché et les limites de jetons signalés par le fournisseur, et rend le modèle à nouveau visible.</string>
     <string name="model_entry_reset_to_default">Réinitialiser par défaut</string>
     <!-- T210: ModelEntryDetailScreen sections (iOS parity). -->
     <string name="modeldetail_identity_footer_custom">Il s\'agit d\'un modèle personnalisé. L\'ID du modèle est modifiable.</string>
@@ -583,7 +529,6 @@
     <string name="modeldetail_section_capabilities">Capacités</string>
     <string name="modeldetail_context_window">Fenêtre de contexte</string>
     <string name="modeldetail_thinking">Réflexion</string>
-    <string name="modeldetail_capabilities_footer">Fenêtre de contexte et nombre max de jetons de sortie (en jetons). Laisser vide pour utiliser les valeurs par défaut du fournisseur. Activez Réflexion pour les modèles qui prennent en charge le raisonnement étendu.</string>
     <string name="modeldetail_provider_default">Par défaut du fournisseur</string>
     <string name="modeldetail_max_tokens_exceeds_warning">Dépasse la limite signalée par le fournisseur (%1$d). La valeur est enregistrée mais peut provoquer des erreurs.</string>
     <string name="modeldetail_section_input_modality">Modalité d\'entrée</string>
@@ -591,15 +536,9 @@
     <string name="modeldetail_pdf_input">Entrée PDF</string>
     <string name="modeldetail_audio_input">Entrée audio</string>
     <string name="modeldetail_video_input">Entrée vidéo</string>
-    <string name="modeldetail_input_modality_footer">L\'entrée texte est toujours prise en charge. Désactivez les modalités que le modèle ne peut pas accepter pour éviter d\'envoyer des pièces jointes non prises en charge.</string>
     <string name="modeldetail_section_output_modality">Modalité de sortie</string>
     <string name="modeldetail_image_output">Sortie image</string>
     <string name="modeldetail_audio_output">Sortie audio</string>
-    <string name="modeldetail_output_modality_footer">Activez pour les modèles qui génèrent des images ou de l\'audio (par exemple gpt-image-1, TTS). La sortie texte est toujours disponible.</string>
-    <string name="modelgroup_speech_output">Sortie vocale</string>
-    <string name="modelgroup_speech_transcription">Transcription vocale</string>
-    <string name="modelgroup_text_generation">Génération de texte</string>
-    <string name="common_default">Par défaut</string>
     <string name="settings_agent_loop_models">Modèles de l’agent</string>
 
     <!-- T172-A parameterized strings -->
@@ -611,8 +550,6 @@
     <string name="provider_detail_models_count_header">Modèles (%1$d)</string>
     <string name="provider_detail_delete_provider_confirm">Êtes-vous sûr de vouloir supprimer \"%1$s\" ? Cette action est irréversible.</string>
     <string name="provider_detail_delete_model_confirm">Êtes-vous sûr de vouloir supprimer \"%1$s\" ? Cette action est irréversible.</string>
-    <string name="agent_loop_models_model_count_singular">1 modèle</string>
-    <string name="agent_loop_models_model_count_plural">%1$d modèles</string>
     <string name="provider_list_models_count">%1$d modèles</string>
 
     <!-- T180-bg-notif — Task Notifications toggle + completion notification
@@ -620,7 +557,6 @@
          EnhancedBackgroundSettingsView + BackgroundKeepAliveManager. -->
     <string name="settings_section_notifications">Notifications</string>
     <string name="settings_task_notifications">Notifications de tâche</string>
-    <string name="settings_task_notifications_footer">Notifie lorsqu\'une tâche d\'agent se termine pendant que l\'app est en arrière-plan. Affiche la progression dans le panneau de notifications et sur l\'écran de verrouillage.</string>
     <string name="notif_one_task_running">1 tâche en cours</string>
     <string name="notif_n_tasks_running">%1$d tâches en cours</string>
     <string name="notif_in_session">En session</string>
@@ -636,21 +572,16 @@
     <string name="notif_task_failed_body">La tâche s\'est terminée par une erreur. Appuyez pour ouvrir le chat.</string>
 
     <!-- T182 agent loop section i18n -->
-    <string name="agent_loop_section_title">Modèles disponibles dans la boucle d\'agent</string>
-    <string name="agent_loop_section_add_models">Ajouter des modèles</string>
     <string name="agent_loop_section_add_models_title">Ajouter des modèles</string>
     <string name="agent_loop_section_no_available_models">Tous les modèles éligibles ont déjà été ajoutés.</string>
-    <string name="agent_loop_section_remove">Retirer de la boucle d\'agent</string>
     <!-- T184-chatmenu-i18n — ChatScreen overflow ⋮ menu -->
     <string name="chat_menu_new_chat">Nouveau chat</string>
     <string name="chat_new_chat_stop_dialog_body">Une tâche est en cours dans ce chat. Démarrer un nouveau chat l’arrêtera.</string>
     <string name="chat_new_chat_stop_dialog_confirm">Arrêter et nouveau chat</string>
     <string name="chat_menu_clear_chat">Effacer le chat</string>
-    <string name="chat_menu_open_terminal">Ouvrir le terminal</string>
     <string name="chat_menu_open_browser">Ouvrir le navigateur</string>
     <string name="chat_menu_browse_chat_files">Parcourir les fichiers du chat</string>
     <string name="chat_menu_enhanced_cache">Cache amélioré</string>
-    <string name="chat_menu_fast_mode">Activer le mode rapide</string>
     <string name="enhanced_cache_dialog_body">Le cache amélioré étend le cache de prompt d’Anthropic de 5 minutes à 1 heure, gardant le contexte actif lors des longues sessions. Cela peut entraîner des frais d’écriture de cache supplémentaires. L’activer ?</string>
     <string name="enhanced_cache_dialog_confirm">Activer</string>
 
@@ -670,18 +601,9 @@
     <string name="chat_clear_dialog_confirm">Effacer</string>
 
     <!-- T235 — Dossiers partagés (fixes : Partagé / Skills / Memory) -->
-    <string name="settings_shared_folders">Dossiers partagés</string>
-    <string name="settings_shared_folders_subtitle">Parcourir /var/minis : partagé, skills, memory</string>
-    <string name="shared_folders_title">Dossiers partagés</string>
-    <string name="shared_folders_info_banner">Ces dossiers sont visibles dans le bac à sable Linux. Skills et Memory sont gérés par les outils des agents IA — ne les modifiez pas manuellement.</string>
     <string name="shared_folder_name_shared">Partagé</string>
-    <string name="shared_folder_name_skills">Skills</string>
-    <string name="shared_folder_name_memory">Memory</string>
-    <string name="shared_folder_detail_title">Détails du dossier</string>
-    <string name="shared_folder_browse_files">Parcourir les fichiers</string>
 
     <!-- T219-2 — Monter des dossiers externes -->
-    <string name="settings_mount_external_folders">Monter des dossiers externes</string>
     <string name="settings_mount_external_folders_subtitle">Lier les dossiers choisis dans /var/minis/mounts/</string>
     <string name="mount_folders_title">Dossiers montés</string>
     <string name="mount_folders_info_banner">Les dossiers choisis sont liés à /var/minis/mounts/&lt;nom&gt;. Jusqu\'à 10 dossiers peuvent être montés simultanément.</string>
@@ -712,7 +634,6 @@
     <string name="mount_detail_browse_files">Parcourir les fichiers</string>
     <string name="mount_detail_name_invalid">Le nom ne peut pas être vide, contenir \'/\' ni être \'.\' ou \'..\'</string>
     <string name="mount_path_unavailable">Chemin indisponible</string>
-    <string name="mount_add_failed">Impossible d\'ajouter le montage. Le nom est peut-être déjà pris ou invalide.</string>
 
     <!-- T241: panneau de commandes slash + feuille Choisir un modèle -->
     <string name="slash_compact_subtitle">Compresser l\'historique en résumé</string>
@@ -729,10 +650,7 @@
     <string name="model_picker_done">Terminé</string>
     <string name="model_picker_search_placeholder">Rechercher des modèles</string>
     <string name="model_picker_search_clear">Effacer</string>
-    <string name="model_picker_default_badge">Par défaut</string>
     <string name="model_picker_active_badge">Actif</string>
-    <string name="model_picker_no_linked_models">Aucun modèle lié à ce groupe.</string>
-    <string name="model_picker_models_count_unlinked">%d modèles (non liés)</string>
     <string name="model_picker_no_results">Aucun résultat</string>
     <string name="model_picker_no_models">Aucun modèle disponible</string>
     <string name="model_picker_configure_hint">Configurez des fournisseurs dans Réglages pour voir les modèles ici.</string>
@@ -791,8 +709,6 @@
     <string name="selection_read_aloud">Lire à voix haute</string>
     <!-- T-minis-textkit boutons du menu de sélection -->
     <string name="selection_copy">Copier</string>
-    <string name="selection_copy_markdown">Copier en Markdown</string>
-    <string name="selection_copy_rich_text">Copier en texte enrichi</string>
     <string name="selection_copied_toast">Copié : %1$s</string>
     <string name="selection_copied_as_markdown_toast">Copié en Markdown</string>
     <string name="selection_copied_as_rich_text_toast">Copié en texte enrichi</string>
@@ -839,7 +755,6 @@
     <string name="mcp_add">Ajouter un serveur MCP</string>
     <string name="mcp_edit">Modifier le serveur MCP</string>
     <string name="mcp_section_servers">Serveurs</string>
-    <string name="mcp_section_footer">Les serveurs MCP permettent à l’agent d’appeler des outils externes via minis-mcp-cli. La configuration est stockée dans /var/minis/mcp-servers/servers.json (compatible Claude Desktop).</string>
     <string name="mcp_empty_title">Aucun serveur MCP</string>
     <string name="mcp_empty_action">Ajoutez un serveur avec le bouton +.</string>
     <string name="mcp_transport_http">HTTP</string>
@@ -913,13 +828,10 @@
     <string name="voice_correction_button_a11y">Corriger la transcription avec l\'IA</string>
     <string name="voice_correction_none_needed">Aucune correction nécessaire</string>
     <string name="voice_correction_failed">Échec de la correction, original conservé</string>
-    <string name="voice_correction_section">Apprentissage des corrections vocales</string>
     <string name="voice_correction_toggle">Collecter les données de correction vocale</string>
-    <string name="voice_correction_footer">Une fois activé, vos corrections manuelles des transcriptions (original → corrigé), les corrections IA acceptées et les termes fréquemment saisis sont enregistrés dans une base locale sur l\'appareil afin d\'améliorer les futures corrections vocales. Rien n\'est envoyé en ligne. Désactivé par défaut ; les données existantes sont conservées jusqu\'à ce que vous les effaciez.</string>
     <string name="voice_correction_clear_title">Effacer toutes les données de correction vocale collectées ?</string>
     <string name="voice_correction_clear">Tout effacer</string>
     <string name="voice_correction_cleared">Données de correction vocale effacées</string>
-    <string name="voice_provider_system">Système</string>
     <string name="add_provider_subtitle_kimi">Kimi Coding Plan — connectez-vous avec votre compte Kimi</string>
     <string name="kimi_login_title">Se connecter avec Kimi Code</string>
     <string name="kimi_login_instructions">Ouvrez la page de vérification et saisissez ce code pour autoriser Minis :</string>
@@ -963,7 +875,6 @@
     <string name="backup_encrypt_footer_off_creds">Cette sauvegarde contient vos clés API, vos jetons OAuth et les valeurs de vos variables d\'environnement, et elle n\'est PAS chiffrée — quiconque possède le fichier peut les lire. Activez le chiffrement pour la protéger.</string>
     <string name="backup_encrypt_footer_off">Sans chiffrement, la sauvegarde n\'est pas protégée — quiconque possède le fichier peut en lire le contenu.</string>
     <string name="backup_start">Démarrer la sauvegarde</string>
-    <string name="backup_working">En cours…</string>
     <string name="backup_manage_destinations">Gérer les destinations…</string>
     <string name="backup_section_destinations">Destinations</string>
     <string name="backup_destinations_footer">Les nouvelles sauvegardes sont envoyées à toutes les destinations listées ici.</string>
@@ -986,7 +897,6 @@
     <string name="backup_history_summary">RÉSUMÉ</string>
     <string name="backup_history_log">JOURNAL</string>
     <string name="backup_history_no_log">Aucun journal pour cette exécution.</string>
-    <string name="backup_history_skipped">%1$d fichier(s) exclu(s) par la limite de taille</string>
     <string name="backup_history_remove">Supprimer l\'enregistrement</string>
     <string name="backup_history_status">État</string>
     <string name="backup_history_started">Démarrée</string>
@@ -1013,11 +923,6 @@
     <string name="backup_local_removed">Copie locale supprimée — %1$s libéré(s) sur cet appareil</string>
     <string name="backup_local_kept">Copie locale conservée — toutes les destinations n\'ont pas pu être vérifiées</string>
     <string name="backup_result_delivered_cleaned">Transmise à l\'ensemble des %1$d destination(s) et vérifiée. La copie sur cet appareil a été supprimée pour économiser de l\'espace.</string>
-    <string name="backup_ready_footer">Taille %1$s.</string>
-    <string name="backup_ready_footer_excluded">Taille %1$s · %2$d fichier(s) exclu(s) par la limite de taille.</string>
-    <string name="backup_share">Partager…</string>
-    <string name="backup_share_chooser">Partager la sauvegarde</string>
-    <string name="backup_save_to_files">Enregistrer dans Fichiers…</string>
     <string name="backup_choose_file">Choisir un fichier de sauvegarde…</string>
     <string name="backup_choose_file_footer">Choisissez un fichier .minisbak dans Fichiers, Drive ou tout stockage connecté.</string>
     <string name="backup_restore_destinations">Destinations de sauvegarde</string>
@@ -1025,7 +930,6 @@
     <string name="backup_restore_other_sources">Autres sources</string>
     <string name="backup_choose_server">Choisir depuis un serveur…</string>
     <string name="backup_server_title">Restaurer depuis un serveur</string>
-    <string name="backup_server_empty">Aucun serveur configuré. Ajoutez-en un dans « Gérer les destinations ».</string>
     <string name="backup_server_no_packages">Aucune sauvegarde trouvée sur ce serveur.</string>
     <string name="backup_server_row">%1$s · /%2$s</string>
     <string name="backup_restore_servers_footer">Choisissez un serveur pour voir les sauvegardes qui y sont stockées.</string>
@@ -1134,7 +1038,6 @@
     <string name="chat_input_placeholder_hint_3">Faites glisser du texte dans la conversation pour l’envoyer</string>
     <string name="chat_show_sidebar">Afficher la liste des sessions</string>
     <string name="chat_hide_sidebar">Masquer la liste des sessions</string>
-    <string name="split_no_conversation_title">Aucune conversation sélectionnée</string>
     <string name="split_no_conversation_subtitle">Sélectionnez une conversation ou démarrez-en une nouvelle</string>
     <string name="chat_input_placeholder_hint_5">Minis peut régler la touche ↩︎ sur envoyer ou saut de ligne</string>
     <!-- [T-android-paste-edit-delete & textkit] -->
@@ -1212,21 +1115,16 @@
     <string name="newer_db_exit">Fermer</string>
 
     <!-- T-android-work-process / T-android-assistant-home / lint MissingTranslation -->
-    <string name="work_process_running_step">Étape %1$d en cours · %2$s</string>
-    <string name="work_process_running_thinking">Réflexion…</string>
     <plurals name="work_process_completed_steps">
         <item quantity="one">%d étape terminée</item>
         <item quantity="many">%d étapes terminées</item>
         <item quantity="other">%d étapes terminées</item>
     </plurals>
-    <string name="work_process_completed_thinking">Réflexion terminée</string>
     <string name="work_process_expand">Développer le processus</string>
     <string name="work_process_collapse">Réduire le processus</string>
-    <string name="appearance_section_work_process">Processus de travail</string>
     <string name="appearance_steps_presentation_title">Regrouper les étapes de réflexion et d’outil</string>
     <string name="appearance_steps_presentation_on">Les blocs de réflexion et les appels d’outil consécutifs sont regroupés en une seule ligne dépliable.</string>
     <string name="appearance_steps_presentation_off">Chaque bloc de réflexion et chaque appel d’outil garde sa propre ligne.</string>
-    <string name="appearance_steps_presentation_footer">Une ligne réduite se déploie automatiquement pendant l’exécution des étapes et se replie à la fin ; une étape échouée inscrit sa raison sur la ligne réduite. Désactivez cette option pour une ligne par étape, avec le menu d’appui long inchangé (relancer, copier, arrêter).</string>
     <string name="assistant_home_title">Accueil de l’assistant</string>
     <string name="assistant_home_back">Retour</string>
     <string name="assistant_home_greeting_morning">Bonjour</string>
@@ -1282,7 +1180,6 @@
     <string name="characters_entry_content">What the entry says</string>
     <string name="characters_entry_before">Insert before the character block</string>
     <string name="characters_entry_constant">Always active</string>
-    <string name="characters_entry_delete">Delete this entry</string>
     <string name="characters_entry_unnamed">Unnamed entry</string>
     <string name="characters_import_failed">The card could not be imported.</string>
     <string name="characters_export_failed">The character could not be exported.</string>
@@ -1290,8 +1187,6 @@
     <string name="system_permissions_module_a11y_toggle">Maintenir le service d\'accessibilité activé</string>
     <string name="system_permissions_module_a11y_unavailable">Le module Minis n\'est pas installé ou n\'est pas actif</string>
 
-    <string name="module_settings_title">Réglages du module</string>
-    <string name="module_settings_row_subtitle">Interrupteurs lus par le module LSPosed</string>
     <string name="module_settings_section_switches">Gestes</string>
     <string name="module_settings_gesture_bar">Un appui long sur la barre gestuelle ouvre la recherche système</string>
     <string name="module_settings_gesture_bar_sub">Redirige la recherche d\'écran de la barre de navigation vers la recherche contextuelle du système.</string>
@@ -1300,16 +1195,10 @@
     <string name="module_settings_hotword">Maintenir la détection du mot-clé après extinction de l\'écran</string>
     <string name="module_settings_hotword_sub">Redémarre la session de mot-clé logicielle de l\'assistant lorsqu\'une extinction d\'écran l\'interrompt.</string>
     <string name="module_settings_section_assistant">Assistant du bouton d\'alimentation</string>
-    <string name="module_settings_assistant_footer">Seul l\'appui long sur le bouton d\'alimentation est repris ; les autres raccourcis gardent leur comportement.</string>
     <string name="module_settings_target_oem">L\'assistant du appareil</string>
     <string name="module_settings_target_minis">Minis</string>
     <string name="module_settings_not_connected">Framework Xposed non connecté : ces interrupteurs ne peuvent pas être écrits. Installez le framework et activez Minis dans son périmètre.</string>
     <string name="module_settings_write_failed">Le framework n\'a pas confirmé la modification</string>
-    <string name="module_settings_assistant_role">Assistant par défaut du système</string>
-    <string name="module_settings_assistant_role_held">Minis est l\'assistant de l\'appareil</string>
-    <string name="module_settings_assistant_role_needed">Nécessaire pour que Minis reprenne le bouton d\'alimentation</string>
-    <string name="module_settings_assistant_role_unavailable">Cet appareil n\'a pas de réglage d\'assistant par défaut</string>
-    <string name="module_settings_footer">Ces interrupteurs sont lus par le module LSPosed Minis : installez-le et activez Minis dans sa portée. Un changement prend effet à la prochaine interception, sans redémarrage.</string>
 
     <string name="modeldetail_hosted_web_search">Recherche web côté serveur</string>
     <string name="modeldetail_hosted_web_search_sub">Autorise le modèle à utiliser la recherche du fournisseur. Les sources reviennent sous forme de citations ; cela consomme le quota du fournisseur, et seule l\'API Responses la connaît.</string>
@@ -1325,7 +1214,6 @@
 
     <string name="system_enhance_title">Modules</string>
     <string name="system_enhance_row_subtitle">Interrupteurs du module LSPosed</string>
-    <string name="system_enhance_section_status">État</string>
     <string name="system_enhance_root">Root</string>
     <string name="system_enhance_root_checking">Vérification…</string>
     <string name="system_enhance_root_granted">Accordé</string>
@@ -1335,27 +1223,13 @@
     <string name="system_enhance_root_timeout">La demande su a expiré</string>
     <string name="system_enhance_root_unknown">su a répondu sans identité</string>
     <string name="system_enhance_root_action">Vérifier</string>
-    <string name="system_enhance_protection">Maintien du service d\'accessibilité</string>
-    <string name="system_enhance_protection_on">Activé — le module relie le service à nouveau</string>
-    <string name="system_enhance_protection_off">Désactivé — rien ne relie le service à nouveau</string>
-    <string name="system_enhance_hooks">Interrupteurs du module</string>
-    <string name="system_enhance_hooks_subtitle">Reprises que le module lit depuis cette application</string>
     <string name="system_enhance_root_section">Ce qui exige Root</string>
-    <string name="system_enhance_root_footer">Root est nécessaire au runtime Linux : le chroot Ubuntu 24.04, son namespace de montage et les processus invités. Le contrôle de l\'appareil et la lecture des données privées passent par le même chemin contrôlé ; rien ici ne donne un shell root général à l\'agent.</string>
     <string name="system_enhance_root_feature_runtime">Runtime Ubuntu 24.04 (chroot, namespace de montage)</string>
     <string name="system_enhance_root_feature_device">Contrôle de l\'appareil (argv structuré et contrôlé)</string>
     <string name="system_enhance_root_feature_data">Lecture des données privées (horloge, presse-papiers, santé, notes)</string>
-    <string name="system_enhance_module_section">Ce qui exige le module</string>
-    <string name="system_enhance_module_footer">Le module tourne dans d\'autres processus et atteint les entrées que cette application ne peut pas : les gestes assistant et recherche à l\'écran des fabricants, les contrôles d\'éligibilité Google, le maintien du service d\'accessibilité et la réparation des mots-clés. Il lit seulement les interrupteurs réglés sur la page du module.</string>
-    <string name="system_enhance_module_feature_entries">Entrées fabricants (assistant, recherche à l\'écran, gestes)</string>
-    <string name="system_enhance_module_feature_google">Éligibilité Google (entrée Gemini, masquage de l\'appareil)</string>
-    <string name="system_enhance_module_feature_accessibility">Maintien du service d\'accessibilité et réparation des mots-clés</string>
 
     <string name="system_enhance_root_hidden">su n\'est pas visible pour cette application ; %1$s est installé – autorise cette application dans sa liste (ou désactive le masquage de su)</string>
-    <string name="settings_terminal_subtitle">Ouvrir le shell Ubuntu (démarre l\'exécution Linux)</string>
-    <string name="settings_section_runtime">Exécution</string>
     <string name="settings_section_system">Système et autorisations</string>
-    <string name="settings_section_diagnostics">Diagnostic et à propos</string>
     <string name="settings_auto_compact">Compresser le contexte automatiquement</string>
     <string name="settings_auto_compact_subtitle">Compresser l\'historique au seuil de jetons</string>
     <string name="settings_pet">Compagnon de bureau</string>
@@ -1366,16 +1240,9 @@
     <string name="settings_assistant_role_unavailable">Choisir Minis dans les réglages d\'assistant du système</string>
     <string name="settings_assistant_role_held_toast">Déjà l\'assistant par défaut</string>
     <string name="settings_assistant_role_missing_toast">Cet appareil n\'a pas de réglage d\'assistant</string>
-    <string name="settings_system_enhance_footer">Root, les interrupteurs du module et ce qu\'ils débloquent sont ici.</string>
     <string name="chat_new_session">Nouvelle conversation</string>
-    <string name="settings_category_models_sub">Fournisseurs, emplacements de modèle, usage et compression auto</string>
-    <string name="settings_category_agent_sub">Compétences, personnages, persona, prompt, mémoire et MCP</string>
-    <string name="settings_category_appearance_sub">Apparence et compagnon de bureau</string>
-    <string name="settings_category_runtime_sub">Terminal et variables d\'environnement</string>
     <string name="settings_section_files">Gestion des fichiers</string>
     <string name="settings_category_files_sub">Stockage, dossiers partagés, montages, fichiers de session, sauvegarde et restauration</string>
-    <string name="settings_category_system_sub">Root, module, autorisations et arrière-plan</string>
-    <string name="settings_category_about_sub">Journaux, à propos et retours</string>
     <string name="settings_cat_models">Modèles</string>
     <string name="settings_cat_agent">Agent</string>
     <string name="settings_cat_chat">Chat et saisie</string>
@@ -1391,7 +1258,6 @@
     <string name="settings_root_footer">Le terminal est dans le tiroir des sessions ; l\'équipe et les tâches planifiées sont dans Agent.</string>
     <string name="settings_attention_count">%1$d point(s) à traiter</string>
     <string name="settings_ready_header">Vérification de l’état</string>
-    <string name="settings_ready_footer">Les conditions système dont l’agent a besoin sont regroupées ici. Les éléments facultatifs ne comptent pas comme non prêts.</string>
     <string name="settings_ready_root_title">Root</string>
     <string name="settings_ready_root_ok">Accordé · l’environnement Ubuntu est disponible</string>
     <string name="settings_ready_root_bad">Non accordé : l’environnement Ubuntu ne peut pas démarrer</string>
@@ -1418,14 +1284,8 @@
     <string name="settings_agent_section_delegation">Délégation</string>
     <string name="settings_runtime_rootfs_title">Rootfs</string>
     <string name="settings_runtime_rootfs_sub">Ubuntu 24.04 chroot · installer, réinitialiser, restaurer</string>
-    <string name="settings_runtime_section_tools">Outils</string>
-    <string name="settings_runtime_browse_files">Parcourir les fichiers</string>
-    <string name="settings_runtime_footer">Le bac à sable est un chroot Ubuntu 24.04 et nécessite Root. Les autorisations requises se vérifient dans « Système et autorisations ».</string>
     <string name="settings_data_section_app">Application</string>
     <string name="settings_permissions_category_sub">Accessibilité, superposition et accès aux notifications</string>
-    <string name="settings_system_footer">Ce que cette app peut faire sur cet appareil, et où chaque autorisation se règle.</string>
-    <string name="settings_assistant_role_footer">Le geste d\'assistant (Home / bouton d\'alimentation) ouvre l\'app qui détient ce rôle.</string>
-    <string name="module_settings_assistant_role_hint">Minis ne reprend le bouton d\'alimentation qu\'une fois défini comme assistant système, dans « Autorisations ».</string>
     <string name="settings_tool_permissions">Autorisations de l\'agent</string>
     <string name="settings_tool_permissions_sub">Ce que l\'agent peut faire seul</string>
     <string name="settings_root_sub">État du root et ce qu’il permet</string>
@@ -1434,7 +1294,6 @@
     <string name="system_permissions_overlay_row">Afficher par-dessus les autres apps</string>
     <string name="system_permissions_overlay_granted">Accordée</string>
     <string name="system_permissions_overlay_missing">Non accordée - touchez pour ouvrir les réglages</string>
-    <string name="system_permissions_overlay_footer">Le compagnon de bureau en a besoin pour flotter au-dessus des autres apps.</string>
     <plurals name="work_item_command">
         <item quantity="one">%1$d commande</item>
         <item quantity="other">%1$d commandes</item>
@@ -1468,7 +1327,6 @@
         <item quantity="other">%1$d délégations</item>
     </plurals>
     <string name="work_process_duration">Durée %1$s</string>
-    <string name="work_process_elapsed">En cours depuis %1$s</string>
     <string name="appearance_tool_status_bar_title">Barre d\'état des outils</string>
     <string name="appearance_tool_status_bar_sub">La bande au-dessus du champ de saisie qui indique l\'outil en cours et son résultat.</string>
     <string name="appearance_section_accent">Couleur d\'accent</string>
@@ -1490,19 +1348,15 @@
     <string name="mount_add_failed_commit">Le montage n\'a pas pu être enregistré. Réessayez.</string>
     <string name="mount_detail_change_failed">La modification n\'a pas pu être appliquée. Le nom est peut-être déjà utilisé.</string>
     <string name="mount_add_grant_action">Autoriser</string>
-    <string name="common_menu">Menu</string>
     <string name="common_more">Plus</string>
     <string name="common_loading">Chargement…</string>
     <string name="common_previous">Précédent</string>
     <string name="common_next_item">Suivant</string>
     <string name="common_stop">Arrêter</string>
     <string name="common_attach">Joindre</string>
-    <string name="common_search">Rechercher</string>
     <string name="common_play">Lire</string>
     <string name="common_pause">Pause</string>
     <string name="common_revert">Rétablir</string>
-    <string name="common_copied_preview">Copié : %1$s</string>
-    <string name="chat_scroll_to_previous">Aller au message précédent</string>
     <string name="chat_scroll_to_bottom">Aller en bas</string>
     <string name="chat_read_image">Lire l\'image</string>
     <string name="chat_switch_to_keyboard">Passer au clavier</string>
@@ -1637,7 +1491,6 @@
     <string name="drawer_recent">Récent</string>
     <string name="drawer_no_search_match">Aucune conversation correspondante</string>
     <string name="drawer_search_results">%1$d résultats</string>
-    <string name="settings_agent_team_sub">Membres, rôles, modèles et routines</string>
     <string name="settings_agent_tasks_sub">Exécutions récurrentes, historique et exécutants</string>
     <string name="chat_quick_battery_title">Vérifier la batterie</string>
     <string name="chat_quick_battery_sub">Niveau, charge et température</string>
@@ -1670,17 +1523,12 @@
     <string name="files_hub_used_by">Utilisé par Minis</string>
     <string name="files_section_sandbox">Dossiers dans le bac à sable</string>
     <string name="files_shared_title">Partagé</string>
-    <string name="files_sandbox_footer">Ces dossiers sont visibles dans le bac à sable Linux. L’IA lit et écrit les compétences et la mémoire ; vous pouvez aussi les consulter et les modifier ici.</string>
     <string name="files_section_external">Dossiers externes</string>
     <string name="files_mounted_title">Dossiers montés</string>
     <string name="files_section_generated">Fichiers générés</string>
     <string name="files_section_backup">Sauvegarde</string>
     <string name="files_session_files_title">Fichiers de session</string>
     <string name="files_session_files_sub">Voir et effacer par conversation</string>
-    <string name="files_section_advanced">Avancé</string>
-    <string name="files_browse_rootfs">Parcourir tout le Rootfs</string>
-    <string name="files_open_in_terminal">Ouvrir dans le terminal</string>
-    <string name="files_advanced_footer">L’installation, la réinitialisation et les miroirs de Rootfs se gèrent dans Réglages → Environnement d’exécution.</string>
     <string name="drawer_select_done">Terminé</string>
     <string name="drawer_move_n">Déplacer %1$d</string>
     <string name="chat_empty_greeting_morning">Bonjour</string>
@@ -1735,7 +1583,6 @@
     <string name="model_slot_voice_output">Sortie vocale</string>
     <string name="model_slot_empty">Aucun modèle assigné</string>
     <string name="model_slot_main_options">Options du modèle principal</string>
-    <string name="model_slot_fallback_help">Les modèles sont essayés dans l’ordre déclaré. Le comportement de repli dépend de ce réglage.</string>
     <string name="model_slot_fallback_title">Repli en cas d’erreur</string>
     <string name="model_slot_fallback_always">À chaque erreur</string>
     <string name="model_slot_fallback_default">Sur limitation de débit et erreurs serveur</string>
@@ -1745,7 +1592,6 @@
     <string name="model_slot_order_footer">Les entrées sont essayées dans cet ordre. Déplacez-les pour changer la priorité.</string>
     <string name="model_slot_legacy_unresolved">Entrée indisponible conservée depuis la configuration existante</string>
     <string name="model_slot_available_models">Modèles disponibles</string>
-    <string name="model_slot_available_footer">Les modèles masqués ou sans capacité compatible sont exclus.</string>
     <string name="model_slot_no_candidates">Aucun modèle compatible disponible</string>
     <string name="model_slot_system_entry">Moteur vocal intégré à l’appareil</string>
     <string name="model_slot_provider_disabled">Fournisseur désactivé</string>
@@ -1806,7 +1652,6 @@
     <string name="vscreen_preview_failed">Aperçu indisponible. Les écrans sécurisés ou noirs ne sont pas affichés.</string>
     <string name="vscreen_probe_failed">Certaines vérifications ont échoué. L’écran virtuel reste désactivé.</string>
     <string name="vscreen_probe_passed">Toutes les vérifications requises ont réussi. Vous pouvez activer l’écran virtuel.</string>
-    <string name="vscreen_probe_running">Vérification…</string>
     <string name="vscreen_reason_android_old">Android 10 ou version ultérieure est requis. Mettez l’appareil à jour puis réessayez.</string>
     <string name="vscreen_reason_android_ready">Cette version d’Android satisfait à l’exigence minimale.</string>
     <string name="vscreen_reason_app_moved">L’application a quitté l’écran virtuel. Arrêtez l’action ; aucun repli vers l’écran physique n’a lieu.</string>
@@ -1893,12 +1738,7 @@
     <string name="first_run_step_chat_locked">Terminez d\'abord les étapes ci-dessus</string>
     <string name="first_run_done">Terminé</string>
     <string name="settings_agent_loop_models_subtitle">Les sous-agents et minis-model-use peuvent les utiliser</string>
-    <string name="settings_thinking_rules">Règles de réflexion</string>
-    <string name="settings_thinking_rules_subtitle">Paramètres de réflexion par fournisseur</string>
     <string name="settings_models_stats_header">Statistiques</string>
-    <string name="thinking_rules_hub_footer">Les règles dépendent du protocole et se modifient par fournisseur.</string>
-    <string name="thinking_rules_hub_custom">Règles personnalisées prises en charge</string>
-    <string name="thinking_rules_hub_official">Protocole officiel, pas de règles personnalisées</string>
     <string name="scheduled_tasks_empty_title">Aucune tâche planifiée</string>
     <string name="scheduled_run_ok">Réussi</string>
     <string name="scheduled_run_failed">Échec</string>
