@@ -69,8 +69,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
-import com.openminis.app.auth.OpenAIOAuthManager
-import com.openminis.app.auth.OpenRouterOAuthManager
 import com.openminis.app.data.model.ProviderCredential
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.ProviderType
@@ -637,11 +635,7 @@ private fun ColumnScope.OAuthConfigSection(
     var isAuthenticated by remember { mutableStateOf(false) }
     var maskedToken by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val oauthAvailableInThisBuild = when (providerType) {
-        ProviderType.anthropic -> com.openminis.app.auth.ClaudeOAuthManager.isAvailableInThisBuild
-        ProviderType.antigravity -> com.openminis.app.auth.AntigravityOAuthManager.isAvailableInThisBuild
-        else -> true
-    }
+    val oauthAvailableInThisBuild = isOAuthAvailableInThisBuild(providerType)
 
     // Manual OAuth token entry state
     var manualToken by remember { mutableStateOf("") }
@@ -741,44 +735,15 @@ private fun ColumnScope.OAuthConfigSection(
                         com.openminis.app.auth.OAuthForegroundGate.begin()
                         kimiLoginJob = scope.launch {
                             try {
-                                when (providerType) {
-                                    ProviderType.kimiCode -> {
-                                        // [T-kimi-oauth] Device-code flow: the
-                                        // onDeviceCode callback flips the dialog
-                                        // state as soon as the code is issued;
-                                        // login() keeps polling underneath and
-                                        // returns once the user authorizes.
-                                        val key = com.openminis.app.auth.KimiOAuthManager.login(
-                                            context, pendingInstanceId, providerRepository,
-                                            onDeviceCode = { auth -> kimiDeviceAuth = auth },
-                                        )
-                                        kimiDeviceAuth = null
-                                        maskedToken = maskOAuthToken(key)
-                                    }
-                                    ProviderType.openRouter -> {
-                                        val key = OpenRouterOAuthManager.login(context, pendingInstanceId, providerRepository)
-                                        maskedToken = maskOAuthToken(key)
-                                    }
-                                    ProviderType.anthropic -> {
-                                        val key = com.openminis.app.auth.ClaudeOAuthManager.login(context, pendingInstanceId, providerRepository)
-                                        maskedToken = maskOAuthToken(key)
-                                    }
-                                    ProviderType.openAI -> {
-                                        val key = OpenAIOAuthManager.login(context, pendingInstanceId, providerRepository)
-                                        maskedToken = maskOAuthToken(key)
-                                    }
-                                    ProviderType.xAI -> {
-                                        val key = com.openminis.app.auth.XAIOAuthManager.login(context, pendingInstanceId, providerRepository)
-                                        maskedToken = maskOAuthToken(key)
-                                    }
-                                    ProviderType.antigravity -> {
-                                        val key = com.openminis.app.auth.AntigravityOAuthManager.login(context, pendingInstanceId, providerRepository)
-                                        maskedToken = maskOAuthToken(key)
-                                    }
-                                    else -> {
-                                        throw Exception("OAuth not yet implemented for ${providerType.displayName}")
-                                    }
-                                }
+                                // [T-kimi-oauth] Kimi's device-code flow flips the dialog state as soon
+                                // as the code is issued; login() keeps polling underneath and returns
+                                // once the user authorizes.
+                                val key = loginWithOAuth(
+                                    context, providerType, pendingInstanceId, providerRepository,
+                                    onDeviceCode = { auth -> kimiDeviceAuth = auth },
+                                ) ?: throw Exception("OAuth not yet implemented for ${providerType.displayName}")
+                                kimiDeviceAuth = null
+                                maskedToken = maskOAuthToken(key)
                                 isAuthenticated = true
                             } catch (e: kotlinx.coroutines.CancellationException) {
                                 // [T-kimi-oauth] User dismissed the device-code
@@ -794,13 +759,8 @@ private fun ColumnScope.OAuthConfigSection(
                                 // (4xx, token format) keep their raw
                                 // message so we don't lose diagnostic
                                 // signal.
-                                errorMessage = when (e) {
-                                    is com.openminis.app.auth.ProviderCustomizationUnavailableException ->
-                                        context.getString(R.string.provider_oauth_not_available_in_this_build)
-                                    is com.openminis.app.auth.OAuthNetworkUnreachableException ->
-                                        context.getString(R.string.add_provider_oauth_network_unreachable)
-                                    else -> e.message ?: "Authentication failed"
-                                }
+                                errorMessage = oauthKnownFailureMessage(context, e)
+                                    ?: e.message ?: "Authentication failed"
                             } finally {
                                 isAuthenticating = false
                                 com.openminis.app.auth.OAuthForegroundGate.end()

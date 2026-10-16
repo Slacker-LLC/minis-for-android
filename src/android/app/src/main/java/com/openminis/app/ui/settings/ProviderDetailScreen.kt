@@ -870,11 +870,7 @@ private fun OAuthCredentialBlock(
     // ProviderInstanceDetailView's `oauthRefreshTrigger.toggle()`.
     var displayedKey by remember(instance.id) { mutableStateOf(storedKey) }
     var isAuthenticating by remember(instance.id) { mutableStateOf(false) }
-    val oauthAvailableInThisBuild = when (instance.providerType) {
-        ProviderType.anthropic -> com.openminis.app.auth.ClaudeOAuthManager.isAvailableInThisBuild
-        ProviderType.antigravity -> com.openminis.app.auth.AntigravityOAuthManager.isAvailableInThisBuild
-        else -> true
-    }
+    val oauthAvailableInThisBuild = isOAuthAvailableInThisBuild(instance.providerType)
     // [T-kimi-oauth] Device-code dialog state for Kimi re-auth (see
     // AddProviderScreen.OAuthConfigSection for the rationale).
     var kimiDeviceAuth by remember(instance.id) {
@@ -966,34 +962,10 @@ private fun OAuthCredentialBlock(
                 com.openminis.app.auth.OAuthForegroundGate.begin()
                 kimiLoginJob = scope.launch {
                     try {
-                        val token = when (instance.providerType) {
-                            ProviderType.kimiCode ->
-                                com.openminis.app.auth.KimiOAuthManager.login(
-                                    context, instance.id, providerRepository,
-                                    onDeviceCode = { auth -> kimiDeviceAuth = auth },
-                                ).also { kimiDeviceAuth = null }
-                            ProviderType.anthropic ->
-                                com.openminis.app.auth.ClaudeOAuthManager.login(
-                                    context, instance.id, providerRepository,
-                                )
-                            ProviderType.openAI ->
-                                com.openminis.app.auth.OpenAIOAuthManager.login(
-                                    context, instance.id, providerRepository,
-                                )
-                            ProviderType.openRouter ->
-                                com.openminis.app.auth.OpenRouterOAuthManager.login(
-                                    context, instance.id, providerRepository,
-                                )
-                            ProviderType.xAI ->
-                                com.openminis.app.auth.XAIOAuthManager.login(
-                                    context, instance.id, providerRepository,
-                                )
-                            ProviderType.antigravity ->
-                                com.openminis.app.auth.AntigravityOAuthManager.login(
-                                    context, instance.id, providerRepository,
-                                )
-                            else -> null
-                        }
+                        val token = loginWithOAuth(
+                            context, instance.providerType, instance.id, providerRepository,
+                            onDeviceCode = { auth -> kimiDeviceAuth = auth },
+                        )
                         // login() persists the token via providerRepository.saveApiKey;
                         // reflect it locally so the UI flips to the connected state
                         // without needing the parent to recompose.
@@ -1006,16 +978,10 @@ private fun OAuthCredentialBlock(
                         // an error to show.
                         if (e is kotlinx.coroutines.CancellationException) throw e
                         AppLogger.warning(TAG, "OAuth sign-in failed for ${instance.id}: ${e.message}")
-                        authError = when (e) {
-                            is com.openminis.app.auth.ProviderCustomizationUnavailableException ->
-                                context.getString(R.string.provider_oauth_not_available_in_this_build)
-                            is com.openminis.app.auth.OAuthNetworkUnreachableException ->
-                                context.getString(R.string.add_provider_oauth_network_unreachable)
-                            else -> context.getString(
-                                R.string.oauth_sign_in_failed,
-                                e.message ?: e.javaClass.simpleName,
-                            )
-                        }
+                        authError = oauthKnownFailureMessage(context, e) ?: context.getString(
+                            R.string.oauth_sign_in_failed,
+                            e.message ?: e.javaClass.simpleName,
+                        )
                     } finally {
                         isAuthenticating = false
                         kimiDeviceAuth = null
