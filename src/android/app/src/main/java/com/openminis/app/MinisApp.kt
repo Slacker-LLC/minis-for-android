@@ -908,6 +908,10 @@ class MinisApp : Application(), ImageLoaderFactory {
         // The abstract-socket listener is retired; clear what it left behind.
         Thread { NativeOffloadServer.deleteLegacyReplyFiles() }.apply { isDaemon = true }.start()
 
+        // Voice-correction learning was removed with the inline dictation panel; drop its leftovers.
+        Thread { com.openminis.app.speech.LegacyVoiceCorrectionCleanup.run(this) }
+            .apply { isDaemon = true }.start()
+
         // Initialize session activity tracker for foreground service management
         SessionActivityTracker.init(this)
         // OpenMinis Pet fork: restore the optional overlay after process recreation.

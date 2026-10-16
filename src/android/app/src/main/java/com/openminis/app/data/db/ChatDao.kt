@@ -364,20 +364,6 @@ interface ChatDao {
         return ordered
     }
 
-    /**
-     * [T-android-voice-correction] User messages newer than [since] (epoch ms),
-     * across every session, for typed-vocabulary mining.
-     *
-     * Filtering in SQL rather than loading all sessions and discarding in
-     * Kotlin (which is what iOS does) keeps an incremental build proportional
-     * to what is actually new. [limit] bounds a first run over a long history.
-     */
-    @Query(
-        "SELECT * FROM messages WHERE role = 'user' AND created_at > :since " +
-            "ORDER BY created_at ASC LIMIT :limit",
-    )
-    suspend fun loadUserMessagesSince(since: Long, limit: Int): List<MessageEntity>
-
     @Query("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM messages WHERE session_id = :sessionId")
     suspend fun nextSortOrder(sessionId: String): Int
 
