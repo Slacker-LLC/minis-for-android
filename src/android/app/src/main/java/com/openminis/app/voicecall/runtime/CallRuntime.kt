@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.SharedFlow
 enum class CallNotice { RECOGNITION_RETRY, TASK_FAILED, IDLE_REMINDER }
 
 /** 通话被 runtime 自动结束的原因；UI 据此在结束页给出说明。 */
-enum class CallEndReason { PERMISSION_DENIED, RECOGNITION_FAILED, TASK_FAILED, IDLE_TIMEOUT }
+enum class CallEndReason { PERMISSION_DENIED, RECOGNITION_FAILED, TASK_FAILED, IDLE_TIMEOUT, CONNECTION_FAILED }
 
 /** CallRuntime 抛给 CallController 的事件。 */
 sealed interface CallEvent {

@@ -2442,6 +2442,7 @@
     <string name="voice_call_chat_empty">還沒有內容，你和助理說的話會顯示在這裡。</string>
     <string name="voice_call_leave_to_chat">返回聊天</string>
     <string name="voice_call_ended_idle">很久沒有人說話，通話已自動結束。</string>
+    <string name="voice_call_ended_connection">無法連線到即時語音服務：%1$s</string>
     <string name="settings_ralph_limit">Ralph 單輪時限</string>
     <string name="settings_ralph_limit_subtitle">每輪 %1$d 分鐘 · 停止後等待子任務清理</string>
     <string name="settings_ralph_timeout">單輪時限（1–30 分鐘）</string>

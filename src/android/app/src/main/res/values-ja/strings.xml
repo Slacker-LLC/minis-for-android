@@ -2270,6 +2270,7 @@
     <string name="voice_call_chat_empty">まだ会話がありません。やり取りはここに表示されます。</string>
     <string name="voice_call_leave_to_chat">チャットに戻る</string>
     <string name="voice_call_ended_idle">しばらく誰も話さなかったため、通話を終了しました。</string>
+    <string name="voice_call_ended_connection">リアルタイム音声サービスに接続できませんでした：%1$s</string>
     <string name="settings_ralph_limit">Ralph の各ラウンドの制限時間</string>
     <string name="settings_ralph_limit_subtitle">各ラウンド %1$d 分 · 停止後に子タスクの後処理を待機</string>
     <string name="settings_ralph_timeout">各ラウンドの制限時間（1–30 分）</string>

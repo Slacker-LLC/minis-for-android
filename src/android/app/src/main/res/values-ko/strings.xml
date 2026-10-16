@@ -2262,6 +2262,7 @@
     <string name="voice_call_chat_empty">아직 대화가 없어요. 나눈 대화가 여기에 표시됩니다.</string>
     <string name="voice_call_leave_to_chat">채팅으로 돌아가기</string>
     <string name="voice_call_ended_idle">한동안 아무도 말하지 않아 통화를 종료했어요.</string>
+    <string name="voice_call_ended_connection">실시간 음성 서비스에 연결하지 못했어요: %1$s</string>
     <string name="settings_ralph_limit">Ralph 라운드 제한 시간</string>
     <string name="settings_ralph_limit_subtitle">라운드당 %1$d분 · 중지 후 하위 작업 정리 대기</string>
     <string name="settings_ralph_timeout">라운드 제한 시간(1–30분)</string>

@@ -86,3 +86,23 @@
 - 通话提示词补了「更新频率/详细程度偏好整个任务有效」。
 
 与 Codex 的差异：Codex 有独立的语音模型，我们只有一个干活的模型，用概括调用代替。未验证：真机上概括调用的延迟与各 provider 的兼容性（只有单测和 fake 覆盖）。
+
+## 全双工实时通话（对齐 Codex，2026-10-16，第二阶段：运行时）
+
+与原 ASR→Agent→TTS 流水线并列、二选一，**原流水线代码保留**。代码在 `voicecall/realtime/`。
+
+- 结构对齐 Codex：实时语音模型只当对话界面，Agent 是后端执行者（`codex-rs/core/src/realtime_conversation.rs`）。
+  - 后端输出加 `[BACKEND] ` 前缀并按预算截断（同文件 :103、:115、:1657-1668；我们按 2000 字符）。
+  - 交给后端的请求上限 4 KB（`core/src/context/realtime_delegation.rs`）。
+  - 进行中的进度作为额外条目注入（对应 Codex 的 Commentary 阶段，同文件 :960-1030），只报已核实的进度。
+  - 语音模型提示参考 `prompts/templates/realtime/backend_prompt.md`（只说结论、不念表格/代码、偏好整个任务有效），见 `RealtimePrompt.kt`。
+- 两种交接：工具模式（模型调用 `delegate_to_agent`）与条目模式（`codex_responses_as_items`：模型不自动回复，用户说完把转写交 Agent，结果以条目注入）。
+- 复用现有端口：`CallModelGateway`、`CallApprovals`（权限请求由实时模型口头问、转写解析回答，不交给 Agent）、`CallTasks`、空闲 300 s 挂断、静音、打断。
+- 失败关闭：无麦克风权限直接结束；连接失败/15 s 未就绪结束（新增 `CallEndReason.CONNECTION_FAILED`，8 种语言文案）；就绪后单次服务端错误不致命，连续 3 次结束；只接受 `wss://`。
+
+**未验证（没有真实 API key 和真机）**
+- 所有厂商的真实连接、事件顺序、字段细节只对照官方文档写，未联网验证。
+- 回声消除（`AndroidRealtimeAudio` 用 VOICE_COMMUNICATION 音源 + 系统 AEC/降噪/增益）各机型效果未测；扬声器外放最可能出现自我打断。
+- 打断后遗留的未应答函数调用，服务端是否容忍未验证；用户插话时的音频截断（OpenAI `conversation.item.truncate`）未做。
+- 工具模式下口头任务指令与模型自动回复可能抢跑（转写晚于回复开始时）。
+- 千问工具调用字段、豆包/xAI/阶跃星辰/智谱协议尚未读文档。

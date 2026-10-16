@@ -2559,6 +2559,7 @@
     <string name="voice_call_chat_empty">Nothing said yet. What you and the assistant say shows up here.</string>
     <string name="voice_call_leave_to_chat">Back to chat</string>
     <string name="voice_call_ended_idle">Nobody spoke for a while, so the call was ended.</string>
+    <string name="voice_call_ended_connection">Could not reach the realtime voice service: %1$s</string>
     <string name="settings_ralph_limit">Ralph round time limit</string>
     <string name="settings_ralph_limit_subtitle">%1$d min per round · waits for child cleanup</string>
     <string name="settings_ralph_timeout">Per-round time limit (1–30 minutes)</string>

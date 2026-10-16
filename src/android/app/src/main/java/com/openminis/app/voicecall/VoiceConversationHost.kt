@@ -634,6 +634,7 @@ private fun endedText(context: android.content.Context, ended: CallEnded): Strin
         context.getString(R.string.voice_call_recognition_failed, ended.detail.orEmpty())
     CallEndReason.TASK_FAILED -> taskIncompleteText(context, ended.detail)
     CallEndReason.IDLE_TIMEOUT -> context.getString(R.string.voice_call_ended_idle)
+    CallEndReason.CONNECTION_FAILED -> context.getString(R.string.voice_call_ended_connection, ended.detail.orEmpty())
 }
 
 private fun taskIncompleteText(context: android.content.Context, detail: String?): String =

@@ -2467,6 +2467,7 @@
     <string name="voice_call_chat_empty">还没有内容，你和助手说的话会显示在这里。</string>
     <string name="voice_call_leave_to_chat">返回聊天</string>
     <string name="voice_call_ended_idle">很久没有人说话，通话已自动结束。</string>
+    <string name="voice_call_ended_connection">无法连接实时语音服务：%1$s</string>
     <string name="settings_ralph_limit">Ralph 单轮时限</string>
     <string name="settings_ralph_limit_subtitle">每轮 %1$d 分钟 · 停止后等待子任务清理</string>
     <string name="settings_ralph_timeout">单轮时限（1–30 分钟）</string>

@@ -2170,6 +2170,7 @@
     <string name="voice_call_chat_empty">Rien n\'a encore été dit. Votre échange apparaîtra ici.</string>
     <string name="voice_call_leave_to_chat">Retour au chat</string>
     <string name="voice_call_ended_idle">Personne n\'a parlé depuis un moment, l\'appel a donc été terminé.</string>
+    <string name="voice_call_ended_connection">Impossible de joindre le service vocal en temps réel : %1$s</string>
     <string name="settings_ralph_limit">Limite de temps par tour Ralph</string>
     <string name="settings_ralph_limit_subtitle">%1$d min par tour · attend le nettoyage de la tâche enfant</string>
     <string name="settings_ralph_timeout">Temps par tour (1–30 minutes)</string>

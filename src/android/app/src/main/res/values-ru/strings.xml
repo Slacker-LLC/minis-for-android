@@ -2452,6 +2452,7 @@
     <string name="voice_call_chat_empty">Пока ничего не сказано. Ваш разговор появится здесь.</string>
     <string name="voice_call_leave_to_chat">Назад в чат</string>
     <string name="voice_call_ended_idle">Долго никто не говорил, поэтому звонок завершён.</string>
+    <string name="voice_call_ended_connection">Не удалось подключиться к голосовому сервису реального времени: %1$s</string>
     <string name="settings_ralph_limit">Ограничение времени раунда Ralph</string>
     <string name="settings_ralph_limit_subtitle">%1$d мин на раунд · ожидание очистки дочерней задачи</string>
     <string name="settings_ralph_timeout">Время на раунд (1–30 минут)</string>
