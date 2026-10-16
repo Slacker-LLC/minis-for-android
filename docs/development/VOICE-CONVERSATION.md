@@ -106,3 +106,10 @@
 - 打断后遗留的未应答函数调用，服务端是否容忍未验证；用户插话时的音频截断（OpenAI `conversation.item.truncate`）未做。
 - 工具模式下口头任务指令与模型自动回复可能抢跑（转写晚于回复开始时）。
 - 千问工具调用字段、豆包/xAI/阶跃星辰/智谱协议尚未读文档。
+
+### 第三阶段：设置与接线
+
+- **不另存 API key**：实时模型直接使用「管理提供商」里已有的提供商和它的 key（`loadApiKey`）。通话设置只存非敏感选择（提供商、协议档案、模型/音色/业务空间/自定义地址），见 `RealtimeSelection.kt`。
+- key 只发给它所属的厂商：OpenAI/Gemini 档案只接受官方端点的提供商（自定义 base URL、Azure 的 key 不会被发往官方地址），千问和自定义档案接受任意 API key 提供商；OAuth、已停用、`unsupported` 一律拒绝（`providerFits`，有否定用例）。
+- `EngineSwitchingCallRuntime`：默认经典流水线；选了实时模型且设置完整才用实时运行时，否则安静回退到经典流水线。
+- `CallSettingsSheet` 新增「通话引擎」区（8 种语言）。
