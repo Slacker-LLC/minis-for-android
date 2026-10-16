@@ -2063,6 +2063,7 @@
     <string name="vscreen_display_busy">L’écran virtuel est actuellement utilisé par une autre session.</string>
     <string name="voice_call_settings_speed">Vitesse de lecture</string>
     <string name="voice_call_settings_earpiece">Utiliser l\'écouteur</string>
+    <string name="voice_call_settings_new_chat">Nouvelle discussion à chaque appel</string>
     <string name="chat_settings_return_key">Touche Entrée</string>
     <string name="chat_settings_launch">Au lancement</string>
     <string name="chat_settings_group_input">Saisie</string>

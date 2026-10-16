@@ -266,8 +266,21 @@ internal fun VoiceConversationHost(
         if (DeepLinkCoordinator.pendingChatActionFor(sessionId, fromChatRoute) ==
             DeepLinkCoordinator.ChatAction.START_VOICE
         ) {
+            val scoped = DeepLinkCoordinator.pendingChatActionSessionId() != null
             DeepLinkCoordinator.consumePendingChatAction()
-            openCall()
+            // 输入框上的语音键默认新开一个对话：通话和结束后停留的都是新对话。
+            val redirect = VoiceEntryTarget.redirectFromComposer(
+                newChat = VoiceOutputState.callNewChat.value,
+                actionScopedToSession = scoped,
+                currentIsBlankDraft = viewModel.isBlankDraft,
+                newDraftId = { "__new__${java.util.UUID.randomUUID()}" },
+            )
+            if (redirect != null) {
+                DeepLinkCoordinator.setPendingChatAction(DeepLinkCoordinator.ChatAction.START_VOICE, redirect)
+                onMoveToSession(redirect)
+            } else {
+                openCall()
+            }
         }
     }
     // runtime 自动挂断（空闲/连续出错）：不留结束页，直接回到聊天，用提示说明原因。

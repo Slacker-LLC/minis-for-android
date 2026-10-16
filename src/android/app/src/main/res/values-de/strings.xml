@@ -2165,6 +2165,7 @@
     <string name="vscreen_display_busy">Das virtuelle Display wird derzeit von einer anderen Sitzung verwendet.</string>
     <string name="voice_call_settings_speed">Sprechgeschwindigkeit</string>
     <string name="voice_call_settings_earpiece">Hörer verwenden</string>
+    <string name="voice_call_settings_new_chat">Für jeden Anruf neuen Chat starten</string>
     <string name="chat_settings_return_key">Eingabetaste</string>
     <string name="chat_settings_launch">Beim Start</string>
     <string name="chat_settings_group_input">Eingabe</string>

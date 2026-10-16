@@ -2323,6 +2323,7 @@
     <string name="vscreen_display_busy">虚拟屏当前正被另一个会话占用。</string>
     <string name="voice_call_settings_speed">朗读语速</string>
     <string name="voice_call_settings_earpiece">使用听筒播放</string>
+    <string name="voice_call_settings_new_chat">每次通话新开对话</string>
     <string name="chat_settings_return_key">回车键</string>
     <string name="chat_settings_launch">启动时显示</string>
     <string name="chat_settings_group_input">输入</string>

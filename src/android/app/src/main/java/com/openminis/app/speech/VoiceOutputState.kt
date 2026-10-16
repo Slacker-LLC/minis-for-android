@@ -30,6 +30,7 @@ object VoiceOutputState {
     private const val KEY_MUTED = "readReplies.muted"
     private const val KEY_SPEED = "readReplies.speed"
     private const val KEY_CALL_EARPIECE = "call.earpiece"
+    private const val KEY_CALL_NEW_CHAT = "call.new_chat"
     private const val KEY_SYSTEM_VOICE = "readReplies.systemVoice"
     private const val KEY_SYSTEM_VOICE_LABEL = "readReplies.systemVoiceLabel"
 
@@ -54,6 +55,10 @@ object VoiceOutputState {
     /** 通话里用听筒（而不是扬声器）出声；只影响语音通话页。 */
     private val _callEarpiece = MutableStateFlow(false)
     val callEarpiece: StateFlow<Boolean> = _callEarpiece.asStateFlow()
+
+    /** 点语音时是否新开一个对话（默认是）；关闭则在当前/上次的对话里接着聊。 */
+    private val _callNewChat = MutableStateFlow(true)
+    val callNewChat: StateFlow<Boolean> = _callNewChat.asStateFlow()
 
     // Live state mirrored from the active ReadAloudPlayer so the capsule can
     // render playback/synthesis without owning the player.
@@ -163,6 +168,7 @@ object VoiceOutputState {
         _isMuted.value = p.getBoolean(KEY_MUTED, false)
         _speed.value = p.getFloat(KEY_SPEED, 1.0f)
         _callEarpiece.value = p.getBoolean(KEY_CALL_EARPIECE, false)
+        _callNewChat.value = p.getBoolean(KEY_CALL_NEW_CHAT, true)
         _systemVoiceName.value = p.getString(KEY_SYSTEM_VOICE, null)
         _systemVoiceLabel.value = p.getString(KEY_SYSTEM_VOICE_LABEL, null)
     }
@@ -198,6 +204,12 @@ object VoiceOutputState {
         if (_callEarpiece.value == value) return
         _callEarpiece.value = value
         prefs?.edit()?.putBoolean(KEY_CALL_EARPIECE, value)?.apply()
+    }
+
+    fun setCallNewChat(value: Boolean) {
+        if (_callNewChat.value == value) return
+        _callNewChat.value = value
+        prefs?.edit()?.putBoolean(KEY_CALL_NEW_CHAT, value)?.apply()
     }
 
     /** Cycle 1× → 1.25× → 1.5× → 2× → 1×. */

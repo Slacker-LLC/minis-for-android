@@ -815,12 +815,17 @@ class MainActivity : ComponentActivity() {
             is DeepLinkAction.NewCameraChat -> {
                 lifecycleScope.launch {
                     try {
+                        com.openminis.app.speech.VoiceOutputState.init(this@MainActivity)
                         val restored = if (action is DeepLinkAction.NewVoiceChat)
                             com.openminis.app.data.AssistantHomePrefs.resolveVoiceSession(this@MainActivity) else null
                         // Scoped to the session we are about to show: the screen
                         // being replaced also collects this flow and used to
                         // consume the action before it was disposed.
-                        val target = restored ?: "__new__${java.util.UUID.randomUUID()}"
+                        val newDraft = { "__new__${java.util.UUID.randomUUID()}" }
+                        val target = if (action is DeepLinkAction.NewVoiceChat)
+                            com.openminis.app.voicecall.VoiceEntryTarget.forDeepLink(
+                                com.openminis.app.speech.VoiceOutputState.callNewChat.value, restored, newDraft,
+                            ) else restored ?: newDraft()
                         when (action) {
                             is DeepLinkAction.NewVoiceChat -> DeepLinkCoordinator.setPendingChatAction(
                                 DeepLinkCoordinator.ChatAction.START_VOICE,

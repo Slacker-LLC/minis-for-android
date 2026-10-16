@@ -122,6 +122,9 @@ object DeepLinkCoordinator {
         return if (target == sessionId) action else null
     }
 
+    /** Session the pending action is scoped to; null when it targets "whoever holds the composer". */
+    fun pendingChatActionSessionId(): String? = _pendingChatActionSessionId.value
+
     fun consumePendingChatAction(): ChatAction? {
         val current = _pendingChatAction.value
         _pendingChatAction.value = null
