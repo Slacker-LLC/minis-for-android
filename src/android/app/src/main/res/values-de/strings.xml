@@ -331,9 +331,7 @@
     <string name="perm_a11y_section_footer">android-a11y-cli ermöglicht dem Agenten, die UI-Struktur zu lesen, Tippen und Gesten auszuführen sowie Systemereignisse zu beobachten. Beide Zeilen unten müssen gesetzt sein: Agent-Berechtigung wählen und Bedienungshilfen-Dienst in den Systemeinstellungen aktivieren.</string>
     <string name="perm_a11y_cli_description">Agent darf Bildschirm-UI lesen, tippen, eingeben, Ereignisse beobachten</string>
     <string name="perm_a11y_open_settings">Bedienungshilfen-Einstellungen öffnen</string>
-    <string name="perm_system_authorization">Systemautorisierung</string>
     <string name="perm_root_not_granted">Nicht erteilt</string>
-    <string name="perm_agent_policy">Agent-Berechtigung</string>
     <string name="perm_a11y_system_ready">Dienst aktiviert</string>
     <string name="perm_a11y_system_disabled">Dienst nicht aktiviert</string>
     <string name="perm_allow_minis_config">minis-config zulassen</string>
@@ -1498,7 +1496,6 @@
     <string name="settings_attention_count">%1$d Punkte brauchen Aufmerksamkeit</string>
     <string name="settings_ready_header">Bereitschaftsprüfung</string>
     <string name="settings_ready_footer">Hier stehen die Systembedingungen, die der Agent braucht. Optionale Punkte zählen nicht als nicht bereit.</string>
-    <string name="settings_manage_header">Verwalten</string>
     <string name="settings_ready_root_title">Root</string>
     <string name="settings_ready_root_ok">Erteilt · Ubuntu-Laufzeit verfügbar</string>
     <string name="settings_ready_root_bad">Nicht erteilt: Die Ubuntu-Laufzeit kann nicht starten</string>
@@ -2035,8 +2032,6 @@
     <string name="perm_tool_vscreen_close">Virtuellen Bildschirm schließen</string>
     <string name="perm_tool_vscreen_status">Gerätestatus lesen</string>
     <string name="perm_tool_vscreen_ui">Virtuellen Bildschirm bedienen</string>
-    <string name="perm_vscreen_master_title">Agent darf den virtuellen Bildschirm nutzen</string>
-    <string name="perm_vscreen_master_sub">Hauptschalter; darunter die Einzelrechte</string>
     <string name="settings_ready_overlay_title">Über anderen Apps anzeigen</string>
     <string name="settings_ready_overlay_ok">Erlaubt</string>
     <string name="settings_ready_overlay_bad">Aus · Desktop-Pet und schwebende Steuerung brauchen es</string>
@@ -2359,6 +2354,11 @@
     <string name="voice_bot_react_sub">Konfetti bei Erfolg, Hüpfer bei Fehlern und Zuhörbeginn</string>
     <string name="voice_bot_preview_hint">Figur antippen, um Zustände zu testen</string>
     <string name="voice_call_session_missing">Dieser Chat existiert nicht mehr. Starte einen neuen Chat und versuche es erneut.</string>
+    <string name="perm_section_capabilities">Erweiterte Fähigkeiten</string>
+    <string name="perm_vscreen_on">An</string>
+    <string name="perm_vscreen_off">Aus</string>
+    <string name="settings_system_group_agent">Was der Agent darf</string>
+    <string name="settings_system_group_device">Geräteberechtigungen</string>
     <string name="voice_call_settings_title">Sprachanruf</string>
     <string name="voice_call_settings_sub">Erkennungs- und Vorlesemodelle, Hörmuschel, Tempo, Anruf-Engine</string>
     <string name="voice_call_engine">Anruf-Engine</string>

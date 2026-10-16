@@ -555,9 +555,7 @@
     <string name="perm_a11y_section_footer">android-a11y-cli позволяет агенту считывать структуру UI на экране, выполнять нажатия и жесты, а также отслеживать системные события. Должны быть заданы обе строки ниже: выберите разрешение Агента и включите службу Специальных возможностей в системных Настройках.</string>
     <string name="perm_a11y_cli_description">Позволяет агенту считывать UI экрана, нажимать, вводить текст и отслеживать события</string>
     <string name="perm_a11y_open_settings">Открыть настройки Специальных возможностей</string>
-    <string name="perm_system_authorization">Системная авторизация</string>
     <string name="perm_root_not_granted">Не предоставлен</string>
-    <string name="perm_agent_policy">Разрешение агента</string>
     <string name="perm_a11y_system_ready">Служба включена</string>
     <string name="perm_a11y_system_disabled">Служба не включена</string>
     <string name="perm_allow_minis_config">Разрешить minis-config</string>
@@ -1657,7 +1655,6 @@
     <string name="settings_attention_count">Требуют внимания: %1$d</string>
     <string name="settings_ready_header">Проверка готовности</string>
     <string name="settings_ready_footer">Здесь собраны системные условия, нужные агенту. Необязательные пункты не считаются неготовыми.</string>
-    <string name="settings_manage_header">Управление</string>
     <string name="settings_ready_root_title">Root</string>
     <string name="settings_ready_root_ok">Предоставлено · среда Ubuntu доступна</string>
     <string name="settings_ready_root_bad">Не предоставлено: среда Ubuntu не запустится</string>
@@ -2211,8 +2208,6 @@
     <string name="perm_tool_vscreen_close">Закрыть виртуальный экран</string>
     <string name="perm_tool_vscreen_status">Читать состояние устройства</string>
     <string name="perm_tool_vscreen_ui">Управлять виртуальным экраном</string>
-    <string name="perm_vscreen_master_title">Разрешить агенту виртуальный экран</string>
-    <string name="perm_vscreen_master_sub">Главный переключатель; ниже отдельные права</string>
     <string name="settings_ready_overlay_title">Поверх других приложений</string>
     <string name="settings_ready_overlay_ok">Разрешено</string>
     <string name="settings_ready_overlay_bad">Выкл. · нужно питомцу и плавающим элементам</string>
@@ -2537,6 +2532,11 @@
     <string name="voice_bot_react_sub">Конфетти при успехе, прыжок при ошибке и начале прослушивания</string>
     <string name="voice_bot_preview_hint">Нажмите на персонажа, чтобы посмотреть состояния</string>
     <string name="voice_call_session_missing">Этот чат больше не существует. Начните новый чат и повторите попытку.</string>
+    <string name="perm_section_capabilities">Расширенные возможности</string>
+    <string name="perm_vscreen_on">Вкл.</string>
+    <string name="perm_vscreen_off">Выкл.</string>
+    <string name="settings_system_group_agent">Что может агент</string>
+    <string name="settings_system_group_device">Разрешения устройства</string>
     <string name="voice_call_settings_title">Голосовой звонок</string>
     <string name="voice_call_settings_sub">Модели распознавания и озвучки, динамик, скорость, движок звонка</string>
     <string name="voice_call_engine">Движок звонка</string>

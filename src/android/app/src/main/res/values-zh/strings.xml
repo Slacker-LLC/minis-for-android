@@ -425,9 +425,7 @@
     <string name="perm_a11y_section_footer">android-a11y-cli 让 Agent 读取屏幕 UI、模拟点击与输入、监听系统事件。下方两项都需配置:选择 Agent 权限,并在系统设置启用无障碍服务。</string>
     <string name="perm_a11y_cli_description">让 Agent 读取屏幕、点击、输入、监听事件</string>
     <string name="perm_a11y_open_settings">前往无障碍设置</string>
-    <string name="perm_system_authorization">系统授权</string>
     <string name="perm_root_not_granted">未授权</string>
-    <string name="perm_agent_policy">Agent 权限</string>
     <string name="perm_a11y_system_ready">已启用</string>
     <string name="perm_a11y_system_disabled">未启用</string>
     <string name="perm_allow_minis_config">允许 minis-config</string>
@@ -454,7 +452,6 @@
     <string name="root_cli_cap_device_desc">查询设备属性和硬件状态</string>
     <string name="root_cli_cap_service_desc">检查 Root 是否可用</string>
 
-    <string name="perm_section_privileged_backend">特权后端</string>
     <string name="perm_privileged_cli_description">允许 Agent 以 root 身份执行 ADB 级系统命令（pm、am、settings、input…）</string>
 
     <string name="skill_title">技能</string>
@@ -1646,7 +1643,6 @@
     <string name="settings_attention_count">%1$d 项需要处理</string>
     <string name="settings_ready_header">就绪检查</string>
     <string name="settings_ready_footer">这里汇总 Agent 正常工作所需的系统条件。可选项不计入未就绪。</string>
-    <string name="settings_manage_header">管理</string>
     <string name="settings_ready_root_title">Root</string>
     <string name="settings_ready_root_ok">已授权 · Ubuntu 运行时可用</string>
     <string name="settings_ready_root_bad">未授权：Ubuntu 运行时无法启动</string>
@@ -2232,8 +2228,6 @@
     <string name="perm_tool_vscreen_close">关闭虚拟屏幕</string>
     <string name="perm_tool_vscreen_status">读取设备状态</string>
     <string name="perm_tool_vscreen_ui">操作虚拟屏幕</string>
-    <string name="perm_vscreen_master_title">允许 Agent 使用虚拟屏幕</string>
-    <string name="perm_vscreen_master_sub">总开关，下面是各项权限</string>
     <string name="settings_ready_overlay_title">显示在其他应用上层</string>
     <string name="settings_ready_overlay_ok">已允许</string>
     <string name="settings_ready_overlay_bad">未允许 · 桌宠和悬浮控件需要它</string>
@@ -2552,6 +2546,11 @@
     <string name="voice_bot_react">事件反应</string>
     <string name="voice_bot_react_sub">成功时撒彩屑，出错和开始聆听时跳一下</string>
     <string name="voice_bot_preview_hint">点一下角色可预览各状态</string>
+    <string name="perm_section_capabilities">高权限能力</string>
+    <string name="perm_vscreen_on">已开启</string>
+    <string name="perm_vscreen_off">未开启</string>
+    <string name="settings_system_group_agent">Agent 能做什么</string>
+    <string name="settings_system_group_device">设备授权</string>
     <string name="voice_call_settings_title">语音通话</string>
     <string name="voice_call_settings_sub">识别与朗读模型、听筒、语速、通话引擎</string>
     <string name="voice_call_engine">通话引擎</string>

@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.openminis.app.R
+import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.tools.android.DeviceScreenLease
 import com.openminis.app.tools.android.ScreenshotFrameRegistry
 import com.openminis.app.tools.android.UnattendedAccessPrefs
@@ -60,7 +61,8 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenRoot: () -> Unit = {})
     val client = remember(context) { VirtualScreenClientProvider.get(context) }
     val preferences = remember(context) { VirtualScreenPreferences(context) }
     val scope = rememberCoroutineScope()
-    var enabled by remember { mutableStateOf(client.isEnabled()) }
+    // 一个开关同时管系统侧启用和 Agent 使用权限，不再需要到 Agent 权限里再开一遍。
+    var enabled by remember { mutableStateOf(client.isEnabled() && OffloadPermissionManager.isVirtualScreenAllowed()) }
     var probing by remember { mutableStateOf(false) }
     var probePassed by remember { mutableStateOf(client.lastProbe?.passed == true) }
     var probeRows by remember { mutableStateOf(client.lastProbe?.json?.let(::parseProbeRows).orEmpty()) }
@@ -119,6 +121,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenRoot: () -> Unit = {})
                     runCatching { client.setEnabled(true) }.isSuccess
                 }
                 enabled = enabledResult && client.isEnabled()
+                OffloadPermissionManager.setVirtualScreenAllowed(enabled)
                 operationMessage = if (enabled) context.getString(R.string.vscreen_probe_passed)
                 else context.getString(R.string.vscreen_probe_failed)
             } else {
@@ -150,6 +153,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenRoot: () -> Unit = {})
             }
             if (result) {
                 enabled = false
+                OffloadPermissionManager.setVirtualScreenAllowed(false)
                 activeDisplayId = null
                 previewBitmap = null
                 operationMessage = ""

@@ -331,9 +331,7 @@
     <string name="perm_a11y_section_footer">android-a11y-cli を使うと、エージェントは画面の UI 構造を読み取り、タップやジェスチャーを実行し、システムイベントを監視できます。下の 2 行をどちらも設定してください: エージェントの権限を選び、システム設定でユーザー補助サービスを有効化します。</string>
     <string name="perm_a11y_cli_description">エージェントが画面 UI を読み、タップ・入力し、イベントを監視できるようにします</string>
     <string name="perm_a11y_open_settings">ユーザー補助設定を開く</string>
-    <string name="perm_system_authorization">システム認可</string>
     <string name="perm_root_not_granted">未許可</string>
-    <string name="perm_agent_policy">エージェント権限</string>
     <string name="perm_a11y_system_ready">サービス有効</string>
     <string name="perm_a11y_system_disabled">サービス無効</string>
     <string name="perm_allow_minis_config">minis-config を許可</string>
@@ -1503,7 +1501,6 @@
     <string name="settings_attention_count">%1$d 件の対応が必要です</string>
     <string name="settings_ready_header">準備状況</string>
     <string name="settings_ready_footer">Agent が正常に動くために必要なシステム条件をまとめています。任意の項目は未準備に数えません。</string>
-    <string name="settings_manage_header">管理</string>
     <string name="settings_ready_root_title">Root</string>
     <string name="settings_ready_root_ok">許可済み · Ubuntu ランタイムが利用可能</string>
     <string name="settings_ready_root_bad">未許可：Ubuntu ランタイムを起動できません</string>
@@ -2032,8 +2029,6 @@
     <string name="perm_tool_vscreen_close">仮想画面を閉じる</string>
     <string name="perm_tool_vscreen_status">端末の状態を読む</string>
     <string name="perm_tool_vscreen_ui">仮想画面を操作</string>
-    <string name="perm_vscreen_master_title">Agent に仮想画面の使用を許可</string>
-    <string name="perm_vscreen_master_sub">マスタースイッチ。以下は個別の権限</string>
     <string name="settings_ready_overlay_title">他のアプリの上に重ねて表示</string>
     <string name="settings_ready_overlay_ok">許可済み</string>
     <string name="settings_ready_overlay_bad">オフ · デスクトップペットとフローティング操作に必要</string>
@@ -2355,6 +2350,11 @@
     <string name="voice_bot_react_sub">成功で紙吹雪、エラーや聞き取り開始でジャンプ</string>
     <string name="voice_bot_preview_hint">キャラクターをタップして状態をプレビュー</string>
     <string name="voice_call_session_missing">このチャットは存在しません。新しいチャットを開始してからやり直してください。</string>
+    <string name="perm_section_capabilities">高権限の機能</string>
+    <string name="perm_vscreen_on">オン</string>
+    <string name="perm_vscreen_off">オフ</string>
+    <string name="settings_system_group_agent">エージェントにできること</string>
+    <string name="settings_system_group_device">デバイスの権限</string>
     <string name="voice_call_settings_title">音声通話</string>
     <string name="voice_call_settings_sub">認識・読み上げモデル、受話口、速度、通話エンジン</string>
     <string name="voice_call_engine">通話エンジン</string>

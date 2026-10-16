@@ -331,9 +331,7 @@
     <string name="perm_a11y_section_footer">android-a11y-cli는 에이전트가 화면 UI 구조를 읽고, 탭과 제스처를 수행하며 시스템 이벤트를 감시할 수 있게 합니다. 아래 두 행을 모두 설정하세요: 에이전트 권한을 선택하고 시스템 설정에서 접근성 서비스를 활성화하세요.</string>
     <string name="perm_a11y_cli_description">에이전트가 화면 UI를 읽고, 탭/입력하며, 이벤트를 감시</string>
     <string name="perm_a11y_open_settings">접근성 설정 열기</string>
-    <string name="perm_system_authorization">시스템 인가</string>
     <string name="perm_root_not_granted">허용 안 됨</string>
-    <string name="perm_agent_policy">에이전트 권한</string>
     <string name="perm_a11y_system_ready">서비스 활성화됨</string>
     <string name="perm_a11y_system_disabled">서비스 비활성화됨</string>
     <string name="perm_allow_minis_config">minis-config 허용</string>
@@ -1495,7 +1493,6 @@
     <string name="settings_attention_count">%1$d개 항목 확인 필요</string>
     <string name="settings_ready_header">준비 상태</string>
     <string name="settings_ready_footer">에이전트가 정상 동작하는 데 필요한 시스템 조건을 모았습니다. 선택 항목은 미준비로 세지 않습니다.</string>
-    <string name="settings_manage_header">관리</string>
     <string name="settings_ready_root_title">Root</string>
     <string name="settings_ready_root_ok">허용됨 · Ubuntu 런타임 사용 가능</string>
     <string name="settings_ready_root_bad">허용되지 않음: Ubuntu 런타임을 시작할 수 없습니다</string>
@@ -2024,8 +2021,6 @@
     <string name="perm_tool_vscreen_close">가상 화면 닫기</string>
     <string name="perm_tool_vscreen_status">기기 상태 읽기</string>
     <string name="perm_tool_vscreen_ui">가상 화면 조작</string>
-    <string name="perm_vscreen_master_title">에이전트의 가상 화면 사용 허용</string>
-    <string name="perm_vscreen_master_sub">전체 스위치이며 아래는 개별 권한</string>
     <string name="settings_ready_overlay_title">다른 앱 위에 표시</string>
     <string name="settings_ready_overlay_ok">허용됨</string>
     <string name="settings_ready_overlay_bad">꺼짐 · 데스크톱 펫과 플로팅 컨트롤에 필요</string>
@@ -2347,6 +2342,11 @@
     <string name="voice_bot_react_sub">성공하면 색종이, 오류나 듣기 시작 시 점프</string>
     <string name="voice_bot_preview_hint">캐릭터를 눌러 상태를 미리 봅니다</string>
     <string name="voice_call_session_missing">이 대화는 더 이상 존재하지 않습니다. 새 대화를 시작한 뒤 다시 시도하세요.</string>
+    <string name="perm_section_capabilities">고급 권한 기능</string>
+    <string name="perm_vscreen_on">켜짐</string>
+    <string name="perm_vscreen_off">꺼짐</string>
+    <string name="settings_system_group_agent">에이전트가 할 수 있는 일</string>
+    <string name="settings_system_group_device">기기 권한</string>
     <string name="voice_call_settings_title">음성 통화</string>
     <string name="voice_call_settings_sub">인식·낭독 모델, 수화기, 속도, 통화 엔진</string>
     <string name="voice_call_engine">통화 엔진</string>

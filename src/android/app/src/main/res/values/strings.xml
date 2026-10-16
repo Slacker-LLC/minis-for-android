@@ -794,9 +794,7 @@
     <string name="perm_a11y_section_footer">android-a11y-cli lets the agent read on-screen UI structure, perform taps and gestures, and watch system events. Both rows below must be set: pick an Agent permission and enable the Accessibility service in system Settings.</string>
     <string name="perm_a11y_cli_description">Lets the agent read screen UI, tap, type, and watch events</string>
     <string name="perm_a11y_open_settings">Open Accessibility Settings</string>
-    <string name="perm_system_authorization">System authorization</string>
     <string name="perm_root_not_granted">Not granted</string>
-    <string name="perm_agent_policy">Agent permission</string>
     <string name="perm_a11y_system_ready">Service enabled</string>
     <string name="perm_a11y_system_disabled">Service not enabled</string>
     <string name="perm_allow_minis_config">Allow minis-config</string>
@@ -823,7 +821,6 @@
     <string name="root_cli_cap_device_desc">Query device properties and hardware state</string>
     <string name="root_cli_cap_service_desc">Check whether Root is available</string>
 
-    <string name="perm_section_privileged_backend">Privileged Backend</string>
     <string name="perm_privileged_cli_description">Let the agent run ADB-level system commands as root (pm, am, settings, input…)</string>
 
     <string name="skill_title">Skills</string>
@@ -1789,7 +1786,6 @@
     <string name="settings_attention_count">%1$d need attention</string>
     <string name="settings_ready_header">Readiness check</string>
     <string name="settings_ready_footer">What the Agent needs to work normally is gathered here. Optional items are not counted as not ready.</string>
-    <string name="settings_manage_header">Manage</string>
     <string name="settings_ready_root_title">Root</string>
     <string name="settings_ready_root_ok">Granted · the Ubuntu runtime is available</string>
     <string name="settings_ready_root_bad">Not granted: the Ubuntu runtime cannot start</string>
@@ -2322,8 +2318,6 @@
     <string name="perm_tool_vscreen_close">Close the virtual screen</string>
     <string name="perm_tool_vscreen_status">Read device status</string>
     <string name="perm_tool_vscreen_ui">Operate the virtual screen</string>
-    <string name="perm_vscreen_master_title">Let the agent use the virtual screen</string>
-    <string name="perm_vscreen_master_sub">Master switch; the items below are its permissions</string>
     <string name="settings_ready_overlay_title">Display over other apps</string>
     <string name="settings_ready_overlay_ok">Allowed</string>
     <string name="settings_ready_overlay_bad">Off · the desktop pet and floating controls need it</string>
@@ -2644,6 +2638,11 @@
     <string name="voice_bot_react">React to events</string>
     <string name="voice_bot_react_sub">Confetti on success, a hop on errors and when listening starts</string>
     <string name="voice_bot_preview_hint">Tap the character to preview states</string>
+    <string name="perm_section_capabilities">Powerful capabilities</string>
+    <string name="perm_vscreen_on">On</string>
+    <string name="perm_vscreen_off">Off</string>
+    <string name="settings_system_group_agent">What the Agent may do</string>
+    <string name="settings_system_group_device">Device authorization</string>
     <string name="voice_call_settings_title">Voice call</string>
     <string name="voice_call_settings_sub">Recognition and reading models, earpiece, speed, call engine</string>
     <string name="voice_call_engine">Call engine</string>

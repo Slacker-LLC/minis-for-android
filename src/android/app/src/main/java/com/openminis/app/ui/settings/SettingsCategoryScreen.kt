@@ -329,9 +329,18 @@ fun SettingsCategoryScreen(
             SettingsCategory.SYSTEM -> {
                 OneTapAuthorizeSection()
                 ReadinessCheckSection(onOpenBackground = onOpenBackground)
-                SettingsSection(
-                    header = stringResource(R.string.settings_manage_header),
-                ) {
+                // Agent 能用什么（授权给 Agent 的开关）和 设备授权（系统层是否就绪）分开两组。
+                SettingsSection(header = stringResource(R.string.settings_system_group_agent)) {
+                    SettingsRow(
+                        icon = Icons.Outlined.FrontHand,
+                        iconColor = Color(0xFF007AFF),
+                        title = stringResource(R.string.settings_tool_permissions),
+                        subtitle = stringResource(R.string.settings_tool_permissions_sub),
+                        onClick = onToolPermissionsClick,
+                        showDivider = false,
+                    )
+                }
+                SettingsSection(header = stringResource(R.string.settings_system_group_device)) {
                     SettingsRow(
                         icon = Icons.Outlined.Key,
                         iconColor = Color(0xFFFF9500),
@@ -340,25 +349,18 @@ fun SettingsCategoryScreen(
                         onClick = onRootClick,
                     )
                     SettingsRow(
-                        icon = Icons.Outlined.Dashboard,
-                        iconColor = Color(0xFF5856D6),
-                        title = stringResource(R.string.settings_vscreen_entry),
-                        subtitle = stringResource(R.string.settings_vscreen_subtitle),
-                        onClick = onVirtualScreenClick,
-                    )
-                    SettingsRow(
-                        icon = Icons.Outlined.FrontHand,
-                        iconColor = Color(0xFF007AFF),
-                        title = stringResource(R.string.settings_tool_permissions),
-                        subtitle = stringResource(R.string.settings_tool_permissions_sub),
-                        onClick = onToolPermissionsClick,
-                    )
-                    SettingsRow(
                         icon = Icons.Outlined.Lock,
                         iconColor = Color(0xFF34C759),
                         title = stringResource(R.string.system_permissions_title),
                         subtitle = stringResource(R.string.settings_permissions_category_sub),
                         onClick = onPermissionsClick,
+                    )
+                    SettingsRow(
+                        icon = Icons.Outlined.Dashboard,
+                        iconColor = Color(0xFF5856D6),
+                        title = stringResource(R.string.settings_vscreen_entry),
+                        subtitle = stringResource(R.string.settings_vscreen_subtitle),
+                        onClick = onVirtualScreenClick,
                     )
                     SettingsRow(
                         icon = Icons.Outlined.BatteryFull,
@@ -375,7 +377,6 @@ fun SettingsCategoryScreen(
                         onClick = onSystemEnhanceClick,
                         showDivider = false,
                     )
-
                 }
             }
 

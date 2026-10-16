@@ -1248,6 +1248,7 @@ fun AppNavigation(
                 onBack = { navController.safePopBackStack() },
                 onOpenRoot = { navController.safeNavigate(Routes.ROOT) },
                 onOpenSystemPermissions = { navController.safeNavigate(Routes.SYSTEM_PERMISSIONS) },
+                onOpenVirtualScreen = { navController.safeNavigate(Routes.VIRTUAL_SCREEN_SETTINGS) },
             )
         }
 

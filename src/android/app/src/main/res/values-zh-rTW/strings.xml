@@ -565,9 +565,7 @@
     <string name="perm_a11y_section_footer">android-a11y-cli 讓 Agent 讀取螢幕 UI、模擬點擊與輸入、監聽系統事件。下方兩項都需配置:選擇 Agent 權限,並在系統設定啟用無障礙服務。</string>
     <string name="perm_a11y_cli_description">讓 Agent 讀取螢幕、點擊、輸入、監聽事件</string>
     <string name="perm_a11y_open_settings">前往無障礙設定</string>
-    <string name="perm_system_authorization">系統授權</string>
     <string name="perm_root_not_granted">未授權</string>
-    <string name="perm_agent_policy">Agent 權限</string>
     <string name="perm_a11y_system_ready">已啟用</string>
     <string name="perm_a11y_system_disabled">未啟用</string>
     <!-- T-selection-add-to-input — 長按選擇選單「加到輸入框」動作 -->
@@ -1031,7 +1029,6 @@
     <string name="settings_attention_count">%1$d 項需要處理</string>
     <string name="settings_ready_header">就緒檢查</string>
     <string name="settings_ready_footer">這裡彙總 Agent 正常運作所需的系統條件。可選項不計入未就緒。</string>
-    <string name="settings_manage_header">管理</string>
     <string name="settings_ready_root_title">Root</string>
     <string name="settings_ready_root_ok">已授權 · Ubuntu 執行環境可用</string>
     <string name="settings_ready_root_bad">未授權：Ubuntu 執行環境無法啟動</string>
@@ -1455,7 +1452,6 @@
     <string name="root_cli_cap_file_desc">讀寫受保護的檔案路徑</string>
     <string name="root_cli_cap_device_desc">查詢裝置屬性和硬體狀態</string>
     <string name="root_cli_cap_service_desc">檢查 Root 是否可用</string>
-    <string name="perm_section_privileged_backend">特權後端</string>
     <string name="perm_privileged_cli_description">允許 Agent 以 root 身分執行 ADB 級系統命令（pm、am、settings、input…）</string>
     <string name="skill_title">技能</string>
     <string name="skill_add">新增 Skill</string>
@@ -2208,8 +2204,6 @@
     <string name="perm_tool_vscreen_close">關閉虛擬螢幕</string>
     <string name="perm_tool_vscreen_status">讀取裝置狀態</string>
     <string name="perm_tool_vscreen_ui">操作虛擬螢幕</string>
-    <string name="perm_vscreen_master_title">允許 Agent 使用虛擬螢幕</string>
-    <string name="perm_vscreen_master_sub">總開關，下面是各項權限</string>
     <string name="settings_ready_overlay_title">顯示在其他應用程式上層</string>
     <string name="settings_ready_overlay_ok">已允許</string>
     <string name="settings_ready_overlay_bad">未允許 · 桌寵和懸浮控制項需要它</string>
@@ -2508,6 +2502,11 @@
     <string name="voice_bot_react">事件反應</string>
     <string name="voice_bot_react_sub">成功時撒彩屑，出錯與開始聆聽時跳一下</string>
     <string name="voice_bot_preview_hint">點一下角色可預覽各狀態</string>
+    <string name="perm_section_capabilities">高權限能力</string>
+    <string name="perm_vscreen_on">已開啟</string>
+    <string name="perm_vscreen_off">未開啟</string>
+    <string name="settings_system_group_agent">Agent 能做什麼</string>
+    <string name="settings_system_group_device">裝置授權</string>
     <string name="voice_call_settings_title">語音通話</string>
     <string name="voice_call_settings_sub">辨識與朗讀模型、聽筒、語速、通話引擎</string>
     <string name="voice_call_engine">通話引擎</string>
