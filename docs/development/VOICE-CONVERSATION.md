@@ -134,3 +134,30 @@
 - 阶跃：输入采样率（文档未写，假设 24k）；转写事件是否默认开启；`stepaudio-3-realtime-preview` 限免期结束后会下线。
 - xAI：`create_response` 在 server VAD 下的默认行为；转写 `.completed` 是否在未配置转写模型时也发出（我们配了 `grok-transcribe`）。
 - 豆包：就绪事件取 `session.created`；`transcription.completed` 的文本字段（我们依次试 `transcript`/`text`）；`response.output_text.done` 字段；下行 `error` 的结构；`session.close` 回复未等待就断开（文档要求等回复，否则服务端记 `ContextCanceled`）；`speech_text_buffer.commit` 当作口播的效果与是否触发 `response.done`。
+
+### 各厂商实时语音官方定价对比（2026-10-16 读取）
+
+价格都来自当日用 curl 读到的官方页面，**会变，以账单为准**。每分钟成本是单轮估算：用户说 30 秒、模型说 30 秒，加少量文本，不含工具与思考 token；轮数、历史占用、缓存命中率是估算假设，不是官方数字。
+
+| 厂商 / 默认模型 | 计价 | 每分钟估算 | 要点 | 来源 |
+|---|---|---|---|---|
+| 千问 `qwen3.8-omni-flash-realtime` | 元/百万 token：音频入 6、出 12；文本入 1.5、出 4.5。音频入 7 token/秒，出 12.5 token/秒，不足 1 秒按 1 秒 | ¥0.007 | 每轮重放上下文（上限 100 轮或 600 秒音频）；北京 100 万 token、90 天免费额度；必须用业务空间地址；单会话最长 120 分钟 | https://help.aliyun.com/zh/model-studio/model-pricing 、https://help.aliyun.com/zh/model-studio/realtime |
+| Gemini `gemini-3.8-live` | $/百万 token：音频入 3、出 12；文本入 0.75、出 4.5。约 25 token/秒 | $0.012–0.017 | 官方写明每轮按整个上下文重新计费且不支持缓存，10 分钟约 $0.077/分钟，需开 `contextWindowCompression`；转写文本另按文本输出价；有免费层（数据用于改进产品）；支持国家列表无中国大陆 | https://ai.google.dev/gemini-api/docs/pricing.md.txt 、https://ai.google.dev/gemini-api/docs/live-api/best-practices.md.txt |
+| OpenAI `gpt-realtime-2.1-mini` | $/百万 token：音频入 10、出 20；文本入 0.6、出 2.4 | $0.015–0.025 | 官方称指令遵循和函数调用较弱 | https://developers.openai.com/api/docs/models/gpt-realtime-2.1-mini.md |
+| OpenAI `gpt-realtime-2.1` | $/百万 token：音频入 32（缓存 0.4）、出 64；文本入 4、出 24。用户音频 10 token/秒，助手音频 20 token/秒 | $0.05–0.08（另加转写 $0.006/分钟） | 每轮重放历史，缓存尽力而为：10 分钟命中约 $0.055/分钟，不命中约 $0.47/分钟；不按连接时长收费；支持国家列表无中国大陆 | https://developers.openai.com/api/docs/models/gpt-realtime-2.1.md 、https://developers.openai.com/api/docs/guides/realtime-costs.md |
+| xAI `grok-voice-3.0` | $0.08/分钟，不按 token 拆分 | $0.08 | 线性、不重放历史；页面另有一行没写单位的 "$0.004 / text input"；计时口径、取整、实时转写是否另计未写 | https://docs.x.ai/developers/pricing.md |
+| 智谱 `glm-realtime` | flash ¥0.18/分钟、air ¥0.30/分钟（音频） | ¥0.18–0.30 | 默认模型对应哪一档官方没写；`usage` 暂时返回 0，客户端对不了账；通话记忆约 2 分钟；"分钟"是墙钟还是音频时长未写 | https://docs.bigmodel.cn/cn/guide/start/pricing.md |
+| 阶跃 `stepaudio-3-realtime-preview` | 限时免费；付费 `stepaudio-2.5-realtime` 为 ¥10（输入）/2（命中缓存）/70（输出）每百万 token，不分音频与文本 | 免费 | 预览版限免到期后下线，正式价和到期日未公布；官方没有音频秒数折 token 的说明，付费档每分钟算不出；个人账户须实名；会话最长 30 分钟 | https://platform.stepfun.com/docs/zh/pricing/details.md 、https://platform.stepfun.com/docs/zh/guides/models/stepaudio-3-realtime.md |
+| 豆包 Seeduplex `1.2.6.1` | 元/百万 token：音频入 80（命中缓存 5）、出 300；文本入 10、出 80。音频入 6.25 token/秒，出 25 token/秒 | ¥0.25 | 成本几乎全在输出音频；多轮重复内容按缓存价 5 元；QPM 60、TPM 10 万；超过 10 分钟无交互服务端释放连接 | https://www.volcengine.com/docs/6561/1359370 |
+
+**仍未确认**：
+- 豆包计费页的价格表（输出文本 80）与同页计算示例（按 30）矛盾，上表按价格表；价格表只有一组"豆包实时语音大模型"，是否对应 Seeduplex 属推断。
+- 智谱、阶跃的免费额度与企业认证要求，OpenAI、xAI 的免费额度，xAI 的国家限制。
+- 千问文档没写模型自己输出的音频是否也计入下一轮上下文，多轮累计成本只有示意值（约 ¥0.035–0.08/分钟）。
+
+**对产品的含义**：
+- 只看单价，千问与 Gemini 最低。
+- 长通话要防成本随时长上升：Gemini 开上下文压缩，OpenAI 用 `truncation.retention_ratio` 与 `token_limits`，千问靠 100 轮上限。
+- 智谱、xAI 按分钟计价，最好预测。
+- 阶跃预览版免费但会下线，不要当作长期默认。
+- OpenAI 另有项目未接入的全双工产品 `gpt-live-1`（`v1/live/sessions`，$0.05/分钟，后端模型和工具另算），见 https://developers.openai.com/api/docs/models/gpt-live-1.md 。
