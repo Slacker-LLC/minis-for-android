@@ -2254,6 +2254,7 @@
     <string name="voice_bot_react">Réagir aux événements</string>
     <string name="voice_bot_react_sub">Confettis en cas de succès, petit saut en cas d\'erreur ou à l\'écoute</string>
     <string name="voice_bot_preview_hint">Touchez le personnage pour prévisualiser les états</string>
+    <string name="voice_call_session_missing">Cette conversation n\'existe plus. Créez-en une nouvelle et réessayez.</string>
     <string name="voice_call_settings_title">Appel vocal</string>
     <string name="voice_call_settings_sub">Modèles de reconnaissance et de lecture, écouteur, vitesse, moteur d’appel</string>
     <string name="voice_call_engine">Moteur d\'appel</string>

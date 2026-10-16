@@ -2354,6 +2354,7 @@
     <string name="voice_bot_react">イベントに反応</string>
     <string name="voice_bot_react_sub">成功で紙吹雪、エラーや聞き取り開始でジャンプ</string>
     <string name="voice_bot_preview_hint">キャラクターをタップして状態をプレビュー</string>
+    <string name="voice_call_session_missing">このチャットは存在しません。新しいチャットを開始してからやり直してください。</string>
     <string name="voice_call_settings_title">音声通話</string>
     <string name="voice_call_settings_sub">認識・読み上げモデル、受話口、速度、通話エンジン</string>
     <string name="voice_call_engine">通話エンジン</string>

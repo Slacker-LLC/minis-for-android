@@ -2536,6 +2536,7 @@
     <string name="voice_bot_react">Реакция на события</string>
     <string name="voice_bot_react_sub">Конфетти при успехе, прыжок при ошибке и начале прослушивания</string>
     <string name="voice_bot_preview_hint">Нажмите на персонажа, чтобы посмотреть состояния</string>
+    <string name="voice_call_session_missing">Этот чат больше не существует. Начните новый чат и повторите попытку.</string>
     <string name="voice_call_settings_title">Голосовой звонок</string>
     <string name="voice_call_settings_sub">Модели распознавания и озвучки, динамик, скорость, движок звонка</string>
     <string name="voice_call_engine">Движок звонка</string>

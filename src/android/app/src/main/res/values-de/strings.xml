@@ -2358,6 +2358,7 @@
     <string name="voice_bot_react">Auf Ereignisse reagieren</string>
     <string name="voice_bot_react_sub">Konfetti bei Erfolg, Hüpfer bei Fehlern und Zuhörbeginn</string>
     <string name="voice_bot_preview_hint">Figur antippen, um Zustände zu testen</string>
+    <string name="voice_call_session_missing">Dieser Chat existiert nicht mehr. Starte einen neuen Chat und versuche es erneut.</string>
     <string name="voice_call_settings_title">Sprachanruf</string>
     <string name="voice_call_settings_sub">Erkennungs- und Vorlesemodelle, Hörmuschel, Tempo, Anruf-Engine</string>
     <string name="voice_call_engine">Anruf-Engine</string>

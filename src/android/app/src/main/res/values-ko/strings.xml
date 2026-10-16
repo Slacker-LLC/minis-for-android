@@ -2346,6 +2346,7 @@
     <string name="voice_bot_react">이벤트 반응</string>
     <string name="voice_bot_react_sub">성공하면 색종이, 오류나 듣기 시작 시 점프</string>
     <string name="voice_bot_preview_hint">캐릭터를 눌러 상태를 미리 봅니다</string>
+    <string name="voice_call_session_missing">이 대화는 더 이상 존재하지 않습니다. 새 대화를 시작한 뒤 다시 시도하세요.</string>
     <string name="voice_call_settings_title">음성 통화</string>
     <string name="voice_call_settings_sub">인식·낭독 모델, 수화기, 속도, 통화 엔진</string>
     <string name="voice_call_engine">통화 엔진</string>
