@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -586,86 +587,97 @@ private fun CallInputBar(
     onAttach: () -> Unit,
     onRemoveImage: (InputAttachment) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
-    if (images.isNotEmpty()) {
-        LazyRow(
-            Modifier.padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(images, key = { it.id }) { image ->
-                Box(Modifier.size(64.dp)) {
-                    AsyncImage(
-                        model = image.uri,
-                        contentDescription = image.fileName,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
-                    )
-                    IconButton(
-                        onClick = { onRemoveImage(image) },
-                        modifier = Modifier.align(Alignment.TopEnd).size(24.dp),
-                    ) {
-                        Icon(
-                            Icons.Rounded.Close,
-                            contentDescription = stringResource(R.string.voice_call_attach_remove),
-                            modifier = Modifier.size(16.dp).background(Color.Black.copy(alpha = 0.55f), CircleShape),
-                            tint = Color.White,
-                        )
-                    }
-                }
-            }
-        }
-    }
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    // 与聊天页输入框同一语言：一张圆角卡片，文字在上，下排左「＋」右「静音 / 挂断」。
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = ChatColors.inputBg,
+        shadowElevation = 3.dp,
+        border = BorderStroke(0.5.dp, ChatColors.separator),
     ) {
-        if (canAttach) {
-            IconButton(onClick = onAttach, enabled = images.size < MAX_CALL_IMAGES) {
-                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.voice_call_attach))
-            }
-        }
-        OutlinedTextField(
-            value = draft,
-            onValueChange = onDraft,
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            shape = CircleShape,
-            placeholder = { Text(stringResource(R.string.voice_call_input_hint)) },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(onSend = { if (draft.isNotBlank()) onSend() }),
-            trailingIcon = {
-                if (draft.isNotBlank()) {
-                    IconButton(onClick = onSend) {
-                        Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = stringResource(R.string.voice_call_send))
+        Column(Modifier.padding(start = 16.dp, end = 10.dp, top = 6.dp, bottom = 10.dp)) {
+            if (images.isNotEmpty()) {
+                LazyRow(
+                    Modifier.padding(top = 6.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(images, key = { it.id }) { image ->
+                        Box(Modifier.size(64.dp)) {
+                            AsyncImage(
+                                model = image.uri,
+                                contentDescription = image.fileName,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                            )
+                            IconButton(
+                                onClick = { onRemoveImage(image) },
+                                modifier = Modifier.align(Alignment.TopEnd).size(24.dp),
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Close,
+                                    contentDescription = stringResource(R.string.voice_call_attach_remove),
+                                    modifier = Modifier.size(16.dp).background(Color.Black.copy(alpha = 0.55f), CircleShape),
+                                    tint = Color.White,
+                                )
+                            }
+                        }
                     }
                 }
-            },
-        )
-        FilledIconButton(
-            onClick = onToggleMute,
-            modifier = Modifier.size(52.dp),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = if (muted) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = if (muted) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        ) {
-            Icon(
-                if (muted) Icons.Rounded.MicOff else Icons.Rounded.Mic,
-                contentDescription = stringResource(if (muted) R.string.voice_call_unmute else R.string.voice_call_mute),
+            }
+            TextField(
+                value = draft,
+                onValueChange = onDraft,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.voice_call_input_hint)) },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { if (draft.isNotBlank()) onSend() }),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                    focusedPlaceholderColor = ChatColors.secondaryText,
+                    unfocusedPlaceholderColor = ChatColors.secondaryText,
+                ),
             )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (canAttach) {
+                    IconButton(onClick = onAttach, enabled = images.size < MAX_CALL_IMAGES) {
+                        Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.voice_call_attach), tint = ChatColors.primaryText)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onToggleMute) {
+                    Icon(
+                        if (muted) Icons.Rounded.MicOff else Icons.Rounded.Mic,
+                        contentDescription = stringResource(if (muted) R.string.voice_call_unmute else R.string.voice_call_mute),
+                        tint = if (muted) MaterialTheme.colorScheme.error else ChatColors.primaryText,
+                    )
+                }
+                Spacer(Modifier.width(4.dp))
+                // 与聊天页发送键同款的深色圆钮：有文字时是发送，否则是挂断。
+                val sending = draft.isNotBlank()
+                FilledIconButton(
+                    onClick = if (sending) onSend else onEnd,
+                    modifier = Modifier.size(44.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = if (sending) ChatColors.primaryText else MaterialTheme.colorScheme.error,
+                        contentColor = if (sending) ChatColors.inputBg else MaterialTheme.colorScheme.onError,
+                    ),
+                ) {
+                    Icon(
+                        if (sending) Icons.AutoMirrored.Rounded.Send else Icons.Rounded.Close,
+                        contentDescription = stringResource(if (sending) R.string.voice_call_send else R.string.voice_call_end),
+                    )
+                }
+            }
         }
-        FilledIconButton(
-            onClick = onEnd,
-            modifier = Modifier.size(52.dp),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.error,
-                contentColor = MaterialTheme.colorScheme.onError,
-            ),
-        ) {
-            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.voice_call_end))
-        }
-    }
     }
 }
 
