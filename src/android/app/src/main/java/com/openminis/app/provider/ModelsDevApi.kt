@@ -26,11 +26,19 @@ object ModelsDevApi {
     private const val CACHE_TTL_MS = 48 * 3600 * 1000L // 48 hours
 
     // Provider-key mapping for enrichment lookups (matches iOS)
-    private val providerKeyMap = mapOf(
+    //
+    // A provider that is missing here falls through to a scan of the whole
+    // registry, where the same model id is published by many resellers with
+    // different limits (`grok-4.7` output: 500000 on xai, 128000 on
+    // github-copilot), so every first-party vendor we ship needs an entry.
+    internal val providerKeyMap = mapOf(
         "Anthropic" to listOf("anthropic"),
         "Google" to listOf("google", "google-vertex"),
         "OpenAI" to listOf("openai"),
         "OpenRouter" to listOf("openrouter"),
+        "xAI" to listOf("xai"),
+        // models.dev splits Kimi Code by region; both entries list the same ids.
+        "Kimi" to listOf("kimi-code-plan-global", "kimi-code-plan-cn"),
         "Antigravity" to emptyList(), // Custom proxy, no public models.dev entry
     )
 
@@ -92,7 +100,10 @@ object ModelsDevApi {
 
     fun enrichModel(model: LLMModel): LLMModel {
         val registry = loadRegistry() ?: return model
+        return enrichModel(registry, model)
+    }
 
+    internal fun enrichModel(registry: Map<String, ProviderEntry>, model: LLMModel): LLMModel {
         // Try mapped provider keys first
         val keys = providerKeyMap[model.provider] ?: emptyList()
         for (key in keys) {
@@ -112,6 +123,10 @@ object ModelsDevApi {
 
     fun enrichModels(models: List<LLMModel>): List<LLMModel> {
         val registry = loadRegistry() ?: return models
+        return enrichModels(registry, models)
+    }
+
+    internal fun enrichModels(registry: Map<String, ProviderEntry>, models: List<LLMModel>): List<LLMModel> {
         return models.map { model ->
             val keys = providerKeyMap[model.provider] ?: emptyList()
             for (key in keys) {
@@ -299,7 +314,7 @@ object ModelsDevApi {
 
     // MARK: - Parse registry JSON
 
-    private fun parseRegistry(jsonStr: String): Map<String, ProviderEntry>? {
+    internal fun parseRegistry(jsonStr: String): Map<String, ProviderEntry>? {
         return try {
             val json = JSONObject(jsonStr)
             val result = mutableMapOf<String, ProviderEntry>()

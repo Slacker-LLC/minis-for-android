@@ -319,8 +319,6 @@
           "gemini-2.5-flash",
           "gemini-2.5-flash-lite",
           "gpt-5.3-codex",
-          "gpt-5.2-codex",
-          "gpt-5.1-codex-max",
           "gpt-5.2",
           "gpt-4o",
           "gpt-4o-mini",
@@ -342,10 +340,10 @@
           "grok-3-mini-fast",
           "grok-composer-2.5-fast",
           "grok-4-fast",
-          "grok-4-fast-non-reasoning",
-          "grok-code-fast-1",
-          "kimi-k3",
-          "kimi-k2",
+          "k3",
+          "k3-256k",
+          "kimi-for-coding",
+          "kimi-for-coding-highspeed",
           "gpt-5.4",
           "gpt-5.4-mini",
           "gpt-image-2",
@@ -379,6 +377,14 @@
       {
         "id": "claude-sonnet-5-5",
         "displayName": "Claude Sonnet 5.5",
+        "provider": "Anthropic",
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000,
+        "supportsReasoning": true
+      },
+      {
+        "id": "claude-haiku-5-5",
+        "displayName": "Claude Haiku 5.5",
         "provider": "Anthropic",
         "contextWindow": 1000000,
         "maxOutputTokens": 128000,
@@ -528,18 +534,6 @@
       {
         "id": "gpt-5.3-codex",
         "displayName": "GPT-5.3 Codex",
-        "provider": "OpenAI",
-        "supportsReasoning": true
-      },
-      {
-        "id": "gpt-5.2-codex",
-        "displayName": "GPT-5.2 Codex",
-        "provider": "OpenAI",
-        "supportsReasoning": true
-      },
-      {
-        "id": "gpt-5.1-codex-max",
-        "displayName": "GPT-5.1 Codex Max",
         "provider": "OpenAI",
         "supportsReasoning": true
       },
@@ -694,28 +688,27 @@
         "displayName": "Grok 4 Fast",
         "provider": "xAI",
         "supportsReasoning": true
-      },
-      {
-        "id": "grok-4-fast-non-reasoning",
-        "displayName": "Grok 4 Fast (Non-Reasoning)",
-        "provider": "xAI"
-      },
-      {
-        "id": "grok-code-fast-1",
-        "displayName": "Grok Code Fast 1",
-        "provider": "xAI",
-        "supportsReasoning": true
       }
     ],
     "kimi": [
       {
-        "id": "kimi-k3",
+        "id": "k3",
         "displayName": "Kimi K3",
         "provider": "Kimi"
       },
       {
-        "id": "kimi-k2",
-        "displayName": "Kimi K2",
+        "id": "k3-256k",
+        "displayName": "Kimi K3 256K",
+        "provider": "Kimi"
+      },
+      {
+        "id": "kimi-for-coding",
+        "displayName": "Kimi For Coding",
+        "provider": "Kimi"
+      },
+      {
+        "id": "kimi-for-coding-highspeed",
+        "displayName": "Kimi For Coding HighSpeed",
         "provider": "Kimi"
       }
     ],
