@@ -326,6 +326,7 @@ class ProviderSpeechRecognitionEngine(private val appContext: Context) : SpeechR
                 }
 
                 override fun onVoiceEnd(wav: ByteArray, reason: SegmentEndReason, spokenSeconds: Float) {
+                    Log.i(TAG, "[vad] segment end ${wav.size}B spoken=${"%.2f".format(spokenSeconds)}s reason=$reason cancelled=${cancelled.get()}")
                     if (cancelled.get()) return
 
                     // [T-android-vad-merge-segments] ACCUMULATE, don't discard.
@@ -444,6 +445,7 @@ class ProviderSpeechRecognitionEngine(private val appContext: Context) : SpeechR
         for ((instance, entry) in ordered) {
             if (cancelled.get()) return
             val provider = VoiceProviderFactory.make(instance, repo.loadApiKey(instance.id))
+            Log.i(TAG, "transcribe via ${instance.label}/${entry.baseModel.id} provider=${provider?.javaClass?.simpleName} wav=${wav.size}B")
             if (provider == null) {
                 Log.w(TAG, "candidate ${instance.label} cannot serve voice input — skipping")
                 continue
@@ -460,6 +462,7 @@ class ProviderSpeechRecognitionEngine(private val appContext: Context) : SpeechR
                 if (cancelled.get()) return
                 stickyEntryId = entry.id
                 val text = response.text.trim()
+                Log.i(TAG, "transcribed ${text.length} chars via ${entry.baseModel.id}")
                 if (text.isEmpty()) {
                     listener.onError(RecognitionError.NO_MATCH, "Empty transcription.")
                 } else {

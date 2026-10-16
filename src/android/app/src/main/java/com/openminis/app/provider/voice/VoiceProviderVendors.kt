@@ -773,11 +773,19 @@ class MimoVoiceProvider(providerId: String, baseURL: String, apiKey: String?) :
     // ASR ----------------------------------------------------------------------
 
     override suspend fun transcribe(request: VoiceInputRequest): VoiceInputResponse {
+        val modelId = request.model ?: defaultVoiceInputModel()
+        // `asr_options` only belongs to the dedicated ASR model. Audio-capable chat
+        // models (mimo-v2.x) take plain audio understanding; sending them the ASR
+        // envelope leaves the request without a usable transcript.
+        if (!modelId.contains("asr", ignoreCase = true)) {
+            Log.i(TAG, "chat-based ASR via $modelId")
+            return transcribeChatBased(request)
+        }
         val url = composedUrlString("/v1/chat/completions")
         val audioBase64 = Base64.encodeToString(request.audioData, Base64.NO_WRAP)
         val lang = iso6391(request.language) ?: "auto"
         val body = JSONObject().apply {
-            put("model", request.model ?: defaultVoiceInputModel())
+            put("model", modelId)
             put(
                 "messages",
                 JSONArray().put(
