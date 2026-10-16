@@ -49,4 +49,11 @@
 - `SystemEnhanceScreen` 里 Root 状态并入 Root 页后遗留的 `hooksOn`、`HOOK_SWITCH_KEYS`、`enabledHookSwitchCount`、角色/生命周期状态没有读者，删除；`SettingsScreen.FeedbackSheetItem` 无调用，删除；`SettingsCategory.inRoot` 与 `Routes.addModelsToGroup` 无调用，删除。
 - 过期注释改对（设置首页、分类页、模块页的 KDoc）。新增 `everyCategoryIsOnTheHomeExactlyOnce` 测试，保证每个分类在设置首页恰好出现一次。
 
+- 207 条没有任何 `R.string` / `@string` 引用的字符串资源（会话高级设置表、设置页改版后的旧标题和页脚、共享文件夹页、备份页已不显示的文案等）在 8 个语言文件里一并删除，lint 基线里对应的 29 条旧条目同步清掉；删完 `lintDebug` 没有未使用资源或翻译缺失。
+- 添加服务商页与服务商详情页各抄了一份 OAuth 登录分发、「该构建是否提供 OAuth」的判断和两条错误文案，抽到 `ProviderOAuthLogin.kt`，新增 OAuth 服务商只改一处（真实登录流程需要浏览器与账号，未在设备上验证）。
+
 Kotlin K2 编译器不会对未使用的参数/变量/私有函数告警，这类死代码只能靠 grep 调用方发现；全量编译的 95 条警告全是弃用提示，没有一条是关于未使用代码的。
+
+## 页面地图
+
+`python3 scripts/gen_settings_map.py` 从代码生成一页可折叠的页面地图（页面树加各页的分组与设置项，默认只展开到分类）。页面是否存在对照 `AppNavigation.kt` 的 `composable(Routes.X)` 注册：有路由没进地图，或地图里列了已不存在的路由，脚本以非零状态退出。标题、分组和设置项来自各页面的 `stringResource`，所以改名后重新生成即可；按循环生成的行（服务商类型、模型列表、语言）和弹窗里的内容不在其中。
