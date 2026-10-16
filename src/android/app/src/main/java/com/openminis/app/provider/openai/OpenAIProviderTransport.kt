@@ -195,7 +195,7 @@ internal fun OpenAIProvider.rawStreamMessage(
             memBefore, serStartNs, failure = null,
         )
     }
-    val request = buildRequest(bodyStr)
+    val request = buildRequest(bodyStr, derivePromptCacheKey(requestMessages))
     val headerMap = mutableMapOf<String, String>()
     for (name in request.headers.names()) {
         headerMap[name] = request.headers[name] ?: ""

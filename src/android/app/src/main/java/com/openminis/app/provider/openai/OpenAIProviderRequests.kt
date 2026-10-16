@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MultipartBody
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -862,7 +863,7 @@ internal fun OpenAIProvider.globallyDedupeToolCallIds(messagesArray: JSONArray) 
  * the OAuth byte build, and the OkHttp RequestBody. Per-call peak heap
  * dropped by ~2× the body size (often tens of MB on long agent loops).
  */
-internal suspend fun OpenAIProvider.buildRequest(bodyStr: String): Request {
+internal suspend fun OpenAIProvider.buildRequest(bodyStr: String, conversationKey: String? = null): Request {
     val token = getToken()
 
     if (isOAuth && !forceChatCompletions) {
@@ -941,6 +942,15 @@ internal suspend fun OpenAIProvider.buildRequest(bodyStr: String): Request {
     // /responses (this builder serves both). Applied after extraHeaders
     // so the per-provider override wins. null/blank → default UA.
     builder.applyUserAgentOverride(customUserAgent)
+    // OpenCode Zen/Go reject requests without a stable per-conversation
+    // `x-opencode-session` (server answers `MissingSessionID`). Only sent to
+    // opencode.ai itself; a user-set header of the same name still wins.
+    if (conversationKey != null && requestUrl.toHttpUrlOrNull()?.host.let { it == "opencode.ai" || it?.endsWith(".opencode.ai") == true } &&
+        extraHeaders.keys.none { it.equals("x-opencode-session", ignoreCase = true) } &&
+        chatExtraHeaders.keys.none { it.equals("x-opencode-session", ignoreCase = true) }
+    ) {
+        builder.header("x-opencode-session", conversationKey)
+    }
     return builder.build()
 }
 
