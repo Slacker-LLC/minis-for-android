@@ -220,7 +220,7 @@ fun AgentSession.setMemoryEnabledForSession(enabled: Boolean) {
     // A row-less draft snapshots this flag into the row it creates on the first send.
     if (hasNoRow) return
     sessionScope.launch {
-        val sid = ensureSession()
+        val sid = ensureSessionOrNull() ?: return@launch
         chatRepository.dao.updateMemoryEnabled(sid, if (enabled) 1 else 0)
     }
 }
@@ -232,7 +232,7 @@ internal fun AgentSession.toggleMemoryEnabled() {
     // Before the first message there is no row; ensureSession() copies this flag into the row
     // it creates, so a row-less draft needs no write here.
     if (!hasNoRow) sessionScope.launch {
-        val sid = ensureSession()
+        val sid = ensureSessionOrNull() ?: return@launch
         chatRepository.dao.updateMemoryEnabled(sid, if (newValue) 1 else 0)
     }
     appendSystemInfo(
@@ -316,7 +316,7 @@ internal fun AgentSession.persistThinkingOverride(level: ThinkingLevel) {
         return
     }
     sessionScope.launch {
-        val sid = ensureSession()
+        val sid = ensureSessionOrNull() ?: return@launch
         chatRepository.dao.updateThinkingOverride(sid, level.name)
     }
 }
