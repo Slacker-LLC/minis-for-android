@@ -112,7 +112,6 @@ internal fun VoiceConversationHost(
                 SpeechRecognitionManager.init(context)
                 SpeechRecognitionManager.cancelRecording()
                 SpeechRecognitionManager.clearDegradationAndRefresh()
-                com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive = false
                 viewModel.replyPlayer?.stop()
                 val sid = viewModel.agentSession.ensureSessionForSettings()
                 com.openminis.app.data.AssistantHomePrefs.rememberVoiceSession(context, sid)
@@ -195,6 +194,7 @@ internal fun VoiceConversationHost(
                         color = ChatColors.secondaryText,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    CallVoiceOptions(viewModel.providerRepository)
 
                     // 中部：角色居中，下面是状态词与最近一句字幕（长回答截断，全文在聊天里看）。
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {

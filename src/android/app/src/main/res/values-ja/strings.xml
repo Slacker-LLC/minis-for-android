@@ -603,10 +603,6 @@
     <string name="browser_minis_browsing">Minis がブラウジング中</string>
     <string name="chat_typing_indicator">%1$s が考えています</string>
     <string name="read_aloud_unavailable">読み上げに失敗しました：利用可能な音声エンジンがありません。音声出力設定を確認するか、システムの音声合成エンジンをインストールしてください。</string>
-    <string name="voice_panel_no_engine_title">利用できる音声認識がありません</string>
-    <string name="voice_panel_no_engine_body">音声入力には認識エンジンが必要です。端末の音声サービスを有効にするか、Minis で文字起こしプロバイダを設定してください。</string>
-    <string name="voice_panel_no_engine_open_system">端末の設定</string>
-    <string name="voice_panel_no_engine_open_providers">Minis のプロバイダ</string>
     <string name="chat_error_stream_dropped_partial">接続が切断されました。この返信は不完全な可能性があります。再試行してください。</string>
     <string name="browser_takeover">操作引き継ぎ</string>
     <string name="browser_settings_done">完了</string>
@@ -1047,27 +1043,16 @@
     <!-- Spoken substitutions for links during read-aloud (TTS) -->
     <string name="voice_link_to_host">%1$s のリンク</string>
     <string name="voice_bare_link">リンク</string>
-    <!-- [T-android-voice-correction] Consent + correction UI -->
-    <string name="voice_correction_consent_title">音声修正を改善しますか？</string>
-    <string name="voice_correction_consent_body">Minis は文字起こしの修正（元の文 → 修正後）と採用された AI 修正を端末内のデータベースに保存し、今後の音声修正の精度を高めます。アップロードは行いません。設定でいつでも変更・削除できます。</string>
-    <string name="voice_correction_consent_enable">有効にする</string>
-    <string name="voice_correction_consent_not_now">後で</string>
-    <string name="voice_correction_button_a11y">AI で文字起こしを修正</string>
-    <string name="voice_correction_none_needed">修正の必要はありません</string>
-    <string name="voice_correction_failed">修正に失敗しました。元の文を保持します</string>
-    <string name="voice_correction_section">音声修正の学習</string>
-    <string name="voice_correction_toggle">音声修正データを収集</string>
-    <string name="voice_correction_footer">有効にすると、文字起こしへの手動修正（元の文 → 修正後）、採用された AI 修正、よく入力する語句が端末内のデータベースに保存され、今後の音声修正の精度が向上します。アップロードは行いません。既定はオフで、既存のデータは削除するまで保持されます。</string>
-    <string name="voice_correction_clear_title">収集した音声修正データをすべて削除しますか？</string>
-    <string name="voice_correction_clear">すべて削除</string>
-    <string name="voice_correction_cleared">音声修正データを削除しました</string>
     <string name="voice_provider_system">システム</string>
     <string name="add_provider_subtitle_kimi">Kimi Coding Plan — Kimi アカウントでサインイン</string>
+    <string name="add_provider_subtitle_xai">Grok シリーズのモデルに対応</string>
     <string name="kimi_login_title">Kimi Code でサインイン</string>
     <string name="kimi_login_instructions">認証ページを開き、このコードを入力して Minis を許可してください:</string>
     <string name="kimi_login_copy_code">コードをコピー</string>
     <string name="kimi_login_open_verification">認証ページを開く</string>
     <string name="kimi_login_waiting">認証を待っています…</string>
+    <string name="xai_login_title">xAI でサインイン</string>
+    <string name="xai_login_instructions">認証ページを開いて x.ai アカウントにサインインし、このコードを入力して Minis を許可してください:</string>
     <string name="browser_downloads_title">ダウンロード</string>
     <string name="browser_downloads_clear">クリア</string>
     <string name="browser_downloads_empty">ダウンロードなし</string>
@@ -1609,7 +1594,6 @@
     <string name="chat_scroll_to_previous">前のメッセージへ</string>
     <string name="chat_scroll_to_bottom">一番下へ</string>
     <string name="chat_read_image">画像を読み取る</string>
-    <string name="chat_switch_to_keyboard">キーボードに切り替え</string>
     <string name="tool_browser_screenshot">ブラウザのスクリーンショット</string>
     <string name="tool_file_placeholder">（ファイル）</string>
     <string name="tool_edited_label">編集済み</string>
@@ -1629,8 +1613,6 @@
     <string name="chat_collapse">折りたたむ</string>
     <string name="chat_expand">展開</string>
     <string name="memory_list_empty">（空）</string>
-    <string name="chat_voice_input">音声入力</string>
-    <string name="chat_stop_recording">録音を停止</string>
     <string name="common_hide">非表示</string>
     <string name="common_show">表示</string>
     <string name="common_selected">選択済み</string>
@@ -2250,6 +2232,10 @@
     <string name="voice_call_back">チャットを表示</string>
     <string name="voice_call_end">音声会話を終了</string>
     <string name="voice_call_follow_up">指示を追加</string>
+    <string name="voice_call_opt_input">音声認識 · %1$s</string>
+    <string name="voice_call_opt_language">言語 · %1$s</string>
+    <string name="voice_call_opt_output">読み上げ · %1$s</string>
+    <string name="voice_call_opt_system_voice">システム音声</string>
     <string name="settings_ralph_limit">Ralph の各ラウンドの制限時間</string>
     <string name="settings_ralph_limit_subtitle">各ラウンド %1$d 分 · 停止後に子タスクの後処理を待機</string>
     <string name="settings_ralph_timeout">各ラウンドの制限時間（1–30 分）</string>
@@ -2321,4 +2307,5 @@
     <string name="scheduled_task_legacy_executor_removed">このタスクは削除された実行方式を使用していました。再実行する前に内容を確認して保存してください。</string>
     <string name="sub_agent_text_model_required">テキストで応答できるモデルを選択してください。</string>
     <string name="vscreen_display_busy">仮想ディスプレイは現在、別のセッションで使用されています。</string>
+    <string name="chat_plan_exit">終了</string>
 </resources>

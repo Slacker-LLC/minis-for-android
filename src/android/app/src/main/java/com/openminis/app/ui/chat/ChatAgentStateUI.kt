@@ -410,7 +410,7 @@ fun AgentStateBars(
                         MinisTextButton(
                             onClick = { updateState { AgentStateStore.planSet(sessionId, "off", context = context) } },
                             contentPadding = PaddingValues(horizontal = 6.dp),
-                        ) { Text(stringResource(R.string.voice_panel_exit_edit), style = MaterialTheme.typography.labelMedium) }
+                        ) { Text(stringResource(R.string.chat_plan_exit), style = MaterialTheme.typography.labelMedium) }
                     }
                     HorizontalDivider(Modifier.padding(vertical = 6.dp))
                 }

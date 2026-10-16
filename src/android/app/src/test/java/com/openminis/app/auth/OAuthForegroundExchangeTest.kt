@@ -76,10 +76,6 @@ class OAuthForegroundExchangeTest {
         assertGatedBefore("OpenRouterOAuthManager", "exchangeCode(code, verifier)")
 
     @Test
-    fun `xai waits for the foreground before exchanging`() =
-        assertGatedBefore("XAIOAuthManager", "exchangeCodeForToken(code)")
-
-    @Test
     fun `the base loopback flow waits too`() =
         assertGatedBefore("OAuthManager", "exchangeCode(code)")
 

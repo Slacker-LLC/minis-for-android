@@ -381,10 +381,6 @@
     <string name="browser_minis_browsing">Minis просматривает страницы</string>
     <string name="chat_typing_indicator">%1$s думает</string>
     <string name="read_aloud_unavailable">Не удалось озвучить: нет доступного голосового движка. Проверьте настройки голосового вывода или установите системный синтезатор речи.</string>
-    <string name="voice_panel_no_engine_title">Распознавание речи недоступно</string>
-    <string name="voice_panel_no_engine_body">Для голосового ввода нужен движок распознавания. Включите речевую службу устройства или настройте провайдера транскрипции в Minis.</string>
-    <string name="voice_panel_no_engine_open_system">Настройки устройства</string>
-    <string name="voice_panel_no_engine_open_providers">Провайдеры Minis</string>
     <string name="chat_error_stream_dropped_partial">Соединение прервано — этот ответ может быть неполным. Нажмите «Повторить», чтобы продолжить.</string>
     <string name="browser_takeover">Перехватить управление</string>
     <string name="browser_settings_done">Готово</string>
@@ -1195,27 +1191,16 @@
     <!-- Spoken substitutions for links during read-aloud (TTS) -->
     <string name="voice_link_to_host">ссылка на %1$s</string>
     <string name="voice_bare_link">ссылка</string>
-    <!-- [T-android-voice-correction] Consent + correction UI -->
-    <string name="voice_correction_consent_title">Улучшить исправление распознавания речи?</string>
-    <string name="voice_correction_consent_body">Minis может сохранять ваши правки расшифровок (оригинал → исправление) и принятые исправления ИИ в локальной базе данных на устройстве, чтобы в дальнейшем исправлять распознавание точнее. Ничего не загружается в сеть. Вы можете изменить это или удалить данные в настройках в любой момент.</string>
-    <string name="voice_correction_consent_enable">Включить</string>
-    <string name="voice_correction_consent_not_now">Не сейчас</string>
-    <string name="voice_correction_button_a11y">Исправить расшифровку с помощью ИИ</string>
-    <string name="voice_correction_none_needed">Исправления не требуются</string>
-    <string name="voice_correction_failed">Не удалось исправить, оригинал сохранён</string>
-    <string name="voice_correction_section">Обучение на исправлениях речи</string>
-    <string name="voice_correction_toggle">Собирать данные об исправлениях</string>
-    <string name="voice_correction_footer">Когда включено, ваши ручные правки расшифровок (оригинал → исправление), принятые исправления ИИ и часто набираемые термины сохраняются в локальной базе данных на устройстве, чтобы в дальнейшем исправлять распознавание точнее. Ничего не загружается в сеть. По умолчанию выключено; имеющиеся данные сохраняются, пока вы их не удалите.</string>
-    <string name="voice_correction_clear_title">Удалить все собранные данные об исправлениях речи?</string>
-    <string name="voice_correction_clear">Удалить всё</string>
-    <string name="voice_correction_cleared">Данные об исправлениях удалены</string>
     <string name="voice_provider_system">Система</string>
     <string name="add_provider_subtitle_kimi">Kimi Coding Plan — войдите с аккаунтом Kimi</string>
+    <string name="add_provider_subtitle_xai">Поддерживает модели серии Grok</string>
     <string name="kimi_login_title">Войти через Kimi Code</string>
     <string name="kimi_login_instructions">Откройте страницу подтверждения и введите этот код, чтобы авторизовать Minis:</string>
     <string name="kimi_login_copy_code">Скопировать код</string>
     <string name="kimi_login_open_verification">Открыть страницу подтверждения</string>
     <string name="kimi_login_waiting">Ожидание авторизации…</string>
+    <string name="xai_login_title">Войти через xAI</string>
+    <string name="xai_login_instructions">Откройте страницу подтверждения, войдите в аккаунт x.ai и введите этот код, чтобы авторизовать Minis:</string>
     <string name="browser_downloads_title">Загрузки</string>
     <string name="browser_downloads_clear">Очистить</string>
     <string name="browser_downloads_empty">Нет загрузок</string>
@@ -1786,7 +1771,6 @@
     <string name="chat_scroll_to_previous">К предыдущему сообщению</string>
     <string name="chat_scroll_to_bottom">Вниз</string>
     <string name="chat_read_image">Прочитать изображение</string>
-    <string name="chat_switch_to_keyboard">Переключить на клавиатуру</string>
     <string name="tool_browser_screenshot">Снимок браузера</string>
     <string name="tool_file_placeholder">(файл)</string>
     <string name="tool_edited_label">Изменено</string>
@@ -1806,8 +1790,6 @@
     <string name="chat_collapse">Свернуть</string>
     <string name="chat_expand">Развернуть</string>
     <string name="memory_list_empty">(пусто)</string>
-    <string name="chat_voice_input">Голосовой ввод</string>
-    <string name="chat_stop_recording">Остановить запись</string>
     <string name="common_hide">Скрыть</string>
     <string name="common_show">Показать</string>
     <string name="common_selected">Выбрано</string>
@@ -2432,6 +2414,10 @@
     <string name="voice_call_back">Открыть чат</string>
     <string name="voice_call_end">Завершить разговор</string>
     <string name="voice_call_follow_up">Дополнить указания</string>
+    <string name="voice_call_opt_input">Распознавание · %1$s</string>
+    <string name="voice_call_opt_language">Язык · %1$s</string>
+    <string name="voice_call_opt_output">Голос · %1$s</string>
+    <string name="voice_call_opt_system_voice">Системный голос</string>
     <string name="settings_ralph_limit">Ограничение времени раунда Ralph</string>
     <string name="settings_ralph_limit_subtitle">%1$d мин на раунд · ожидание очистки дочерней задачи</string>
     <string name="settings_ralph_timeout">Время на раунд (1–30 минут)</string>
@@ -2503,4 +2489,5 @@
     <string name="scheduled_task_legacy_executor_removed">Эта задача использовала больше недоступный режим выполнения. Проверьте её и сохраните перед повторным запуском.</string>
     <string name="sub_agent_text_model_required">Выберите модель, способную отвечать текстом.</string>
     <string name="vscreen_display_busy">Виртуальный экран сейчас используется другой сессией.</string>
+    <string name="chat_plan_exit">Выйти</string>
 </resources>
