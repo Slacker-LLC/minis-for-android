@@ -515,6 +515,13 @@ fun AppNavigation(
             )
         }
 
+        composable(Routes.VOICE_CALL_SETTINGS) {
+            com.openminis.app.ui.settings.VoiceCallSettingsScreen(
+                providerRepository = providerRepository,
+                onBack = { navController.safePopBackStack() },
+            )
+        }
+
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onBack = { navController.safePopBackStack() },
@@ -532,7 +539,10 @@ fun AppNavigation(
             if (category == null) {
                 navController.safePopBackStack()
             } else if (category == SettingsCategory.CHAT) {
-                ChatInputSettingsScreen(onBack = { navController.safePopBackStack() })
+                ChatInputSettingsScreen(
+                    onBack = { navController.safePopBackStack() },
+                    onOpenVoiceCall = { navController.safeNavigate(Routes.VOICE_CALL_SETTINGS) },
+                )
             } else if (category == SettingsCategory.APPEARANCE) {
                 AppearanceScreen(onBack = { navController.safePopBackStack() })
             } else if (category == SettingsCategory.FILES) {

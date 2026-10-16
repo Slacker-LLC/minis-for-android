@@ -5,6 +5,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.openminis.app.voicecall.model.BloubState
 import com.openminis.app.voicecall.model.CallAiState
+import com.openminis.app.voicecall.model.CallEnded
+import com.openminis.app.voicecall.model.CallLine
+import com.openminis.app.voicecall.model.CallToast
 import com.openminis.app.voicecall.model.CallMode
 import com.openminis.app.voicecall.model.CallUiState
 import com.openminis.app.voicecall.runtime.CallEvent
@@ -22,6 +25,7 @@ class CallController(
         private set
 
     private var preMute: BloubState = BloubState.IDLE
+    private var toastSeq = 0L
 
     init {
         scope.launch {
@@ -36,8 +40,6 @@ class CallController(
             minimized = false,
             muted = false,
             elapsedSeconds = 0L,
-            // 字幕只由 Runtime 的真实回调决定（startListening 会立刻推一条），
-            // 这里不再塞演示文案，避免覆盖用户真正听到/说出的话。
             ai = CallAiState(BloubState.LISTENING),
             model = state.model
         )
@@ -81,8 +83,8 @@ class CallController(
         state = state.copy(ai = state.ai.copy(bloubState = s))
     }
 
-    fun setSubtitle(text: String) {
-        state = state.copy(ai = state.ai.copy(subtitle = text))
+    fun clearToast() {
+        if (state.toast != null) state = state.copy(toast = null)
     }
 
     fun sendText(text: String) {
@@ -98,7 +100,21 @@ class CallController(
         when (event) {
             is CallEvent.BloubStateChanged -> setBloubState(event.state)
             is CallEvent.MuteChanged -> applyMuted(event.muted)
-            is CallEvent.SubtitleChanged -> setSubtitle(event.text)
+            is CallEvent.Transcript ->
+                state = state.copy(transcript = state.transcript + CallLine(event.fromUser, event.text))
+            is CallEvent.Notice -> {
+                toastSeq++
+                state = state.copy(toast = CallToast(toastSeq, event.kind, event.detail))
+            }
+            // runtime 已自行停掉音频，这里只切到结束页；聊天记录保留给结束页查看。
+            is CallEvent.Ended -> if (state.active) {
+                state = CallUiState(
+                    model = state.model,
+                    transcript = state.transcript,
+                    ended = CallEnded(event.reason, event.detail),
+                )
+                preMute = BloubState.IDLE
+            }
         }
     }
 

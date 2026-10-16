@@ -35,8 +35,8 @@ class FakeCallRuntime : CallRuntime {
         _events.tryEmit(CallEvent.BloubStateChanged(state))
     }
 
-    fun emitSubtitle(text: String) {
-        _events.tryEmit(CallEvent.SubtitleChanged(text))
+    fun emitTranscript(fromUser: Boolean, text: String) {
+        _events.tryEmit(CallEvent.Transcript(fromUser, text))
     }
 
     override fun sendText(text: String) {

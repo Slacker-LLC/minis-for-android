@@ -78,6 +78,10 @@ What this does not protect against: Android or the OEM killing the Minis process
 
 Not verified on a device: background survival for 30 minutes or more on HyperOS (Xiaomi 24129PN74C), and how OEM background policies treat this service.
 
+## Voice call service
+
+`VoiceCallForegroundService` is separate from the Agent service and uses the `microphone` type (`FOREGROUND_SERVICE_MICROPHONE`), because a voice call captures audio while the app is in the background. It runs only while a call is active, is started by the call page while it is in the foreground, and returns `START_NOT_STICKY`. The notification has pause/resume and end actions and a chronometer. If the service cannot start, the call page mutes the call when the app leaves the foreground. See `docs/development/VOICE-CONVERSATION.md`.
+
 ## Device and OEM limitations
 
 Foreground-service start restrictions still apply. `specialUse` is a type declaration, not an exemption from Android background-start rules. Exact-alarm/scheduled execution and OEM background policies may behave differently across devices.

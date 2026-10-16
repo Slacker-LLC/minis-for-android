@@ -1441,6 +1441,7 @@ fun ChatScreen(
         sessionId,
         isChatDestination,
         ensureMicPermissionFlow,
+        onMoveToSession,
     )
 
     // Offload permission dialog (also visible over the voice conversation).

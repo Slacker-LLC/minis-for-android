@@ -2478,6 +2478,7 @@
 
     <string name="voice_call_title">Voice conversation</string>
     <string name="voice_call_permission">Microphone permission is required. Grant permission and retry.</string>
+    <string name="voice_call_session_missing">This chat no longer exists. Start a new chat and try again.</string>
     <string name="voice_call_paused">Audio paused</string>
     <string name="voice_call_state_idle">Ready</string>
     <string name="voice_call_state_listening">Listening</string>
@@ -2487,13 +2488,10 @@
     <string name="voice_call_state_success">Done</string>
     <string name="voice_call_state_error">Something went wrong</string>
 
-    <string name="voice_call_model">Current chat model</string>
     <string name="voice_call_preparing">Preparing microphone…</string>
-    <string name="voice_call_listening_hint">Speak to run tasks in this chat.</string>
     <string name="voice_call_recognition_failed">Recognition failed: %1$s. Check the speech service and retry.</string>
     <string name="voice_call_task_incomplete">Task not finished: %1$s</string>
     <string name="voice_call_task_incomplete_generic">Task not finished. Open the chat to see the details.</string>
-    <string name="voice_call_hint">Speak to run tasks in this chat. Tap interrupt to stop this voice turn and speak again. Leaving ends audio; accepted tasks continue in chat.</string>
     <string name="voice_call_mute">Pause audio</string>
     <string name="voice_call_unmute">Resume audio</string>
     <string name="voice_call_retry">Retry</string>
@@ -2501,11 +2499,33 @@
     <string name="voice_call_submit">Send now</string>
     <string name="voice_call_back">View chat</string>
     <string name="voice_call_end">End voice</string>
+    <string name="voice_call_input_hint">Type a message…</string>
+    <string name="voice_call_send">Send</string>
+    <string name="voice_call_show_orb">Back to voice</string>
+    <string name="voice_call_approval_question">Allow “%1$s”? Say allow, allow for this session, or deny.</string>
+    <string name="voice_call_approval_unclear">Sorry, I didn\'t get that. Say allow, allow for this session, or deny.</string>
+    <string name="voice_call_working">One moment, I\'m working on it.</string>
+    <string name="voice_task_none">There are no active tasks right now.</string>
+    <string name="voice_task_summary">You have %1$d tasks. %2$s</string>
+    <string name="voice_task_item">%1$s: %2$s.</string>
+    <string name="voice_task_switching">Okay, switching to “%1$s”.</string>
+    <string name="voice_task_not_found">I couldn\'t find a task called “%1$s”.</string>
+    <string name="voice_task_ambiguous">More than one task matches “%1$s”. Please be more specific.</string>
+    <string name="voice_task_back">Okay, going back to the previous task.</string>
+    <string name="voice_task_no_previous">There is no previous task to go back to.</string>
+    <string name="voice_task_already_here">You\'re already in that task.</string>
+    <string name="voice_task_update">Task “%1$s”: %2$s. %3$s</string>
+    <string name="voice_progress_running">Still working. Right now: %1$s.</string>
+    <string name="voice_progress_steps">Still working. %1$d steps done, now: %2$s.</string>
+    <string name="voice_call_model">Current chat model</string>
+    <string name="voice_call_toast_retry">Didn\'t catch that, trying again…</string>
+    <string name="voice_call_toast_idle">Still there? I\'ll hang up soon if I hear nothing.</string>
+    <string name="voice_call_chat_empty">Nothing said yet. What you and the assistant say shows up here.</string>
+    <string name="voice_call_leave_to_chat">Back to chat</string>
+    <string name="voice_call_ended_idle">Nobody spoke for a while, so the call was ended.</string>
+    <string name="voice_call_ended_connection">Could not reach the realtime voice service: %1$s</string>
     <string name="voice_call_follow_up">Add instructions</string>
-    <string name="voice_call_opt_input">Recognition · %1$s</string>
     <string name="voice_call_opt_language">Language · %1$s</string>
-    <string name="voice_call_opt_output">Voice · %1$s</string>
-    <string name="voice_call_opt_system_voice">System voice</string>
     <string name="settings_ralph_limit">Ralph round time limit</string>
     <string name="settings_ralph_limit_subtitle">%1$d min per round · waits for child cleanup</string>
     <string name="settings_ralph_timeout">Per-round time limit (1–30 minutes)</string>
@@ -2547,9 +2567,6 @@
     <string name="outcome_pending_title">Actions needing inspection</string>
     <string name="outcome_inspect_action">Inspect %1$s</string>
     <string name="outcome_kept_unknown">The action is still unresolved. Its record is preserved.</string>
-    <string name="voice_cancel_recording">Cancel recording</string>
-    <string name="voice_stop_playback">Stop speech</string>
-    <string name="voice_stop_owned_turn">Stop this voice request</string>
     <string name="work_task_summary">Tasks and results</string>
     <string name="work_task_select">Use this task for follow-ups</string>
     <string name="work_task_selected">Selected task</string>
@@ -2577,4 +2594,25 @@
     <string name="scheduled_task_legacy_executor_removed">This task used a removed executor. Review it and save before running it again.</string>
     <string name="sub_agent_text_model_required">Choose a model that can respond with text.</string>
     <string name="vscreen_display_busy">The virtual display is currently in use by another session.</string>
+    <string name="voice_call_settings_speed">Speaking speed</string>
+    <string name="voice_call_settings_earpiece">Use earpiece</string>
+    <string name="voice_call_settings_title">Voice call</string>
+    <string name="voice_call_settings_sub">Recognition and reading models, earpiece, speed, call engine</string>
+    <string name="voice_call_engine">Call engine</string>
+    <string name="voice_call_engine_classic">Classic pipeline</string>
+    <string name="voice_call_engine_realtime">Realtime model</string>
+    <string name="voice_call_rt_provider">Provider (key from Manage providers)</string>
+    <string name="voice_call_rt_model">Model (blank = default)</string>
+    <string name="voice_call_rt_voice">Voice (blank = default)</string>
+    <string name="voice_call_rt_workspace">Workspace ID</string>
+    <string name="voice_call_rt_url">WebSocket URL (wss://, may contain {model})</string>
+    <string name="voice_call_rt_incomplete">Not fully set up, so calls will use the classic pipeline.</string>
+    <string name="voice_call_rt_no_provider">No suitable provider. Add one in Manage providers with an API key first.</string>
+    <string name="voice_call_rt_unverified">Not verified against the vendor docs; may not work.</string>
+    <string name="voice_call_notif_channel">Voice call</string>
+    <string name="voice_call_notif_title">Voice call in progress</string>
+    <string name="voice_call_notif_live">Microphone on</string>
+    <string name="voice_call_notif_muted">Microphone muted</string>
+    <string name="voice_call_attach">Add photos</string>
+    <string name="voice_call_attach_remove">Remove photo</string>
 </resources>

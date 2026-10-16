@@ -1,42 +1,93 @@
 package com.openminis.app.voicecall
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import com.openminis.app.ui.chat.InputAttachment
+import com.openminis.app.ui.chat.getFileName
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.ChatBubbleOutline
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.MicOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
+import android.view.WindowManager
+import android.widget.Toast
 import com.openminis.app.agent.ensureSessionForSettings
 import com.openminis.app.R
 import com.openminis.app.data.repository.ensureDefaultVoiceInputSlot
+import com.openminis.app.data.repository.loadApiKey
+import com.openminis.app.voicecall.realtime.AndroidRealtimeAudio
+import com.openminis.app.voicecall.realtime.EngineSwitchingCallRuntime
+import com.openminis.app.voicecall.realtime.OkHttpRealtimeTransport
+import com.openminis.app.voicecall.realtime.RealtimeCallRuntime
+import com.openminis.app.voicecall.realtime.RealtimeCallSettings
+import com.openminis.app.voicecall.realtime.realtimeInstructions
+import com.openminis.app.voicecall.realtime.resolveRealtime
 import com.openminis.app.data.repository.ensureDefaultVoiceOutputSlot
 import com.openminis.app.deeplink.DeepLinkCoordinator
+import com.openminis.app.service.VoiceCallBridge
+import com.openminis.app.service.VoiceCallForegroundService
 import com.openminis.app.speech.ReadAloudPlayer
+import com.openminis.app.speech.VoiceOutputState
 import com.openminis.app.speech.SpeechRecognitionManager
 import com.openminis.app.ui.chat.ChatViewModel
 import com.openminis.app.ui.chat.TaskWorkSummary
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisOutlinedButton
-import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.minisPageBackground
 import com.openminis.app.voicecall.controller.CallController
 import com.openminis.app.voicecall.grok.VoiceBotAvatar
 import com.openminis.app.voicecall.grok.voiceCallStatusRes
 import com.openminis.app.voicecall.model.BloubState
+import com.openminis.app.voicecall.model.CallEnded
+import com.openminis.app.voicecall.model.CallLine
+import com.openminis.app.voicecall.model.CallToast
 import com.openminis.app.voicecall.model.CallMode
 import com.openminis.app.voicecall.runtime.*
 import kotlinx.coroutines.delay
@@ -44,6 +95,9 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 /** 所有入口绑定当前聊天 VM；权限确认仍由 ChatScreen 的原有 Dialog 承接。 */
+/** 一次通话里最多挂几张待发图片。 */
+private const val MAX_CALL_IMAGES = 4
+
 @Composable
 internal fun VoiceConversationHost(
     viewModel: ChatViewModel,
@@ -51,47 +105,119 @@ internal fun VoiceConversationHost(
     /** Mirrors `ChatScreen(isChatDestination=…)`; deep-link actions require it. */
     fromChatRoute: Boolean,
     ensureMicPermission: suspend () -> Boolean,
+    /** 口头切换任务：结束通话后把聊天切到该任务所在会话（和聊天里的会话跳转同一个入口）。 */
+    onMoveToSession: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val scope = rememberCoroutineScope()
-    val player = remember(viewModel) { lazy { ReadAloudPlayer(context.applicationContext) } }
-    val gateway = remember(viewModel) { AgentCallGateway(viewModel.agentSession) }
+    val player = remember(viewModel) {
+        lazy { ReadAloudPlayer(context.applicationContext).also { it.communicationUsage = VoiceOutputState.callEarpiece.value } }
+    }
+    // 通话里选的图片：随下一条提交的消息（打字或语音）一起发给 Agent。
+    val pendingImages = remember(viewModel) { mutableStateListOf<InputAttachment>() }
+    val callTasks = remember(viewModel) {
+        AgentCallTasks(
+            context.applicationContext,
+            (context.applicationContext as com.openminis.app.MinisApp).agentTaskRepository,
+            { viewModel.agentSession.currentSessionId },
+        )
+    }
+    val gateway = remember(viewModel) {
+        AgentCallGateway(
+            viewModel.agentSession,
+            takeAttachments = { pendingImages.toList().also { pendingImages.clear() } },
+            onTaskReported = callTasks::markReported,
+        )
+    }
+    // 适配器先于 endAudio 创建，切换回调经这个句柄转过去。
+    val switchSession = remember(viewModel) { arrayOf<(String) -> Unit>({}) }
+    val imagePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_CALL_IMAGES),
+    ) { uris ->
+        uris.forEach { uri ->
+            if (pendingImages.size >= MAX_CALL_IMAGES) return@forEach
+            pendingImages += InputAttachment(
+                fileName = getFileName(context, uri) ?: "image.jpg",
+                uri = uri,
+                mimeType = context.contentResolver.getType(uri) ?: "image/jpeg",
+                kind = InputAttachment.Kind.IMAGE,
+            )
+        }
+    }
     val input = remember(viewModel) { AgentCallSpeechInput(viewModel.providerRepository) }
+    val approvals = remember(viewModel) {
+        AgentCallApprovals(context.applicationContext, { viewModel.agentSession.currentSessionId }, scope)
+    }
     val runtime = remember(viewModel) {
-        MinisCallRuntimeAdapter(
+        val classic = MinisCallRuntimeAdapter(
             input,
             gateway,
             AgentCallSpeechOutput(player),
             scope,
-            texts = CallRuntimeTexts(
-                listening = context.getString(R.string.voice_call_listening_hint),
-                recognitionFailed = { detail ->
-                    context.getString(R.string.voice_call_recognition_failed, detail)
-                },
-                taskIncomplete = { detail ->
-                    if (detail.isNullOrBlank()) context.getString(R.string.voice_call_task_incomplete_generic)
-                    else context.getString(R.string.voice_call_task_incomplete, detail)
-                },
-            ),
+            approvals,
+            context.getString(R.string.voice_call_working),
+            callTasks,
+            { id -> switchSession[0](id) },
         )
+        RealtimeCallSettings.init(context)
+        EngineSwitchingCallRuntime(classic, {
+            val repo = viewModel.providerRepository
+            val selection = RealtimeCallSettings.state.value
+            val instance = repo.config.value.instances.firstOrNull { it.id == selection.instanceId }
+            resolveRealtime(selection, instance, instance?.let { repo.loadApiKey(it.id) })?.let { connection ->
+                RealtimeCallRuntime(
+                    connection = connection,
+                    instructions = realtimeInstructions(connection.profile.supportsTools),
+                    transport = OkHttpRealtimeTransport(),
+                    audio = AndroidRealtimeAudio(context.applicationContext),
+                    model = gateway,
+                    scope = scope,
+                    approvals = approvals,
+                    tasks = callTasks,
+                    onSwitchSession = { id -> switchSession[0](id) },
+                )
+            }
+        }, scope)
     }
     val controller = remember(runtime) { CallController(runtime, scope) }
     var visible by remember(viewModel) { mutableStateOf(false) }
     var opening by remember(viewModel) { mutableStateOf(false) }
     var requestVersion by remember(viewModel) { mutableIntStateOf(0) }
     var entryError by remember(viewModel) { mutableStateOf<String?>(null) }
+    var transcriptMode by remember(viewModel) { mutableStateOf(false) }
+    var draft by remember(viewModel) { mutableStateOf("") }
     val pending by DeepLinkCoordinator.pendingChatAction.collectAsState()
     val lifecycleState by lifecycle.currentStateAsState()
     val modelName by viewModel.modelName.collectAsState()
     val active = controller.state.active
+    // 「＋」附图只在当前模型能看图（或有 Vision Group 代看）时出现；换模型后重新判断。
+    val canAttachImages = remember(modelName, active) { viewModel.agentSession.canAcceptImages() }
+    // 听筒/扬声器：通话期间按设置切换系统路由，挂断或离开页面一律还原。
+    val earpiece by VoiceOutputState.callEarpiece.collectAsState()
+    val audioRoute = remember { CallAudioRoute(context) }
+    LaunchedEffect(active, earpiece) {
+        val useEarpiece = active && earpiece
+        if (player.isInitialized()) player.value.communicationUsage = useEarpiece
+        if (useEarpiece) audioRoute.useEarpiece() else audioRoute.release()
+    }
 
     fun endAudio() {
         requestVersion++
         opening = false
         visible = false
+        transcriptMode = false
+        draft = ""
+        pendingImages.clear()
         controller.endCall()
         viewModel.voiceConversationActive.value = false
+        VoiceCallBridge.publish(null)
+    }
+
+    switchSession[0] = { id ->
+        endAudio()
+        DeepLinkCoordinator.setPendingChatAction(DeepLinkCoordinator.ChatAction.START_VOICE, id)
+        onMoveToSession(id)
     }
 
     fun openCall() {
@@ -113,7 +239,15 @@ internal fun VoiceConversationHost(
                 SpeechRecognitionManager.cancelRecording()
                 SpeechRecognitionManager.clearDegradationAndRefresh()
                 viewModel.replyPlayer?.stop()
-                val sid = viewModel.agentSession.ensureSessionForSettings()
+                val sid = try {
+                    viewModel.agentSession.ensureSessionForSettings()
+                } catch (e: IllegalStateException) {
+                    // 历史里点开的会话行已不存在（SessionDeletedException，消息 session_deleted）：
+                    // 提示即可，别让异常冒出 scope 把进程带崩；其它状态错误照常抛。
+                    if (e.message != "session_deleted") throw e
+                    entryError = context.getString(R.string.voice_call_session_missing)
+                    return@launch
+                }
                 com.openminis.app.data.AssistantHomePrefs.rememberVoiceSession(context, sid)
                 viewModel.voiceConversationActive.value = true
                 controller.startCall(CallMode.VOICE)
@@ -136,6 +270,24 @@ internal fun VoiceConversationHost(
             openCall()
         }
     }
+    // runtime 自动挂断（空闲/连续出错）：不留结束页，直接回到聊天，用提示说明原因。
+    val ended = controller.state.ended
+    LaunchedEffect(ended) {
+        if (ended != null) {
+            Toast.makeText(context, endedText(context, ended), Toast.LENGTH_LONG).show()
+            endAudio()
+        }
+    }
+    // 通话期间挂一个 microphone 前台服务：切后台/锁屏后麦克风继续工作，通知栏上有静音和挂断。
+    val callStartedAt = remember(active) { if (active) System.currentTimeMillis() else 0L }
+    LaunchedEffect(active, controller.state.muted) {
+        if (active) {
+            VoiceCallBridge.onHangUp = { endAudio() }
+            VoiceCallBridge.onToggleMute = { controller.setMuted(!controller.state.muted) }
+            VoiceCallBridge.publish(VoiceCallBridge.Call(controller.state.muted, callStartedAt))
+            if (!VoiceCallBridge.serviceRunning.value) VoiceCallForegroundService.start(context.applicationContext)
+        }
+    }
     LaunchedEffect(active) {
         while (controller.state.active) {
             delay(1000)
@@ -145,141 +297,412 @@ internal fun VoiceConversationHost(
     DisposableEffect(lifecycle, controller) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
-                // 前台交互第一版：切后台/锁屏立即暂停，不通过 Root 偷开麦克风。
                 requestVersion++
                 opening = false
-                controller.setMuted(true)
+                // 前台服务在跑（通知栏看得见、可静音可挂断）时通话继续；否则不在用户不知情时采集，立即暂停。
+                if (!(controller.state.active && VoiceCallBridge.serviceRunning.value)) {
+                    controller.setMuted(true)
+                }
             }
         }
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)
+            VoiceCallBridge.onHangUp = null
+            VoiceCallBridge.onToggleMute = null
+            audioRoute.release()
             endAudio()
             if (player.isInitialized()) player.value.shutdown()
         }
     }
 
     if (visible) {
-        Dialog(onDismissRequest = { endAudio() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Dialog(
+            onDismissRequest = { endAudio() },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            // 键盘高度只由 imePadding 处理；窗口自己不再平移/缩放，否则会算两遍。
+            val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+            val darkTheme = ChatColors.isDark
+            SideEffect {
+                dialogWindow?.let { window ->
+                    window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
+                    // 状态栏/导航栏在页面背景上要可读：浅色主题用深色图标。
+                    WindowCompat.getInsetsController(window, window.decorView).apply {
+                        isAppearanceLightStatusBars = !darkTheme
+                        isAppearanceLightNavigationBars = !darkTheme
+                    }
+                }
+            }
             Surface(Modifier.fillMaxSize(), color = minisPageBackground(ChatColors.isDark)) {
-                val characterState = controller.state.effectiveBloubState
+                val state = controller.state
+                val characterState = state.effectiveBloubState
                 val statusLine = when {
                     entryError != null -> entryError.orEmpty()
                     opening -> stringResource(R.string.voice_call_preparing)
                     else -> stringResource(voiceCallStatusRes(characterState))
                 }
-                val detailLine = if (active) controller.state.ai.subtitle else stringResource(R.string.voice_call_hint)
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .systemBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    // 顶栏：只在通话进行时给计时，失败/准备中不显示无意义的 00:00。
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.voice_call_title), style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.weight(1f))
-                        if (active) {
-                            Text(
-                                callClock(controller.state.elapsedSeconds),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = ChatColors.secondaryText,
-                            )
-                        }
-                    }
-                    Text(
-                        modelName.ifBlank { context.getString(R.string.voice_call_model) },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ChatColors.secondaryText,
-                        modifier = Modifier.fillMaxWidth(),
+                val toastText = state.toast?.let { toastText(context, it) }
+                val orbLabel = stringResource(
+                    if (characterState == BloubState.LISTENING) R.string.voice_call_submit
+                    else R.string.voice_call_interrupt,
+                )
+                // 点球：听的时候是「现在发送」，想/说/出错时是「打断并重新说」。
+                val orb: @Composable (Modifier) -> Unit = { modifier ->
+                    VoiceBotAvatar(
+                        characterState,
+                        modifier
+                            .semantics { contentDescription = statusLine }
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                enabled = active && characterState != BloubState.MUTED,
+                                onClickLabel = orbLabel,
+                            ) {
+                                if (characterState == BloubState.LISTENING) input.stop()
+                                else {
+                                    controller.interrupt()
+                                    controller.setMuted(false)
+                                }
+                            },
                     )
-                    CallVoiceOptions(viewModel.providerRepository)
-
-                    // 中部：角色居中，下面是状态词与最近一句字幕（长回答截断，全文在聊天里看）。
-                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Column(
-                            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            VoiceBotAvatar(characterState, Modifier.size(180.dp))
-                            Spacer(Modifier.height(20.dp))
-                            Text(
-                                statusLine,
-                                style = MaterialTheme.typography.headlineSmall,
-                                textAlign = TextAlign.Center,
-                                color = if (characterState == BloubState.ERROR) MaterialTheme.colorScheme.error else Color.Unspecified,
-                            )
-                            if (detailLine.isNotBlank()) {
+                }
+                val statusColor = if (characterState == BloubState.ERROR || entryError != null) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    ChatColors.secondaryText
+                }
+                Box(Modifier.fillMaxSize()) {
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .systemBarsPadding()
+                            .imePadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        // 顶栏：计时居中，右侧在「球」和「文字记录」两种版面间切换。
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            // 通话页不放设置：模型、听筒、语速、引擎都在 设置 › 对话与输入 › 语音通话。
+                            Spacer(Modifier.size(48.dp))
+                            Spacer(Modifier.weight(1f))
+                            if (active) {
                                 Text(
-                                    detailLine,
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    callClock(state.elapsedSeconds),
+                                    style = MaterialTheme.typography.labelLarge,
                                     color = ChatColors.secondaryText,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 4,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(top = 10.dp),
+                                )
+                            }
+                            Spacer(Modifier.weight(1f))
+                            IconButton(onClick = { transcriptMode = !transcriptMode }) {
+                                Icon(
+                                    if (transcriptMode) Icons.Rounded.GraphicEq else Icons.Rounded.ChatBubbleOutline,
+                                    contentDescription = stringResource(
+                                        if (transcriptMode) R.string.voice_call_show_orb else R.string.voice_call_back,
+                                    ),
                                 )
                             }
                         }
-                    }
 
-                    TaskWorkSummary(viewModel.agentSession.activeSessionId)
-
-                    // 底部：一行一个主操作（设计语言：整页最多一个强调按钮），
-                    // 其余行是可换行的文字按钮，最后一行始终留给离开/挂断。
-                    if (active) {
-                        val primary = when {
-                            controller.state.muted -> R.string.voice_call_unmute to { controller.setMuted(false) }
-                            characterState == BloubState.LISTENING -> R.string.voice_call_submit to { input.stop() }
-                            characterState == BloubState.ERROR -> R.string.voice_call_retry to { controller.interrupt(); controller.setMuted(false) }
-                            else -> R.string.voice_call_interrupt to { controller.interrupt(); controller.setMuted(false) }
-                        }
-                        Row(
-                            Modifier.fillMaxWidth().padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (!controller.state.muted) {
-                                MinisOutlinedButton(onClick = { controller.setMuted(true) }) {
-                                    Text(stringResource(R.string.voice_call_mute))
+                        if (transcriptMode) {
+                            TranscriptLayout(
+                                lines = state.transcript,
+                                statusLine = statusLine,
+                                statusColor = statusColor,
+                                orb = { orb(Modifier.size(72.dp)) },
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                            )
+                        } else {
+                            // 球版面：下滑切到文字记录。
+                            var dragged by remember { mutableFloatStateOf(0f) }
+                            val swipeThreshold = with(LocalDensity.current) { 72.dp.toPx() }
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .pointerInput(Unit) {
+                                        detectVerticalDragGestures(
+                                            onDragStart = { dragged = 0f },
+                                            onDragEnd = { if (dragged > swipeThreshold) transcriptMode = true },
+                                            onDragCancel = { dragged = 0f },
+                                        ) { _, delta -> dragged += delta }
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    orb(Modifier.size(240.dp))
+                                    Spacer(Modifier.height(16.dp))
+                                    Text(
+                                        statusLine,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        textAlign = TextAlign.Center,
+                                        color = statusColor,
+                                    )
                                 }
                             }
-                            MinisButton(onClick = primary.second) { Text(stringResource(primary.first)) }
                         }
-                        FlowRow(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-                        ) {
-                            if (characterState == BloubState.THINKING || characterState == BloubState.SPEAKING) {
-                                MinisTextButton(onClick = {
-                                    controller.listenForFollowUp()
-                                    controller.setMuted(false)
-                                }) { Text(stringResource(R.string.voice_call_follow_up)) }
-                            }
-                            MinisTextButton(
-                                onClick = { input.cancel(); controller.setMuted(true) },
-                                enabled = characterState == BloubState.LISTENING && !controller.state.muted,
-                            ) { Text(stringResource(R.string.voice_cancel_recording)) }
-                            MinisTextButton(onClick = { if (player.isInitialized()) player.value.stop() }) {
-                                Text(stringResource(R.string.voice_stop_playback))
-                            }
-                            MinisTextButton(onClick = { gateway.cancel() }) {
-                                Text(stringResource(R.string.voice_stop_owned_turn))
+
+                        TaskWorkSummary(viewModel.agentSession.activeSessionId)
+
+                        // 底部：输入栏（文字框、静音、挂断）。两种版面共用。文字回车即发，
+                        // 助手用语音回答；静音只关麦克风，挂断结束音频，已接受的任务继续在原会话跑。
+                        Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
+                            when {
+                                active -> CallInputBar(
+                                    draft = draft,
+                                    onDraft = { draft = it },
+                                    onSend = {
+                                        controller.sendText(draft)
+                                        draft = ""
+                                    },
+                                    muted = state.muted,
+                                    onToggleMute = { controller.setMuted(!state.muted) },
+                                    onEnd = { endAudio() },
+                                    images = pendingImages,
+                                    canAttach = canAttachImages,
+                                    onAttach = {
+                                        imagePicker.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                        )
+                                    },
+                                    onRemoveImage = { pendingImages.remove(it) },
+                                )
+                                opening -> Unit
+                                else -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    // 入口失败（缺麦克风权限等）：回聊天 / 重试。
+                                    MinisOutlinedButton(onClick = { endAudio() }) {
+                                        Text(stringResource(R.string.voice_call_leave_to_chat))
+                                    }
+                                    MinisButton(onClick = {
+                                        controller.endCall()
+                                        openCall()
+                                    }) {
+                                        Text(stringResource(R.string.voice_call_retry))
+                                    }
+                                }
                             }
                         }
-                    } else {
-                        MinisButton(onClick = { openCall() }, enabled = !opening) { Text(stringResource(R.string.voice_call_retry)) }
                     }
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        // 「查看聊天」是权限确认被本页遮住时的出口；两个入口都结束音频，
-                        // 已接受的 Agent 任务继续在原会话跑。
-                        MinisTextButton(onClick = { endAudio() }) { Text(stringResource(R.string.voice_call_back)) }
-                        Spacer(Modifier.weight(1f))
-                        MinisOutlinedButton(onClick = { endAudio() }) { Text(stringResource(R.string.voice_call_end)) }
+
+                    // toast：悬在输入栏上方，2.5 秒后自行消失。
+                    VoiceToast(toastText, state.toast?.seq) { controller.clearToast() }
+                }
+            }
+        }
+    }
+}
+
+/** 文字记录版面：用户灰底气泡，助手纯文字；球缩小到底部，旁边是状态词。 */
+@Composable
+private fun TranscriptLayout(
+    lines: List<CallLine>,
+    statusLine: String,
+    statusColor: Color,
+    orb: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        val listState = rememberLazyListState()
+        LaunchedEffect(lines.size) {
+            if (lines.isNotEmpty()) listState.animateScrollToItem(lines.lastIndex)
+        }
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            if (lines.isEmpty()) {
+                Text(
+                    stringResource(R.string.voice_call_chat_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ChatColors.secondaryText,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                )
+            } else {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    state = listState,
+                    contentPadding = PaddingValues(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    items(lines) { line ->
+                        if (line.fromUser) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                Surface(
+                                    shape = RoundedCornerShape(18.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.widthIn(max = 300.dp),
+                                ) {
+                                    Text(
+                                        line.text,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    )
+                                }
+                            }
+                        } else {
+                            Text(
+                                line.text,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                            )
+                        }
                     }
                 }
             }
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            orb()
+            Spacer(Modifier.width(8.dp))
+            Text(statusLine, style = MaterialTheme.typography.bodyMedium, color = statusColor)
+        }
+    }
+}
+
+@Composable
+private fun CallInputBar(
+    draft: String,
+    onDraft: (String) -> Unit,
+    onSend: () -> Unit,
+    muted: Boolean,
+    onToggleMute: () -> Unit,
+    onEnd: () -> Unit,
+    images: List<InputAttachment>,
+    canAttach: Boolean,
+    onAttach: () -> Unit,
+    onRemoveImage: (InputAttachment) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+    if (images.isNotEmpty()) {
+        LazyRow(
+            Modifier.padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(images, key = { it.id }) { image ->
+                Box(Modifier.size(64.dp)) {
+                    AsyncImage(
+                        model = image.uri,
+                        contentDescription = image.fileName,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                    )
+                    IconButton(
+                        onClick = { onRemoveImage(image) },
+                        modifier = Modifier.align(Alignment.TopEnd).size(24.dp),
+                    ) {
+                        Icon(
+                            Icons.Rounded.Close,
+                            contentDescription = stringResource(R.string.voice_call_attach_remove),
+                            modifier = Modifier.size(16.dp).background(Color.Black.copy(alpha = 0.55f), CircleShape),
+                            tint = Color.White,
+                        )
+                    }
+                }
+            }
+        }
+    }
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (canAttach) {
+            IconButton(onClick = onAttach, enabled = images.size < MAX_CALL_IMAGES) {
+                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.voice_call_attach))
+            }
+        }
+        OutlinedTextField(
+            value = draft,
+            onValueChange = onDraft,
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            shape = CircleShape,
+            placeholder = { Text(stringResource(R.string.voice_call_input_hint)) },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(onSend = { if (draft.isNotBlank()) onSend() }),
+            trailingIcon = {
+                if (draft.isNotBlank()) {
+                    IconButton(onClick = onSend) {
+                        Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = stringResource(R.string.voice_call_send))
+                    }
+                }
+            },
+        )
+        FilledIconButton(
+            onClick = onToggleMute,
+            modifier = Modifier.size(52.dp),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = if (muted) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = if (muted) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        ) {
+            Icon(
+                if (muted) Icons.Rounded.MicOff else Icons.Rounded.Mic,
+                contentDescription = stringResource(if (muted) R.string.voice_call_unmute else R.string.voice_call_mute),
+            )
+        }
+        FilledIconButton(
+            onClick = onEnd,
+            modifier = Modifier.size(52.dp),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.error,
+                contentColor = MaterialTheme.colorScheme.onError,
+            ),
+        ) {
+            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.voice_call_end))
+        }
+    }
+    }
+}
+
+private fun endedText(context: android.content.Context, ended: CallEnded): String = when (ended.reason) {
+    CallEndReason.PERMISSION_DENIED -> context.getString(R.string.voice_call_permission)
+    CallEndReason.RECOGNITION_FAILED ->
+        context.getString(R.string.voice_call_recognition_failed, ended.detail.orEmpty())
+    CallEndReason.TASK_FAILED -> taskIncompleteText(context, ended.detail)
+    CallEndReason.IDLE_TIMEOUT -> context.getString(R.string.voice_call_ended_idle)
+    CallEndReason.CONNECTION_FAILED -> context.getString(R.string.voice_call_ended_connection, ended.detail.orEmpty())
+}
+
+private fun taskIncompleteText(context: android.content.Context, detail: String?): String =
+    if (detail.isNullOrBlank()) context.getString(R.string.voice_call_task_incomplete_generic)
+    else context.getString(R.string.voice_call_task_incomplete, detail)
+
+private fun toastText(context: android.content.Context, toast: CallToast): String = when (toast.kind) {
+    CallNotice.RECOGNITION_RETRY -> context.getString(R.string.voice_call_toast_retry)
+    CallNotice.TASK_FAILED -> taskIncompleteText(context, toast.detail)
+    CallNotice.IDLE_REMINDER -> context.getString(R.string.voice_call_toast_idle)
+}
+
+@Composable
+private fun BoxScope.VoiceToast(text: String?, seq: Long?, onGone: () -> Unit) {
+    LaunchedEffect(seq) {
+        if (seq != null) {
+            delay(2500)
+            onGone()
+        }
+    }
+    AnimatedVisibility(
+        visible = text != null,
+        modifier = Modifier.align(Alignment.BottomCenter).systemBarsPadding().padding(bottom = 88.dp, start = 24.dp, end = 24.dp),
+        enter = fadeIn(),
+        exit = fadeOut(),
+    ) {
+        // exit 动画期间 text 已为 null，保留最后一句避免闪空。
+        var last by remember { mutableStateOf(text.orEmpty()) }
+        if (text != null) last = text
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.inverseSurface,
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        ) {
+            Text(
+                last,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
