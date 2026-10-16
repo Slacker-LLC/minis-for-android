@@ -603,10 +603,6 @@
     <string name="browser_minis_browsing">Minis surft</string>
     <string name="chat_typing_indicator">%1$s denkt nach</string>
     <string name="read_aloud_unavailable">Vorlesen fehlgeschlagen: keine nutzbare Sprachausgabe. Prüfe die Sprachausgabe-Einstellungen oder installiere eine System-Sprachausgabe.</string>
-    <string name="voice_panel_no_engine_title">Keine Spracherkennung verfügbar</string>
-    <string name="voice_panel_no_engine_body">Für die Spracheingabe wird eine Erkennungs-Engine benötigt. Aktiviere den Sprachdienst deines Geräts oder richte in Minis einen Transkriptionsanbieter ein.</string>
-    <string name="voice_panel_no_engine_open_system">Geräteeinstellungen</string>
-    <string name="voice_panel_no_engine_open_providers">Minis-Anbieter</string>
     <string name="chat_error_stream_dropped_partial">Die Verbindung wurde unterbrochen — diese Antwort ist möglicherweise unvollständig. Zum Fortfahren erneut versuchen.</string>
     <string name="browser_takeover">Übernehmen</string>
     <string name="browser_settings_done">Fertig</string>
@@ -1040,20 +1036,6 @@
     <!-- Spoken substitutions for links during read-aloud (TTS) -->
     <string name="voice_link_to_host">Link zu %1$s</string>
     <string name="voice_bare_link">Link</string>
-    <!-- [T-android-voice-correction] Consent + correction UI -->
-    <string name="voice_correction_consent_title">Sprachkorrekturen verbessern?</string>
-    <string name="voice_correction_consent_body">Minis kann deine Korrekturen an Transkripten (Original → Korrektur) und übernommene KI-Korrekturen in einer lokalen Datenbank auf dem Gerät speichern, um künftige Sprachkorrekturen zu verbessern. Es wird nichts hochgeladen. Du kannst dies jederzeit in den Einstellungen ändern oder die Daten löschen.</string>
-    <string name="voice_correction_consent_enable">Aktivieren</string>
-    <string name="voice_correction_consent_not_now">Jetzt nicht</string>
-    <string name="voice_correction_button_a11y">Transkript mit KI korrigieren</string>
-    <string name="voice_correction_none_needed">Keine Korrekturen nötig</string>
-    <string name="voice_correction_failed">Korrektur fehlgeschlagen, Original beibehalten</string>
-    <string name="voice_correction_section">Lernen aus Sprachkorrekturen</string>
-    <string name="voice_correction_toggle">Sprachkorrekturdaten erfassen</string>
-    <string name="voice_correction_footer">Wenn aktiviert, werden deine manuellen Korrekturen an Transkripten (Original → Korrektur), übernommene KI-Korrekturen und häufig getippte Begriffe lokal auf dem Gerät gespeichert, um künftige Sprachkorrekturen zu verbessern. Es wird nichts hochgeladen. Standardmäßig aus; vorhandene Daten bleiben, bis du sie löschst.</string>
-    <string name="voice_correction_clear_title">Alle erfassten Sprachkorrekturdaten löschen?</string>
-    <string name="voice_correction_clear">Alle löschen</string>
-    <string name="voice_correction_cleared">Sprachkorrekturdaten gelöscht</string>
     <string name="voice_provider_system">System</string>
     <string name="add_provider_subtitle_kimi">Kimi Coding Plan — mit Kimi-Konto anmelden</string>
     <string name="add_provider_subtitle_xai">Unterstützt die Grok-Modellreihe</string>
@@ -1615,7 +1597,6 @@
     <string name="chat_scroll_to_previous">Zur vorherigen Nachricht</string>
     <string name="chat_scroll_to_bottom">Nach unten</string>
     <string name="chat_read_image">Bild lesen</string>
-    <string name="chat_switch_to_keyboard">Zur Tastatur</string>
     <string name="tool_browser_screenshot">Browser-Screenshot</string>
     <string name="tool_file_placeholder">(Datei)</string>
     <string name="tool_edited_label">Bearbeitet</string>
@@ -1635,8 +1616,6 @@
     <string name="chat_collapse">Einklappen</string>
     <string name="chat_expand">Ausklappen</string>
     <string name="memory_list_empty">(leer)</string>
-    <string name="chat_voice_input">Spracheingabe</string>
-    <string name="chat_stop_recording">Aufnahme stoppen</string>
     <string name="common_hide">Ausblenden</string>
     <string name="common_show">Anzeigen</string>
     <string name="common_selected">Ausgewählt</string>
@@ -2257,6 +2236,10 @@
     <string name="voice_call_back">Chat ansehen</string>
     <string name="voice_call_end">Sprachgespräch beenden</string>
     <string name="voice_call_follow_up">Anweisung ergänzen</string>
+    <string name="voice_call_opt_input">Erkennung · %1$s</string>
+    <string name="voice_call_opt_language">Sprache · %1$s</string>
+    <string name="voice_call_opt_output">Stimme · %1$s</string>
+    <string name="voice_call_opt_system_voice">Systemstimme</string>
     <string name="settings_ralph_limit">Ralph: Zeitlimit pro Runde</string>
     <string name="settings_ralph_limit_subtitle">%1$d Min. pro Runde · wartet auf die Bereinigung der untergeordneten Aufgabe</string>
     <string name="settings_ralph_timeout">Zeitlimit pro Runde (1–30 Minuten)</string>

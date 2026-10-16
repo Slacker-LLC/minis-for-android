@@ -280,13 +280,16 @@ object SpeechRecognitionManager {
             if (cb != null) {
                 currentEngine()?.cancel()
                 setState(RecognitionState.IDLE)
-                startRecording(cb.first, cb.second)
+                startRecording(cb.first, cb.second, activeConversation)
             }
         }
     }
 
     /** Callbacks from the most recent [startRecording] so [selectLocale] can restart with them. */
     private var activeCallbacks: Pair<(String, Boolean) -> Unit, (RecognitionError, String?) -> Unit>? = null
+
+    /** Conversation (voice-call) tuning of the latest capture, kept so a language switch restarts it the same way. */
+    private var activeConversation = false
     private var captureGeneration = 0L
 
     fun availableEngines(): List<SpeechRecognitionEngine> = engines.toList()
@@ -349,6 +352,7 @@ object SpeechRecognitionManager {
         _lastError.value = null
         resetLevels()
         activeCallbacks = onPartialOrFinal to onError
+        activeConversation = conversation
 
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         fun deliver(block: () -> Unit) {

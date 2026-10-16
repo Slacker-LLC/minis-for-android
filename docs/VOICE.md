@@ -38,7 +38,7 @@ audio playback
 | System TTS | `speech/TextToSpeechManager.kt` | Android `TextToSpeech` |
 | Pet model path | `pet/PetChatEngine.kt` | short conversational model requests |
 | Pet voice entry | `pet/PetOverlayService.kt` | the pet chat window's mic opens the voice call (`minis://action/voice_chat`); the pet itself records and speaks nothing |
-| Inline chat voice input | `ui/chat/voice/InlineVoiceInputPanel.kt` | writes ASR results into chat input |
+| Call voice options | `voicecall/CallVoiceOptions.kt` | speech-engine, recognition-language and read-aloud-voice chips on the call page; same settings the call itself reads |
 | Voice-conversation call sheet | `voicecall/VoiceConversationHost.kt` | full-screen dialog: character, state line, live subtitle, grouped controls, call timer |
 | Voice-conversation state | `voicecall/controller/CallController.kt` | call state machine fed by runtime events; the subtitle is only ever the runtime's real text |
 | Voice character | `voicecall/grok/VoiceBotAvatar.kt` + Gradle module `:grokbot` | draws the call character and maps the call state to a mood |
@@ -109,6 +109,8 @@ voice picker), the speed chip, mute and a progress bar. The floating speaker but
 earlier builds were removed.
 
 - The bar shows for a reading you started and for automatic read-aloud while it is speaking or synthesising.
+  Automatic read-aloud (`VoiceOutputState`) no longer has a switch in the chat composer; it can still be turned on
+  and off by the agent's TTS tool, and the saved preference is honoured.
 - Close ends the reading that was started by hand. In automatic mode it turns "read replies aloud" off, because
   stopping one sentence of an automatic reading would only be followed by the next.
 - The selection toolbar offers **Copy** (with a menu for Markdown, rich text and plain text), **Read aloud** and
@@ -131,7 +133,7 @@ Call-style state machines wrap existing production classes behind the existing s
 
 `VoiceConversationHost → CallController → MinisCallRuntimeAdapter → AgentCallGateway → 当前 ChatViewModel.submitPrompt`。
 
-- 聊天页提供声波按钮；原麦克风按钮保留听写编辑用途。`minis://action/voice_chat`、旧 `minis://action/voice`、`ACTION_ASSIST` 与 `ACTION_VOICE_ASSIST` 进入同一对话页面。AssistSession 使用可解析的 `voice_chat` URI。
+- 聊天页只有声波按钮一个语音入口（原麦克风听写面板已移除，宠物小窗麦克风也进入这里）；识别引擎、识别语言和朗读音色在通话页角色下方的三个选项条（「识别 · 」「语言 · 」「朗读 · 」）里选，写的仍是同一份 Voice Input/Output 配置。`minis://action/voice_chat`、旧 `minis://action/voice`、`ACTION_ASSIST` 与 `ACTION_VOICE_ASSIST` 进入同一对话页面。AssistSession 使用可解析的 `voice_chat` URI。
 - 自动提交一段最终识别结果，Agent 可调用当前会话全部可用工具。成功回复经 `ReadAloudPlayer.speakConversation` 播放，然后再次聆听。用该请求的 AgentTurnHandle 判断回合终态，并按消息持久 Run 提取回复；任务短简报读取真实 Task 状态，不把回合结束当目标完成。
 - 对话采用轮流录音/播报，播放时点击“打断并说话”停止该通话拥有的回合并再次聆听；尚不是原生音频模型的全双工、说话自动打断。
 - 使用现有 Voice Input/Output 配置。VAD 在对话模式下采用约 1.8 秒尾部静音与 0.2 秒语音下限；普通听写保持原参数。实际端点时延依赖设备/识别服务，未视为真机验收。

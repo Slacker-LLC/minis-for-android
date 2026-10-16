@@ -802,10 +802,6 @@
     <string name="composer_swipe_release_to_queue">Relâcher pour mettre en file</string>
     <string name="chat_typing_indicator">%1$s réfléchit</string>
     <string name="read_aloud_unavailable">Lecture à voix haute impossible : aucun moteur vocal disponible. Vérifiez les réglages de sortie vocale ou installez un moteur de synthèse système.</string>
-    <string name="voice_panel_no_engine_title">Aucune reconnaissance vocale disponible</string>
-    <string name="voice_panel_no_engine_body">La saisie vocale nécessite un moteur de reconnaissance. Activez le service vocal de votre appareil ou configurez un fournisseur de transcription dans Minis.</string>
-    <string name="voice_panel_no_engine_open_system">Réglages de l\'appareil</string>
-    <string name="voice_panel_no_engine_open_providers">Fournisseurs Minis</string>
     <string name="chat_error_stream_dropped_partial">La connexion a été interrompue — cette réponse est peut-être incomplète. Appuyez sur Réessayer pour continuer.</string>
     <!-- T-android-update-check-403-hint — friendly update-check failure hints -->
     <string name="update_error_network_unreachable">Impossible d\'atteindre le serveur de mise à jour. Vérifiez votre réseau et réessayez.</string>
@@ -907,20 +903,6 @@
     <!-- Spoken substitutions for links during read-aloud (TTS) -->
     <string name="voice_link_to_host">lien vers %1$s</string>
     <string name="voice_bare_link">lien</string>
-    <!-- [T-android-voice-correction] Consent + correction UI -->
-    <string name="voice_correction_consent_title">Améliorer les corrections vocales ?</string>
-    <string name="voice_correction_consent_body">Minis peut enregistrer vos corrections de transcription (original → corrigé) et les corrections IA acceptées dans une base de données locale sur l\'appareil afin d\'améliorer les futures corrections vocales. Rien n\'est envoyé en ligne. Vous pouvez modifier ce choix ou effacer les données à tout moment dans les Réglages.</string>
-    <string name="voice_correction_consent_enable">Activer</string>
-    <string name="voice_correction_consent_not_now">Plus tard</string>
-    <string name="voice_correction_button_a11y">Corriger la transcription avec l\'IA</string>
-    <string name="voice_correction_none_needed">Aucune correction nécessaire</string>
-    <string name="voice_correction_failed">Échec de la correction, original conservé</string>
-    <string name="voice_correction_section">Apprentissage des corrections vocales</string>
-    <string name="voice_correction_toggle">Collecter les données de correction vocale</string>
-    <string name="voice_correction_footer">Une fois activé, vos corrections manuelles des transcriptions (original → corrigé), les corrections IA acceptées et les termes fréquemment saisis sont enregistrés dans une base locale sur l\'appareil afin d\'améliorer les futures corrections vocales. Rien n\'est envoyé en ligne. Désactivé par défaut ; les données existantes sont conservées jusqu\'à ce que vous les effaciez.</string>
-    <string name="voice_correction_clear_title">Effacer toutes les données de correction vocale collectées ?</string>
-    <string name="voice_correction_clear">Tout effacer</string>
-    <string name="voice_correction_cleared">Données de correction vocale effacées</string>
     <string name="voice_provider_system">Système</string>
     <string name="add_provider_subtitle_kimi">Kimi Coding Plan — connectez-vous avec votre compte Kimi</string>
     <string name="add_provider_subtitle_xai">Compatible avec la série de modèles Grok</string>
@@ -1511,7 +1493,6 @@
     <string name="chat_scroll_to_previous">Aller au message précédent</string>
     <string name="chat_scroll_to_bottom">Aller en bas</string>
     <string name="chat_read_image">Lire l\'image</string>
-    <string name="chat_switch_to_keyboard">Passer au clavier</string>
     <string name="tool_browser_screenshot">Capture du navigateur</string>
     <string name="tool_file_placeholder">(fichier)</string>
     <string name="tool_edited_label">Modifié</string>
@@ -1531,8 +1512,6 @@
     <string name="chat_collapse">Réduire</string>
     <string name="chat_expand">Développer</string>
     <string name="memory_list_empty">(vide)</string>
-    <string name="chat_voice_input">Saisie vocale</string>
-    <string name="chat_stop_recording">Arrêter l\'enregistrement</string>
     <string name="common_hide">Masquer</string>
     <string name="common_show">Afficher</string>
     <string name="common_selected">Sélectionné</string>
@@ -2153,6 +2132,10 @@
     <string name="voice_call_back">Voir le chat</string>
     <string name="voice_call_end">Terminer</string>
     <string name="voice_call_follow_up">Ajouter des consignes</string>
+    <string name="voice_call_opt_input">Reconnaissance · %1$s</string>
+    <string name="voice_call_opt_language">Langue · %1$s</string>
+    <string name="voice_call_opt_output">Voix · %1$s</string>
+    <string name="voice_call_opt_system_voice">Voix système</string>
     <string name="settings_ralph_limit">Limite de temps par tour Ralph</string>
     <string name="settings_ralph_limit_subtitle">%1$d min par tour · attend le nettoyage de la tâche enfant</string>
     <string name="settings_ralph_timeout">Temps par tour (1–30 minutes)</string>

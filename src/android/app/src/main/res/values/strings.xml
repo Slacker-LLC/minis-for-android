@@ -1290,29 +1290,7 @@
     <string name="model_picker_modality_audio">audio</string>
     <string name="model_picker_modality_video">video</string>
 
-    <!-- [T-android-voice-panel] Inline voice input panel (mirrors iOS InlineVoiceInputView) -->
-    <string name="voice_panel_collapse">Collapse voice panel</string>
-    <string name="voice_panel_no_engine_title">No speech recognition available</string>
-    <string name="voice_panel_no_engine_body">Voice input needs a recognition engine. Enable your device\'s speech service, or configure a transcription provider in Minis.</string>
-    <string name="voice_panel_no_engine_open_system">Device settings</string>
-    <string name="voice_panel_no_engine_open_providers">Minis providers</string>
-    <string name="voice_panel_expand">Expand voice panel</string>
-    <string name="voice_panel_language">Recognition language</string>
-    <string name="voice_panel_tap_to_speak">Tap to speak</string>
-    <string name="voice_panel_tip_tap_to_transcribe">Tap to transcribe</string>
-    <string name="voice_panel_tip_listening">Listening…</string>
-    <string name="voice_panel_tip_double_tap_edit">Double-tap text to edit</string>
-    <string name="voice_panel_tip_tap_to_continue">Tap mic to continue</string>
-    <string name="voice_panel_tip_hold_delete">Hold ⌫ to delete</string>
-    <string name="voice_panel_recognizing">Recognizing…</string>
-    <string name="voice_panel_editing">Editing — tap mic to resume</string>
-    <string name="voice_panel_exit_edit">Exit</string>
-    <string name="voice_panel_permission_denied">Microphone access denied — enable it in Settings</string>
-    <string name="voice_panel_buffered_chars">… %1$d chars …</string>
-    <string name="voice_panel_cancel_transcription">Cancel transcription</string>
-    <string name="voice_panel_toggle_recording">Toggle recording</string>
-    <string name="voice_panel_delete">Delete dictated text</string>
-    <string name="voice_panel_read_replies">Read replies</string>
+    <string name="chat_plan_exit">Exit</string>
     <string name="tts_capsule_picker_title">Voice Output Model</string>
     <string name="tts_capsule_system_engine">System TTS</string>
     <string name="voice_system_tts_subtitle">Android built-in text-to-speech</string>
@@ -1547,20 +1525,6 @@
     <!-- Spoken substitutions for links during read-aloud (TTS) -->
     <string name="voice_link_to_host">link to %1$s</string>
     <string name="voice_bare_link">link</string>
-    <!-- [T-android-voice-correction] Consent + correction UI -->
-    <string name="voice_correction_consent_title">Improve voice corrections?</string>
-    <string name="voice_correction_consent_body">Minis can store your transcript fixes (original → corrected pairs) and accepted AI corrections in a local on-device database to make future voice corrections smarter. Nothing is uploaded. You can change this or clear the data anytime in Settings.</string>
-    <string name="voice_correction_consent_enable">Enable</string>
-    <string name="voice_correction_consent_not_now">Not Now</string>
-    <string name="voice_correction_button_a11y">Correct transcript with AI</string>
-    <string name="voice_correction_none_needed">No corrections needed</string>
-    <string name="voice_correction_failed">Correction failed, original kept</string>
-    <string name="voice_correction_section">Voice Correction Learning</string>
-    <string name="voice_correction_toggle">Collect voice correction data</string>
-    <string name="voice_correction_footer">When enabled, your manual fixes to voice transcripts (original → corrected pairs), accepted AI corrections, and frequently typed terms are stored in a local on-device database to make future voice corrections smarter. Nothing is uploaded. Default is off; existing data stays until you clear it.</string>
-    <string name="voice_correction_clear_title">Clear all collected voice correction data?</string>
-    <string name="voice_correction_clear">Clear All</string>
-    <string name="voice_correction_cleared">Voice correction data cleared</string>
     <string name="voice_provider_system">System</string>
     <string name="add_provider_subtitle_kimi">Kimi Coding Plan — sign in with your Kimi account</string>
     <string name="kimi_login_title">Sign in with Kimi Code</string>
@@ -1904,7 +1868,6 @@
     <string name="chat_scroll_to_previous">Scroll to previous message</string>
     <string name="chat_scroll_to_bottom">Scroll to bottom</string>
     <string name="chat_read_image">Read image</string>
-    <string name="chat_switch_to_keyboard">Switch to keyboard</string>
     <string name="tool_browser_screenshot">Browser screenshot</string>
     <string name="tool_file_placeholder">(file)</string>
     <string name="tool_edited_label">Edited</string>
@@ -1924,8 +1887,6 @@
     <string name="chat_collapse">Collapse</string>
     <string name="chat_expand">Expand</string>
     <string name="memory_list_empty">(empty)</string>
-    <string name="chat_voice_input">Voice input</string>
-    <string name="chat_stop_recording">Stop recording</string>
     <string name="common_hide">Hide</string>
     <string name="common_show">Show</string>
     <string name="common_selected">Selected</string>
@@ -2541,6 +2502,10 @@
     <string name="voice_call_back">View chat</string>
     <string name="voice_call_end">End voice</string>
     <string name="voice_call_follow_up">Add instructions</string>
+    <string name="voice_call_opt_input">Recognition · %1$s</string>
+    <string name="voice_call_opt_language">Language · %1$s</string>
+    <string name="voice_call_opt_output">Voice · %1$s</string>
+    <string name="voice_call_opt_system_voice">System voice</string>
     <string name="settings_ralph_limit">Ralph round time limit</string>
     <string name="settings_ralph_limit_subtitle">%1$d min per round · waits for child cleanup</string>
     <string name="settings_ralph_timeout">Per-round time limit (1–30 minutes)</string>
