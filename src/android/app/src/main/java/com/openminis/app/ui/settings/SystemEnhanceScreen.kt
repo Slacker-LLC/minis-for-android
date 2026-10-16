@@ -3,8 +3,6 @@ package com.openminis.app.ui.settings
 import android.content.Intent
 import android.provider.Settings
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.Check
@@ -18,19 +16,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import com.openminis.app.R
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.runtime.ubuntu.RootAccess
@@ -44,15 +37,10 @@ import com.openminis.app.xposed.PowerAssistantTarget
 import com.openminis.app.xposed.system.AccessibilityProtectionClient
 
 /**
- * [T-system-enhance-android] One page for everything the device has to grant before the
- * takeovers work: root, the LSPosed module, and the switches the module reads.
+ * [T-system-enhance-android] The LSPosed module page: the switches the module reads and the
+ * target of the power-button assistant. Root has a page of its own ([RootAccessScreen]).
  *
- * Shaped after Eta's `SystemEnhanceScreen` (Mangi-11/Eta @ c15de97), which pairs a root card
- * with a framework-connection card and the explanation sections. The module's switches used to
- * live on a second page ("module settings") while this one only counted them, which meant the
- * same subject - the module and what it does - was spread over two screens with two different
- * row styles. They are one page now: status first, then the switches themselves, then what root
- * and the module each unlock.
+ * Shaped after Eta's `SystemEnhanceScreen` (Mangi-11/Eta @ c15de97).
  *
  * The framework connection is readable here only because the module app now writes its switches
  * through the libxposed service: when that service is absent there is nothing to write, and the
@@ -61,12 +49,8 @@ import com.openminis.app.xposed.system.AccessibilityProtectionClient
  * state.
  */
 @Composable
-fun SystemEnhanceScreen(
-    onBack: () -> Unit,
-    onOpenSystemPermissions: () -> Unit = {},
-) {
+fun SystemEnhanceScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    var hooksOn by remember { mutableIntStateOf(enabledHookSwitchCount(context)) }
 
     // [T-eta-xposed-groups] The switches below are committed through the framework's service;
     // without a framework there is nothing to write, so the rows are disabled and the footer
@@ -88,37 +72,6 @@ fun SystemEnhanceScreen(
     fun writeFailed() {
         com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.module_settings_write_failed))
     }
-
-    // The assistant role can also change from the OEM settings app, so re-read it whenever this
-    // screen comes back to the foreground instead of trusting a value captured at composition.
-    val roleManager = remember(context) { context.assistantRoleManagerOrNull() }
-    var roleHeld by remember { mutableStateOf(false) }
-    var roleAvailable by remember { mutableStateOf(false) }
-
-    fun refreshAssistantRole() {
-        val manager = roleManager
-        if (manager == null) {
-            roleAvailable = false
-            roleHeld = false
-            return
-        }
-        roleAvailable = runCatching { manager.assistantRoleAvailable() }.getOrDefault(false)
-        roleHeld = roleAvailable && runCatching { manager.assistantRoleHeld() }.getOrDefault(false)
-    }
-
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, roleManager) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) refreshAssistantRole()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        refreshAssistantRole()
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    val roleLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) { refreshAssistantRole() }
 
     SettingsScaffold(
         title = stringResource(R.string.system_enhance_title),
@@ -156,7 +109,6 @@ fun SystemEnhanceScreen(
                         )
                     ) {
                         gestureBar = enabled
-                        hooksOn = enabledHookSwitchCount(context)
                     } else {
                         writeFailed()
                     }
@@ -177,7 +129,6 @@ fun SystemEnhanceScreen(
                         )
                     ) {
                         doubleFinger = enabled
-                        hooksOn = enabledHookSwitchCount(context)
                     } else {
                         writeFailed()
                     }
@@ -198,7 +149,6 @@ fun SystemEnhanceScreen(
                         )
                     ) {
                         hotword = enabled
-                        hooksOn = enabledHookSwitchCount(context)
                     } else {
                         writeFailed()
                     }
@@ -209,10 +159,6 @@ fun SystemEnhanceScreen(
 
         SettingsSection(
             header = stringResource(R.string.module_settings_section_assistant),
-            // [T-android-settings-hierarchy] The assistant role itself is a grant and lives on the
-            // permissions page; repeating it here as a second row made the same switch appear
-            // twice with two different subtitles. What this page owns is the target choice, so the
-            // role only shows up as the sentence that explains when the choice can take effect.
         ) {
             PowerAssistantTarget.entries.forEachIndexed { index, target ->
                 SettingsRow(
@@ -248,16 +194,6 @@ private fun PowerAssistantTarget.labelRes(): Int = when (this) {
     PowerAssistantTarget.OEM -> R.string.module_settings_target_oem
     PowerAssistantTarget.MINIS -> R.string.module_settings_target_minis
 }
-
-/** The switch keys the module owns; the status row above counts them. */
-private val HOOK_SWITCH_KEYS = listOf(
-    ModulePrefs.Keys.GESTURE_BAR_CIRCLE_TO_SEARCH,
-    ModulePrefs.Keys.DOUBLE_FINGER_CIRCLE_TO_SEARCH,
-    ModulePrefs.Keys.HOTWORD_SELF_HEAL,
-)
-
-private fun enabledHookSwitchCount(context: android.content.Context): Int =
-    HOOK_SWITCH_KEYS.count { ModuleSettingsStore.isEnabled(context, it) }
 
 /**
  * [T-root-manager-detection-android] "su is absent" and "su is hidden from this app" are

@@ -199,7 +199,7 @@ object DeepLinkHandler {
                 DeepLinkCoordinator.setPendingLogsTab(uri.getQueryParameter("tab"))
                 DeepLinkAction.OpenSettingsScreen(Routes.LOGS)
             }
-            "appearance" -> DeepLinkAction.OpenSettingsScreen(Routes.APPEARANCE)
+            "appearance" -> DeepLinkAction.OpenSettingsScreen(Routes.settingsCategory("appearance"))
             "background" -> DeepLinkAction.OpenSettingsScreen(Routes.BACKGROUND)
             "about" -> DeepLinkAction.OpenSettingsScreen(Routes.ABOUT)
             "permissions" -> DeepLinkAction.OpenPermissionSettings

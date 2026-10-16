@@ -585,8 +585,6 @@ fun AppNavigation(
                     onMcpClick = { navController.safeNavigate(Routes.MCP) },
                     onEnvVarsClick = { navController.safeNavigate(Routes.ENV_VARS) },
                     onRootfsManagementClick = { navController.safeNavigate(Routes.ROOTFS_MANAGEMENT) },
-                    onOpenBackground = { navController.safeNavigate(Routes.BACKGROUND) },
-                    onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
                     onSystemEnhanceClick = { navController.safeNavigate(Routes.SYSTEM_ENHANCE) },
                     onPermissionsClick = { navController.safeNavigate(Routes.SYSTEM_PERMISSIONS) },
                     // [T-android-settings-hierarchy] The tool-permission and Root screens
@@ -1275,10 +1273,7 @@ fun AppNavigation(
         // LSPosed module reads, and what each of them unlocks. The former "module settings"
         // screen is this page's switch section now.
         composable(Routes.SYSTEM_ENHANCE) {
-            SystemEnhanceScreen(
-                onBack = { navController.safePopBackStack() },
-                onOpenSystemPermissions = { navController.safeNavigate(Routes.SYSTEM_PERMISSIONS) },
-            )
+            SystemEnhanceScreen(onBack = { navController.safePopBackStack() })
         }
 
         composable(Routes.USAGE_STATS) {
@@ -1291,12 +1286,6 @@ fun AppNavigation(
             UsageStatsScreen(
                 chatDao = chatRepository.dao,
                 providerConfig = providerConfigState,
-                onBack = { navController.safePopBackStack() },
-            )
-        }
-
-        composable(Routes.APPEARANCE) {
-            AppearanceScreen(
                 onBack = { navController.safePopBackStack() },
             )
         }
