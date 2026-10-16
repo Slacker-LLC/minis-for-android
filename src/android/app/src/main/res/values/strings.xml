@@ -1568,6 +1568,8 @@
     <string name="kimi_login_copy_code">Copy code</string>
     <string name="kimi_login_open_verification">Open verification page</string>
     <string name="kimi_login_waiting">Waiting for authorization…</string>
+    <string name="xai_login_title">Sign in with xAI</string>
+    <string name="xai_login_instructions">Open the verification page, sign in to your x.ai account and enter this code to authorize Minis:</string>
     <string name="browser_downloads_title">Downloads</string>
     <string name="browser_downloads_clear">Clear</string>
     <string name="browser_downloads_empty">No downloads</string>

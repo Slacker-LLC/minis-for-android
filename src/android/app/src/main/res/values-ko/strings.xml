@@ -1060,6 +1060,8 @@
     <string name="kimi_login_copy_code">코드 복사</string>
     <string name="kimi_login_open_verification">인증 페이지 열기</string>
     <string name="kimi_login_waiting">승인 대기 중…</string>
+    <string name="xai_login_title">xAI로 로그인</string>
+    <string name="xai_login_instructions">인증 페이지를 열어 x.ai 계정에 로그인한 뒤 이 코드를 입력하여 Minis를 승인하세요:</string>
     <string name="browser_downloads_title">다운로드</string>
     <string name="browser_downloads_clear">지우기</string>
     <string name="browser_downloads_empty">다운로드 없음</string>

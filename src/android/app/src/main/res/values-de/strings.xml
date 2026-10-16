@@ -1061,6 +1061,8 @@
     <string name="kimi_login_copy_code">Code kopieren</string>
     <string name="kimi_login_open_verification">Bestätigungsseite öffnen</string>
     <string name="kimi_login_waiting">Warte auf Autorisierung…</string>
+    <string name="xai_login_title">Mit xAI anmelden</string>
+    <string name="xai_login_instructions">Öffne die Bestätigungsseite, melde dich bei deinem x.ai-Konto an und gib diesen Code ein, um Minis zu autorisieren:</string>
     <string name="browser_downloads_title">Downloads</string>
     <string name="browser_downloads_clear">Leeren</string>
     <string name="browser_downloads_empty">Keine Downloads</string>

@@ -928,6 +928,8 @@
     <string name="kimi_login_copy_code">Copier le code</string>
     <string name="kimi_login_open_verification">Ouvrir la page de vérification</string>
     <string name="kimi_login_waiting">En attente d\'autorisation…</string>
+    <string name="xai_login_title">Se connecter avec xAI</string>
+    <string name="xai_login_instructions">Ouvrez la page de vérification, connectez-vous à votre compte x.ai et saisissez ce code pour autoriser Minis :</string>
     <string name="browser_downloads_title">Téléchargements</string>
     <string name="browser_downloads_clear">Effacer</string>
     <string name="browser_downloads_empty">Aucun téléchargement</string>

@@ -1216,6 +1216,8 @@
     <string name="kimi_login_copy_code">Скопировать код</string>
     <string name="kimi_login_open_verification">Открыть страницу подтверждения</string>
     <string name="kimi_login_waiting">Ожидание авторизации…</string>
+    <string name="xai_login_title">Войти через xAI</string>
+    <string name="xai_login_instructions">Откройте страницу подтверждения, войдите в аккаунт x.ai и введите этот код, чтобы авторизовать Minis:</string>
     <string name="browser_downloads_title">Загрузки</string>
     <string name="browser_downloads_clear">Очистить</string>
     <string name="browser_downloads_empty">Нет загрузок</string>

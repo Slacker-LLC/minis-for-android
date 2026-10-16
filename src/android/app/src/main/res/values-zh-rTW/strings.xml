@@ -723,6 +723,8 @@
     <string name="kimi_login_copy_code">複製代碼</string>
     <string name="kimi_login_open_verification">開啟驗證頁面</string>
     <string name="kimi_login_waiting">等待授權中…</string>
+    <string name="xai_login_title">使用 xAI 登入</string>
+    <string name="xai_login_instructions">開啟驗證頁面，登入你的 x.ai 帳號並輸入以下代碼以授權 Minis:</string>
     <string name="browser_downloads_title">下載</string>
     <string name="browser_downloads_clear">清除</string>
     <string name="browser_downloads_empty">暫無下載</string>

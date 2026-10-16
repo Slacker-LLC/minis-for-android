@@ -875,7 +875,7 @@ private fun OAuthCredentialBlock(
         ProviderType.antigravity -> com.openminis.app.auth.AntigravityOAuthManager.isAvailableInThisBuild
         else -> true
     }
-    // [T-kimi-oauth] Device-code dialog state for Kimi re-auth (see
+    // [T-kimi-oauth] Device-code dialog state for Kimi / xAI re-auth (see
     // AddProviderScreen.OAuthConfigSection for the rationale).
     var kimiDeviceAuth by remember(instance.id) {
         mutableStateOf<com.openminis.app.auth.KimiDeviceFlow.DeviceAuthorization?>(null)
@@ -888,9 +888,14 @@ private fun OAuthCredentialBlock(
     var authError by remember(instance.id) { mutableStateOf<String?>(null) }
     val oauthPhase by com.openminis.app.auth.OAuthForegroundGate.phase.collectAsState()
     kimiDeviceAuth?.let { auth ->
+        val isXai = instance.providerType == ProviderType.xAI
         KimiDeviceLoginDialog(
             userCode = auth.userCode,
             verificationUrl = auth.openUrl,
+            title = stringResource(if (isXai) R.string.xai_login_title else R.string.kimi_login_title),
+            instructions = stringResource(
+                if (isXai) R.string.xai_login_instructions else R.string.kimi_login_instructions,
+            ),
             onCancel = {
                 kimiLoginJob?.cancel()
                 kimiDeviceAuth = null
@@ -987,7 +992,8 @@ private fun OAuthCredentialBlock(
                             ProviderType.xAI ->
                                 com.openminis.app.auth.XAIOAuthManager.login(
                                     context, instance.id, providerRepository,
-                                )
+                                    onDeviceCode = { auth -> kimiDeviceAuth = auth },
+                                ).also { kimiDeviceAuth = null }
                             ProviderType.antigravity ->
                                 com.openminis.app.auth.AntigravityOAuthManager.login(
                                     context, instance.id, providerRepository,

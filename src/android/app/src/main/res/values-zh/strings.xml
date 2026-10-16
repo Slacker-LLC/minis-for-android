@@ -1391,6 +1391,8 @@
     <string name="kimi_login_copy_code">复制代码</string>
     <string name="kimi_login_open_verification">打开验证页面</string>
     <string name="kimi_login_waiting">等待授权中…</string>
+    <string name="xai_login_title">使用 xAI 登录</string>
+    <string name="xai_login_instructions">打开验证页面，登录你的 x.ai 账号并输入以下代码以授权 Minis:</string>
     <string name="browser_downloads_title">下载</string>
     <string name="browser_downloads_clear">清除</string>
     <string name="browser_downloads_empty">暂无下载</string>

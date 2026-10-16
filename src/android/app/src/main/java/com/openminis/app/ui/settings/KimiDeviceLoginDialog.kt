@@ -42,7 +42,8 @@ import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.ui.theme.ChatColors
 
 /**
- * [T-kimi-oauth] Device-code login dialog for Kimi Code (RFC 8628): shows the
+ * [T-kimi-oauth] Device-code login dialog (RFC 8628; Kimi Code and xAI share it — the
+ * caller passes [title]/[instructions] for the provider, defaults are Kimi's): shows the
  * short user code (tap to copy), an "Open verification page" button (Chrome
  * Custom Tab — same in-app browser experience as the other OAuth providers;
  * NO FLAG_ACTIVITY_NEW_TASK, MainActivity is singleTask), and a waiting
@@ -58,6 +59,8 @@ fun KimiDeviceLoginDialog(
     userCode: String,
     verificationUrl: String,
     onCancel: () -> Unit,
+    title: String = stringResource(R.string.kimi_login_title),
+    instructions: String = stringResource(R.string.kimi_login_instructions),
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -65,11 +68,11 @@ fun KimiDeviceLoginDialog(
 
     MinisAlertDialog(
         onDismissRequest = onCancel,
-        title = { Text(stringResource(R.string.kimi_login_title)) },
+        title = { Text(title) },
         text = {
             Column {
                 Text(
-                    stringResource(R.string.kimi_login_instructions),
+                    instructions,
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(16.dp))

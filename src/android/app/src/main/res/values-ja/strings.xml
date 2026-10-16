@@ -1068,6 +1068,8 @@
     <string name="kimi_login_copy_code">コードをコピー</string>
     <string name="kimi_login_open_verification">認証ページを開く</string>
     <string name="kimi_login_waiting">認証を待っています…</string>
+    <string name="xai_login_title">xAI でサインイン</string>
+    <string name="xai_login_instructions">認証ページを開いて x.ai アカウントにサインインし、このコードを入力して Minis を許可してください:</string>
     <string name="browser_downloads_title">ダウンロード</string>
     <string name="browser_downloads_clear">クリア</string>
     <string name="browser_downloads_empty">ダウンロードなし</string>
