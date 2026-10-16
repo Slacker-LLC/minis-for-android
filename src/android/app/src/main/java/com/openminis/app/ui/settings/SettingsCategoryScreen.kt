@@ -68,16 +68,14 @@ import com.openminis.app.ui.theme.minisSheetColor
 /**
  * [T-android-settings-hierarchy] One level-2 page: the settings that belong to a single category.
  *
- * The Settings home lists the categories in the order of the design board (Models, Agent, Chat &
- * input, Appearance), then Files, Runtime environment, System & permissions, Data & about. Files are not a
- * settings category any more: they are a daily entry in the session drawer. [FILES] stays as a
- * hidden page only because that drawer entry still opens it.
+ * The Settings home lists every category, in the order of the design board (Models, Agent, Chat &
+ * input, Appearance), then Files, Runtime environment, System & permissions, Data & about. The
+ * session drawer's Files entry opens [FILES] too.
  */
 enum class SettingsCategory(
     val key: String,
     val titleRes: Int,
     val subtitleRes: Int,
-    val inRoot: Boolean = true,
 ) {
     MODELS("models", R.string.settings_cat_models, R.string.settings_cat_models_sub2),
     AGENT("agent", R.string.settings_cat_agent, R.string.settings_cat_agent_sub2),
@@ -144,7 +142,6 @@ fun SettingsCategoryScreen(
     onMemoryClick: () -> Unit = {},
     onMcpClick: () -> Unit = {},
     onEnvVarsClick: () -> Unit = {},
-    onAppearanceClick: () -> Unit = {},
     onSystemEnhanceClick: () -> Unit = {},
     onPermissionsClick: () -> Unit = {},
     onToolPermissionsClick: () -> Unit = {},
@@ -155,7 +152,6 @@ fun SettingsCategoryScreen(
     onAboutClick: () -> Unit = {},
     onScheduledTasksClick: () -> Unit = {},
     onRootfsManagementClick: () -> Unit = {},
-    onOpenBackground: () -> Unit = {},
 ) {
     val context = LocalContext.current
     // The UI language, which follows the in-app language setting: it picks the Chinese or English policy.
@@ -328,10 +324,19 @@ fun SettingsCategoryScreen(
 
             SettingsCategory.SYSTEM -> {
                 OneTapAuthorizeSection()
-                ReadinessCheckSection(onOpenBackground = onOpenBackground)
-                SettingsSection(
-                    header = stringResource(R.string.settings_manage_header),
-                ) {
+                ReadinessCheckSection(onOpenBackground = onBackgroundClick)
+                // Agent 能用什么（授权给 Agent 的开关）和 设备授权（系统层是否就绪）分开两组。
+                SettingsSection(header = stringResource(R.string.settings_system_group_agent)) {
+                    SettingsRow(
+                        icon = Icons.Outlined.FrontHand,
+                        iconColor = Color(0xFF007AFF),
+                        title = stringResource(R.string.settings_tool_permissions),
+                        subtitle = stringResource(R.string.settings_tool_permissions_sub),
+                        onClick = onToolPermissionsClick,
+                        showDivider = false,
+                    )
+                }
+                SettingsSection(header = stringResource(R.string.settings_system_group_device)) {
                     SettingsRow(
                         icon = Icons.Outlined.Key,
                         iconColor = Color(0xFFFF9500),
@@ -340,25 +345,18 @@ fun SettingsCategoryScreen(
                         onClick = onRootClick,
                     )
                     SettingsRow(
-                        icon = Icons.Outlined.Dashboard,
-                        iconColor = Color(0xFF5856D6),
-                        title = stringResource(R.string.settings_vscreen_entry),
-                        subtitle = stringResource(R.string.settings_vscreen_subtitle),
-                        onClick = onVirtualScreenClick,
-                    )
-                    SettingsRow(
-                        icon = Icons.Outlined.FrontHand,
-                        iconColor = Color(0xFF007AFF),
-                        title = stringResource(R.string.settings_tool_permissions),
-                        subtitle = stringResource(R.string.settings_tool_permissions_sub),
-                        onClick = onToolPermissionsClick,
-                    )
-                    SettingsRow(
                         icon = Icons.Outlined.Lock,
                         iconColor = Color(0xFF34C759),
                         title = stringResource(R.string.system_permissions_title),
                         subtitle = stringResource(R.string.settings_permissions_category_sub),
                         onClick = onPermissionsClick,
+                    )
+                    SettingsRow(
+                        icon = Icons.Outlined.Dashboard,
+                        iconColor = Color(0xFF5856D6),
+                        title = stringResource(R.string.settings_vscreen_entry),
+                        subtitle = stringResource(R.string.settings_vscreen_subtitle),
+                        onClick = onVirtualScreenClick,
                     )
                     SettingsRow(
                         icon = Icons.Outlined.BatteryFull,
@@ -375,7 +373,6 @@ fun SettingsCategoryScreen(
                         onClick = onSystemEnhanceClick,
                         showDivider = false,
                     )
-
                 }
             }
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Accessibility
+import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +47,7 @@ fun OffloadPermissionScreen(
     onBack: () -> Unit,
     onOpenRoot: () -> Unit = {},
     onOpenSystemPermissions: () -> Unit = {},
+    onOpenVirtualScreen: () -> Unit = {},
 ) {
     val grouped = OffloadPermissionManager.toolRegistry
         .filter { it.showInSettings }
@@ -146,72 +148,43 @@ fun OffloadPermissionScreen(
             }
         }
 
-        IntegrationSection(
-            iconVector = Icons.Outlined.Accessibility,
-            iconTint = ChatColors.ok,
-            sectionHeaderRes = R.string.perm_section_a11y,
-            toolName = "a11y_cli",
-            descriptionRes = R.string.perm_a11y_cli_description,
-            systemReady = a11yEnabled,
-            systemStatusTitleRes =
-                if (a11yEnabled) R.string.perm_a11y_system_ready
-                else R.string.perm_a11y_system_disabled,
-            systemActionTitleRes = R.string.perm_a11y_open_settings,
-            onSystemAction = { openAccessibilitySettings(context) },
-            resetEpoch = resetEpoch,
-        )
-
-        IntegrationSection(
-            iconVector = Icons.Outlined.Shield,
-            iconTint = Color(0xFFAF52DE),
-            sectionHeaderRes = R.string.perm_section_privileged_backend,
-            toolName = RootCliOffloadHandler.TOOL_NAME,
-            descriptionRes = R.string.perm_privileged_cli_description,
-            systemReady = rootState.isGranted,
-            systemStatusTitleRes = when {
-                rootState.isGranted -> R.string.system_enhance_root_granted
-                rootState.isChecking -> R.string.system_enhance_root_checking
-                else -> R.string.perm_root_not_granted
-            },
-            systemActionTitleRes = R.string.system_enhance_root_action,
-            onSystemAction = onOpenRoot,
-            onStatusRowClick = onOpenRoot,
-            resetEpoch = resetEpoch,
-        )
-
-        // The virtual screen's tools are opt-in like the other integrations, so they are set here too.
-        val vscreenTools = grouped[OffloadPermissionManager.PermissionCategory.INTEGRATIONS]
-            .orEmpty()
-            .filter { it.toolName.startsWith("android.vscreen.") }
-        if (vscreenTools.isNotEmpty()) {
-            // One master switch; the five tools are its sub-items and only show while it is on.
-            var vscreenOn by remember(resetEpoch) {
-                mutableStateOf(vscreenTools.any { OffloadPermissionManager.isAllowed(it.toolName) })
-            }
-            SettingsSection(header = stringResource(R.string.settings_vscreen_entry)) {
-                SettingsSwitchRow(
-                    title = stringResource(R.string.perm_vscreen_master_title),
-                    subtitle = stringResource(R.string.perm_vscreen_master_sub),
-                    checked = vscreenOn,
-                    onCheckedChange = { on ->
-                        vscreenOn = on
-                        vscreenTools.forEach { tool ->
-                            val current = OffloadPermissionManager.getLevel(tool.toolName)
-                            if (on && current == OffloadPermissionManager.PermissionLevel.NOT_ALLOWED) {
-                                OffloadPermissionManager.setLevel(tool.toolName, OffloadPermissionManager.PermissionLevel.BYPASS)
-                            } else if (!on) {
-                                OffloadPermissionManager.setLevel(tool.toolName, OffloadPermissionManager.PermissionLevel.NOT_ALLOWED)
-                            }
-                        }
-                    },
-                    showDivider = vscreenOn,
-                )
-                if (vscreenOn) {
-                    vscreenTools.forEachIndexed { idx, tool ->
-                        PermissionRow(tool = tool, showDivider = idx < vscreenTools.size - 1, resetEpoch = resetEpoch)
-                    }
-                }
-            }
+        // 高权限能力：每项只有一个开关（Agent 能不能用），系统侧是否就绪写在副标题里，
+        // 未就绪时才多一行「去开启」。虚拟屏幕的开关在它自己的页面里，这里只显示状态。
+        val vscreenOn = remember(resetEpoch) { OffloadPermissionManager.isVirtualScreenAllowed() }
+        SettingsSection(header = stringResource(R.string.perm_section_capabilities)) {
+            CapabilityRow(
+                toolName = "a11y_cli",
+                descriptionRes = R.string.perm_a11y_cli_description,
+                systemReady = a11yEnabled,
+                statusRes = if (a11yEnabled) R.string.perm_a11y_system_ready else R.string.perm_a11y_system_disabled,
+                actionRes = R.string.perm_a11y_open_settings,
+                onAction = { openAccessibilitySettings(context) },
+                resetEpoch = resetEpoch,
+            )
+            CapabilityRow(
+                toolName = RootCliOffloadHandler.TOOL_NAME,
+                descriptionRes = R.string.perm_privileged_cli_description,
+                systemReady = rootState.isGranted,
+                statusRes = when {
+                    rootState.isGranted -> R.string.system_enhance_root_granted
+                    rootState.isChecking -> R.string.system_enhance_root_checking
+                    else -> R.string.perm_root_not_granted
+                },
+                actionRes = R.string.system_enhance_root_action,
+                onAction = onOpenRoot,
+                resetEpoch = resetEpoch,
+            )
+            grouped[OffloadPermissionManager.PermissionCategory.INTEGRATIONS].orEmpty()
+                .firstOrNull { it.toolName == "apt_cli" }
+                ?.let { PermissionRow(tool = it, showDivider = true, resetEpoch = resetEpoch) }
+            SettingsValueRow(
+                icon = Icons.Outlined.Dashboard,
+                iconColor = Color(0xFF5856D6),
+                title = stringResource(R.string.settings_vscreen_entry),
+                value = stringResource(if (vscreenOn) R.string.perm_vscreen_on else R.string.perm_vscreen_off),
+                onClick = onOpenVirtualScreen,
+                showDivider = false,
+            )
         }
 
         // Fork-only system grants remain reachable without creating a second
@@ -257,75 +230,30 @@ fun OffloadPermissionScreen(
     }
 }
 
+/** 一项高权限能力：一个开关管 Agent 能不能用；系统侧没就绪时，副标题说明并多一行「去开启」。 */
 @Composable
-private fun IntegrationSection(
-    iconVector: ImageVector,
-    iconTint: Color,
-    sectionHeaderRes: Int,
+private fun CapabilityRow(
     toolName: String,
     descriptionRes: Int,
     systemReady: Boolean,
-    systemStatusTitleRes: Int,
-    systemActionTitleRes: Int,
-    onSystemAction: () -> Unit,
-    onStatusRowClick: (() -> Unit)? = null,
-    resetEpoch: Int = 0,
-) {
-    SettingsSection(
-        header = stringResource(sectionHeaderRes),
-    ) {
-        SettingsRow(
-            icon = iconVector,
-            iconColor = iconTint,
-            title = stringResource(toolTitleRes(toolName)),
-            subtitle = stringResource(descriptionRes),
-            showChevron = false,
-        )
-
-        AgentPolicyRow(toolName = toolName, showDivider = true, resetEpoch = resetEpoch)
-
-        SettingsRow(
-            title = stringResource(R.string.perm_system_authorization),
-            onClick = onStatusRowClick,
-            showChevron = onStatusRowClick != null,
-            showDivider = onStatusRowClick == null && !systemReady,
-            trailing = {
-                Text(
-                    text = stringResource(systemStatusTitleRes),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (systemReady) ChatColors.ok
-                    else MaterialTheme.colorScheme.error,
-                )
-            },
-        )
-
-        if (onStatusRowClick == null && !systemReady) {
-            SettingsRow(
-                title = stringResource(systemActionTitleRes),
-                onClick = onSystemAction,
-                showDivider = false,
-            )
-        }
-    }
-}
-
-/** The Agent's access to one integration: a plain on/off switch. */
-@Composable
-private fun AgentPolicyRow(
-    toolName: String,
-    showDivider: Boolean,
+    statusRes: Int,
+    actionRes: Int,
+    onAction: () -> Unit,
     resetEpoch: Int,
 ) {
     var allowed by remember(resetEpoch) { mutableStateOf(OffloadPermissionManager.isAllowed(toolName)) }
     SettingsSwitchRow(
-        title = stringResource(R.string.perm_agent_policy),
+        title = stringResource(toolTitleRes(toolName)),
+        subtitle = stringResource(descriptionRes) + "\n" + stringResource(statusRes),
         checked = allowed,
         onCheckedChange = {
             allowed = it
             OffloadPermissionManager.setAllowed(toolName, it)
         },
-        showDivider = showDivider,
     )
+    if (!systemReady) {
+        SettingsRow(title = stringResource(actionRes), onClick = onAction)
+    }
 }
 
 /** One tool the Agent may use: on = allowed, off = denied. */

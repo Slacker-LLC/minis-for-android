@@ -26,7 +26,6 @@
     <string name="memory_save_toast">已保存</string>
     <string name="memory_edit_load_failed">无法读取此文件，为避免覆盖已禁用编辑</string>
     <string name="memory_edit_changed_elsewhere">编辑期间该文件已被修改。请返回并重新打开以查看最新版本；你的内容未被保存</string>
-    <string name="memory_save_error">保存失败：%1$s</string>
     <string name="memory_global_footer">每个会话中对智能体可见的持久指令和偏好。智能体无法修改此文件。</string>
     <string name="check_update_section_header">应用更新</string>
     <string name="check_update_current_version">当前版本：%1$s</string>
@@ -45,7 +44,6 @@
     <string name="check_update_install_launch_failed">启动安装程序失败。请检查\"安装未知应用\"权限或手动打开下载的 APK。</string>
     <string name="check_update_install_hint">提示：如果安装时无任何反馈，可能是签名不匹配，请先卸载旧版本再重新点击下载。</string>
     <string name="check_update_open_install_settings">打开设置</string>
-    <string name="permissions_category_media">媒体</string>
     <string name="mention_scanning">正在扫描文件…</string>
     <string name="mention_no_match">没有匹配的文件</string>
     <string name="resume_action">继续</string>
@@ -58,7 +56,6 @@
     <string name="mic_permission_cancel">取消</string>
     <string name="bg_section_header">后台与通知</string>
     <string name="bg_section_subtitle">电池优化与 OEM 自启动</string>
-    <string name="bg_section_footer">长时间运行的 agent 任务需要权限以在屏幕熄灭时保持 CPU 唤醒。没有这些设置，系统可能会在后台几分钟后暂停推理。</string>
     <string name="bg_service_channel_name">Agent 状态</string>
     <string name="bg_service_channel_description">显示运行中 agent 会话的状态。</string>
     <!-- T-bg-overlay phase 2 fix — SAW 权限提示通道 -->
@@ -93,27 +90,20 @@
         <item quantity="other">%d 个会话</item>
     </plurals>
     <string name="battery_opt_section_title">电池优化</string>
-    <string name="battery_opt_section_footer">豁免后，Android 不会在任务执行中让应用进入休眠。每次返回此页面会重新检查。</string>
     <string name="battery_opt_row_title">允许后台运行</string>
     <string name="battery_opt_already_exempt">已允许</string>
     <string name="battery_opt_request_subtitle">点击允许 Minis 不被中断地运行</string>
     <string name="rom_autostart_section_title">自启动权限</string>
-    <string name="rom_autostart_section_footer">某些 Android 系统（%1$s）在标准系统设置之外还需要额外的自启动权限。否则 Minis 可能在进入后台几分钟内被杀掉。</string>
     <string name="rom_autostart_row_title">打开自启动设置</string>
     <string name="rom_autostart_row_subtitle">在 %1$s 上启用 Minis</string>
     <string name="browser_settings_ua_not_set">未设置</string>
     <!-- T135 — Settings + About i18n keys -->
-    <string name="settings_back">返回</string>
     <string name="settings_title">设置</string>
-    <string name="settings_section_llm_providers">LLM 提供商</string>
     <string name="settings_section_llm_providers_footer">配置 agent 使用的模型、管理每个提供商的 API key 与 OAuth，并将模型条目分配到固定模型槽位。</string>
     <string name="settings_manage_providers">管理提供商</string>
     <string name="settings_manage_providers_subtitle">API key 与 OAuth 登录</string>
     <string name="settings_token_usage">Token 用量</string>
     <string name="settings_token_usage_subtitle">跨提供商追踪 API 使用情况</string>
-    <string name="settings_section_appearance">外观</string>
-    <string name="settings_appearance_subtitle">主题、字号与显示</string>
-    <string name="settings_section_agent_runtime">Agent 运行时</string>
     <string name="settings_skills">技能</string>
     <string name="settings_skills_subtitle">管理 AI agent 的技能与指令</string>
     <string name="settings_memory">记忆</string>
@@ -122,7 +112,6 @@
     <!-- T-system-prompt-modules - 系统提示词模块 -->
     <string name="settings_system_prompt">系统提示词</string>
     <string name="settings_system_prompt_subtitle">写入你自己的系统提示词（优先级最高）</string>
-    <string name="system_prompt_intro">Agent 提示词由三部分组成：SOUL 身份层（设置 - 人格）、下面这些模块，以及每轮注入的运行时数据（技能、MCP、记忆、日期与语言）。编辑模块会写入本地覆盖；“恢复默认”会还原随 App 发布的文案。</string>
     <string name="system_prompt_badge_custom">已自定义</string>
     <string name="system_prompt_badge_default">默认</string>
     <string name="system_prompt_gate_memory_on">仅记忆开启时</string>
@@ -136,7 +125,6 @@
     <string name="system_prompt_reset_all_confirm_body">所有自定义文案与开关都会被清除，每个模块都还原为随 App 发布的默认内容。</string>
     <string name="system_prompt_custom_section">自定义系统提示词</string>
     <string name="system_prompt_custom_hint">在这里写下你的系统提示词……</string>
-    <string name="system_prompt_custom_footer">保存后的内容会注入到每次对话的最前面，并附带优先级声明：与人格（Soul）、回复风格、预设或会话级 Soul 冲突时，以这段内容为准。留空则不注入。</string>
     <string name="system_prompt_custom_clear">清空</string>
     <string name="system_prompt_custom_clear_confirm_title">清空自定义系统提示词？</string>
     <string name="system_prompt_custom_clear_confirm_body">输入框会被清空，这段内容不再注入；其它设置不受影响。</string>
@@ -153,7 +141,6 @@
     <string name="soul_section_preview">预览</string>
     <string name="soul_section_identity">身份</string>
     <string name="soul_section_personality">人格提示词</string>
-    <string name="soul_personality_footer">编辑 SOUL.md 的 Markdown 正文。长度上限按语言判定：中文 ≤ 1600 字符 或 英文 ≤ 1000 词（按正文主导语言选规则）。超长正文保存时会被拒绝，构建系统提示词时会被忽略。</string>
     <string name="soul_field_name">名称</string>
     <string name="soul_field_style">风格</string>
     <string name="soul_field_lang">语言</string>
@@ -170,13 +157,8 @@
     <string name="soul_save_error_title">保存失败</string>
     <string name="settings_env_vars">环境变量</string>
     <string name="settings_env_vars_subtitle">注入到沙箱内的变量</string>
-    <string name="settings_section_storage">存储</string>
-    <string name="settings_storage_subtitle">管理 Ubuntu Linux rootfs 并浏览文件</string>
-    <string name="settings_section_permissions">权限</string>
-    <string name="settings_permissions_subtitle">控制 agent 对隐私敏感功能的访问</string>
     <string name="settings_section_logs">日志</string>
     <string name="settings_logs_subtitle">查看与导出应用日志</string>
-    <string name="settings_section_about">关于</string>
     <string name="settings_about_minis">关于 Minis</string>
     <string name="settings_about_subtitle">版本与项目信息</string>
     <string name="settings_privacy_policy">隐私政策</string>
@@ -294,39 +276,25 @@
     <string name="appearance_theme_system">跟随系统</string>
     <string name="appearance_theme_light">浅色</string>
     <string name="appearance_theme_dark">深色</string>
-    <string name="appearance_section_launch">启动会话</string>
     <string name="appearance_launch_footer">选择应用启动时显示的内容。\"自动\"会在上次会话超过 15 分钟时打开新对话。</string>
     <string name="appearance_launch_auto">自动</string>
     <string name="appearance_launch_last">上次会话</string>
     <string name="appearance_launch_new">新对话</string>
     <string name="appearance_launch_home">主页</string>
-    <string name="appearance_section_return_key">回车键</string>
     <string name="appearance_return_key_footer">选择聊天输入框中回车键的行为：插入换行或发送消息。硬件键盘 Shift+Return 始终插入换行。</string>
     <string name="appearance_return_key_newline">换行</string>
     <string name="appearance_return_key_send">发送</string>
-    <string name="appearance_section_keep_awake">屏幕常亮</string>
-    <string name="appearance_keep_awake_footer">有会话任务运行时保持屏幕不熄灭，可能增加电量损耗。</string>
     <string name="appearance_keep_awake_title">屏幕常亮</string>
-    <string name="appearance_section_chat_title">会话标题</string>
     <string name="appearance_show_chat_title">显示会话标题</string>
     <string name="appearance_show_chat_title_subtitle">滚动时显示当前会话标题</string>
-    <string name="appearance_show_chat_title_footer">滚动浏览历史消息时，在聊天顶部以悬浮胶囊形式显示当前会话标题。</string>
     <string name="chat_title_pill_session_default">未命名会话</string>
-    <string name="appearance_section_grouping">分组</string>
     <string name="appearance_auto_grouping">自动归类</string>
     <string name="appearance_auto_grouping_subtitle">新会话自动归入匹配的分组</string>
-    <string name="appearance_auto_grouping_footer">首次生成会话标题时，同时把它归入匹配的现有分组。每个会话只运行一次，只使用你已创建的分组，没有匹配时保持未分组。</string>
-    <string name="appearance_section_tool_preview">工具状态栏</string>
-    <string name="appearance_tool_preview_footer">在 Agent 执行期间，于工具状态栏旁显示实时预览缩略图。</string>
     <string name="appearance_tool_preview_title">工具预览窗口</string>
-    <string name="appearance_section_auto_focus_after_reply">回复后自动聚焦输入框</string>
     <string name="appearance_auto_focus_after_reply_title">回复后自动聚焦输入框</string>
-    <string name="appearance_auto_focus_after_reply_footer">开启后，模型回复结束会自动弹出键盘，方便你立即追加输入。默认开启；如果你更希望先读完回复，可以关掉避免键盘意外弹出。</string>
     <string name="appearance_section_deep_thinking">深度思考</string>
     <string name="appearance_auto_expand_thinking_title">流式输出时展开思考</string>
-    <string name="appearance_auto_expand_thinking_footer">开启后，模型思考时新的思考块会自动展开，思考结束后自动折叠。关闭后，思考块保持折叠状态——点击即可查看。</string>
     <string name="appearance_section_font_size">字体大小</string>
-    <string name="appearance_font_size_footer">调整聊天输入、消息内容和应用文本的字体大小。更改立即生效。</string>
     <string name="appearance_font_scale_title">字体缩放</string>
     <string name="appearance_font_scale_subtitle">在下方调整大小</string>
     <string name="appearance_font_chat_input">聊天输入</string>
@@ -334,10 +302,8 @@
     <string name="appearance_font_app_base">应用基础</string>
     <string name="appearance_font_reset">恢复默认</string>
     <string name="appearance_section_language">语言</string>
-    <string name="appearance_language_footer">自定义此 App 的显示语言。选择「系统」将跟随设备语言设置。</string>
     <!-- T-android-dynamic-app-icon: 启动图标选择项。 -->
     <string name="appearance_section_app_icon">应用图标</string>
-    <string name="appearance_app_icon_footer">更换桌面图标。切换后桌面图标可能需要几秒钟才会刷新。</string>
     <string name="appearance_app_icon_auto">自动</string>
     <string name="appearance_app_icon_light">浅色</string>
     <string name="appearance_app_icon_dark">深色</string>
@@ -345,9 +311,7 @@
     <string name="env_var_add">添加</string>
     <string name="env_var_privacy_header">隐私</string>
     <string name="env_var_privacy_toggle">隐私模式</string>
-    <string name="env_var_privacy_footer">开启后，shell-execute 输出中检测到的环境变量值在送达模型前会被打码（例如 `sk-1********ajhks`）。少于 8 个字符的值会被全部替换为 `*`。聊天中用户可见的输出保持不变。</string>
     <string name="env_var_section_header">变量</string>
-    <string name="env_var_section_footer">环境变量在会话开始时被注入到沙箱 shell。名称将被转为大写，并且必须符合 POSIX shell 变量规则。</string>
     <string name="env_var_empty_title">无环境变量</string>
     <string name="env_var_empty_action">点击 + 添加。</string>
     <string name="env_var_toggle_visibility">切换可见性</string>
@@ -381,13 +345,11 @@
     <string name="log_share_chooser">分享日志</string>
     <string name="memory_title">记忆</string>
     <string name="settings_memory_global_header">默认</string>
-    <string name="settings_memory_global_footer">单个会话的开关（通过 /memory 斜杠命令或"会话记忆"面板设置）会覆盖此默认值。切换此开关不会影响已有会话。</string>
     <string name="settings_memory_global_enabled_title">默认启用记忆</string>
     <string name="settings_memory_global_enabled_subtitle">关闭后，新会话默认不加载 GLOBAL.md 和每日记忆</string>
     <string name="memory_empty_title">暂无记忆文件</string>
     <string name="memory_empty_description">记忆文件在会话之间持久保存知识。编辑 GLOBAL.md 添加 agent 可见的指令。</string>
     <string name="memory_section_files">文件</string>
-    <string name="memory_section_footer">GLOBAL.md 包含 agent 可见的持久指令。每日日志在对话期间自动创建。</string>
     <string name="memory_delete_confirm_title">删除 %1$s？</string>
     <string name="memory_delete_confirm_text">这将永久删除该记忆日志。</string>
     <string name="memory_editor_placeholder">输入内容…</string>
@@ -422,16 +384,12 @@
     <string name="perm_tool_root_cli">android-root-cli</string>
     <string name="perm_tool_apt_cli">minis-apt</string>
     <string name="perm_section_a11y">无障碍</string>
-    <string name="perm_a11y_section_footer">android-a11y-cli 让 Agent 读取屏幕 UI、模拟点击与输入、监听系统事件。下方两项都需配置:选择 Agent 权限,并在系统设置启用无障碍服务。</string>
     <string name="perm_a11y_cli_description">让 Agent 读取屏幕、点击、输入、监听事件</string>
     <string name="perm_a11y_open_settings">前往无障碍设置</string>
-    <string name="perm_system_authorization">系统授权</string>
     <string name="perm_root_not_granted">未授权</string>
-    <string name="perm_agent_policy">Agent 权限</string>
     <string name="perm_a11y_system_ready">已启用</string>
     <string name="perm_a11y_system_disabled">未启用</string>
     <string name="perm_allow_minis_config">允许 minis-config</string>
-    <string name="perm_minis_config_desc">禁用后，智能体将无法通过 minis-config 读取或修改任何设置。日志 → 配置变更 中的变更历史仍可查看。智能体会收到 permission_denied 错误，并通过深度链接引导你操作。</string>
     <string name="perm_section_privacy">隐私</string>
     <string name="perm_section_media">媒体</string>
     <string name="perm_section_system">系统</string>
@@ -454,13 +412,11 @@
     <string name="root_cli_cap_device_desc">查询设备属性和硬件状态</string>
     <string name="root_cli_cap_service_desc">检查 Root 是否可用</string>
 
-    <string name="perm_section_privileged_backend">特权后端</string>
     <string name="perm_privileged_cli_description">允许 Agent 以 root 身份执行 ADB 级系统命令（pm、am、settings、input…）</string>
 
     <string name="skill_title">技能</string>
     <string name="skill_add">添加 Skill</string>
     <string name="skill_section_installed">已安装</string>
-    <string name="skill_section_footer">Skill 通过专门的指令和工作流扩展 AI agent。启用后会被载入 system prompt。</string>
     <string name="skill_empty_title">未安装 Skill</string>
     <string name="skill_empty_action">点击 + 导入 SKILL.md 或浏览 Minis Skills。</string>
     <string name="skill_import_modal_title">导入技能</string>
@@ -519,12 +475,6 @@
     <string name="storage_overview_sessions">会话文件</string>
     <string name="storage_section_sessions">会话</string>
     <string name="storage_no_sessions">无会话</string>
-    <string name="storage_section_minis_files">Minis 文件</string>
-    <string name="storage_no_minis_files">无 Minis 文件</string>
-    <string name="storage_section_media">媒体文件</string>
-    <string name="storage_no_media_files">无媒体文件</string>
-    <string name="storage_clear_session_footer">删除此会话生成的所有文件。对话内容本身将保留。</string>
-    <string name="storage_browse_files">浏览文件</string>
     <string name="storage_clearing_status">清除中…</string>
     <string name="storage_clear_incomplete">部分媒体文件未能删除，显示的是剩余的大小。</string>
     <string name="storage_clear_session_button">清除会话文件</string>
@@ -545,7 +495,6 @@
     <string name="usage_detail_attribution_estimated">对 %1$d 条旧记录估算</string>
     <string name="usage_detail_sessions">会话</string>
     <string name="usage_detail_active_days">活跃天数</string>
-    <string name="mirror_back">返回</string>
     <string name="mirror_current_section">当前</string>
     <string name="mirror_use_mirror_toggle">使用镜像</string>
     <string name="mirror_official_default">官方（默认）</string>
@@ -561,8 +510,6 @@
     <string name="rootfs_installed_label">已安装</string>
     <string name="rootfs_size_label">大小</string>
     <string name="rootfs_path_label">路径</string>
-    <string name="rootfs_browse_section">浏览</string>
-    <string name="rootfs_browse_files_label">浏览文件</string>
     <string name="rootfs_mirrors_section">镜像</string>
     <string name="rootfs_actions_section">操作</string>
     <string name="rootfs_install_label">安装 Rootfs</string>
@@ -576,10 +523,8 @@
     <string name="rootfs_reset_confirm_message">这会用应用内置的镜像重新安装 Ubuntu 系统。工作区、home 目录、技能、记忆、共享文件和会话文件都会保留；用 apt 安装的软件包和对系统的其他修改会被清除。</string>
 
     <!-- T172 — components / onboarding / preview i18n -->
-    <string name="common_back">返回</string>
     <string name="common_close">关闭</string>
     <string name="common_skip">跳过</string>
-    <string name="common_next">下一步</string>
     <string name="onboarding_welcome_title">欢迎使用 Minis</string>
     <string name="onboarding_welcome_subtitle">集终端、浏览器和设备本地访问于一身的 AI 助手。</string>
     <string name="onboarding_get_started">开始使用</string>
@@ -591,9 +536,7 @@
     <string name="onboarding_select_models_title">选择模型</string>
     <string name="onboarding_select_models_subtitle">最多选择 3 个模型；第一个将设为主模型，其余不会自动加入备用列表。</string>
     <string name="onboarding_search_models">搜索模型</string>
-    <string name="onboarding_filter_models">筛选模型</string>
     <string name="onboarding_done_count">完成 (%1$d/3)</string>
-    <string name="onboarding_loading_models">正在加载模型…</string>
     <string name="webpreview_close">关闭</string>
     <string name="webpreview_stop">停止加载</string>
     <string name="webpreview_reload">重新加载</string>
@@ -680,7 +623,6 @@
     <string name="characters_entry_content">条目内容</string>
     <string name="characters_entry_before">插入到角色描述之前</string>
     <string name="characters_entry_constant">始终生效</string>
-    <string name="characters_entry_delete">删除此条目</string>
     <string name="characters_entry_unnamed">未命名条目</string>
     <string name="characters_import_failed">无法导入该角色卡。</string>
     <string name="characters_export_failed">无法导出该角色。</string>
@@ -752,8 +694,6 @@
     <string name="browser_history_clear_dialog_message">这将删除所有浏览历史。此操作无法撤销。</string>
     <string name="terminal_title">Minis Shell</string>
     <string name="terminal_clear">清屏</string>
-    <string name="terminal_show_keyboard">显示</string>
-    <string name="terminal_hide_keyboard">隐藏</string>
 
     <!-- T172-A providers / models / settings i18n -->
     <string name="provider_list_providers">AI 服务商</string>
@@ -786,7 +726,6 @@
     <string name="provider_detail_chat_completions">Chat Completions</string>
     <string name="provider_detail_responses_api">Responses API</string>
     <string name="provider_detail_azure_openai">Azure OpenAI</string>
-    <string name="provider_detail_azure_openai_footer">使用 Azure OpenAI 认证（api-key 请求头）。将完整的 Azure 端点（含 ?api-version=… 查询参数）粘贴到上面的自定义 API Base。两种 API 格式均可用。</string>
     <string name="provider_detail_status">状态</string>
     <string name="provider_detail_enabled">已启用</string>
     <string name="provider_detail_refresh_models">刷新模型</string>
@@ -805,22 +744,15 @@
     <string name="common_remove">移除</string>
     <string name="provider_detail_set_manual_bearer_token">设置手动 Bearer Token</string>
     <string name="add_provider_choose_provider">选择 AI 服务商</string>
-    <string name="add_provider_you_can_add_multiple_instances_of_the_sa">你可以添加同一服务商的多个实例（例如工作和个人账户）。OpenAI 和 Anthropic 也支持兼容的第三方端点 —— 选择匹配的协议后再设置自定义 API Base URL。</string>
-    <string name="add_provider_auth_method">认证方式</string>
-    <string name="add_provider_choose_authentication">选择身份验证方式</string>
-    <string name="add_provider_pick_the_auth_method_that_matches_your_a">选择与你账户匹配的身份验证方式。OAuth 通过服务商的网页流程登录；API Key 使用账户面板里的密钥。</string>
     <string name="add_provider_identity">标识</string>
     <string name="add_provider_the_label_is_shown_in_the_provider_list_">标签会显示在服务商列表和模型选择器里。</string>
     <string name="add_provider_credential">凭证</string>
-    <string name="add_provider_your_key_is_stored_securely_in_encrypted">你的密钥保存在加密存储中,不会离开设备。</string>
     <string name="add_provider_endpoint">端点</string>
     <string name="add_provider_custom_api_base_optional">自定义 API 地址（可选）</string>
     <string name="add_provider_authentication">认证</string>
-    <string name="add_provider_sign_in_succeeded_the_token_is_stored_in">登录成功。token 已保存在加密存储中。点击保存以添加服务商。</string>
     <string name="add_provider_authenticated">已认证</string>
     <string name="add_provider_token">Token</string>
     <string name="add_provider_save_provider">保存 AI 服务商</string>
-    <string name="add_provider_opens_the_provider_s_web_sign_in_flow_af">打开服务商的网页登录流程。登录后,token 会自动写入这里。</string>
     <string name="add_provider_signing_in">正在登录…</string>
     <!-- T-android-codex-oauth-dns -->
     <string name="add_provider_oauth_network_unreachable">无法连接到登录服务器，请检查网络或代理设置后重试。</string>
@@ -828,7 +760,6 @@
     <string name="oauth_completing_sign_in">正在完成登录…</string>
     <string name="oauth_sign_in_failed">登录失败：%1$s</string>
     <string name="add_provider_or_configure_manually">或手动配置</string>
-    <string name="add_provider_for_third_party_coding_plans_e_g_minimax">第三方 Coding Plan（如 MiniMax、Kimi）或兼容的代理端点，请手动填入 API 基础 URL 和 Bearer Token。</string>
     <string name="add_provider_bearer_token">Bearer Token</string>
     <string name="add_custom_model_model_id">模型 ID</string>
     <string name="add_custom_model_display_name_optional">显示名称（可选）</string>
@@ -839,7 +770,6 @@
     <string name="model_entry_visibility">可见性</string>
     <string name="model_entry_hidden_models_won_t_appear_in_the_model_">隐藏的模型不会出现在模型选择器中。</string>
     <string name="model_entry_hidden">隐藏</string>
-    <string name="model_entry_restores_the_provider_reported_display_n">恢复服务商汇报的显示名称和 token 上限,并取消模型隐藏。</string>
     <string name="model_entry_reset_to_default">恢复默认</string>
     <!-- T210: ModelEntryDetailScreen sections (iOS parity). -->
     <string name="modeldetail_identity_footer_custom">这是自定义模型。可以编辑模型 ID。</string>
@@ -847,7 +777,6 @@
     <string name="modeldetail_section_capabilities">能力</string>
     <string name="modeldetail_context_window">上下文窗口</string>
     <string name="modeldetail_thinking">思考</string>
-    <string name="modeldetail_capabilities_footer">上下文窗口和最大输出 Token 数（以 tokens 计）。留空使用服务商默认值。对支持扩展推理的模型启用思考模式。</string>
     <string name="modeldetail_provider_default">服务商默认</string>
     <string name="modeldetail_max_tokens_exceeds_warning">超过服务商上报的上限（%1$d）。值已保存，但可能导致请求失败。</string>
     <string name="modeldetail_section_input_modality">输入模态</string>
@@ -855,11 +784,9 @@
     <string name="modeldetail_pdf_input">PDF 输入</string>
     <string name="modeldetail_audio_input">音频输入</string>
     <string name="modeldetail_video_input">视频输入</string>
-    <string name="modeldetail_input_modality_footer">文本输入始终支持。禁用模型不接受的模态以避免发送不支持的附件。</string>
     <string name="modeldetail_section_output_modality">输出模态</string>
     <string name="modeldetail_image_output">图片输出</string>
     <string name="modeldetail_audio_output">音频输出</string>
-    <string name="modeldetail_output_modality_footer">仅对生成图片或音频的模型启用（例如 gpt-image-1、TTS）。文本输出始终可用。</string>
     <!-- [T-android-model-quick-test] 快速测试 -->
     <string name="quicktest_title">快速测试</string>
     <string name="quicktest_button">快速测试</string>
@@ -875,10 +802,6 @@
     <string name="quicktest_image_unsupported">该模型的供应商不支持通过快速测试进行图像生成。</string>
     <string name="quicktest_no_image">未返回任何图像。</string>
     <string name="quicktest_speech_unavailable">Android 端暂不支持语音输出/转写测试。</string>
-    <string name="modelgroup_speech_output">语音输出</string>
-    <string name="modelgroup_speech_transcription">语音转写</string>
-    <string name="modelgroup_text_generation">文本生成</string>
-    <string name="common_default">默认</string>
     <!-- [T-android-vision-group / GH#182] Vision Input slot label -->
     <string name="settings_agent_loop_models">Agent 可调用的模型</string>
 
@@ -897,8 +820,6 @@
     <string name="provider_detail_models_count_header">模型 (%1$d)</string>
     <string name="provider_detail_delete_provider_confirm">确定要删除 \"%1$s\" 吗？此操作无法撤销。</string>
     <string name="provider_detail_delete_model_confirm">确定要删除 \"%1$s\" 吗？此操作无法撤销。</string>
-    <string name="agent_loop_models_model_count_singular">1 个模型</string>
-    <string name="agent_loop_models_model_count_plural">%1$d 个模型</string>
     <string name="provider_list_models_count">%1$d 个模型</string>
 
     <!-- T180-bg-notif — Task Notifications toggle + completion notification
@@ -906,7 +827,6 @@
          EnhancedBackgroundSettingsView + BackgroundKeepAliveManager. -->
     <string name="settings_section_notifications">通知</string>
     <string name="settings_task_notifications">任务通知</string>
-    <string name="settings_task_notifications_footer">应用进入后台时，agent 任务完成会通过通知中心和锁屏提醒你。</string>
     <string name="notif_one_task_running">1 个任务执行中</string>
     <string name="notif_n_tasks_running">%1$d 个任务执行中</string>
     <string name="notif_in_session">会话中</string>
@@ -927,8 +847,6 @@
     <string name="read_aloud_group">朗读</string>
    <!-- T-minis-textkit 选择菜单按钮 -->
    <string name="selection_copy">复制</string>
-   <string name="selection_copy_markdown">复制 Markdown</string>
-   <string name="selection_copy_rich_text">复制富文本</string>
     <string name="selection_copy_full_markdown">复制完整 Markdown</string>
     <string name="selection_copy_full_rich_text">复制完整富文本</string>
     <string name="selection_copy_full_plain_text">复制完整纯文本</string>
@@ -943,29 +861,21 @@
     <string name="markdown_table_image_copied_toast">已复制表格图片</string>
     <string name="markdown_table_image_copy_failed_toast">复制表格图片失败</string>
     <string name="settings_bg_overlay">应用内任务浮窗</string>
-    <string name="settings_bg_overlay_footer">Minis 处于后台时，显示一个小型悬浮胶囊展示当前工具。需要"显示在其他应用上层"权限。点击悬浮窗回到 Minis；拖拽可移动位置。</string>
     <string name="settings_bg_overlay_permission_needed">需先授予"显示在其他应用上层"权限</string>
     <string name="settings_dynamic_island">灵动岛（实时更新）</string>
-    <string name="settings_dynamic_island_footer">在 Android 16 状态胶囊上显示实时的助手状态。开启后将取代悬浮窗，避免同时出现两个状态指示。</string>
     <string name="settings_dynamic_island_unsupported">当前系统版本暂不支持实时更新（需 Android 16 及以上并已开启该功能）。</string>
 
     <!-- T182 agent loop section i18n -->
-    <string name="agent_loop_section_title">智能体循环可用模型</string>
-    <string name="agent_loop_section_add_models">添加模型</string>
     <string name="agent_loop_section_add_models_title">添加模型</string>
     <string name="agent_loop_section_no_available_models">所有符合条件的模型都已添加。</string>
-    <string name="agent_loop_section_remove">从智能体循环中移除</string>
     <!-- T184-chatmenu-i18n — ChatScreen overflow ⋮ menu -->
     <string name="chat_menu_new_chat">新建对话</string>
     <string name="chat_new_chat_stop_dialog_body">当前对话有任务正在运行，新建对话将停止它。</string>
     <string name="chat_new_chat_stop_dialog_confirm">停止并新建</string>
     <string name="chat_menu_clear_chat">清空对话</string>
-    <string name="chat_menu_open_terminal">打开终端</string>
     <string name="chat_menu_open_browser">打开浏览器</string>
     <string name="chat_menu_browse_chat_files">浏览对话文件</string>
     <string name="chat_menu_enhanced_cache">增强缓存</string>
-    <string name="chat_menu_fast_mode">启用高速模式</string>
-    <string name="chat_menu_auto_compact">自动压缩</string>
     <string name="context_near_capacity_title">上下文接近上限</string>
     <string name="context_near_capacity_message">对话上下文即将占满。发送前可先压缩历史以释放空间。启用自动压缩后，之后将自动完成此操作。</string>
     <string name="context_compact_and_send">压缩并发送</string>
@@ -999,24 +909,14 @@
    <string name="chat_edit_exit_button">退出编辑</string>
     <string name="chat_show_sidebar">显示会话列表</string>
     <string name="chat_hide_sidebar">隐藏会话列表</string>
-    <string name="split_no_conversation_title">未选择会话</string>
     <string name="split_no_conversation_subtitle">选择一个会话，或开始新对话</string>
    <string name="chat_clear_dialog_body">删除此会话的所有消息？工作区文件、附件和卸载内容会保留。</string>
     <string name="chat_clear_dialog_confirm">清除</string>
 
     <!-- T235 — 共享文件夹（固定: 共享 / 技能 / 记忆） -->
-    <string name="settings_shared_folders">共享文件夹</string>
-    <string name="settings_shared_folders_subtitle">浏览 /var/minis 下的共享、技能、记忆目录</string>
-    <string name="shared_folders_title">共享文件夹</string>
-    <string name="shared_folders_info_banner">这些目录在 Linux 沙箱内可见，技能与记忆由 AI 代理工具自动维护，请勿手动修改。</string>
     <string name="shared_folder_name_shared">共享</string>
-    <string name="shared_folder_name_skills">技能</string>
-    <string name="shared_folder_name_memory">记忆</string>
-    <string name="shared_folder_detail_title">文件夹详情</string>
-    <string name="shared_folder_browse_files">浏览文件</string>
 
     <!-- T219-2 — 挂载外部文件夹 -->
-    <string name="settings_mount_external_folders">挂载外部文件夹</string>
     <string name="settings_mount_external_folders_subtitle">将选定文件夹绑定到 /var/minis/mounts/</string>
     <string name="mount_folders_title">已挂载文件夹</string>
     <string name="mount_folders_info_banner">所选文件夹会被绑定到 /var/minis/mounts/&lt;name&gt;。最多可同时挂载 10 个文件夹。</string>
@@ -1047,7 +947,6 @@
     <string name="mount_detail_browse_files">浏览文件</string>
     <string name="mount_detail_name_invalid">挂载名称不能为空，不能包含 \'/\'，也不能是 \'.\' 或 \'..\'</string>
     <string name="mount_path_unavailable">路径不可用</string>
-    <string name="mount_add_failed">无法添加挂载，名称可能已被使用或无效。</string>
 
     <!-- T241: 斜杠命令面板 + 选择模型 sheet -->
     <string name="slash_compact_subtitle">压缩对话历史为摘要</string>
@@ -1068,10 +967,7 @@
     <string name="model_picker_done">完成</string>
     <string name="model_picker_search_placeholder">搜索模型</string>
     <string name="model_picker_search_clear">清除</string>
-    <string name="model_picker_default_badge">默认</string>
     <string name="model_picker_active_badge">活跃</string>
-    <string name="model_picker_no_linked_models">该分组未绑定任何模型。</string>
-    <string name="model_picker_models_count_unlinked">%d 个模型（未绑定）</string>
     <string name="model_picker_no_results">无结果</string>
     <string name="model_picker_no_models">没有可用模型</string>
     <string name="model_picker_configure_hint">请在设置中配置提供商以显示模型。</string>
@@ -1221,7 +1117,6 @@
     <string name="mcp_add">添加 MCP 服务器</string>
     <string name="mcp_edit">编辑 MCP 服务器</string>
     <string name="mcp_section_servers">服务器</string>
-    <string name="mcp_section_footer">MCP 服务器让 AI 通过 minis-mcp-cli 调用外部工具。配置保存在 /var/minis/mcp-servers/servers.json（与 Claude Desktop 兼容）。</string>
     <string name="mcp_empty_title">暂无 MCP 服务器</string>
     <string name="mcp_empty_action">点击 + 按钮添加服务器。</string>
     <string name="mcp_transport_http">HTTP</string>
@@ -1279,12 +1174,6 @@
     <string name="session_mcps_footer">仅为此会话开关 MCP 服务器。默认值来自 设置 → MCP 集成。</string>
     <string name="session_mcps_empty_title">暂无 MCP 服务器</string>
     <string name="session_mcps_empty_subtitle">请在 设置 → MCP 集成 中添加服务器。</string>
-    <string name="system_permissions_a11y_oem_header">服务总是被杀死？</string>
-    <string name="system_permissions_a11y_oem_footer">%1$s 可能会提示「此服务出现故障」并在后台停止无障碍服务。请将本应用加入自启动白名单，并取消省电限制，使其保持连接。</string>
-    <string name="system_permissions_a11y_oem_autostart">加入自启动白名单</string>
-    <string name="system_permissions_a11y_oem_autostart_sub">打开自启动管理并启用 Minis</string>
-    <string name="system_permissions_a11y_oem_battery">取消后台 / 省电限制</string>
-    <string name="system_permissions_a11y_oem_battery_sub">将耗电管理设为「无限制」</string>
 
     <!-- [T-android-overlay-landscape-width-rotation-drift] Scheduled Tasks localization -->
     <string name="scheduled_tasks_title">定时任务</string>
@@ -1293,7 +1182,6 @@
     <string name="scheduled_task_edit">编辑定时任务</string>
     <string name="scheduled_task_field_label">名称</string>
     <string name="scheduled_task_field_time">触发时间</string>
-    <string name="scheduled_task_field_repeat">重复</string>
     <string name="scheduled_task_field_prompt">提示词</string>
     <string name="scheduled_task_field_prompt_hint">触发时希望助手做什么？</string>
     <string name="scheduled_task_target_new_session_note">每次触发都会创建一个新的聊天会话，完成后发送通知。点击通知即可查看结果。</string>
@@ -1321,7 +1209,6 @@
     <string name="scheduled_task_pick_message">选择一条消息…</string>
     <string name="scheduled_task_field_model">模型</string>
     <string name="scheduled_task_model_default">应用默认</string>
-    <string name="scheduled_task_field_active_window">活动时段（可选）</string>
     <string name="scheduled_task_field_start_date">开始</string>
     <string name="scheduled_task_field_end_date">结束</string>
     <string name="scheduled_task_date_any">不限</string>
@@ -1340,7 +1227,6 @@
     <string name="scheduled_tasks_footer">每次触发都会创建一个新的聊天会话，完成后发送通知。点击通知即可查看结果。</string>
     <string name="scheduled_task_runs_title">运行记录</string>
     <string name="scheduled_task_runs_empty">还没有运行记录。该任务尚未触发 —— 触发后运行记录会显示在这里。</string>
-    <string name="scheduled_task_runs_open_session">打开会话</string>
     <string name="error_empty_response_generic">模型返回了空响应。请重试或切换模型。</string>
     <string name="error_empty_response_context_large">模型返回了空响应。会话上下文可能过大 —— 请尝试压缩上下文或开启新会话。</string>
     <string name="error_empty_response_after_tool">在工具结果之后，即使经过提醒，模型仍未返回任何响应。它可能已过载 —— 请重试或切换模型。</string>
@@ -1461,19 +1347,14 @@
     <string name="compact_progress_split">正在压缩… %1$d 秒 · 分段摘要中（%2$d/%3$d）</string>
 
     <!-- [T-android-work-process] 工作过程收束行（思考 + 工具步骤）。 -->
-    <string name="work_process_running_step">正在执行第 %1$d 步 · %2$s</string>
-    <string name="work_process_running_thinking">正在思考…</string>
     <plurals name="work_process_completed_steps">
         <item quantity="other">已完成 %d 个步骤</item>
     </plurals>
-    <string name="work_process_completed_thinking">已完成思考</string>
     <string name="work_process_expand">展开工作过程</string>
     <string name="work_process_collapse">收起工作过程</string>
-    <string name="appearance_section_work_process">工作过程</string>
     <string name="appearance_steps_presentation_title">思考与工具步骤收束</string>
     <string name="appearance_steps_presentation_on">连续的思考块与工具调用合并为一条可展开行。</string>
     <string name="appearance_steps_presentation_off">每个思考块与工具调用各自单独一行。</string>
-    <string name="appearance_steps_presentation_footer">收束行在步骤运行中自动展开、结束后自动折叠；失败的步骤会把原因写在折叠行上。关闭后保持每步一行，长按菜单（重跑 / 复制 / 停止）不变。</string>
 
     <!-- [T-android-assistant-home] 助手首页与快捷动作卡。 -->
     <string name="assistant_home_title">助手首页</string>
@@ -1511,8 +1392,6 @@
     <string name="system_permissions_module_a11y_toggle">保持无障碍服务开启</string>
     <string name="system_permissions_module_a11y_unavailable">Minis 模块未安装或未启用</string>
 
-    <string name="module_settings_title">模块设置</string>
-    <string name="module_settings_row_subtitle">LSPosed 模块读取的开关</string>
     <string name="module_settings_section_switches">手势</string>
     <string name="module_settings_gesture_bar">手势条长按打开系统搜索</string>
     <string name="module_settings_gesture_bar_sub">把导航条上的识屏交给系统自己的 contextual search。</string>
@@ -1521,16 +1400,10 @@
     <string name="module_settings_hotword">熄屏后保持热词检测</string>
     <string name="module_settings_hotword_sub">熄屏把助手的软件热词会话拆掉时，把它重新拉起来。</string>
     <string name="module_settings_section_assistant">电源键助手</string>
-    <string name="module_settings_assistant_footer">只接管电源键长按；其它快捷方式保持各自的行为。</string>
     <string name="module_settings_target_oem">设备自带的助手</string>
     <string name="module_settings_target_minis">Minis</string>
     <string name="module_settings_not_connected">尚未连接 Xposed 框架，这些开关暂时写不进去。请在框架管理器里启用 Minis，然后重启 Minis：框架只在应用启动时下发连接。</string>
     <string name="module_settings_write_failed">框架没有确认这次写入</string>
-    <string name="module_settings_assistant_role">系统默认助手</string>
-    <string name="module_settings_assistant_role_held">Minis 已是本机的数字助手</string>
-    <string name="module_settings_assistant_role_needed">长按电源键由 Minis 接管前，必须先设为默认助手</string>
-    <string name="module_settings_assistant_role_unavailable">此设备没有默认助手设置</string>
-    <string name="module_settings_footer">这些开关由 Minis 的 LSPosed 模块读取：先安装模块，并在其作用域里勾选 Minis。改动在下一次拦截即生效，不需要重启。</string>
 
     <string name="modeldetail_hosted_web_search">服务端联网搜索</string>
     <string name="modeldetail_hosted_web_search_sub">允许模型调用服务商自己的联网搜索。来源以引用形式返回；会消耗服务商配额，且只有 Responses API 支持。</string>
@@ -1546,7 +1419,6 @@
 
     <string name="system_enhance_title">模块</string>
     <string name="system_enhance_row_subtitle">LSPosed 模块开关</string>
-    <string name="system_enhance_section_status">状态</string>
     <string name="system_enhance_root">Root</string>
     <string name="system_enhance_root_checking">检测中…</string>
     <string name="system_enhance_root_granted">已授权</string>
@@ -1556,27 +1428,13 @@
     <string name="system_enhance_root_timeout">su 授权弹窗超时</string>
     <string name="system_enhance_root_unknown">su 没有答复身份</string>
     <string name="system_enhance_root_action">检测</string>
-    <string name="system_enhance_protection">无障碍保活</string>
-    <string name="system_enhance_protection_on">已开启——模块会重新绑定服务</string>
-    <string name="system_enhance_protection_off">已关闭——没有东西会重新绑定服务</string>
-    <string name="system_enhance_hooks">模块开关</string>
-    <string name="system_enhance_hooks_subtitle">模块从本应用读取的接管开关</string>
     <string name="system_enhance_root_section">需要 Root 的能力</string>
-    <string name="system_enhance_root_footer">Root 是 Linux 运行时需要的：Ubuntu 24.04 chroot、它的挂载命名空间与其中的 guest 进程。设备控制与私有数据读取走同一条受控路径；这里不会给 agent 一个通用 Root shell。</string>
     <string name="system_enhance_root_feature_runtime">Ubuntu 24.04 运行时（chroot、挂载命名空间）</string>
     <string name="system_enhance_root_feature_device">设备控制（结构化、受控 argv）</string>
     <string name="system_enhance_root_feature_data">私有数据读取（时钟、剪贴板、健康、便签）</string>
-    <string name="system_enhance_module_section">需要模块的能力</string>
-    <string name="system_enhance_module_footer">模块运行在其他进程里，负责本应用自己够不到的入口：厂商助手与识屏手势、Google 资格检查、无障碍保活与热词自愈。它只读取你在模块设置页设的开关。</string>
-    <string name="system_enhance_module_feature_entries">厂商入口（助手、识屏、手势）</string>
-    <string name="system_enhance_module_feature_google">Google 资格（Gemini 入口、机型伪装）</string>
-    <string name="system_enhance_module_feature_accessibility">无障碍保活与热词自愈</string>
 
     <string name="system_enhance_root_hidden">su 对本应用不可见；本机装有 %1$s——请在它的应用列表里允许本应用（或关闭 su 隐藏）</string>
-    <string name="settings_terminal_subtitle">打开 Ubuntu Shell（会启动 Linux 运行时）</string>
-    <string name="settings_section_runtime">运行时</string>
     <string name="settings_section_system">系统与权限</string>
-    <string name="settings_section_diagnostics">诊断与关于</string>
     <string name="settings_auto_compact">自动压缩上下文</string>
     <string name="settings_auto_compact_subtitle">Token 达到阈值时自动压缩历史记录</string>
     <string name="settings_pet">桌面宠物</string>
@@ -1587,16 +1445,9 @@
     <string name="settings_assistant_role_unavailable">在系统默认助手设置中选择 Minis</string>
     <string name="settings_assistant_role_held_toast">已是默认数字助手</string>
     <string name="settings_assistant_role_missing_toast">此设备未提供默认助手设置</string>
-    <string name="settings_system_enhance_footer">Root、模块开关以及它们各自解锁的能力都在这里。</string>
     <string name="chat_new_session">新建会话</string>
-    <string name="settings_category_models_sub">提供商、模型槽位、用量与自动压缩</string>
-    <string name="settings_category_agent_sub">技能、角色、人格、提示词、记忆与 MCP</string>
-    <string name="settings_category_appearance_sub">外观与桌面宠物</string>
-    <string name="settings_category_runtime_sub">终端与环境变量</string>
     <string name="settings_section_files">文件管理</string>
     <string name="settings_category_files_sub">存储占用、共享文件夹、挂载、会话文件、备份与恢复</string>
-    <string name="settings_category_system_sub">Root、模块、权限与后台</string>
-    <string name="settings_category_about_sub">日志、关于与反馈</string>
     <string name="settings_cat_models">模型</string>
     <string name="settings_cat_agent">Agent</string>
     <string name="settings_cat_chat">对话与输入</string>
@@ -1612,8 +1463,6 @@
     <string name="settings_root_footer">终端在会话抽屉里；团队和定时任务在 Agent 里。</string>
     <string name="settings_attention_count">%1$d 项需要处理</string>
     <string name="settings_ready_header">就绪检查</string>
-    <string name="settings_ready_footer">这里汇总 Agent 正常工作所需的系统条件。可选项不计入未就绪。</string>
-    <string name="settings_manage_header">管理</string>
     <string name="settings_ready_root_title">Root</string>
     <string name="settings_ready_root_ok">已授权 · Ubuntu 运行时可用</string>
     <string name="settings_ready_root_bad">未授权：Ubuntu 运行时无法启动</string>
@@ -1640,14 +1489,8 @@
     <string name="settings_agent_section_delegation">委派</string>
     <string name="settings_runtime_rootfs_title">Rootfs</string>
     <string name="settings_runtime_rootfs_sub">Ubuntu 24.04 chroot · 安装、重置与恢复</string>
-    <string name="settings_runtime_section_tools">工具</string>
-    <string name="settings_runtime_browse_files">浏览文件</string>
-    <string name="settings_runtime_footer">沙箱是一个 Ubuntu 24.04 chroot，需要 Root。运行时依赖的授权在「系统与权限」里检查。</string>
     <string name="settings_data_section_app">应用</string>
     <string name="settings_permissions_category_sub">无障碍、悬浮窗与通知使用权</string>
-    <string name="settings_system_footer">本 App 在这台设备上被允许做什么，以及每项授权在哪里改。</string>
-    <string name="settings_assistant_role_footer">长按 Home / 电源键的助手手势会打开当前持有该角色的 App。</string>
-    <string name="module_settings_assistant_role_hint">要让 Minis 接管电源键，先在「权限」里把它设为系统默认助手。</string>
     <string name="settings_tool_permissions">Agent 权限</string>
     <string name="settings_tool_permissions_sub">Agent 可以自己做哪些事</string>
     <string name="settings_root_sub">Root 状态与可用功能</string>
@@ -1655,7 +1498,6 @@
     <string name="system_permissions_overlay_row">显示在其他应用上层</string>
     <string name="system_permissions_overlay_granted">已授权</string>
     <string name="system_permissions_overlay_missing">未授权，点击前往系统设置</string>
-    <string name="system_permissions_overlay_footer">桌面宠物需要这个权限才能浮在其他应用上面。</string>
     <plurals name="work_item_command">
         <item quantity="other">%1$d 条命令</item>
     </plurals>
@@ -1681,7 +1523,6 @@
         <item quantity="other">%1$d 次委派</item>
     </plurals>
     <string name="work_process_duration">用时 %1$s</string>
-    <string name="work_process_elapsed">已处理 %1$s</string>
     <string name="appearance_tool_status_bar_title">工具状态栏</string>
     <string name="appearance_tool_status_bar_sub">输入框上方那条显示正在运行的工具与结果的横条。</string>
     <string name="appearance_section_accent">强调色</string>
@@ -1707,7 +1548,6 @@
     <string name="mcp_form_startup_timeout">启动超时（秒）</string>
     <string name="mcp_form_startup_timeout_placeholder">默认 60</string>
     <string name="voice_services_section">语音服务</string>
-    <string name="voice_services_duplicate_hint">同一个语音服务被配置了多次。这里会合并为一行；想删除多余的提供商，请在上方操作。</string>
     <string name="voice_services_stt_count">%1$d 个语音转文字</string>
     <string name="voice_services_tts_count">%1$d 个文字转语音</string>
     <string name="voice_service_source">来源</string>
@@ -1719,7 +1559,6 @@
     <string name="voice_service_shared_credential_note">此语音服务与所属提供商共用 API 密钥和接口地址。要修改它们，请编辑该提供商。</string>
     <string name="voice_service_hidden_badge">已隐藏</string>
     <string name="add_provider_voice_chat_providers">语音对话提供商</string>
-    <string name="add_provider_voice_templates_footer">语音转文字与文字转语音厂商。提供商类型和基础 URL 已预填，只需填 API 密钥。</string>
     <string name="add_provider_voice_capability_tts">语音合成（TTS）</string>
     <string name="add_provider_voice_capability_asr">语音识别（ASR）</string>
     <string name="add_provider_voice_capability_both">识别 + 合成</string>
@@ -1755,7 +1594,6 @@
     <string name="system_permissions_a11y_row">Minis 无障碍服务</string>
     <string name="system_permissions_a11y_enabled">已启用 —— android-a11y-cli 可用</string>
     <string name="system_permissions_a11y_disabled">未启用 —— 点按前往系统设置开启</string>
-    <string name="system_permissions_a11y_footer">android-a11y-cli 读取 UI 树、注入手势和监听事件所必需。没有它，AI 代理无法操作其他应用。请在下一屏的 Minis 条目下打开这个开关。</string>
     <string name="a11y_service_label">Minis 无障碍</string>
     <string name="a11y_service_description">让 Minis 代替调用 android-a11y-cli 的 AI 代理读取屏幕 UI 结构、执行点按与手势，并接收系统事件。</string>
     <string name="a11y_service_summary">Minis 的 UI 层自动化后端</string>
@@ -1765,19 +1603,15 @@
     <string name="ok">确定</string>
     <string name="sessionlist_scheduled_tasks">定时任务</string>
     <string name="chat_load_older_messages">↑ 加载更早的消息</string>
-    <string name="common_menu">菜单</string>
     <string name="common_more">更多</string>
     <string name="common_loading">加载中…</string>
     <string name="common_previous">上一个</string>
     <string name="common_next_item">下一个</string>
     <string name="common_stop">停止</string>
     <string name="common_attach">添加附件</string>
-    <string name="common_search">搜索</string>
     <string name="common_play">播放</string>
     <string name="common_pause">暂停</string>
     <string name="common_revert">撤销</string>
-    <string name="common_copied_preview">已复制：%1$s</string>
-    <string name="chat_scroll_to_previous">滚动到上一条消息</string>
     <string name="chat_scroll_to_bottom">回到底部</string>
     <string name="chat_read_image">读取图片</string>
     <string name="tool_browser_screenshot">浏览器截图</string>
@@ -1909,7 +1743,6 @@
     <string name="drawer_recent">最近</string>
     <string name="drawer_no_search_match">未找到相关对话</string>
     <string name="drawer_search_results">%1$d 个结果</string>
-    <string name="settings_agent_team_sub">成员及其职责、模型与例程</string>
     <string name="settings_agent_tasks_sub">定期运行、运行记录与执行者</string>
     <string name="chat_quick_battery_title">查看电池状态</string>
     <string name="chat_quick_battery_sub">电量、充电与温度</string>
@@ -1942,17 +1775,12 @@
     <string name="files_hub_used_by">Minis 占用</string>
     <string name="files_section_sandbox">沙箱内的目录</string>
     <string name="files_shared_title">共享</string>
-    <string name="files_sandbox_footer">这些目录在 Linux 沙箱内可见。技能与记忆由 AI 读写，你也可以在这里查看和编辑。</string>
     <string name="files_section_external">外部文件夹</string>
     <string name="files_mounted_title">已挂载文件夹</string>
     <string name="files_section_generated">生成的文件</string>
     <string name="files_section_backup">备份</string>
     <string name="files_session_files_title">会话文件</string>
     <string name="files_session_files_sub">按会话查看与清除</string>
-    <string name="files_section_advanced">高级</string>
-    <string name="files_browse_rootfs">浏览整个 Rootfs</string>
-    <string name="files_open_in_terminal">在终端中打开</string>
-    <string name="files_advanced_footer">Rootfs 的安装、重置与镜像在「设置 → 运行环境」中管理。</string>
     <string name="drawer_select_done">完成</string>
     <string name="drawer_move_n">移动 %1$d 项</string>
     <string name="chat_empty_greeting_morning">早上好</string>
@@ -2007,7 +1835,6 @@
     <string name="model_slot_voice_output">语音输出</string>
     <string name="model_slot_empty">未分配模型</string>
     <string name="model_slot_main_options">主模型槽位选项</string>
-    <string name="model_slot_fallback_help">按声明顺序尝试模型，并根据此设置决定何时切换到下一个模型。</string>
     <string name="model_slot_fallback_title">错误时回退</string>
     <string name="model_slot_fallback_always">任何错误时</string>
     <string name="model_slot_fallback_default">限流和服务器错误时</string>
@@ -2017,7 +1844,6 @@
     <string name="model_slot_order_footer">模型会按此顺序尝试。使用箭头调整优先级。</string>
     <string name="model_slot_legacy_unresolved">保留自现有配置的不可用条目</string>
     <string name="model_slot_available_models">可用模型</string>
-    <string name="model_slot_available_footer">隐藏模型及不具备此槽位所需能力的模型不会显示。</string>
     <string name="model_slot_no_candidates">没有兼容的模型</string>
     <string name="model_slot_system_entry">设备内置语音引擎</string>
     <string name="model_slot_provider_disabled">服务提供方已停用</string>
@@ -2077,7 +1903,6 @@
     <string name="vscreen_preview_failed">无法截取预览。安全屏幕或全黑画面不会显示。</string>
     <string name="vscreen_probe_failed">部分检测未通过，虚拟屏幕保持关闭。</string>
     <string name="vscreen_probe_passed">所有必需检测均已通过，可以启用虚拟屏幕。</string>
-    <string name="vscreen_probe_running">检测中…</string>
     <string name="vscreen_reason_android_old">需要 Android 10 或更高版本，请先升级系统再试。</string>
     <string name="vscreen_reason_android_ready">当前 Android 版本满足最低要求。</string>
     <string name="vscreen_reason_app_moved">应用已离开虚拟屏。请停止操作；Minis 不会回退到物理屏。</string>
@@ -2161,12 +1986,7 @@
     <string name="first_run_step_chat_locked">请先完成前两步</string>
     <string name="first_run_done">已完成</string>
     <string name="settings_agent_loop_models_subtitle">子代理和 minis-model-use 可以使用这些模型</string>
-    <string name="settings_thinking_rules">思考规则</string>
-    <string name="settings_thinking_rules_subtitle">不同服务商的思考参数格式</string>
     <string name="settings_models_stats_header">统计</string>
-    <string name="thinking_rules_hub_footer">思考规则依赖各服务商的协议，因此在各服务商内分别编辑。</string>
-    <string name="thinking_rules_hub_custom">支持自定义规则</string>
-    <string name="thinking_rules_hub_official">官方协议，无需自定义规则</string>
     <string name="scheduled_tasks_empty_title">还没有定时任务</string>
     <string name="scheduled_run_ok">成功</string>
     <string name="scheduled_run_failed">失败</string>
@@ -2196,8 +2016,6 @@
     <string name="perm_tool_vscreen_close">关闭虚拟屏幕</string>
     <string name="perm_tool_vscreen_status">读取设备状态</string>
     <string name="perm_tool_vscreen_ui">操作虚拟屏幕</string>
-    <string name="perm_vscreen_master_title">允许 Agent 使用虚拟屏幕</string>
-    <string name="perm_vscreen_master_sub">总开关，下面是各项权限</string>
     <string name="settings_ready_overlay_title">显示在其他应用上层</string>
     <string name="settings_ready_overlay_ok">已允许</string>
     <string name="settings_ready_overlay_bad">未允许 · 桌宠和悬浮控件需要它</string>
@@ -2505,6 +2323,24 @@
     <string name="vscreen_display_busy">虚拟屏当前正被另一个会话占用。</string>
     <string name="voice_call_settings_speed">朗读语速</string>
     <string name="voice_call_settings_earpiece">使用听筒播放</string>
+    <string name="chat_settings_return_key">回车键</string>
+    <string name="chat_settings_launch">启动时显示</string>
+    <string name="chat_settings_group_input">输入</string>
+    <string name="chat_settings_group_reply">回复显示</string>
+    <string name="chat_settings_group_session">会话</string>
+    <string name="chat_settings_group_voice">语音</string>
+    <string name="voice_bot_section">角色</string>
+    <string name="voice_bot_follow">跟随主题色</string>
+    <string name="voice_bot_color">颜色</string>
+    <string name="voice_bot_shape">形状</string>
+    <string name="voice_bot_react">事件反应</string>
+    <string name="voice_bot_react_sub">成功时撒彩屑，出错和开始聆听时跳一下</string>
+    <string name="voice_bot_preview_hint">点一下角色可预览各状态</string>
+    <string name="perm_section_capabilities">高权限能力</string>
+    <string name="perm_vscreen_on">已开启</string>
+    <string name="perm_vscreen_off">未开启</string>
+    <string name="settings_system_group_agent">Agent 能做什么</string>
+    <string name="settings_system_group_device">设备授权</string>
     <string name="voice_call_settings_title">语音通话</string>
     <string name="voice_call_settings_sub">识别与朗读模型、听筒、语速、通话引擎</string>
     <string name="voice_call_engine">通话引擎</string>

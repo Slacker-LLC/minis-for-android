@@ -1,5 +1,41 @@
 package com.openminis.app.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.lollipop.grokbot.GrokBot
+import com.lollipop.grokbot.GrokBotConfig
+import com.lollipop.grokbot.GrokColor
+import com.lollipop.grokbot.GrokMode
+import com.lollipop.grokbot.GrokScheme
+import com.lollipop.grokbot.GrokShape
+import com.lollipop.grokbot.toColor
+import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.voicecall.grok.VoiceBotAvatar
+import com.openminis.app.voicecall.grok.VoiceBotLook
+import com.openminis.app.voicecall.grok.VoiceBotPrefs
+import com.openminis.app.voicecall.grok.rememberVoiceBotLook
+import com.openminis.app.voicecall.model.BloubState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -44,12 +80,14 @@ fun VoiceCallSettingsScreen(
     val locale by SpeechRecognitionManager.locale.collectAsState()
     var picker by remember { mutableStateOf<VoicePicker?>(null) }
 
+    val look = rememberVoiceBotLook()
     SettingsScaffold(
         title = stringResource(R.string.voice_call_settings_title),
         onBack = onBack,
         backLabel = stringResource(R.string.settings_cat_chat),
         largeTitle = true,
     ) {
+        BotAppearanceSection(look)
         SettingsSection {
             SettingsRow(
                 icon = Icons.Outlined.Mic,
@@ -65,10 +103,7 @@ fun VoiceCallSettingsScreen(
                 icon = Icons.Outlined.RecordVoiceOver,
                 title = stringResource(R.string.tts_capsule_picker_title),
                 onClick = { picker = VoicePicker.OUTPUT },
-                showDivider = false,
             )
-        }
-        SettingsSection {
             SettingsSwitchRow(
                 icon = Icons.Outlined.Hearing,
                 title = stringResource(R.string.voice_call_settings_earpiece),
@@ -107,3 +142,107 @@ fun VoiceCallSettingsScreen(
 }
 
 private enum class VoicePicker { INPUT, LANGUAGE, OUTPUT }
+
+private val PREVIEW_STATES = listOf(
+    BloubState.IDLE, BloubState.LISTENING, BloubState.THINKING, BloubState.SPEAKING, BloubState.SUCCESS,
+)
+
+/** 角色外观：预览（点一下轮换状态）、跟随主题色、颜色、形状、事件反应。 */
+@Composable
+private fun BotAppearanceSection(look: VoiceBotLook) {
+    val context = LocalContext.current
+    var previewIndex by remember { mutableStateOf(0) }
+    val followLabel = stringResource(R.string.voice_bot_follow)
+    SettingsSection(header = stringResource(R.string.voice_bot_section), footer = stringResource(R.string.voice_bot_preview_hint)) {
+        SettingsCardBlock {
+            Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+                VoiceBotAvatar(
+                    PREVIEW_STATES[previewIndex],
+                    Modifier.size(132.dp).clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { previewIndex = (previewIndex + 1) % PREVIEW_STATES.size },
+                    look,
+                )
+            }
+        }
+        // 颜色：第一个色块是「跟随主题色」（应用强调色，默认），其后是官方 11 色。
+        SettingsRow(title = stringResource(R.string.voice_bot_color), showDivider = false)
+        SettingsCardBlock {
+            val scheme = if (ChatColors.isDark) GrokScheme.DARK else GrokScheme.LIGHT
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(vertical = 8.dp),
+            ) {
+                item {
+                    Box(
+                        Modifier.size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
+                            .border(if (look.followAccent) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                            .semantics { contentDescription = followLabel }
+                            .clickable { VoiceBotPrefs.write(context, look.copy(followAccent = true)) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Outlined.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
+                    }
+                }
+                items(GrokColor.entries.toList()) { c ->
+                    val selected = !look.followAccent && c == look.color
+                    Box(
+                        Modifier.size(36.dp)
+                            .clip(CircleShape)
+                            .background(c.toColor(scheme))
+                            .border(if (selected) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                            .semantics { contentDescription = c.id }
+                            .clickable { VoiceBotPrefs.write(context, look.copy(color = c, followAccent = false)) },
+                    )
+                }
+            }
+        }
+        SettingsRow(title = stringResource(R.string.voice_bot_shape), showDivider = false)
+        SettingsCardBlock {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(vertical = 8.dp),
+            ) {
+                items(GrokShape.entries.toList()) { shape ->
+                    val selected = shape == look.shape
+                    Box(
+                        Modifier.size(52.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(
+                                if (selected) 2.dp else 1.dp,
+                                if (selected) MaterialTheme.colorScheme.primary else ChatColors.separator,
+                                RoundedCornerShape(14.dp),
+                            )
+                            .semantics { contentDescription = shape.label }
+                            .clickable { VoiceBotPrefs.write(context, look.copy(shape = shape)) }
+                            .padding(6.dp),
+                    ) {
+                        GrokBot(
+                            Modifier.fillMaxSize(),
+                            GrokBotConfig(
+                                shape = shape,
+                                color = look.color,
+                                scheme = if (ChatColors.isDark) GrokScheme.DARK else GrokScheme.LIGHT,
+                                mode = GrokMode.HOLD,
+                                paused = true,
+                                followPointer = false,
+                                flatInk = if (look.followAccent) MaterialTheme.colorScheme.primary else null,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+        SettingsSwitchRow(
+            icon = Icons.Outlined.AutoAwesome,
+            title = stringResource(R.string.voice_bot_react),
+            subtitle = stringResource(R.string.voice_bot_react_sub),
+            checked = look.react,
+            onCheckedChange = { VoiceBotPrefs.write(context, look.copy(react = it)) },
+            showDivider = false,
+        )
+    }
+}

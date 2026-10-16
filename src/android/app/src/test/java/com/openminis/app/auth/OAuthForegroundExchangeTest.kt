@@ -118,10 +118,30 @@ class OAuthForegroundExchangeTest {
     fun `a failed sign-in is shown, not only logged`() {
         val catch = screen.substringAfter("OAuth sign-in failed for").substringBefore("} finally {")
         assertTrue("the failure must reach the screen", catch.contains("authError ="))
-        assertTrue(catch.contains("add_provider_oauth_network_unreachable"))
+        assertTrue(
+            "no-network and unavailable-build failures get their localized text",
+            catch.contains("oauthKnownFailureMessage(context, e)"),
+        )
         assertTrue(
             "a cancelled sign-in must not be shown as an error",
             screen.contains("if (e is kotlinx.coroutines.CancellationException) throw e"),
         )
+    }
+
+    @Test
+    fun `both sign-in screens share one failure text and one login dispatch`() {
+        val shared = code(src("src/main/java/com/openminis/app/ui/settings/ProviderOAuthLogin.kt"))
+        assertTrue(
+            shared.contains("is OAuthNetworkUnreachableException -> context.getString(R.string.add_provider_oauth_network_unreachable)"),
+        )
+        assertTrue(
+            shared.contains("is ProviderCustomizationUnavailableException -> context.getString(R.string.provider_oauth_not_available_in_this_build)"),
+        )
+        val add = code(src("src/main/java/com/openminis/app/ui/settings/AddProviderScreen.kt"))
+        for ((name, text) in listOf("ProviderDetailScreen" to screen, "AddProviderScreen" to add)) {
+            assertTrue("$name must use the shared failure text", text.contains("oauthKnownFailureMessage(context, e)"))
+            assertTrue("$name must use the shared login dispatch", text.contains("loginWithOAuth("))
+            assertFalse("$name must not call a manager's login() itself", Regex("OAuthManager\\.login\\(").containsMatchIn(text))
+        }
     }
 }

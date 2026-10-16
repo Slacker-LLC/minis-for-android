@@ -114,7 +114,6 @@ object Routes {
     const val USAGE_STATS = "usage_stats"
     const val LOGS = "logs"
     const val LOG_DETAIL = "log_detail/{fileName}"
-    const val APPEARANCE = "appearance"
     const val BACKGROUND = "background"
     const val ABOUT = "about"
     const val ONBOARDING_MODELS = "onboarding_models"
@@ -122,10 +121,6 @@ object Routes {
     const val MOUNTED_FOLDERS = "mounted_folders"
     const val MOUNTED_FOLDERS_DETAIL = "mounted_folders_detail/{mountId}"
     fun mountedFoldersDetail(mountId: String) = "mounted_folders_detail/$mountId"
-    /** T235: Shared folders (Shared / Skills / Memory) — fixed list. */
-    const val SHARED_FOLDERS = "shared_folders"
-    const val SHARED_FOLDERS_DETAIL = "shared_folders_detail/{folderId}"
-    fun sharedFoldersDetail(folderId: String) = "shared_folders_detail/$folderId"
     /** [T-android-scheduled-tasks-design] Scheduled tasks list + editor. */
     const val SCHEDULED_TASKS = "scheduled_tasks"
     const val SCHEDULED_TASK_EDIT = "scheduled_tasks/edit?taskId={taskId}"
@@ -144,7 +139,6 @@ object Routes {
     fun chat(sessionId: String) = "chat/$sessionId"
     fun providerDetail(instanceId: String) = "provider/$instanceId"
     fun shadowVoiceDetail(instanceId: String) = "voice_service/$instanceId"
-    fun addModelsToGroup(groupId: String) = "add_models_to_group/$groupId"
     // [T-android-model-entry-route-slash-crash] entryId is a composite key
     // "<instanceId>/<modelId>" (compositeEntryKey) — it CONTAINS a '/'. Left
     // raw, that slash splits the route into an extra path segment, so the

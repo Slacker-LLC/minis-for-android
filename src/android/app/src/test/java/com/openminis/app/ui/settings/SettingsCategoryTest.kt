@@ -18,16 +18,14 @@ class SettingsCategoryTest {
     }
 
     @Test fun filesManagementIsACategoryOnTheHome() {
-        assertTrue(SettingsCategory.FILES.inRoot)
         assertTrue(SettingsCategory.rootGroups.flatten().contains(SettingsCategory.FILES))
         assertSame(SettingsCategory.FILES, SettingsCategory.parse("files"))
     }
 
-    @Test fun everyRootCategoryIsMarkedInRoot() {
-        assertEquals(
-            SettingsCategory.entries.filter { it.inRoot }.toSet(),
-            SettingsCategory.rootGroups.flatten().toSet(),
-        )
+    @Test fun everyCategoryIsOnTheHomeExactlyOnce() {
+        val root = SettingsCategory.rootGroups.flatten()
+        assertEquals(SettingsCategory.entries.toSet(), root.toSet())
+        assertEquals(root.size, root.toSet().size)
     }
 
     @Test fun keysAreUniqueAndRoundTrip() {

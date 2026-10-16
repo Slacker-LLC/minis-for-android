@@ -1034,17 +1034,6 @@
 
     <issue
         id="MissingTranslation"
-        message="&quot;voice_services_duplicate_hint&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French), &quot;zh&quot; (Chinese)"
-        errorLine1="    &lt;string name=&quot;voice_services_duplicate_hint&quot;>A voice service is configured more than once. Voice is merged into a single row here; you can delete the extra provider above if you want.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="207"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
         message="&quot;voice_services_stt_count&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French), &quot;zh&quot; (Chinese)"
         errorLine1="    &lt;string name=&quot;voice_services_stt_count&quot;>%1$d speech-to-text&lt;/string>"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
@@ -1161,17 +1150,6 @@
         <location
             file="src/main/res/values/strings.xml"
             line="218"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;add_provider_voice_templates_footer&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French), &quot;zh&quot; (Chinese)"
-        errorLine1="    &lt;string name=&quot;add_provider_voice_templates_footer&quot;>Speech-to-text and text-to-speech vendors. The provider type and base URL are prefilled — just add your API key.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="219"
             column="13"/>
     </issue>
 
@@ -1373,17 +1351,6 @@
         <location
             file="src/main/res/values/strings.xml"
             line="278"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;soul_personality_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;soul_personality_footer&quot;>Edited as the Markdown body of SOUL.md. Length cap is language-aware: Chinese ≤ 1600 characters OR English ≤ 1000 words (the rule is picked by the majority language). Over-limit bodies are rejected on save and ignored at prompt-build time.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="279"
             column="13"/>
     </issue>
 
@@ -3225,28 +3192,6 @@
 
     <issue
         id="MissingTranslation"
-        message="&quot;terminal_show_keyboard&quot; is not translated in &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;terminal_show_keyboard&quot;>Show&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="593"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;terminal_hide_keyboard&quot; is not translated in &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;terminal_hide_keyboard&quot;>Hide&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="594"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
         message="&quot;thinking_rules_section&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
         errorLine1="    &lt;string name=&quot;thinking_rules_section&quot;>Thinking Rules&lt;/string>"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
@@ -3643,17 +3588,6 @@
 
     <issue
         id="MissingTranslation"
-        message="&quot;appearance_section_chat_title&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;appearance_section_chat_title&quot;>Chat Title&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="664"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
         message="&quot;appearance_show_chat_title&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
         errorLine1="    &lt;string name=&quot;appearance_show_chat_title&quot;>Show chat title&lt;/string>"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
@@ -3676,34 +3610,12 @@
 
     <issue
         id="MissingTranslation"
-        message="&quot;appearance_show_chat_title_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;appearance_show_chat_title_footer&quot;>Display the current session title as a floating pill at the top of the chat while scrolling through history.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="667"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
         message="&quot;chat_title_pill_session_default&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
         errorLine1="    &lt;string name=&quot;chat_title_pill_session_default&quot;>Untitled&lt;/string>"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/strings.xml"
             line="668"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;appearance_section_grouping&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;appearance_section_grouping&quot;>Grouping&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="669"
             column="13"/>
     </issue>
 
@@ -3731,45 +3643,12 @@
 
     <issue
         id="MissingTranslation"
-        message="&quot;appearance_auto_grouping_footer&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;appearance_auto_grouping_footer&quot;>When a chat\&apos;s title is first generated, also file it into a matching existing group. Runs once per chat, only uses groups you already created, and leaves the chat ungrouped when nothing matches.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="672"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;appearance_section_auto_focus_after_reply&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;appearance_section_auto_focus_after_reply&quot;>Auto-Focus Input After Reply&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="676"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
         message="&quot;appearance_auto_focus_after_reply_title&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
         errorLine1="    &lt;string name=&quot;appearance_auto_focus_after_reply_title&quot;>Auto-Focus Input After Reply&lt;/string>"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/strings.xml"
             line="677"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;appearance_auto_focus_after_reply_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;appearance_auto_focus_after_reply_footer&quot;>When on, the keyboard pops up automatically after the model finishes replying so the input is ready for a follow-up. On by default; turn off if you prefer to read the response without an unexpected keyboard.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="678"
             column="13"/>
     </issue>
 
@@ -3797,34 +3676,12 @@
 
     <issue
         id="MissingTranslation"
-        message="&quot;appearance_auto_expand_thinking_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;appearance_auto_expand_thinking_footer&quot;>When on, a new thinking block expands automatically while the model is reasoning and collapses when it finishes. When off, thinking blocks stay collapsed — tap one to read it.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="681"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
         message="&quot;appearance_section_app_icon&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
         errorLine1="    &lt;string name=&quot;appearance_section_app_icon&quot;>App Icon&lt;/string>"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/strings.xml"
             line="693"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;appearance_app_icon_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;appearance_app_icon_footer&quot;>Change the launcher icon. The home-screen icon may take a few seconds to refresh after a tap.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="694"
             column="13"/>
     </issue>
 
@@ -3869,17 +3726,6 @@
         <location
             file="src/main/res/values/strings.xml"
             line="738"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;settings_memory_global_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;settings_memory_global_footer&quot;>Per-session toggles (set via the /memory slash command or the Session Memory sheet) override this default. Existing sessions are not affected when you flip this switch.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="739"
             column="13"/>
     </issue>
 
@@ -4341,17 +4187,6 @@
 
     <issue
         id="MissingTranslation"
-        message="&quot;settings_bg_overlay_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;settings_bg_overlay_footer&quot;>Show a small floating capsule with the current tool while Minis is in the background. Requires permission to display over other apps. Tap the capsule to bring Minis to the foreground; drag to move it.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1234"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
         message="&quot;settings_bg_overlay_permission_needed&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
         errorLine1="    &lt;string name=&quot;settings_bg_overlay_permission_needed&quot;>Allow drawing over other apps to enable&lt;/string>"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
@@ -4374,34 +4209,12 @@
 
     <issue
         id="MissingTranslation"
-        message="&quot;settings_dynamic_island_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;settings_dynamic_island_footer&quot;>Show live agent status on the Android 16 status chip. When on, this replaces the floating overlay so you don\&apos;t see two status indicators at once.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1238"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
         message="&quot;settings_dynamic_island_unsupported&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
         errorLine1="    &lt;string name=&quot;settings_dynamic_island_unsupported&quot;>Your current system version doesn\&apos;t support Live Updates yet (requires Android 16+ with the feature enabled).&lt;/string>"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/strings.xml"
             line="1239"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;chat_menu_auto_compact&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;chat_menu_auto_compact&quot;>Auto Compact&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1265"
             column="13"/>
     </issue>
 
@@ -4991,83 +4804,6 @@
         <location
             file="src/main/res/values/strings.xml"
             line="1458"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;system_permissions_a11y_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French), &quot;zh&quot; (Chinese)"
-        errorLine1="    &lt;string name=&quot;system_permissions_a11y_footer&quot;>Required by android-a11y-cli for UI-tree reads, gesture injection, and event monitoring. Without this, AI agents cannot drive other apps. Toggle the switch under Minis on the next screen.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1459"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;system_permissions_a11y_oem_header&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;system_permissions_a11y_oem_header&quot;>Service keeps getting killed?&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1460"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;system_permissions_a11y_oem_footer&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;system_permissions_a11y_oem_footer&quot;>%1$s may show \&quot;this service has failed\&quot; and stop the accessibility service in the background. Whitelist autostart and remove the battery restriction so it stays connected.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1461"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;system_permissions_a11y_oem_autostart&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;system_permissions_a11y_oem_autostart&quot;>Add to autostart whitelist&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1462"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;system_permissions_a11y_oem_autostart_sub&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;system_permissions_a11y_oem_autostart_sub&quot;>Open the autostart manager and enable Minis&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1463"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;system_permissions_a11y_oem_battery&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;system_permissions_a11y_oem_battery&quot;>Remove background / battery restriction&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1464"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;system_permissions_a11y_oem_battery_sub&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;system_permissions_a11y_oem_battery_sub&quot;>Set battery usage to \&quot;No restrictions\&quot;&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1465"
             column="13"/>
     </issue>
 
@@ -5791,17 +5527,6 @@
 
     <issue
         id="MissingTranslation"
-        message="&quot;scheduled_task_field_repeat&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;scheduled_task_field_repeat&quot;>Repeat&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1575"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
         message="&quot;scheduled_task_field_prompt&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
         errorLine1="    &lt;string name=&quot;scheduled_task_field_prompt&quot;>Prompt&lt;/string>"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
@@ -6101,17 +5826,6 @@
 
     <issue
         id="MissingTranslation"
-        message="&quot;scheduled_task_field_active_window&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;scheduled_task_field_active_window&quot;>Active window (optional)&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1606"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
         message="&quot;scheduled_task_field_start_date&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
         errorLine1="    &lt;string name=&quot;scheduled_task_field_start_date&quot;>Start&lt;/string>"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
@@ -6273,17 +5987,6 @@
         <location
             file="src/main/res/values/strings.xml"
             line="1623"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;scheduled_task_runs_open_session&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;scheduled_task_runs_open_session&quot;>Open session&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1624"
             column="13"/>
     </issue>
 
@@ -6480,17 +6183,6 @@
     <issue
         id="PluralsCandidate"
         message="Formatting %d followed by words (&quot;models&quot;): This should probably be a plural rather than a string"
-        errorLine1="    &lt;string name=&quot;agent_loop_models_model_count_plural&quot;>%1$d models&lt;/string>"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1183"
-            column="5"/>
-    </issue>
-
-    <issue
-        id="PluralsCandidate"
-        message="Formatting %d followed by words (&quot;models&quot;): This should probably be a plural rather than a string"
         errorLine1="    &lt;string name=&quot;provider_list_models_count&quot;>%1$d models&lt;/string>"
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
@@ -6518,17 +6210,6 @@
         <location
             file="src/main/res/values/strings.xml"
             line="1211"
-            column="5"/>
-    </issue>
-
-    <issue
-        id="PluralsCandidate"
-        message="Formatting %d followed by words (&quot;models&quot;): This should probably be a plural rather than a string"
-        errorLine1="    &lt;string name=&quot;model_picker_models_count_unlinked&quot;>%d models (unlinked)&lt;/string>"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1364"
             column="5"/>
     </issue>
 
