@@ -473,6 +473,29 @@ class MinisCallRuntimeAdapterTest {
     }
 
     @Test
+    fun `full reply goes to the transcript while only the brief is spoken`() {
+        val long = "结论：已改好。\n\n" + "细节".repeat(300)
+        val scope = TestScope(UnconfinedTestDispatcher())
+        val output = FakeOutput()
+        val asked = mutableListOf<String>()
+        val model = object : CallModelGateway {
+            override suspend fun ask(text: String): Result<String> = Result.success(long)
+            override fun cancel() = Unit
+            override suspend fun speakable(userText: String, reply: String): String { asked += userText; return "已改好，细节在屏幕上。" }
+        }
+        val input = FakeInput()
+        val transcript = mutableListOf<String>()
+        val adapter = MinisCallRuntimeAdapter(input, model, output, scope)
+        scope.launch { adapter.events.collect { if (it is CallEvent.Transcript && !it.fromUser) transcript += it.text } }
+        adapter.start()
+        input.fireFinal("改一下配置")
+        scope.runCurrent()
+        assertEquals(listOf(long), transcript)
+        assertEquals(listOf("已改好，细节在屏幕上。"), output.spoken)
+        assertEquals(listOf("改一下配置"), asked)
+    }
+
+    @Test
     fun `verified progress is spoken when it changes and never repeated`() {
         val steps = ArrayDeque(listOf("正在读取文件", "正在读取文件", "正在写入结果"))
         val gate = kotlinx.coroutines.CompletableDeferred<String>()

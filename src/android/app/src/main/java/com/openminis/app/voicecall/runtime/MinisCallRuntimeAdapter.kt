@@ -293,8 +293,10 @@ class MinisCallRuntimeAdapter(
                 taskFailures = 0
                 _events.tryEmit(CallEvent.Transcript(fromUser = false, text = reply))
                 if (!muted || typed) {
+                    val spoken = model.speakable(text, reply)
+                    if (!valid(gen)) return@launch
                     state(BloubState.SPEAKING)
-                    output.speak(reply)
+                    output.speak(spoken)
                 }
                 if (valid(gen) && !muted) {
                     armIdle()

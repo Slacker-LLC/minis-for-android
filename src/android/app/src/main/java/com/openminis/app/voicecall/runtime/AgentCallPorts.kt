@@ -51,6 +51,43 @@ internal class AgentCallGateway(
         return describeProgress(blocks, progressText)
     }
 
+    /**
+     * 对齐 Codex：完整回复留在屏幕上，语音只念结论。短而干净的回复原样念；用户明确要求详细才念长版；
+     * 其余交给一次轻量概括调用，失败/超时/结果不合格时用规则退化，绝不整篇念出来。
+     */
+    override suspend fun speakable(userText: String, reply: String): String {
+        if (wantsDetail(userText)) return detailForSpeech(reply).ifBlank { reply.take(DETAIL_MAX_CHARS) }
+        if (isSpeakableAsIs(reply)) return stripForSpeech(reply).ifBlank { reply }
+        val llm = session.currentProvider
+        val brief = if (llm == null) null else try {
+            withTimeout(BRIEF_TIMEOUT_MS) {
+                acceptBrief(
+                    llm.sendMessage(
+                        messages = listOf(
+                            com.openminis.app.data.model.LLMMessage(
+                                role = com.openminis.app.data.model.LLMMessage.Role.USER,
+                                content = buildBriefRequest(userText, reply),
+                            ),
+                        ),
+                        systemPrompt = BRIEF_SYSTEM_PROMPT,
+                        maxTokens = 300,
+                        temperature = null,
+                        imageParts = emptyList(),
+                        tools = emptyList(),
+                        thinkingLevel = com.openminis.app.data.model.ThinkingLevel.OFF,
+                    ).text,
+                )
+            }
+        } catch (e: TimeoutCancellationException) {
+            null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+        return brief ?: fallbackBrief(reply).ifBlank { reply.take(BRIEF_MAX_CHARS) }
+    }
+
     override suspend fun ask(text: String): Result<String> = withContext(Dispatchers.Main.immediate) {
         try {
             withTimeout(5_000L) {

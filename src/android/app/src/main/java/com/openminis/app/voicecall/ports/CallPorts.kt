@@ -40,6 +40,12 @@ interface CallModelGateway {
      * 通话据此在长任务期间口头汇报，而不是编一句泛泛的「处理中」。
      */
     fun progress(): String? = null
+
+    /**
+     * 回答里真正要念出来的部分。完整回复留在屏幕上，语音只念结论（对齐 Codex 语音模式：
+     * 不念表格/代码块，用户明确要求才详细念）。默认原样念，保持旧行为。
+     */
+    suspend fun speakable(userText: String, reply: String): String = reply
 }
 
 interface CallSpeechOutput {
