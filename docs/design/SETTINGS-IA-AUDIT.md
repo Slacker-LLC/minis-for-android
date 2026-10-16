@@ -25,7 +25,7 @@
 
 | 重叠 | 处理 |
 |---|---|
-| 技能、记忆在 Agent 分类和文件页各有一个入口 | 保留 Agent；文件页「沙箱内的目录」只留「共享」（直接进文件浏览） |
+| 技能、记忆在 Agent 分类和文件页各有一个入口 | 曾经文件页只留「共享」；后来设计稿的文件页把「共享 / 技能 / 记忆」三个沙箱目录并排列出（回答「我的文件在哪」），现在以设计稿为准保留三行，Agent 分类里的技能、记忆入口也保留（同一个页面） |
 | 添加服务商要点三层（类型 → 认证方式 → 表单） | 去掉「认证方式」页：选类型后直接进表单，支持 API Key / OAuth 两种方式的服务商在表单顶部有一个分段开关；返回回到服务商列表 |
 
 ## 仍保留的两个入口
@@ -39,3 +39,14 @@
 - 虚拟屏幕的 Agent 权限（打开 / 启动应用 / 关闭 / 状态 / 操作）原来在权限表里有默认值，但设置里没有入口改；现在在「Agent 权限」页有「虚拟屏幕」一段，和其他集成一样可设（真机验证）。
 - 内置提示词模块页去掉了大段说明，编辑面板改成取消 / 标题 / 保存；虚拟屏幕设置页的分辨率输入改成行内输入，去掉说明段落。
 - 虚拟屏幕查看器从全屏弹窗改成和浏览器同高度的底部面板（约 86%）。
+
+## 2026-10 死代码与重复路由清理
+
+对着设置页的导航表（`Routes`、`SettingsCategory`、`composable(...)` 注册）逐个查调用方，没有孤儿页面（63 条路由都有入口），但有下面这些半孤儿、死代码和重复，已删：
+
+- `Routes.APPEARANCE` 与 `settings_category/appearance` 渲染的是同一个外观页，两条路径并存。保留分类路径，删 `Routes.APPEARANCE` 及其 `composable`、`onAppearanceClick`、`onOpenBackground` 回调；深链 `appearance` 改指向分类路径。
+- 共享文件夹页（`SharedFoldersScreen`）与详情页（`SharedFolderDetailScreen`）从设置里没有任何入口：文件页的「共享」直接进文件浏览，两个页面只剩深链能到。整页删除，`shared-folders` 深链改打开「文件」分类；`/var/minis/shared` 仍可从文件页第一行进入。
+- `SystemEnhanceScreen` 里 Root 状态并入 Root 页后遗留的 `hooksOn`、`HOOK_SWITCH_KEYS`、`enabledHookSwitchCount`、角色/生命周期状态没有读者，删除；`SettingsScreen.FeedbackSheetItem` 无调用，删除；`SettingsCategory.inRoot` 与 `Routes.addModelsToGroup` 无调用，删除。
+- 过期注释改对（设置首页、分类页、模块页的 KDoc）。新增 `everyCategoryIsOnTheHomeExactlyOnce` 测试，保证每个分类在设置首页恰好出现一次。
+
+Kotlin K2 编译器不会对未使用的参数/变量/私有函数告警，这类死代码只能靠 grep 调用方发现；全量编译的 95 条警告全是弃用提示，没有一条是关于未使用代码的。
