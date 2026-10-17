@@ -708,7 +708,17 @@ class AgentSession(
     /** Deferred tools this session has loaded; only ever grows (see [ToolDeferral]). */
     private val loadedDeferredTools: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
-    private fun deferralEnabled() = com.openminis.app.tools.ToolDeferralPrefs.isEnabled(context)
+    /** Per model: the user's choice for [currentModel], else its model-rules entry, else the global switch. */
+    private fun deferralEnabled(): Boolean {
+        val model = currentModel
+        return com.openminis.app.tools.ToolDeferral.enabledFor(
+            modelChoice = model?.toolDeferral,
+            familyDefault = model?.let {
+                runCatching { com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(it.id).toolDeferral }.getOrNull()
+            },
+            global = com.openminis.app.tools.ToolDeferralPrefs.isEnabled(context),
+        )
+    }
 
     /** What the next model request carries: the resident tools plus the deferred ones loaded so far. */
     internal val agentTools: List<AgentToolDefinition>
@@ -733,10 +743,8 @@ class AgentSession(
 
     /** The system prompt's list of deferred tools; null when nothing is deferred or tools are off this turn. */
     internal fun deferredToolsPromptFragment(): String? {
-        if (chatOnlyForNextTurn || !deferralEnabled()) return null
-        return com.openminis.app.tools.ToolDeferral.indexFragment(
-            com.openminis.app.tools.ToolDeferral.split(agentToolPool).deferred,
-        )
+        if (chatOnlyForNextTurn) return null
+        return com.openminis.app.tools.ToolDeferral.indexFor(agentToolPool, deferralEnabled())
     }
 
     /**

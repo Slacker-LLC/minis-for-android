@@ -1289,6 +1289,14 @@
 
     <string name="modeldetail_hosted_web_search">서버 측 웹 검색</string>
     <string name="modeldetail_hosted_web_search_sub">모델이 공급자 자체 검색을 호출하도록 허용합니다. 출처는 인용으로 돌아오고, 공급자 할당량을 사용하며, Responses API에서만 지원됩니다.</string>
+    <string name="modeldetail_tool_deferral">도구 지연 로드</string>
+    <string name="modeldetail_tool_deferral_this_model">이 모델</string>
+    <string name="modeldetail_tool_deferral_auto">자동</string>
+    <string name="modeldetail_tool_deferral_on">켜짐</string>
+    <string name="modeldetail_tool_deferral_off">꺼짐</string>
+    <string name="modeldetail_tool_deferral_global">모든 모델의 지연 로드</string>
+    <string name="modeldetail_tool_deferral_global_sub">‘자동’으로 설정된 모델에 적용됩니다.</string>
+    <string name="modeldetail_tool_deferral_footer">켜짐: 요청마다 자주 쓰는 도구 정의만 보내고 나머지는 필요할 때 불러옵니다. 꺼짐: 매번 전체 도구 목록을 보냅니다. 먼저 불러와야 하면 도구를 호출하지 않는 모델에 알맞습니다. 자동은 아래 스위치를 따릅니다.</string>
 
     <string name="hosted_tool_web_search">웹 검색</string>
     <string name="hosted_tool_file_search">파일 검색</string>

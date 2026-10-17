@@ -202,6 +202,61 @@ class ToolDeferralTest {
         assertTrue(conversation.calledToolNames.isEmpty())
     }
 
+    // ── Per-model switch ───────────────────────────────────────────────────
+
+    @Test
+    fun `a model's own choice wins over the global switch and its family rule`() {
+        assertTrue(ToolDeferral.enabledFor(modelChoice = true, familyDefault = false, global = false))
+        assertFalse(ToolDeferral.enabledFor(modelChoice = false, familyDefault = true, global = true))
+        assertFalse(ToolDeferral.enabledFor(modelChoice = false, familyDefault = null, global = true))
+    }
+
+    @Test
+    fun `auto follows the global switch, and a family rule can only opt out`() {
+        assertTrue("no rule: global on", ToolDeferral.enabledFor(null, null, global = true))
+        assertFalse("no rule: global off", ToolDeferral.enabledFor(null, null, global = false))
+        assertTrue("rule true: global on", ToolDeferral.enabledFor(null, true, global = true))
+        assertFalse("rule true cannot turn it on against the global switch", ToolDeferral.enabledFor(null, true, global = false))
+        assertFalse("rule false opts the family out", ToolDeferral.enabledFor(null, false, global = true))
+    }
+
+    @Test
+    fun `a model switched off gets the whole pool and no index, find_tools still there`() {
+        val all = fullPool()
+        val off = ToolDeferral.enabledFor(modelChoice = false, familyDefault = null, global = true)
+        assertEquals(all, ToolDeferral.offered(all, emptySet(), off, mcp))
+        assertNull(ToolDeferral.indexFor(all, off, mcp))
+        assertTrue(ToolDeferral.offered(all, emptySet(), off, mcp).any { it.name == "find_tools" })
+    }
+
+    @Test
+    fun `a model switched on is deferred exactly as before`() {
+        val all = fullPool()
+        val on = ToolDeferral.enabledFor(modelChoice = true, familyDefault = null, global = true)
+        assertEquals(ToolDeferral.offered(all, emptySet(), true, mcp), ToolDeferral.offered(all, emptySet(), on, mcp))
+        assertEquals(ToolDeferral.indexFragment(ToolDeferral.split(all, mcp).deferred), ToolDeferral.indexFor(all, on, mcp))
+        assertNotNull(ToolDeferral.indexFor(all, on, mcp))
+    }
+
+    @Test
+    fun `switching one model off leaves another model deferred`() {
+        val all = fullPool()
+        val modelA = ToolDeferral.enabledFor(modelChoice = false, familyDefault = null, global = true)
+        val modelB = ToolDeferral.enabledFor(modelChoice = null, familyDefault = null, global = true)
+        assertEquals(all.size, ToolDeferral.offered(all, emptySet(), modelA, mcp).size)
+        assertTrue(ToolDeferral.offered(all, emptySet(), modelB, mcp).size < all.size)
+    }
+
+    @Test
+    fun `global off sends the whole pool to auto models and only to them`() {
+        val all = fullPool()
+        val auto = ToolDeferral.enabledFor(null, null, global = false)
+        val explicitOn = ToolDeferral.enabledFor(true, null, global = false)
+        assertEquals(all, ToolDeferral.offered(all, emptySet(), auto, mcp))
+        assertNull(ToolDeferral.indexFor(all, auto, mcp))
+        assertTrue(ToolDeferral.offered(all, emptySet(), explicitOn, mcp).size < all.size)
+    }
+
     // ── Real pool: drift guards ────────────────────────────────────────────
 
     private fun fullPool() = AgentTools.makeAgentTools(

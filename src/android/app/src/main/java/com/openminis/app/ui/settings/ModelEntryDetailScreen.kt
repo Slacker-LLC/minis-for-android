@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -40,6 +41,7 @@ import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisTextButton
 import kotlin.math.roundToInt
 import com.openminis.app.data.repository.updateEntry
+import com.openminis.app.tools.ToolDeferralPrefs
 
 /**
  * Detail / edit screen for a single ModelEntry. T210: brought to iOS
@@ -86,6 +88,12 @@ fun ModelEntryDetailScreen(
     var hostedWebSearch by remember {
         mutableStateOf(overrides.hostedWebSearch ?: baseModel.hostedWebSearch)
     }
+    // Deferred tool loading: null auto, true on, false off. The global switch is app-wide and is only
+    // written on Save, like the rest of this page.
+    val appContext = LocalContext.current.applicationContext
+    var toolDeferral by remember { mutableStateOf(overrides.toolDeferral) }
+    var toolDeferralMenuExpanded by remember { mutableStateOf(false) }
+    var globalToolDeferral by remember { mutableStateOf(ToolDeferralPrefs.isEnabled(appContext)) }
     var isHidden by remember { mutableStateOf(entry.isHidden) }
     var showQuickTest by remember { mutableStateOf(false) }
 
@@ -161,6 +169,7 @@ fun ModelEntryDetailScreen(
                         // supportsReasoning: persist only when user diverged from base.
                         supportsReasoning = thinkingEnabled.takeIf { it != (baseModel.supportsReasoning ?: false) },
                         hostedWebSearch = hostedWebSearch.takeIf { it != baseModel.hostedWebSearch },
+                        toolDeferral = toolDeferral,
                         defaultThinkingLevel = defaultThinkingLevel,
                         contextLimitTokens = contextLimitTokens,
                         lastContextLimitTokens = lastContextLimitTokens,
@@ -174,6 +183,9 @@ fun ModelEntryDetailScreen(
                         entry.copy(baseModel = baseModel.copy(id = modelId), overrides = newOverrides, isHidden = isHidden)
                     } else {
                         entry.copy(overrides = newOverrides, isHidden = isHidden)
+                    }
+                    if (globalToolDeferral != ToolDeferralPrefs.isEnabled(appContext)) {
+                        ToolDeferralPrefs.setEnabled(appContext, globalToolDeferral)
                     }
                     providerRepository.updateEntry(updated)
                     onBack()
@@ -291,6 +303,40 @@ fun ModelEntryDetailScreen(
                     }
                 }
             }
+        }
+
+        SettingsSection(
+            header = stringResource(R.string.modeldetail_tool_deferral),
+            footer = stringResource(R.string.modeldetail_tool_deferral_footer),
+        ) {
+            Box {
+                SettingsRow(
+                    title = stringResource(R.string.modeldetail_tool_deferral_this_model),
+                    subtitle = stringResource(toolDeferralLabel(toolDeferral)),
+                    onClick = { toolDeferralMenuExpanded = true },
+                )
+                DropdownMenu(
+                    expanded = toolDeferralMenuExpanded,
+                    onDismissRequest = { toolDeferralMenuExpanded = false },
+                ) {
+                    listOf<Boolean?>(null, true, false).forEach { choice ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(toolDeferralLabel(choice))) },
+                            onClick = {
+                                toolDeferral = choice
+                                toolDeferralMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+            SettingsSwitchRow(
+                title = stringResource(R.string.modeldetail_tool_deferral_global),
+                subtitle = stringResource(R.string.modeldetail_tool_deferral_global_sub),
+                checked = globalToolDeferral,
+                onCheckedChange = { globalToolDeferral = it },
+                showDivider = false,
+            )
         }
 
         SettingsSection(
@@ -433,6 +479,12 @@ private fun thinkingLevelLabel(level: ThinkingLevel?): Int = when (level) {
     ThinkingLevel.XHIGH -> R.string.model_entry_thinking_xhigh
     ThinkingLevel.MAX -> R.string.model_entry_thinking_max
     ThinkingLevel.ULTRA -> R.string.model_entry_thinking_ultra
+}
+
+private fun toolDeferralLabel(choice: Boolean?): Int = when (choice) {
+    null -> R.string.modeldetail_tool_deferral_auto
+    true -> R.string.modeldetail_tool_deferral_on
+    false -> R.string.modeldetail_tool_deferral_off
 }
 
 private const val ENTRY_CONTEXT_UNLIMITED_SENTINEL: Int = Int.MAX_VALUE

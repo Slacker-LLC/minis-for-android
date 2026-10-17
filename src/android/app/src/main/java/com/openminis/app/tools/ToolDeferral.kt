@@ -44,6 +44,15 @@ object ToolDeferral {
     )
     private val residentKeys = RESIDENT_NAMES.map(::key).toSet()
 
+    /**
+     * Whether a request to this model defers tools. The user's choice for the model wins (`true` on, `false`
+     * off). Left on auto (`null`), the global switch decides, and a model-rules entry can opt a model family
+     * out: [familyDefault] `false` means off, `true` or absent (no rule, or one that failed to parse) means on.
+     * A global switch that is off turns every auto model off, whatever its rule says.
+     */
+    fun enabledFor(modelChoice: Boolean?, familyDefault: Boolean?, global: Boolean): Boolean =
+        modelChoice ?: (global && (familyDefault ?: true))
+
     /** How many deferred tools one `find_tools` call may load. */
     const val MAX_LOAD_PER_CALL = 6
 
@@ -163,6 +172,13 @@ object ToolDeferral {
             append(names.joinToString(", "))
         }
     }
+
+    /** The index for one request: none when deferral is off for it, since then every tool ships. */
+    fun indexFor(
+        pool: List<AgentToolDefinition>,
+        enabled: Boolean,
+        pinned: (AgentToolDefinition) -> Boolean = mcpTool,
+    ): String? = if (enabled) indexFragment(split(pool, pinned).deferred) else null
 
     /** What a refused call to a not-yet-loaded tool tells the model. */
     fun loadedOnDemandMessage(name: String): String =
