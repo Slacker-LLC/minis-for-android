@@ -17,6 +17,7 @@ import com.openminis.app.data.model.ImageEndpointMode
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ModelOverrides
+import com.openminis.app.data.model.inheritMissingMetadata
 import com.openminis.app.data.model.ModelSlot
 import com.openminis.app.data.model.ProviderConfig
 import com.openminis.app.data.model.ProviderCredential
@@ -987,11 +988,13 @@ fun ProviderRepository.replaceEntries(instanceId: String, models: List<LLMModel>
         ?.filter { it.hasVoiceModality }
         ?.associateBy { it.id }
         ?: emptyMap()
+    // Same-id models on the user's other providers; see inheritMissingMetadata.
+    val peerModels = config.modelEntries.filter { it.providerInstanceId != instanceId }.map { it.baseModel }
     val newEntries = models.map { model ->
         val prior = existingByModelId[model.id]
         // Dedicated ASR/TTS id/name patterns fill the exact voice shape when
         // the API returned no modality info; the template's shape wins last.
-        var resolved = model.withInferredVoiceModality()
+        var resolved = model.withInferredVoiceModality().inheritMissingMetadata(peerModels)
         templateVoiceModelById[model.id]?.let { tplModel ->
             resolved = resolved.copy(
                 inputModalities = tplModel.inputModalities,
@@ -1123,7 +1126,8 @@ fun ProviderRepository.addEntry(entry: ModelEntry): Unit = synchronized(configLo
         // it might only leave the synchronized lambda.
         if (exists) return@addEntry
     }
-    config.modelEntries.add(entry)
+    val peers = config.modelEntries.filter { it.providerInstanceId != entry.providerInstanceId }.map { it.baseModel }
+    config.modelEntries.add(entry.copy(baseModel = entry.baseModel.inheritMissingMetadata(peers)))
     saveConfig(config)
 }
 

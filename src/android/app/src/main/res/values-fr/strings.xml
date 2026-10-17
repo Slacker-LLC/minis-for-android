@@ -528,6 +528,8 @@
     <string name="modeldetail_identity_footer_builtin">Modèle intégré. Le nom affiché remplace la valeur par défaut du fournisseur.</string>
     <string name="modeldetail_section_capabilities">Capacités</string>
     <string name="modeldetail_context_window">Fenêtre de contexte</string>
+    <string name="modeldetail_context_window_unknown">Non indiqué par le fournisseur ; estimé à %1$d jetons d\'après le nom du modèle. Le compactage automatique utilise cette valeur — saisissez la vraie fenêtre si vous la connaissez.</string>
+    <string name="modeldetail_thinking_unconfirmed">Le fournisseur n\'indique pas si ce modèle peut réfléchir. Activez cette option pour obtenir le sélecteur de réflexion dans le chat.</string>
     <string name="modeldetail_thinking">Réflexion</string>
     <string name="modeldetail_provider_default">Par défaut du fournisseur</string>
     <string name="modeldetail_max_tokens_exceeds_warning">Dépasse la limite signalée par le fournisseur (%1$d). La valeur est enregistrée mais peut provoquer des erreurs.</string>

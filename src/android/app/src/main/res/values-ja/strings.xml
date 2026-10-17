@@ -662,6 +662,8 @@
     <string name="modeldetail_identity_footer_builtin">組み込みモデル。表示名はプロバイダーのデフォルト値を上書きします。</string>
     <string name="modeldetail_section_capabilities">機能</string>
     <string name="modeldetail_context_window">コンテキスト ウィンドウ</string>
+    <string name="modeldetail_context_window_unknown">プロバイダーから提供されていないため、モデル名から %1$d トークンと推定しています。自動圧縮のしきい値はこの値から決まります。実際のウィンドウが分かる場合は入力してください。</string>
+    <string name="modeldetail_thinking_unconfirmed">プロバイダーはこのモデルが思考に対応するか示していません。オンにするとチャットで思考の選択が表示されます。</string>
     <string name="modeldetail_thinking">思考</string>
     <string name="modeldetail_provider_default">プロバイダーのデフォルト</string>
     <string name="modeldetail_max_tokens_exceeds_warning">プロバイダーが報告した上限（%1$d）を超えています。値は保存されますが、エラーが発生する可能性があります。</string>

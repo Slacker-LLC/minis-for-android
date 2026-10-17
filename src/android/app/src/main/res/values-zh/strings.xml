@@ -776,6 +776,8 @@
     <string name="modeldetail_identity_footer_builtin">内置模型。显示名称会覆盖服务商提供的默认值。</string>
     <string name="modeldetail_section_capabilities">能力</string>
     <string name="modeldetail_context_window">上下文窗口</string>
+    <string name="modeldetail_context_window_unknown">服务商没有提供上下文窗口，按模型名估算为 %1$d tokens。自动压缩的阈值由它推出，知道真实窗口的话请在此填写。</string>
+    <string name="modeldetail_thinking_unconfirmed">服务商没有说明该模型是否支持思考。打开后，聊天里才会出现思考选择。</string>
     <string name="modeldetail_thinking">思考</string>
     <string name="modeldetail_provider_default">服务商默认</string>
     <string name="modeldetail_max_tokens_exceeds_warning">超过服务商上报的上限（%1$d）。值已保存，但可能导致请求失败。</string>

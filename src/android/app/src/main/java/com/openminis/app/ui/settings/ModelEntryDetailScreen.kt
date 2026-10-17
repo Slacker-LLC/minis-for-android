@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.openminis.app.data.model.ModelOverrides
 import com.openminis.app.data.model.ThinkingLevel
+import com.openminis.app.data.model.hasKnownContextWindow
 import com.openminis.app.data.model.normalizeModalityName
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.components.RowLabel
@@ -226,6 +227,15 @@ fun ModelEntryDetailScreen(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 )
+                // The window drives the auto-compaction threshold; say so when it is a guess.
+                if (contextWindowText.isBlank() && !baseModel.hasKnownContextWindow) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.modeldetail_context_window_unknown, baseModel.contextWindowTokens),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
                 RowLabel(text = stringResource(R.string.model_entry_max_output_tokens))
                 SectionTextField(
@@ -252,6 +262,11 @@ fun ModelEntryDetailScreen(
             }
             SettingsSwitchRow(
                 title = stringResource(R.string.modeldetail_thinking),
+                subtitle = if (baseModel.supportsReasoning == null && overrides.supportsReasoning == null) {
+                    stringResource(R.string.modeldetail_thinking_unconfirmed)
+                } else {
+                    null
+                },
                 checked = thinkingEnabled,
                 onCheckedChange = { thinkingEnabled = it },
             )

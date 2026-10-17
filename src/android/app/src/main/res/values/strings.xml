@@ -963,6 +963,8 @@
     <string name="modeldetail_identity_footer_builtin">Built-in model. Display Name overrides the provider default.</string>
     <string name="modeldetail_section_capabilities">Capabilities</string>
     <string name="modeldetail_context_window">Context Window</string>
+    <string name="modeldetail_context_window_unknown">Not reported by the provider; estimating %1$d tokens from the model name. Auto-compaction uses this value — enter the real window if you know it.</string>
+    <string name="modeldetail_thinking_unconfirmed">The provider doesn\'t say whether this model can think. Turn this on to get the thinking picker in chat.</string>
     <string name="modeldetail_thinking">Thinking</string>
     <string name="modeldetail_provider_default">Provider default</string>
     <string name="modeldetail_max_tokens_exceeds_warning">Exceeds provider-reported limit (%1$d). The value is saved but may cause errors.</string>
