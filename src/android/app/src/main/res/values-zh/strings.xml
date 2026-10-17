@@ -1645,6 +1645,10 @@
     <string name="provider_refresh_models">刷新模型列表</string>
     <string name="provider_refreshing">正在刷新…</string>
     <string name="provider_refresh_failed">未能获取模型列表，已保留现有列表。</string>
+    <string name="provider_refresh_live">已更新：从服务商获取到 %1$d 个模型。</string>
+    <string name="provider_refresh_snapshot">未能获取服务商的实时列表，当前显示的是内置快照。</string>
+    <string name="provider_refresh_snapshot_reason">未能获取服务商的实时列表（%1$s），当前显示的是内置快照。</string>
+    <string name="provider_refresh_failed_reason">未能获取模型列表：%1$s\n已保留现有列表。</string>
     <string name="provider_imported_toast">已导入提供商「%1$s」</string>
     <string name="browser_ua_default">默认（按 UA 自动）</string>
     <string name="browser_viewport_custom_subtitle">自定义宽 × 高</string>

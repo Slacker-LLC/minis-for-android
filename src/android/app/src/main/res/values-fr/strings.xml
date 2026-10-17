@@ -1378,6 +1378,10 @@
     <string name="provider_refresh_models">Actualiser la liste des modèles</string>
     <string name="provider_refreshing">Actualisation…</string>
     <string name="provider_refresh_failed">Impossible de récupérer la liste des modèles. La liste existante a été conservée.</string>
+    <string name="provider_refresh_live">Mis à jour : %1$d modèles reçus du fournisseur.</string>
+    <string name="provider_refresh_snapshot">Liste en direct du fournisseur inaccessible ; un instantané intégré est affiché à la place.</string>
+    <string name="provider_refresh_snapshot_reason">Liste en direct du fournisseur inaccessible (%1$s) ; un instantané intégré est affiché à la place.</string>
+    <string name="provider_refresh_failed_reason">Impossible de récupérer la liste des modèles : %1$s\nLa liste existante a été conservée.</string>
     <string name="provider_imported_toast">Fournisseur « %1$s » importé</string>
     <string name="browser_ua_default">Par défaut (auto via UA)</string>
     <string name="browser_viewport_custom_subtitle">Définir votre propre largeur × hauteur</string>

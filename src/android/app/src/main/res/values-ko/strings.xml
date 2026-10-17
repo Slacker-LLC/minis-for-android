@@ -1469,6 +1469,10 @@
     <string name="provider_refresh_models">모델 목록 새로고침</string>
     <string name="provider_refreshing">새로 고치는 중…</string>
     <string name="provider_refresh_failed">모델 목록을 가져오지 못했습니다. 기존 목록은 그대로 유지됩니다.</string>
+    <string name="provider_refresh_live">업데이트됨: 제공업체에서 모델 %1$d개를 가져왔습니다.</string>
+    <string name="provider_refresh_snapshot">제공업체의 실시간 목록에 연결하지 못해 내장 스냅샷을 대신 표시합니다.</string>
+    <string name="provider_refresh_snapshot_reason">제공업체의 실시간 목록에 연결하지 못해(%1$s) 내장 스냅샷을 대신 표시합니다.</string>
+    <string name="provider_refresh_failed_reason">모델 목록을 가져오지 못했습니다: %1$s\n기존 목록은 그대로 유지됩니다.</string>
     <string name="provider_imported_toast">공급자 \"%1$s\"을(를) 가져왔습니다</string>
     <string name="browser_ua_default">기본(UA에 따라 자동)</string>
     <string name="browser_viewport_custom_subtitle">너비 × 높이 직접 설정</string>

@@ -1477,6 +1477,10 @@
     <string name="provider_refresh_models">モデル一覧を更新</string>
     <string name="provider_refreshing">更新中…</string>
     <string name="provider_refresh_failed">モデル一覧を取得できませんでした。現在の一覧はそのまま残しています。</string>
+    <string name="provider_refresh_live">更新しました：プロバイダーから %1$d 個のモデルを取得しました。</string>
+    <string name="provider_refresh_snapshot">プロバイダーのライブ一覧に接続できなかったため、内蔵のスナップショットを表示しています。</string>
+    <string name="provider_refresh_snapshot_reason">プロバイダーのライブ一覧に接続できなかったため（%1$s）、内蔵のスナップショットを表示しています。</string>
+    <string name="provider_refresh_failed_reason">モデル一覧を取得できませんでした：%1$s\n現在の一覧はそのまま残しています。</string>
     <string name="provider_imported_toast">プロバイダー「%1$s」をインポートしました</string>
     <string name="browser_ua_default">既定（UA により自動）</string>
     <string name="browser_viewport_custom_subtitle">幅 × 高さを自分で指定</string>

@@ -12,6 +12,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -442,6 +443,38 @@ class ProviderRepository(internal val context: Context) {
 
 
     internal val refreshesInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Manual / add-flow refreshes run here rather than in a screen's
+     * `rememberCoroutineScope`, which is cancelled the moment the screen
+     * leaves composition (the add-provider page closes right after saving).
+     */
+    internal val refreshScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
+    )
+
+    private val _modelRefreshStatus = MutableStateFlow<Map<String, ModelRefreshStatus>>(emptyMap())
+
+    /** Per-instance state of the refreshes started through [launchRefresh]. */
+    val modelRefreshStatus: StateFlow<Map<String, ModelRefreshStatus>> = _modelRefreshStatus.asStateFlow()
+
+    /** Claims the instance's refresh slot; false when one is already running. */
+    internal fun markRefreshRunning(instanceId: String): Boolean {
+        var claimed = false
+        _modelRefreshStatus.update { current ->
+            claimed = current[instanceId] !is ModelRefreshStatus.Running
+            if (claimed) current + (instanceId to ModelRefreshStatus.Running) else current
+        }
+        return claimed
+    }
+
+    internal fun publishRefreshDone(instanceId: String, result: ModelRefreshResult) {
+        _modelRefreshStatus.update { it + (instanceId to ModelRefreshStatus.Done(result)) }
+    }
+
+    internal fun clearRefreshStatus(instanceId: String) {
+        _modelRefreshStatus.update { it - instanceId }
+    }
     internal val lastStaleAttemptAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
 
