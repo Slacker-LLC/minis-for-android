@@ -51,20 +51,13 @@ class ChatMessageMapperTest {
 
     @Test
     fun `a user row that is only a pasted block or file is still a message`() {
-        val dir = java.nio.file.Files.createTempDirectory("media").toFile()
-        try {
-            File(dir, "Pasted#3.txt").writeText("pasted body")
-            val ref = JSONObject().put("type", "mediaRef").put(
-                "value",
-                JSONObject().put("id", "m1").put("relativePath", "Pasted#3.txt").put("mimeType", "text/plain").put("originalFileName", "Pasted#3"),
-            )
-            val rows = listOf(row("u", "user", JSONArray().put(ref), 0))
-            val out = ChatMessageMapper(dir) { null }.toChatMessages(rows, parsed(rows))
-            assertEquals(listOf("u"), out.map { it.id })
-            assertEquals(listOf("Pasted#3"), out.single().attachmentNames)
-        } finally {
-            dir.deleteRecursively()
-        }
+        // Uri is a stub in JVM tests, so the restoration itself cannot run here; the rule that keeps the row can.
+        assertFalse(ChatMessageMapper.isHiddenUserRow("user", "", imageCount = 0, attachmentCount = 1))
+        assertFalse(ChatMessageMapper.isHiddenUserRow("user", "", imageCount = 1, attachmentCount = 0))
+        assertFalse(ChatMessageMapper.isHiddenUserRow("user", "hi", imageCount = 0, attachmentCount = 0))
+        assertTrue(ChatMessageMapper.isHiddenUserRow("user", "  ", imageCount = 0, attachmentCount = 0))
+        // Only user rows are hidden by this rule.
+        assertFalse(ChatMessageMapper.isHiddenUserRow("assistant", "", imageCount = 0, attachmentCount = 0))
     }
 
     @Test
