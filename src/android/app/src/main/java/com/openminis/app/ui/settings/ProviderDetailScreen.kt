@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.openminis.app.data.model.ProviderType
 import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.data.repository.launchRefresh
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.ui.theme.ChatColors
@@ -81,7 +82,6 @@ import com.openminis.app.data.repository.exportInstanceJSON
 import com.openminis.app.data.repository.hasVoiceModels
 import com.openminis.app.data.repository.isVoiceShadowDisabled
 import com.openminis.app.data.repository.loadApiKey
-import com.openminis.app.data.repository.refreshModels
 import com.openminis.app.data.repository.removeEntry
 import com.openminis.app.data.repository.removeInstance
 import com.openminis.app.data.repository.saveApiKey
@@ -158,9 +158,13 @@ fun ProviderDetailScreen(
     var customUserAgent by remember { mutableStateOf(instance.customUserAgent ?: "") }
 
     val entries = providerRepository.entriesFor(instanceId)
-    var isRefreshing by remember { mutableStateOf(false) }
-
     val exportContext = androidx.compose.ui.platform.LocalContext.current
+    // The refresh runs in the repository's scope, so it survives leaving this
+    // screen; the row just mirrors its status.
+    val refreshStatus = providerRepository.modelRefreshStatus.collectAsState().value[instanceId]
+    val isRefreshing = refreshStatus is com.openminis.app.data.repository.ModelRefreshStatus.Running
+    val refreshSubtitle = (refreshStatus as? com.openminis.app.data.repository.ModelRefreshStatus.Done)
+        ?.result?.let { describeRefreshResult(exportContext, it) }
 
     SettingsScaffold(
         title = instance.label,
@@ -593,33 +597,11 @@ fun ProviderDetailScreen(
             // tap-to-refresh affordance in the section header area.
             SettingsRow(
                 title = stringResource(if (isRefreshing) R.string.provider_refreshing else R.string.provider_refresh_models),
+                subtitle = refreshSubtitle,
                 onClick = if (isRefreshing) {
                     null
                 } else {
-                    {
-                        isRefreshing = true
-                        scope.launch {
-                            val updated = try {
-                                providerRepository.refreshModels(instance).also {
-                                    AppLogger.info(TAG, "Refreshed models for ${instance.id} (updated=$it)")
-                                }
-                            } catch (e: kotlinx.coroutines.CancellationException) {
-                                throw e
-                            } catch (e: Exception) {
-                                AppLogger.warning(TAG, "Model refresh failed for ${instance.id}: ${e.message}")
-                                false
-                            } finally {
-                                isRefreshing = false
-                            }
-                            if (!updated) {
-                                android.widget.Toast.makeText(
-                                    exportContext,
-                                    R.string.provider_refresh_failed,
-                                    android.widget.Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                        }
-                    }
+                    { providerRepository.launchRefresh(instance) }
                 },
                 showChevron = false,
                 trailing = {
@@ -1292,5 +1274,24 @@ private fun ModalityIconsRow(
         if ("image" in outputModalities) Icon(Icons.Default.AddPhotoAlternate, contentDescription = stringResource(R.string.modeldetail_image_output), tint = outputTint, modifier = size)
         if ("audio" in outputModalities) Icon(Icons.Default.VolumeUp, contentDescription = stringResource(R.string.modeldetail_audio_output), tint = outputTint, modifier = size)
         if ("video" in outputModalities) Icon(Icons.Default.MovieCreation, contentDescription = stringResource(R.string.modeldetail_video_output), tint = outputTint, modifier = size)
+    }
+}
+
+
+/** One line (plus the reason, when there is one) saying how the last model refresh ended. */
+private fun describeRefreshResult(
+    context: android.content.Context,
+    result: com.openminis.app.data.repository.ModelRefreshResult,
+): String {
+    val reason = result.error?.let { com.openminis.app.ui.chat.LLMErrorPresenter.present(context, it) }
+    return when (result.outcome) {
+        com.openminis.app.data.repository.ModelRefreshOutcome.LIVE ->
+            context.getString(R.string.provider_refresh_live, result.count)
+        com.openminis.app.data.repository.ModelRefreshOutcome.SNAPSHOT ->
+            if (reason.isNullOrBlank()) context.getString(R.string.provider_refresh_snapshot)
+            else context.getString(R.string.provider_refresh_snapshot_reason, reason)
+        com.openminis.app.data.repository.ModelRefreshOutcome.FAILED ->
+            if (reason.isNullOrBlank()) context.getString(R.string.provider_refresh_failed)
+            else context.getString(R.string.provider_refresh_failed_reason, reason)
     }
 }

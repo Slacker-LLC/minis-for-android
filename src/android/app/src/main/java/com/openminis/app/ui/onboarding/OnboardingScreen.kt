@@ -70,7 +70,7 @@ import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.data.repository.addEntry
 import com.openminis.app.data.repository.addInstance
-import com.openminis.app.data.repository.refreshModels
+import com.openminis.app.data.repository.launchRefresh
 import com.openminis.app.data.repository.saveApiKey
 import com.openminis.app.data.repository.setSlotEntries
 
@@ -305,7 +305,7 @@ internal fun ModelSelectionStep(
     // live catalog rather than only the built-in placeholder list seeded when the provider was added.
     LaunchedEffect(Unit) {
         for (instance in providerRepository.config.value.instances.filter { it.isEnabled }) {
-            launch(kotlinx.coroutines.Dispatchers.IO) { providerRepository.refreshModels(instance) }
+            providerRepository.launchRefresh(instance)
         }
     }
     val selected = remember { mutableStateListOf<String>() } // entry UUIDs

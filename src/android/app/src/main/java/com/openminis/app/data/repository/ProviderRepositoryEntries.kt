@@ -5,6 +5,7 @@ import com.openminis.app.data.db.ProviderThinkingRuleEntity
 import com.openminis.app.data.db.compositeEntryKey
 import com.openminis.app.data.migration.LegacyGroupMigrator
 import com.openminis.app.data.migration.LegacyGroupStateParser
+import com.openminis.app.data.model.LLMError
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ModelOverrides
@@ -294,15 +295,77 @@ fun ProviderRepository.hasFoldedShadowDuplicates(): Boolean {
 }
 
 /**
+ * How a model-list refresh ended, so the UI can tell a real update from a
+ * silent fallback.
+ *
+ *  - [LIVE]      the provider's own list replaced the entries.
+ *  - [SNAPSHOT]  no live list was available (no credential, or the instance had
+ *                nothing yet), so the bundled / models.dev snapshot was used.
+ *                [ModelRefreshResult.error] says why the live call was skipped
+ *                or failed, when it was attempted.
+ *  - [FAILED]    nothing changed; the existing list was kept.
+ */
+enum class ModelRefreshOutcome { LIVE, SNAPSHOT, FAILED }
+
+data class ModelRefreshResult(
+    val outcome: ModelRefreshOutcome,
+    val error: Throwable? = null,
+    val count: Int = 0,
+) {
+    /** Entries were actually replaced. */
+    val updated: Boolean get() = outcome != ModelRefreshOutcome.FAILED
+}
+
+/** What the UI shows for an instance's refresh: still running, or how the last one ended. */
+sealed class ModelRefreshStatus {
+    data object Running : ModelRefreshStatus()
+    data class Done(val result: ModelRefreshResult) : ModelRefreshStatus()
+}
+
+/**
+ * Refreshes [instance]'s model list in the repository's own scope, so leaving
+ * the screen that asked (add-provider, onboarding) does not cancel it, and
+ * publishes progress / outcome through [ProviderRepository.modelRefreshStatus].
+ * A second call while one is running for the same instance is a no-op.
+ */
+fun ProviderRepository.launchRefresh(instance: ProviderInstance): kotlinx.coroutines.Job =
+    refreshScope.launch {
+        if (!markRefreshRunning(instance.id)) return@launch
+        try {
+            publishRefreshDone(instance.id, refreshModelsDetailed(instance))
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            clearRefreshStatus(instance.id)
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("ProviderRepo", "launchRefresh failed for ${instance.label}: ${e.message}")
+            publishRefreshDone(instance.id, ModelRefreshResult(ModelRefreshOutcome.FAILED, e))
+        }
+    }
+
+/**
  * Fetches the instance's model list and replaces its entries. Returns whether
  * entries were actually replaced: `false` means nothing usable came back
  * (no credential and no models.dev match, or a failed call against a private
  * host whose existing list is deliberately kept), so callers can tell the
  * user instead of showing an unchanged list as if it had been refreshed.
  */
-suspend fun ProviderRepository.refreshModels(instance: ProviderInstance): Boolean {
-    com.openminis.app.provider.ProviderTransportPolicy
-        .requireAllowedInstanceBase(instance, instance.effectiveBaseURL)
+suspend fun ProviderRepository.refreshModels(instance: ProviderInstance): Boolean =
+    refreshModelsDetailed(instance).updated
+
+/** [refreshModels] with the outcome and failure reason; see [ModelRefreshResult]. */
+suspend fun ProviderRepository.refreshModelsDetailed(instance: ProviderInstance): ModelRefreshResult {
+    try {
+        com.openminis.app.provider.ProviderTransportPolicy
+            .requireAllowedInstanceBase(instance, instance.effectiveBaseURL)
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        return ModelRefreshResult(ModelRefreshOutcome.FAILED, e)
+    }
+    // A live call that failed must not wipe a list the user already has; the
+    // bundled snapshot is only for an instance with nothing to lose.
+    val hasEntries = _config.value.modelEntries.any { it.providerInstanceId == instance.id }
+    var fetchError: Throwable? = null
     var apiKey = loadApiKey(instance.id)
 
     // For OAuth providers, try to refresh the token before using it (mirrors iOS validAccessToken)
@@ -341,7 +404,7 @@ suspend fun ProviderRepository.refreshModels(instance: ProviderInstance): Boolea
         }
         if (models.isNotEmpty()) {
             replaceEntries(instance.id, models)
-            return true
+            return ModelRefreshResult(ModelRefreshOutcome.LIVE, count = models.size)
         }
     }
 
@@ -373,18 +436,29 @@ suspend fun ProviderRepository.refreshModels(instance: ProviderInstance): Boolea
                 // models from the same /v1/models endpoint — only the
                 // completion endpoint differs.
                 ProviderType.openAI, ProviderType.openAIResponses ->
-                    OpenAIModelsApi.fetchModels(apiKey, baseURL, customUserAgent = instance.customUserAgent)
+                    OpenAIModelsApi.fetchModels(apiKey, baseURL, customUserAgent = instance.customUserAgent, strict = true)
                 ProviderType.openRouter -> OpenRouterModelsApi.fetchModels(apiKey)
                 // xAI exposes an OpenAI-compatible live catalog. Keep the
                 // built-in list as a vendor-specific fallback so a failed
                 // refresh never empties the model picker or substitutes
                 // models from the wrong provider.
-                ProviderType.xAI -> OpenAIModelsApi.fetchModels(
-                    apiKey,
-                    baseURL ?: "https://api.x.ai/v1",
-                    customUserAgent = instance.customUserAgent,
-                    providerLabel = "xAI",
-                ).ifEmpty { com.openminis.app.provider.xai.XAIModelsApi.fetchModelsOAuth() }
+                ProviderType.xAI -> try {
+                    OpenAIModelsApi.fetchModels(
+                        apiKey,
+                        baseURL ?: "https://api.x.ai/v1",
+                        customUserAgent = instance.customUserAgent,
+                        providerLabel = "xAI",
+                        strict = true,
+                    ).ifEmpty { com.openminis.app.provider.xai.XAIModelsApi.fetchModelsOAuth() }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // An instance that already has a list keeps it; one with
+                    // nothing yet gets the built-in catalog, flagged as such.
+                    if (hasEntries) throw e
+                    fetchError = e
+                    com.openminis.app.provider.xai.XAIModelsApi.fetchModelsOAuth()
+                }
                 // [T-kimi-oauth] Kimi Code: unlike Codex OAuth, the Kimi
                 // OAuth token CAN call the models endpoint — real fetch
                 // from GET /coding/v1/models (OpenAI-compatible shape).
@@ -395,6 +469,7 @@ suspend fun ProviderRepository.refreshModels(instance: ProviderInstance): Boolea
                     baseURL ?: "${com.openminis.app.auth.KimiDeviceFlow.CODING_API_BASE}/v1",
                     customUserAgent = instance.customUserAgent,
                     providerLabel = "Kimi",
+                    strict = true,
                 )
                 // [T-android-provider-type-parity] No models endpoint to
                 // query for a type this build cannot drive; the instance
@@ -414,8 +489,11 @@ suspend fun ProviderRepository.refreshModels(instance: ProviderInstance): Boolea
                 }
                 ProviderType.unsupported -> emptyList()
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             android.util.Log.e("ProviderRepo", "refreshModels fetch error: ${e.message}", e)
+            fetchError = if (e is java.io.IOException) LLMError.NetworkError(e) else e
             emptyList()
         }
         android.util.Log.i("ProviderRepo", "refreshModels: got ${models.size} models")
@@ -423,8 +501,16 @@ suspend fun ProviderRepository.refreshModels(instance: ProviderInstance): Boolea
         // Step 2: If API returned results, use them
         if (models.isNotEmpty()) {
             replaceEntries(instance.id, models)
-            return true
+            // A built-in list standing in for a failed live call is a snapshot, not a refresh.
+            val outcome = if (fetchError != null) ModelRefreshOutcome.SNAPSHOT else ModelRefreshOutcome.LIVE
+            return ModelRefreshResult(outcome, fetchError, models.size)
         }
+    }
+
+    // A live call failed and the instance already has a list: keep it rather
+    // than overwrite the user's models with a generic snapshot.
+    if (fetchError != null && hasEntries) {
+        return ModelRefreshResult(ModelRefreshOutcome.FAILED, fetchError)
     }
 
     // Step 3: Fallback to models.dev by base URL.
@@ -437,11 +523,11 @@ suspend fun ProviderRepository.refreshModels(instance: ProviderInstance): Boolea
     if (fallbackModels.isNotEmpty()) {
         android.util.Log.i("ProviderRepo", "models.dev fallback returned ${fallbackModels.size} models for ${instance.label}")
         replaceEntries(instance.id, fallbackModels)
-        return true
+        return ModelRefreshResult(ModelRefreshOutcome.SNAPSHOT, fetchError, fallbackModels.size)
     } else if (isThirdParty) {
         android.util.Log.i("ProviderRepo", "Third-party endpoint, no models.dev match — preserving existing models for ${instance.label}")
     }
-    return false
+    return ModelRefreshResult(ModelRefreshOutcome.FAILED, fetchError)
 }
 
 /**

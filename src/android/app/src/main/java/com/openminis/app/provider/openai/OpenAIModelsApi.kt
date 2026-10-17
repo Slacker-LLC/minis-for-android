@@ -1,6 +1,7 @@
 package com.openminis.app.provider.openai
 
 import android.content.Context
+import com.openminis.app.data.model.LLMError
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.normalizeModalities
 import com.openminis.app.logging.AppLogger
@@ -166,6 +167,10 @@ object OpenAIModelsApi {
         // (xAI, Kimi Code). Becomes `LLMModel.provider` so ModelsDevApi looks
         // the models up under that vendor instead of scanning every reseller.
         providerLabel: String? = null,
+        // Refresh path: report an HTTP/parse failure as an LLMError instead of
+        // quietly returning [fallback], so the caller can tell "live list" from
+        // "request failed" and keep the user's existing list.
+        strict: Boolean = false,
     ): List<LLMModel> = withContext(Dispatchers.IO) {
         val isCustomBase = baseURL != null && !isOfficialOpenAI(baseURL)
         // For third-party endpoints (vLLM, Ollama, etc.), return empty on failure
@@ -187,18 +192,24 @@ object OpenAIModelsApi {
             .build()
 
         val response = client.newCall(request).execute()
-        val body = response.body?.string() ?: return@withContext fallback
+        val body = response.body?.string()
 
         if (!response.isSuccessful) {
             if (context != null && (response.code == 401 || response.code == 403)) {
                 cache.invalidate(context, cacheKey)
             }
+            if (strict) throw httpFailure(response.code, body)
+            return@withContext fallback
+        }
+        if (body == null) {
+            if (strict) throw LLMError.DecodingError(IllegalStateException("empty response body"))
             return@withContext fallback
         }
 
         val models = try {
             val json = JSONObject(body)
-            val data = json.optJSONArray("data") ?: return@withContext fallback
+            val data = json.optJSONArray("data")
+                ?: if (strict) throw IllegalStateException("no data array in model list") else return@withContext fallback
             val parsed = mutableListOf<LLMModel>()
             for (i in 0 until data.length()) {
                 val obj = data.getJSONObject(i)
@@ -236,12 +247,25 @@ object OpenAIModelsApi {
             }
             if (parsed.isEmpty()) return@withContext fallback
             ModelsDevApi.enrichModels(parsed)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            if (strict) throw LLMError.DecodingError(e)
             return@withContext fallback
         }
 
         if (context != null) cache.save(context, cacheKey, models)
         models
+    }
+
+    /** Typed HTTP failure for [fetchModels] with `strict = true`; the detail carries `HTTP <code>` so the presenter can read the status. */
+    internal fun httpFailure(code: Int, body: String?): LLMError {
+        val snippet = body.orEmpty().replace(Regex("\\s+"), " ").trim().take(160)
+        val detail = if (snippet.isEmpty()) "HTTP $code" else "HTTP $code: $snippet"
+        return when {
+            code == 401 || code == 403 -> LLMError.InvalidApiKey(detail)
+            code == 429 -> LLMError.RateLimited()
+            code in 500..599 -> LLMError.TransientError(detail)
+            else -> LLMError.ProviderError(detail)
+        }
     }
 
     private fun JSONArray.toStringList(): List<String> {

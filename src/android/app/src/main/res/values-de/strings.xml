@@ -1480,6 +1480,10 @@
     <string name="provider_refresh_models">Modellliste aktualisieren</string>
     <string name="provider_refreshing">Wird aktualisiert…</string>
     <string name="provider_refresh_failed">Die Modellliste konnte nicht abgerufen werden. Die bestehende Liste wurde beibehalten.</string>
+    <string name="provider_refresh_live">Aktualisiert: %1$d Modelle vom Anbieter.</string>
+    <string name="provider_refresh_snapshot">Die Live-Liste des Anbieters war nicht erreichbar; es wird stattdessen ein integrierter Snapshot angezeigt.</string>
+    <string name="provider_refresh_snapshot_reason">Die Live-Liste des Anbieters war nicht erreichbar (%1$s); es wird stattdessen ein integrierter Snapshot angezeigt.</string>
+    <string name="provider_refresh_failed_reason">Die Modellliste konnte nicht abgerufen werden: %1$s\nDie bestehende Liste wurde beibehalten.</string>
     <string name="provider_imported_toast">Anbieter \"%1$s\" importiert</string>
     <string name="browser_ua_default">Standard (automatisch per UA)</string>
     <string name="browser_viewport_custom_subtitle">Eigene Breite × Höhe festlegen</string>

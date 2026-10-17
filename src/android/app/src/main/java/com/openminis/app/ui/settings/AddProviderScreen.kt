@@ -82,7 +82,7 @@ import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.RowLabel
 import com.openminis.app.ui.components.SectionTextField
 import com.openminis.app.data.repository.addInstance
-import com.openminis.app.data.repository.refreshModels
+import com.openminis.app.data.repository.launchRefresh
 import com.openminis.app.data.repository.saveApiKey
 
 private enum class AddProviderStep {
@@ -599,7 +599,7 @@ private fun ColumnScope.ApiKeyConfigSection(
                 providerRepository.saveApiKey(instance.id, apiKey.trim())
             }
             // Auto-refresh models in background (fetches from API or falls back to models.dev)
-            scope.launch { providerRepository.refreshModels(instance) }
+            providerRepository.launchRefresh(instance)
             onSaved()
         },
         modifier = Modifier
@@ -718,7 +718,7 @@ private fun ColumnScope.OAuthConfigSection(
                 )
                 providerRepository.addInstance(instance)
                 // Auto-refresh models (fetches from API or falls back to models.dev)
-                scope.launch { providerRepository.refreshModels(instance) }
+                providerRepository.launchRefresh(instance)
                 onSaved()
             },
             modifier = Modifier
@@ -865,7 +865,7 @@ private fun ColumnScope.OAuthConfigSection(
                     providerRepository.addInstance(instance)
                     // Store the manual token as API key — ProviderFactory uses loadApiKey() for all credential types
                     providerRepository.saveApiKey(instance.id, manualToken.trim())
-                    scope.launch { providerRepository.refreshModels(instance) }
+                    providerRepository.launchRefresh(instance)
                     onSaved()
                 },
                 modifier = Modifier
