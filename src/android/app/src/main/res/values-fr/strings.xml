@@ -1505,6 +1505,7 @@
     <string name="chat_quick_recap_sub">Ce sur quoi vous avez travaillé</string>
     <string name="chat_quick_recap_prompt">Résume ce sur quoi nous avons travaillé dans mes conversations récentes.</string>
     <string name="chat_thinking_chip">Réflexion · %1$s</string>
+    <string name="chat_thinking_off_chip">Off</string>
     <string name="files_hub_used_by">Utilisé par Minis</string>
     <string name="files_section_sandbox">Dossiers dans le bac à sable</string>
     <string name="files_shared_title">Partagé</string>
@@ -1972,11 +1973,7 @@
     <string name="voice_call_retry">Réessayer</string>
     <string name="voice_call_interrupt">Interrompre et parler</string>
     <string name="voice_call_submit">Envoyer maintenant</string>
-    <string name="voice_call_back">Voir le chat</string>
     <string name="voice_call_end">Terminer</string>
-    <string name="voice_call_input_hint">Saisir un message…</string>
-    <string name="voice_call_send">Envoyer</string>
-    <string name="voice_call_show_orb">Retour à la voix</string>
     <string name="voice_call_approval_question">Autoriser « %1$s » ? Dites autoriser, autoriser pour cette session ou refuser.</string>
     <string name="voice_call_approval_unclear">Je n\'ai pas compris. Dites autoriser, autoriser pour cette session ou refuser.</string>
     <string name="voice_call_working">Un instant, je m\'en occupe.</string>
@@ -1995,8 +1992,9 @@
     <string name="voice_call_model">Modèle du chat actuel</string>
     <string name="voice_call_toast_retry">Je n\'ai pas compris, je réessaie…</string>
     <string name="voice_call_toast_idle">Vous êtes là ? Sans son, je raccrocherai bientôt.</string>
-    <string name="voice_call_chat_empty">Rien n\'a encore été dit. Votre échange apparaîtra ici.</string>
     <string name="voice_call_leave_to_chat">Retour au chat</string>
+    <string name="voice_call_back">Voir le chat</string>
+    <string name="voice_call_show_orb">Retour à la voix</string>
     <string name="voice_call_ended_idle">Personne n\'a parlé depuis un moment, l\'appel a donc été terminé.</string>
     <string name="voice_call_ended_connection">Impossible de joindre le service vocal en temps réel : %1$s</string>
     <string name="voice_call_follow_up">Ajouter des consignes</string>
@@ -2108,7 +2106,5 @@
     <string name="voice_call_notif_title">Appel vocal en cours</string>
     <string name="voice_call_notif_live">Micro activé</string>
     <string name="voice_call_notif_muted">Micro en pause</string>
-    <string name="voice_call_attach">Ajouter des photos</string>
-    <string name="voice_call_attach_remove">Retirer la photo</string>
     <string name="chat_plan_exit">Quitter</string>
 </resources>

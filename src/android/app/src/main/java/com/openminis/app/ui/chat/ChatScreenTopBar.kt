@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -21,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -99,6 +103,40 @@ internal fun ChatTopBar(
                     shape = RoundedCornerShape(14.dp),
                     tonalElevation = 0.dp,
                 ) {
+                    // 通话中只在最前面多出两项通话设置，其余和平时一样；挂断后自然恢复。
+                    val voiceCall = com.openminis.app.voicecall.LocalVoiceCall.current
+                    if (voiceCall != null) {
+                        val earpiece by com.openminis.app.speech.VoiceOutputState.callEarpiece.collectAsState()
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.voice_call_settings_earpiece)) },
+                            onClick = {
+                                com.openminis.app.speech.VoiceOutputState.setCallEarpiece(!earpiece)
+                                showChatMenu = false
+                            },
+                            trailingIcon = {
+                                if (earpiece) {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(22.dp))
+                                }
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(stringResource(if (voiceCall.orbMode) R.string.voice_call_back else R.string.voice_call_show_orb))
+                            },
+                            onClick = {
+                                showChatMenu = false
+                                voiceCall.actions.toggleOrb()
+                            },
+                            trailingIcon = {
+                                Icon(
+                                    if (voiceCall.orbMode) Icons.Outlined.ChatBubbleOutline else Icons.Outlined.GraphicEq,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            },
+                        )
+                        MinisMenuDivider()
+                    }
                     // Conversation actions only: new chat is its own button and the terminal lives in
                     // the drawer.
                     DropdownMenuItem(

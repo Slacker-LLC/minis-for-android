@@ -1607,6 +1607,7 @@
     <string name="chat_quick_recap_sub">Woran du zuletzt gearbeitet hast</string>
     <string name="chat_quick_recap_prompt">Fasse zusammen, woran wir in meinen letzten Unterhaltungen gearbeitet haben.</string>
     <string name="chat_thinking_chip">Denken · %1$s</string>
+    <string name="chat_thinking_off_chip">Aus</string>
     <string name="files_hub_used_by">Von Minis belegt</string>
     <string name="files_section_sandbox">Ordner in der Sandbox</string>
     <string name="files_shared_title">Freigegeben</string>
@@ -2074,11 +2075,7 @@
     <string name="voice_call_retry">Erneut versuchen</string>
     <string name="voice_call_interrupt">Unterbrechen und sprechen</string>
     <string name="voice_call_submit">Jetzt senden</string>
-    <string name="voice_call_back">Chat ansehen</string>
     <string name="voice_call_end">Sprachgespräch beenden</string>
-    <string name="voice_call_input_hint">Nachricht eingeben…</string>
-    <string name="voice_call_send">Senden</string>
-    <string name="voice_call_show_orb">Zurück zur Sprache</string>
     <string name="voice_call_approval_question">„%1$s“ erlauben? Sagen Sie erlauben, für diese Sitzung erlauben oder ablehnen.</string>
     <string name="voice_call_approval_unclear">Das habe ich nicht verstanden. Sagen Sie erlauben, für diese Sitzung erlauben oder ablehnen.</string>
     <string name="voice_call_working">Einen Moment, ich bin dran.</string>
@@ -2097,8 +2094,9 @@
     <string name="voice_call_model">Aktuelles Chatmodell</string>
     <string name="voice_call_toast_retry">Nicht verstanden, ich versuche es erneut…</string>
     <string name="voice_call_toast_idle">Noch da? Ohne Ton lege ich bald auf.</string>
-    <string name="voice_call_chat_empty">Noch nichts gesagt. Euer Gespräch erscheint hier.</string>
     <string name="voice_call_leave_to_chat">Zurück zum Chat</string>
+    <string name="voice_call_back">Chat ansehen</string>
+    <string name="voice_call_show_orb">Zurück zur Sprache</string>
     <string name="voice_call_ended_idle">Lange hat niemand gesprochen, daher wurde der Anruf beendet.</string>
     <string name="voice_call_ended_connection">Der Echtzeit-Sprachdienst ist nicht erreichbar: %1$s</string>
     <string name="voice_call_follow_up">Anweisung ergänzen</string>
@@ -2210,7 +2208,5 @@
     <string name="voice_call_notif_title">Sprachanruf läuft</string>
     <string name="voice_call_notif_live">Mikrofon an</string>
     <string name="voice_call_notif_muted">Mikrofon pausiert</string>
-    <string name="voice_call_attach">Fotos hinzufügen</string>
-    <string name="voice_call_attach_remove">Foto entfernen</string>
     <string name="chat_plan_exit">Beenden</string>
 </resources>

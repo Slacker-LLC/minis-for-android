@@ -8,6 +8,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -52,7 +54,9 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
@@ -186,6 +190,194 @@ internal fun ChatComposer(
     val showSlashMenu by showSlashMenuState
     val showMentionMenu by showMentionMenuState
     val showMoveCapsule by showMoveCapsuleState
+    // 与通话页同一语言：左边一张圆角输入卡片（「＋」和文字同一行），右边一个深色圆钮：空时是语音，有字是发送，生成中是停止。
+    val plusButton: @Composable () -> Unit = {
+            Box {
+                InputCircleButton(
+                    onClick = {
+                        if (viewModel.showSlashMenu.value) {
+                            viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
+                        }
+                        showAttachMenu = !showAttachMenu
+                    },
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = stringResource(R.string.common_attach),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                MinisMenu(
+                    expanded = showAttachMenu,
+                    onDismissRequest = { showAttachMenu = false },
+                    shape = RoundedCornerShape(14.dp),
+                    minWidth = 220.dp,
+                    tonalElevation = 0.dp,
+                    containerColor = if (ChatColors.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White,
+                ) {
+                    // 模型与思考强度：从输入框挪进「＋」，输入框只留一行干净的输入。
+                    val chipModelRaw = modelName.ifEmpty { stringResource(R.string.model_slot_main) }
+                    val chipModel = if (chipModelRaw.contains("/")) chipModelRaw.substringAfterLast("/") else chipModelRaw
+                    val composerThinking by viewModel.thinkingLevel.collectAsState()
+                    val canThink = viewModel.currentModelSupportsReasoning
+                    val composerEntryId by viewModel.activeEntryId.collectAsState()
+                    val composerConfig by providerRepository.config.collectAsState()
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = chipModel,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = ChatColors.primaryText,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.widthIn(max = 190.dp),
+                                )
+                                // A dot when the active provider's balance / subscription is running low or out.
+                                com.openminis.app.ui.settings.QuotaDot(
+                                    instanceId = composerConfig.modelEntries.firstOrNull { it.id == composerEntryId }?.providerInstanceId,
+                                    providerRepository = providerRepository,
+                                    modifier = Modifier.padding(start = 6.dp),
+                                )
+                            }
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = stringResource(R.string.settings_models_title),
+                                tint = ChatColors.secondaryText,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        },
+                        trailingIcon = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                        modifier = Modifier.heightIn(min = 40.dp),
+                        onClick = { showAttachMenu = false; showModelPicker = true },
+                    )
+                    if (canThink) {
+                        // 思考强度排成一行，一眼看全；档位多时可以横着滑。
+                        val levels = listOf(ThinkingLevel.OFF) + viewModel.availableThinkingLevels
+                        Text(
+                            text = stringResource(R.string.thinking_level_sheet_title),
+                            fontSize = 11.5.sp,
+                            color = ChatColors.secondaryText,
+                            modifier = Modifier.padding(start = 16.dp, top = 6.dp, bottom = 4.dp),
+                        )
+                        Row(
+                            modifier = Modifier
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            levels.forEach { level ->
+                                val selected = level == composerThinking || (level == ThinkingLevel.OFF && !composerThinking.isEnabled)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(if (selected) ChatColors.primaryText else ChatColors.inputBg)
+                                        .border(0.5.dp, ChatColors.separator, RoundedCornerShape(16.dp))
+                                        .clickable { showAttachMenu = false; viewModel.setThinkingLevel(level) }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                ) {
+                                    Text(
+                                        text = if (level == ThinkingLevel.OFF) stringResource(R.string.chat_thinking_off_chip) else thinkingLevelLabel(level),
+                                        fontSize = 12.5.sp,
+                                        color = if (selected) ChatColors.inputBg else ChatColors.primaryText,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    MinisMenuDivider()
+                    // 拍照
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = stringResource(R.string.chat_attach_take_photo),
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = ChatColors.primaryText,
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.CameraAlt,
+                                contentDescription = null,
+                                tint = ChatColors.secondaryText,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        },
+                        modifier = Modifier.heightIn(min = 40.dp),
+                        onClick = {
+                            showAttachMenu = false
+                            val granted = ContextCompat.checkSelfPermission(
+                                context,
+                                android.Manifest.permission.CAMERA,
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (granted) {
+                                launchCamera()
+                            } else {
+                                cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                            }
+                        },
+                    )
+                    // 选择照片和视频
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = stringResource(R.string.chat_attach_choose_photos_videos),
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = ChatColors.primaryText,
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.PhotoLibrary,
+                                contentDescription = null,
+                                tint = ChatColors.secondaryText,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        },
+                        modifier = Modifier.heightIn(min = 40.dp),
+                        onClick = {
+                            showAttachMenu = false
+                            mediaPickerLauncher.launch(
+                                androidx.activity.result.PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.ImageAndVideo,
+                                ),
+                            )
+                        },
+                    )
+                    // 添加文件
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = stringResource(R.string.chat_attach_add_file),
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = ChatColors.primaryText,
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Description,
+                                contentDescription = null,
+                                tint = ChatColors.secondaryText,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        },
+                        modifier = Modifier.heightIn(min = 40.dp),
+                        onClick = {
+                            showAttachMenu = false
+                            filePickerLauncher.launch(arrayOf("*/*"))
+                        },
+                    )
+                }
+            }
+    }
+    val editingId by viewModel.editingMessageId.collectAsState()
     Box(modifier = Modifier
         .fillMaxWidth()
         .pointerInput(Unit) {
@@ -268,9 +460,10 @@ internal fun ChatComposer(
             }
         },
     ) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
+            .weight(1f)
             .then(
                 // Glass style: the card fill + symmetric shadow are
                 // replaced by the liquid-glass surface (blur samples
@@ -595,6 +788,33 @@ internal fun ChatComposer(
             Spacer(modifier = Modifier.height(6.dp))
         }
 
+        // T187: Exit Edit Mode pill, only while editingMessageId is non-null. Tap clears the edit flag + composer text
+        // without truncating history. iOS parity: AIChatView.swift L1586 editExitButton.
+        if (editingId != null) {
+            Row(Modifier.padding(start = 12.dp, top = 8.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = ChatColors.inputBg,
+                    modifier = Modifier.clickable {
+                        viewModel.cancelEdit()
+                        viewModel.setInputText("")
+                    },
+                ) {
+                    Text(
+                        text = stringResource(R.string.chat_edit_exit_button),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = ChatColors.secondaryText,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 4.dp, top = 2.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            plusButton()
+            Box(modifier = Modifier.weight(1f)) {
        // Text field (iOS: placeholder "Message Minis", no border)
        run {
            val interactionSource = remember { MutableInteractionSource() }
@@ -916,314 +1136,78 @@ internal fun ChatComposer(
                 },
             )
         }
-
-        // Button row below text field (iOS layout: + / ... mic send)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                // T185: 12dp horizontal lines the +/slash and
-                // mic/send icon-button column up with the
-                // attachment row + textfield + Move-to popup.
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Left: + button (36x36 circle, secondary bg)
-            Box {
-                InputCircleButton(
-                    onClick = {
-                        if (viewModel.showSlashMenu.value) {
-                            viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
-                        }
-                        showAttachMenu = !showAttachMenu
-                    },
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = stringResource(R.string.common_attach),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                MinisMenu(
-                    expanded = showAttachMenu,
-                    onDismissRequest = { showAttachMenu = false },
-                    shape = RoundedCornerShape(14.dp),
-                    minWidth = 220.dp,
-                    tonalElevation = 0.dp,
-                    containerColor = if (ChatColors.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White,
-                ) {
-                    // 模型与思考强度：从输入框挪进「＋」，输入框只留一行干净的输入。
-                    val chipModelRaw = modelName.ifEmpty { stringResource(R.string.model_slot_main) }
-                    val chipModel = if (chipModelRaw.contains("/")) chipModelRaw.substringAfterLast("/") else chipModelRaw
-                    val composerThinking by viewModel.thinkingLevel.collectAsState()
-                    val canThink = viewModel.currentModelSupportsReasoning
-                    val composerEntryId by viewModel.activeEntryId.collectAsState()
-                    val composerConfig by providerRepository.config.collectAsState()
-                    DropdownMenuItem(
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = chipModel,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = ChatColors.primaryText,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.widthIn(max = 190.dp),
-                                )
-                                // A dot when the active provider's balance / subscription is running low or out.
-                                com.openminis.app.ui.settings.QuotaDot(
-                                    instanceId = composerConfig.modelEntries.firstOrNull { it.id == composerEntryId }?.providerInstanceId,
-                                    providerRepository = providerRepository,
-                                    modifier = Modifier.padding(start = 6.dp),
-                                )
-                            }
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.AutoAwesome,
-                                contentDescription = stringResource(R.string.settings_models_title),
-                                tint = ChatColors.secondaryText,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        },
-                        trailingIcon = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                        modifier = Modifier.heightIn(min = 40.dp),
-                        onClick = { showAttachMenu = false; showModelPicker = true },
-                    )
-                    if (canThink) {
-                        val levels = listOf(ThinkingLevel.OFF) + viewModel.availableThinkingLevels
-                        levels.forEach { level ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = stringResource(R.string.chat_thinking_chip, thinkingLevelLabel(level)),
-                                        fontSize = 13.5.sp,
-                                        color = ChatColors.primaryText,
-                                    )
-                                },
-                                trailingIcon = {
-                                    if (level == composerThinking || (level == ThinkingLevel.OFF && !composerThinking.isEnabled)) {
-                                        Icon(Icons.Default.Check, contentDescription = null)
-                                    }
-                                },
-                                modifier = Modifier.heightIn(min = 36.dp),
-                                onClick = { showAttachMenu = false; viewModel.setThinkingLevel(level) },
-                            )
-                        }
-                    }
-                    MinisMenuDivider()
-                    // 拍照
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = stringResource(R.string.chat_attach_take_photo),
-                                fontSize = 13.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = ChatColors.primaryText,
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.CameraAlt,
-                                contentDescription = null,
-                                tint = ChatColors.secondaryText,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        },
-                        modifier = Modifier.heightIn(min = 40.dp),
-                        onClick = {
-                            showAttachMenu = false
-                            val granted = ContextCompat.checkSelfPermission(
-                                context,
-                                android.Manifest.permission.CAMERA,
-                            ) == PackageManager.PERMISSION_GRANTED
-                            if (granted) {
-                                launchCamera()
-                            } else {
-                                cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
-                            }
-                        },
-                    )
-                    // 选择照片和视频
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = stringResource(R.string.chat_attach_choose_photos_videos),
-                                fontSize = 13.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = ChatColors.primaryText,
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.PhotoLibrary,
-                                contentDescription = null,
-                                tint = ChatColors.secondaryText,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        },
-                        modifier = Modifier.heightIn(min = 40.dp),
-                        onClick = {
-                            showAttachMenu = false
-                            mediaPickerLauncher.launch(
-                                androidx.activity.result.PickVisualMediaRequest(
-                                    ActivityResultContracts.PickVisualMedia.ImageAndVideo,
-                                ),
-                            )
-                        },
-                    )
-                    // 添加文件
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = stringResource(R.string.chat_attach_add_file),
-                                fontSize = 13.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = ChatColors.primaryText,
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Description,
-                                contentDescription = null,
-                                tint = ChatColors.secondaryText,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        },
-                        modifier = Modifier.heightIn(min = 40.dp),
-                        onClick = {
-                            showAttachMenu = false
-                            filePickerLauncher.launch(arrayOf("*/*"))
-                        },
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // Middle: Model selection & status pills - ONLY COMPRESSIBLE REGION
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val editingId by viewModel.editingMessageId.collectAsState()
-                Spacer(modifier = Modifier.weight(1f))
-
-            // T187: Exit Edit Mode pill, only while editingMessageId
-            // is non-null. Tap clears the edit flag + composer text
-            // without truncating history. iOS parity:
-            // AIChatView.swift L1586 editExitButton.
-            if (editingId != null) {
-                Spacer(modifier = Modifier.width(6.dp))
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = ChatColors.inputBg,
-                    modifier = Modifier.clickable {
-                        viewModel.cancelEdit()
-                        viewModel.setInputText("")
-                    },
-                ) {
-                    Text(
-                        text = stringResource(R.string.chat_edit_exit_button),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = ChatColors.secondaryText,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
-                }
             }
         }
-
+            }
         Spacer(modifier = Modifier.width(8.dp))
-
-        // Right: Fixed group — "Voice + Send" (never squeezed or pushed out)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            androidx.compose.material3.IconButton(onClick = {
-                com.openminis.app.deeplink.DeepLinkCoordinator.setPendingChatAction(
-                    com.openminis.app.deeplink.DeepLinkCoordinator.ChatAction.START_VOICE,
-                )
-            }) {
+        // 深色圆钮的三个状态：生成中且没有内容 → 停止；空 → 语音通话；有字或附件 → 发送（生成中则排队）。
+        val actionHasContent = inputText.isNotBlank() || attachments.isNotEmpty()
+        // 通话中：空 → 结束通话（球旁的静音钮在它左边）；有字 → 发给通话。
+        val voiceCall = com.openminis.app.voicecall.LocalVoiceCall.current
+        val inCall = voiceCall?.active == true
+        val actionEnd = inCall && !actionHasContent
+        val actionStop = !inCall && isStreaming && !actionHasContent
+        val actionVoice = !inCall && !isStreaming && !actionHasContent
+        if (voiceCall != null && voiceCall.active) {
+            Box(
+                modifier = Modifier
+                    .padding(bottom = 2.dp)
+                    .size(46.dp)
+                    .background(
+                        if (voiceCall.muted) MaterialTheme.colorScheme.errorContainer else ChatColors.inputBg,
+                        CircleShape,
+                    )
+                    .border(0.5.dp, ChatColors.separator, CircleShape)
+                    .clip(CircleShape)
+                    .clickable { voiceCall.actions.toggleMute() },
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(
-                    Icons.Filled.GraphicEq,
-                    contentDescription = stringResource(R.string.voice_call_title),
-                    tint = ChatColors.primaryText,
+                    if (voiceCall.muted) Icons.Filled.MicOff else Icons.Filled.Mic,
+                    contentDescription = stringResource(if (voiceCall.muted) R.string.voice_call_unmute else R.string.voice_call_mute),
+                    tint = if (voiceCall.muted) MaterialTheme.colorScheme.onErrorContainer else ChatColors.primaryText,
+                    modifier = Modifier.size(22.dp),
                 )
             }
-
             Spacer(modifier = Modifier.width(8.dp))
-
-            // Right: 3-state Send / Enqueue / Stop button (mirrors iOS sendButton).
-            //   • streaming + hasText  → SEND (routes through viewModel.sendMessage,
-            //     which dispatches to enqueuePrompt since _isStreaming is true).
-            //     Visual feedback for the queued prompt comes from the dashed
-            //     bubble that ChatViewModel.enqueuePrompt appends to the message
-            //     list — no extra button badge needed (matches iOS).
-            //   • streaming + !hasText → STOP (cancel current run).
-            //   • !streaming           → SEND (full color when hasText, dimmed
-            //     when empty; same as before).
-            // T180: an attachments-only send (no caption) is a
-            // valid message — mirrors iOS where !attachments.isEmpty
-            // satisfies the composer's send guard. Without this an
-            // image-only "look at this" send is impossible.
-            val hasText = inputText.isNotBlank()
-            val hasContent = hasText || attachments.isNotEmpty()
-            val showStop = isStreaming && !hasContent
-            if (showStop) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(ChatColors.sendButton, CircleShape)
-                        .clip(CircleShape)
-                        .clickable { viewModel.cancelStream() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Default.Stop,
-                        contentDescription = stringResource(R.string.common_stop),
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            } else {
-                // Streaming with content → Send-into-queue; Idle with content → Send.
-                // Idle without text or attachments → disabled.
-                val canActivate = hasContent
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .background(
-                            if (canActivate) ChatColors.sendButton
-                            else ChatColors.sendButtonDisabled,
-                            CircleShape,
+        }
+        Box(
+            modifier = Modifier
+                .padding(bottom = 2.dp)
+                .size(46.dp)
+                .background(ChatColors.primaryText, CircleShape)
+                .clip(CircleShape)
+                .clickable {
+                    when {
+                        actionEnd -> voiceCall?.actions?.end?.invoke()
+                        actionStop -> viewModel.cancelStream()
+                        actionVoice -> com.openminis.app.deeplink.DeepLinkCoordinator.setPendingChatAction(
+                            com.openminis.app.deeplink.DeepLinkCoordinator.ChatAction.START_VOICE,
                         )
-                        .clip(CircleShape)
-                        .clickable(enabled = canActivate) {
-                            // T-drag-send-queue: route through the
-                            // shared send-or-enqueue handler. Same
-                            // semantics as before: slash short-
-                            // circuit, snapshot text, clear input
-                            // + focus, then sendMessage (which
-                            // routes to enqueuePrompt when
-                            // _isStreaming is true), then re-pin
-                            // the list to index 0 with a 100ms
-                            // re-pin to catch the late-mounting
-                            // "thinking" indicator.
-                            performSendOrEnqueue(inputText, PendingDelivery.STEER)
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Default.ArrowUpward,
-                        contentDescription = stringResource(R.string.send),
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
+                        else -> performSendOrEnqueue(inputText, PendingDelivery.STEER)
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                when {
+                    actionEnd -> Icons.Default.Close
+                    actionStop -> Icons.Default.Stop
+                    actionVoice -> Icons.Filled.GraphicEq
+                    else -> Icons.Default.ArrowUpward
+                },
+                contentDescription = stringResource(
+                    when {
+                        actionEnd -> R.string.voice_call_end
+                        actionStop -> R.string.common_stop
+                        actionVoice -> R.string.voice_call_title
+                        else -> R.string.send
+                    },
+                ),
+                tint = ChatColors.inputBg,
+                modifier = Modifier.size(22.dp),
+            )
         }
     }
-            }
         }
 }

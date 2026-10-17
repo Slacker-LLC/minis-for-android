@@ -1748,6 +1748,7 @@
     <string name="chat_quick_recap_sub">最近都做了什麼</string>
     <string name="chat_quick_recap_prompt">整理一下我最近的對話裡都做了什麼。</string>
     <string name="chat_thinking_chip">思考 · %1$s</string>
+    <string name="chat_thinking_off_chip">關</string>
     <string name="files_hub_used_by">Minis 佔用</string>
     <string name="files_section_sandbox">沙箱內的目錄</string>
     <string name="files_shared_title">共用</string>
@@ -2207,11 +2208,7 @@
     <string name="voice_call_retry">重試</string>
     <string name="voice_call_interrupt">打斷並說話</string>
     <string name="voice_call_submit">現在傳送</string>
-    <string name="voice_call_back">查看聊天</string>
     <string name="voice_call_end">結束語音</string>
-    <string name="voice_call_input_hint">輸入文字…</string>
-    <string name="voice_call_send">傳送</string>
-    <string name="voice_call_show_orb">回到語音</string>
     <string name="voice_call_approval_question">要允許「%1$s」嗎？請說「允許」「本次會話都允許」或「拒絕」。</string>
     <string name="voice_call_approval_unclear">沒聽清。請說「允許」「本次會話都允許」或「拒絕」。</string>
     <string name="voice_call_working">稍等，我在處理。</string>
@@ -2230,8 +2227,9 @@
     <string name="voice_call_model">目前對話模型</string>
     <string name="voice_call_toast_retry">沒聽清，再試一次…</string>
     <string name="voice_call_toast_idle">還在嗎？一直沒聲音我就要掛斷囉。</string>
-    <string name="voice_call_chat_empty">還沒有內容，你和助理說的話會顯示在這裡。</string>
     <string name="voice_call_leave_to_chat">返回聊天</string>
+    <string name="voice_call_back">查看聊天</string>
+    <string name="voice_call_show_orb">回到語音</string>
     <string name="voice_call_ended_idle">很久沒有人說話，通話已自動結束。</string>
     <string name="voice_call_ended_connection">無法連線到即時語音服務：%1$s</string>
     <string name="voice_call_follow_up">補充指令</string>
@@ -2323,6 +2321,4 @@
     <string name="voice_call_notif_title">語音通話進行中</string>
     <string name="voice_call_notif_live">麥克風已開啟</string>
     <string name="voice_call_notif_muted">麥克風已暫停</string>
-    <string name="voice_call_attach">新增圖片</string>
-    <string name="voice_call_attach_remove">移除圖片</string>
 </resources>

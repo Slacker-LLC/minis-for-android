@@ -696,6 +696,18 @@ fun ChatScreen(
         userScrolledAwayState = userScrolledAway_st,
         releaseComposerAfterSend = releaseComposerAfterSend,
     )
+    // 通话就在这一页里：通话开着时，发送键发的文字走通话（助手用语音回答），其余照常。
+    val callUi_st = remember { mutableStateOf<com.openminis.app.voicecall.VoiceCallUi?>(null) }
+    val sendOrCallText: (String, PendingDelivery) -> Unit = { text, delivery ->
+        val call = callUi_st.value
+        if (call != null && call.active) {
+            viewModel.setInputText("")
+            releaseComposerAfterSend()
+            call.actions.sendText(text)
+        } else {
+            performSendOrEnqueue(text, delivery)
+        }
+    }
     val lastInterruptMs_st = remember { mutableStateOf(0L) }
     var lastInterruptMs by lastInterruptMs_st
     // [T-android-composer-input-blocked-while-streaming] True only while the
@@ -1155,6 +1167,7 @@ fun ChatScreen(
         // minis://attachments/* lookups don't rely on the global bindMounts
         // map (which is last-writer-wins across sessions).
         LocalMarkdownSessionId provides sessionId,
+        com.openminis.app.voicecall.LocalVoiceCall provides callUi_st.value,
         // Long-press a file or image in the chat to quote it into the next message.
         LocalQuoteFile provides { file, name ->
             viewModel.quoteAttachmentFile(file, name)
@@ -1195,6 +1208,9 @@ fun ChatScreen(
                 .imePadding()
                 .onGloballyPositioned { chatPaneWidthPx = it.size.width },
         ) {
+        @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+        androidx.compose.animation.SharedTransitionLayout(Modifier.fillMaxSize()) {
+        CompositionLocalProvider(com.openminis.app.voicecall.LocalCallSharedScope provides this) {
         Column(
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -1212,55 +1228,70 @@ fun ChatScreen(
                 }
             }
 
-            // Messages + scroll-to-bottom button
-            ChatMessagePane(
-                sessionId = sessionId,
-                providerRepository = providerRepository,
-                onOpenSetupStep = onOpenSetupStep,
-                onOpenTerminalWithCommand = onOpenTerminalWithCommand,
-                onMoveToSession = onMoveToSession,
-                onPreviewAttachment = onPreviewAttachment,
-                context = context,
-                keyboardController = keyboardController,
-                focusManager = focusManager,
-                viewModel = viewModel,
-                messages_st = messages_st,
-                messagesState = messages_st,
-                hasOlderMessages_st = hasOlderMessages_st,
-                isStreaming_st = isStreaming_st,
-                isStreamingState = isStreaming_st,
-                generatingMessageId_st = generatingMessageId_st,
-                replySpeechState_st = replySpeechState_st,
-                replySpeechStateState = replySpeechState_st,
-                canResume_st = canResume_st,
-                compactProgress_st = compactProgress_st,
-                error_st = error_st,
-                sessionTitle_st = sessionTitle_st,
-                listState = listState,
-                inputText_st = inputText_st,
-                inputTextState = inputText_st,
-                lastUserAppendMs_st = lastUserAppendMs_st,
-                lastUserAppendMsState = lastUserAppendMs_st,
-                inputFocusRequester = inputFocusRequester,
-                coroutineScope = coroutineScope,
-                showAttachMenu_st = showAttachMenu_st,
-                deleteSingleMessageTargetId_st = deleteSingleMessageTargetId_st,
-                regenerateTarget_st = regenerateTarget_st,
-                messageMenuTargetState = messageMenuTarget_st,
-                deleteFromHereTargetId_st = deleteFromHereTargetId_st,
-                compactAboveTargetId_st = compactAboveTargetId_st,
-                tracedScrollToItem = tracedScrollToItem,
-                isNearBottom = isNearBottom,
-                contentOverflows = contentOverflows,
-                userScrolledAway_st = userScrolledAway_st,
-                userScrolledAwayState = userScrolledAway_st,
-                lastJumpedUserId_st = lastJumpedUserId_st,
-                lastInterruptMs_st = lastInterruptMs_st,
-                toolStatusBarEnabledState = toolStatusBarEnabled_st,
-                previewImageGallery_st = previewImageGallery_st,
-                urlClickHandler = urlClickHandler,
-                chatPaneWidthPxState = chatPaneWidthPx_st,
-            )
+            // 通话默认是大球版面：球占满消息区，消息列表在切换后出现。
+            val callNow = com.openminis.app.voicecall.LocalVoiceCall.current
+            // 退出动画要用最后一帧的通话状态，别在通话结束瞬间把大球抽走。
+            var lastCall by remember { mutableStateOf<com.openminis.app.voicecall.VoiceCallUi?>(null) }
+            if (callNow != null) lastCall = callNow
+            androidx.compose.animation.AnimatedVisibility(
+                visible = callNow?.orbMode == true,
+                modifier = Modifier.weight(1f),
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically(),
+            ) {
+                lastCall?.let { com.openminis.app.voicecall.VoiceCallOrbPane(it, Modifier.fillMaxSize(), visibility = this) }
+            }
+            if (callNow?.orbMode != true) {
+                // Messages + scroll-to-bottom button
+                ChatMessagePane(
+                    sessionId = sessionId,
+                    providerRepository = providerRepository,
+                    onOpenSetupStep = onOpenSetupStep,
+                    onOpenTerminalWithCommand = onOpenTerminalWithCommand,
+                    onMoveToSession = onMoveToSession,
+                    onPreviewAttachment = onPreviewAttachment,
+                    context = context,
+                    keyboardController = keyboardController,
+                    focusManager = focusManager,
+                    viewModel = viewModel,
+                    messages_st = messages_st,
+                    messagesState = messages_st,
+                    hasOlderMessages_st = hasOlderMessages_st,
+                    isStreaming_st = isStreaming_st,
+                    isStreamingState = isStreaming_st,
+                    generatingMessageId_st = generatingMessageId_st,
+                    replySpeechState_st = replySpeechState_st,
+                    replySpeechStateState = replySpeechState_st,
+                    canResume_st = canResume_st,
+                    compactProgress_st = compactProgress_st,
+                    error_st = error_st,
+                    sessionTitle_st = sessionTitle_st,
+                    listState = listState,
+                    inputText_st = inputText_st,
+                    inputTextState = inputText_st,
+                    lastUserAppendMs_st = lastUserAppendMs_st,
+                    lastUserAppendMsState = lastUserAppendMs_st,
+                    inputFocusRequester = inputFocusRequester,
+                    coroutineScope = coroutineScope,
+                    showAttachMenu_st = showAttachMenu_st,
+                    deleteSingleMessageTargetId_st = deleteSingleMessageTargetId_st,
+                    regenerateTarget_st = regenerateTarget_st,
+                    messageMenuTargetState = messageMenuTarget_st,
+                    deleteFromHereTargetId_st = deleteFromHereTargetId_st,
+                    compactAboveTargetId_st = compactAboveTargetId_st,
+                    tracedScrollToItem = tracedScrollToItem,
+                    isNearBottom = isNearBottom,
+                    contentOverflows = contentOverflows,
+                    userScrolledAway_st = userScrolledAway_st,
+                    userScrolledAwayState = userScrolledAway_st,
+                    lastJumpedUserId_st = lastJumpedUserId_st,
+                    lastInterruptMs_st = lastInterruptMs_st,
+                    toolStatusBarEnabledState = toolStatusBarEnabled_st,
+                    previewImageGallery_st = previewImageGallery_st,
+                    urlClickHandler = urlClickHandler,
+                    chatPaneWidthPxState = chatPaneWidthPx_st,
+                )
+            }
 
             // T-chat-title-pill-edit: reuse SessionEditSheet from the session
             // list (same composable, exposed `internal`) so title + category
@@ -1321,12 +1352,14 @@ fun ChatScreen(
                 tracedScrollToItem = tracedScrollToItem,
                 userScrolledAway_st = userScrolledAway_st,
                 releaseComposerAfterSend = releaseComposerAfterSend,
-                performSendOrEnqueue = performSendOrEnqueue,
+                performSendOrEnqueue = sendOrCallText,
                 editingSessionState = editingSession_st,
                 chatInputFontScale = chatInputFontScale,
                 previewImageGallery_st = previewImageGallery_st,
                 webAppSheetTarget_st = webAppSheetTarget_st,
             )
+        }
+        }
         }
         // Top gradient fade: messages fade into the Scaffold background.
         Box(
@@ -1442,6 +1475,7 @@ fun ChatScreen(
         isChatDestination,
         ensureMicPermissionFlow,
         onMoveToSession,
+        callUi_st,
     )
 
     // Offload permission dialog (also visible over the voice conversation).

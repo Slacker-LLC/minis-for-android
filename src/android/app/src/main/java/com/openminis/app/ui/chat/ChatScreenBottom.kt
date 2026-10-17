@@ -142,6 +142,15 @@ internal fun ChatBottomArea(
     )
     val composerWidthPx_st = remember { mutableStateOf(0) }
     var composerWidthPx by composerWidthPx_st
+    // 通话中看消息列表时：输入框正上方居中一行小球加状态字；大球版面的状态字在球下面。
+    val callRow = com.openminis.app.voicecall.LocalVoiceCall.current
+    androidx.compose.animation.AnimatedVisibility(
+        visible = callRow != null && !callRow.orbMode,
+        enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+        exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically(),
+    ) {
+        if (callRow != null) com.openminis.app.voicecall.VoiceCallStatusRow(callRow, visibility = this)
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()

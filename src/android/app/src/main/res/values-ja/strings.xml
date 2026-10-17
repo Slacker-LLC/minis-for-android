@@ -1604,6 +1604,7 @@
     <string name="chat_quick_recap_sub">最近取り組んだこと</string>
     <string name="chat_quick_recap_prompt">最近の会話で取り組んだことを要約して。</string>
     <string name="chat_thinking_chip">思考 · %1$s</string>
+    <string name="chat_thinking_off_chip">オフ</string>
     <string name="files_hub_used_by">Minis の使用量</string>
     <string name="files_section_sandbox">サンドボックス内のフォルダ</string>
     <string name="files_shared_title">共有</string>
@@ -2070,11 +2071,7 @@
     <string name="voice_call_retry">再試行</string>
     <string name="voice_call_interrupt">中断して話す</string>
     <string name="voice_call_submit">今すぐ送信</string>
-    <string name="voice_call_back">チャットを表示</string>
     <string name="voice_call_end">音声会話を終了</string>
-    <string name="voice_call_input_hint">メッセージを入力…</string>
-    <string name="voice_call_send">送信</string>
-    <string name="voice_call_show_orb">音声画面に戻る</string>
     <string name="voice_call_approval_question">「%1$s」を許可しますか？「許可」「このセッションで許可」「拒否」のいずれかを言ってください。</string>
     <string name="voice_call_approval_unclear">聞き取れませんでした。「許可」「このセッションで許可」「拒否」のいずれかを言ってください。</string>
     <string name="voice_call_working">少々お待ちください、対応中です。</string>
@@ -2093,8 +2090,9 @@
     <string name="voice_call_model">現在のチャットモデル</string>
     <string name="voice_call_toast_retry">聞き取れませんでした。もう一度聞きます…</string>
     <string name="voice_call_toast_idle">いらっしゃいますか？声がないと、まもなく切断します。</string>
-    <string name="voice_call_chat_empty">まだ会話がありません。やり取りはここに表示されます。</string>
     <string name="voice_call_leave_to_chat">チャットに戻る</string>
+    <string name="voice_call_back">チャットを表示</string>
+    <string name="voice_call_show_orb">音声画面に戻る</string>
     <string name="voice_call_ended_idle">しばらく誰も話さなかったため、通話を終了しました。</string>
     <string name="voice_call_ended_connection">リアルタイム音声サービスに接続できませんでした：%1$s</string>
     <string name="voice_call_follow_up">指示を追加</string>
@@ -2206,7 +2204,5 @@
     <string name="voice_call_notif_title">音声通話中</string>
     <string name="voice_call_notif_live">マイクはオンです</string>
     <string name="voice_call_notif_muted">マイクは一時停止中です</string>
-    <string name="voice_call_attach">写真を追加</string>
-    <string name="voice_call_attach_remove">写真を削除</string>
     <string name="chat_plan_exit">終了</string>
 </resources>
