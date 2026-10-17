@@ -53,9 +53,9 @@ internal object ProtectedView {
         "/debug_ramdisk/su",
     )
 
-    private const val LIBDIR_REL = "usr/lib/aarch64-linux-gnu"
-    private const val LIBDIR2_REL = "lib/aarch64-linux-gnu"
-    private const val LOADER_REL = "usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1"
+    internal const val LIBDIR_REL = "usr/lib/aarch64-linux-gnu"
+    internal const val LIBDIR2_REL = "lib/aarch64-linux-gnu"
+    internal const val LOADER_REL = "usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1"
 
     /**
      * Wrap [script] so it runs inside the view. [rootfs] is the Ubuntu rootfs on the host; its

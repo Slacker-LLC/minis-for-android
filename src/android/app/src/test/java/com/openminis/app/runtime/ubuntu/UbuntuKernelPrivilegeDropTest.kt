@@ -125,4 +125,25 @@ class UbuntuKernelPrivilegeDropTest {
             root.deleteRecursively()
         }
     }
+
+    @Test
+    fun `launch makes its mount namespace private with the rootfs mount, not the toybox bind`() {
+        val commands = UbuntuKernel.buildPrivateNamespaceCommands()
+        val script = commands.joinToString("\n")
+        assertTrue(script.contains("--make-rslave /"))
+        assertTrue(script.contains("ld-linux-aarch64.so.1"))
+        assertTrue("toybox cannot change propagation: its rprivate,bind is a plain bind", !script.contains("rprivate"))
+        assertTrue(script.contains("exit 77"))
+    }
+
+    @Test
+    fun `launch fails closed when the rootfs mount cannot be used`() {
+        // No rootfs here: the loader and mount are missing, so the script must stop before it could mount anything.
+        val script = "set -eu\nROOTFS=/nonexistent-minis-rootfs\n" +
+            UbuntuKernel.buildPrivateNamespaceCommands().joinToString("\n") + "\necho reached"
+        val process = ProcessBuilder("sh", "-c", script).redirectErrorStream(true).start()
+        val output = process.inputStream.bufferedReader().readText()
+        assertEquals(77, process.waitFor())
+        assertFalse(output, output.contains("reached"))
+    }
 }

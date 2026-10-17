@@ -5,6 +5,7 @@ import android.net.Uri
 import android.system.Os
 import android.util.Log
 import com.openminis.app.data.MountedFoldersStore
+import com.openminis.app.integrity.ProtectedView
 import com.openminis.app.runtime.ExecutionCoordinator
 import com.openminis.app.runtime.guest.GuestCommandBridge
 import com.openminis.app.runtime.RuntimePathRegistry
@@ -79,6 +80,22 @@ internal object UbuntuKernel {
         }
         return AppIdentity(uid = uid, gid = gid)
     }
+
+    /**
+     * Makes the launch's mount namespace really private before anything is mounted in it.
+     *
+     * `unshare -m` copies the host's mounts with their peer groups, and `/` and `/data` are shared there, so a
+     * bind made in the copy shows up on the host as well. Android's toybox cannot change propagation: its
+     * `mount -o rprivate,bind / /` is a plain bind (the kernel runs the bind and ignores the propagation flag),
+     * which is why [ProtectedView] uses the rootfs's util-linux `mount` instead, through the rootfs loader.
+     * `--make-rslave` keeps host mounts visible here and keeps ours from reaching the host. Fails closed.
+     */
+    internal fun buildPrivateNamespaceCommands(): List<String> = listOf(
+        "LOADER=\"\$ROOTFS/${ProtectedView.LOADER_REL}\"",
+        "[ -x \"\$LOADER\" ] && [ -x \"\$ROOTFS/usr/bin/mount\" ] || exit 77",
+        "\"\$LOADER\" --library-path \"\$ROOTFS/${ProtectedView.LIBDIR_REL}:\$ROOTFS/${ProtectedView.LIBDIR2_REL}\" " +
+            "\"\$ROOTFS/usr/bin/mount\" --make-rslave / || exit 77",
+    )
 
     internal fun buildGuestSetprivExec(uid: Int, gid: Int, envArgs: String, shellArgs: String): String {
         require(uid > 0) { "invalid app uid" }
@@ -602,15 +619,13 @@ internal object UbuntuKernel {
         commands += "set -eu"
         commands += "ROOTFS=${shellQuote(rootfs)}"
         commands += buildGuestIdentityCommands(rootfs, identity)
-        // Android's toybox mount has no GNU --make-rprivate subcommand. The
-        // two-path bind form carries the same MS_PRIVATE|MS_REC operation and
-        // works with the mount implementation shipped on rooted devices.
-        commands += "/system/bin/mount -o rprivate,bind / /"
+        commands += buildPrivateNamespaceCommands()
         commands += UbuntuMountPolicy.setupCommands()
         for (bind in binds) {
             val target = rootfs + bind.guest
             commands += noSymlinkMountTargetGuards(rootfs, bind.guest)
-            commands += "mkdir -p ${shellQuote(target)}"
+            // The directory exists after the first launch; a fork per bind to find that out is wasted time.
+            commands += "[ -d ${shellQuote(target)} ] || mkdir -p ${shellQuote(target)}"
             commands += "[ -d ${shellQuote(target)} ] && [ ! -L ${shellQuote(target)} ] || exit 75"
             commands += "/system/bin/mount -o bind ${shellQuote(bind.host)} ${shellQuote(target)}"
             if (bind.readOnly) {
@@ -652,7 +667,7 @@ internal object UbuntuKernel {
         val pidDir = File(DirectRootRunner.ROOT_STATE_DIR, "shells")
         val pidFile = File(pidDir, "shell-${UUID.randomUUID()}.pid")
         val child = "umask 077; " +
-            "mkdir -p ${shellQuote(pidDir.absolutePath)} || exit 126; " +
+            "[ -d ${shellQuote(pidDir.absolutePath)} ] || mkdir -p ${shellQuote(pidDir.absolutePath)} || exit 126; " +
             "chmod 711 ${shellQuote(pidDir.absolutePath)} || exit 126; " +
             "printf '%s\\n%s\\n' \"\$\$\" ${shellQuote(shellMarkerToken)} > ${shellQuote(pidFile.absolutePath)} || exit 126; " +
             "exec /system/bin/unshare -m /system/bin/sh -c ${shellQuote(inner)}"

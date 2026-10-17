@@ -521,7 +521,7 @@ fi
 stdin_hex=''
 has_input=false
 for arg in "${'$'}@"; do
-  case "${'$'}arg" in --input|--input=*) has_input=true ;; esac
+  case "${'$'}arg" in --input|--input=*|-h|--help) has_input=true ;; esac
 done
 if [ "${'$'}cmd" = 'minis-model-use' ] && [ "${'$'}{1:-}" = 'run' ] && [ "${'$'}has_input" = false ] && [ ! -t 0 ]; then
   stdin_hex="${'$'}(head -c 2097153 | od -An -v -tx1 | tr -d ' \n')"

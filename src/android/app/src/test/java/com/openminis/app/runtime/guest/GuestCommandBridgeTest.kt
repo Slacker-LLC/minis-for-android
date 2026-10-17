@@ -162,4 +162,38 @@ class GuestCommandBridgeTest {
         limiter.release()
         assertEquals(0, limiter.activeCount())
     }
+
+    @Test
+    fun `help never waits for piped input, a real run still reads it`() {
+        val dir = java.nio.file.Files.createTempDirectory("minis-wrapper").toFile()
+        try {
+            val config = java.io.File(dir, "proxy").apply {
+                // Port 1 refuses the connection, so the wrapper ends right after the stdin step.
+                writeText("MINIS_CONFIG_PROXY_PORT=1\nMINIS_CONFIG_PROXY_TOKEN=t\n")
+            }
+            val wrapper = java.io.File(dir, "minis-model-use").apply {
+                writeText(GuestCommandBridge.wrapperScriptForTest().replace("/etc/minis/minis-config-proxy", config.path))
+            }
+            fun run(vararg args: String): Pair<Int, String> {
+                val process = ProcessBuilder("bash", "-c", "yes | bash \"\$0\" \"\$@\"", wrapper.path, *args)
+                    .redirectErrorStream(true).start()
+                val text = process.inputStream.bufferedReader().readText()
+                return process.waitFor() to text
+            }
+            org.junit.Assume.assumeTrue(java.io.File("/bin/bash").canExecute() || java.io.File("/usr/bin/bash").canExecute())
+
+            // Endless input: reading it is what the 2 MiB guard would reject.
+            val help = run("run", "--help")
+            assertEquals(help.second, 127, help.first)
+            assertTrue(help.second, help.second.contains("cannot connect"))
+            val shortHelp = run("run", "-h")
+            assertTrue(shortHelp.second, shortHelp.second.contains("cannot connect"))
+
+            val real = run("run")
+            assertEquals(real.second, 1, real.first)
+            assertTrue(real.second, real.second.contains("stdin exceeds 2 MiB"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }
