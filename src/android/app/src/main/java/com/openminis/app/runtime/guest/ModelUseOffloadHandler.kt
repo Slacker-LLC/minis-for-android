@@ -21,7 +21,7 @@ import com.openminis.app.data.repository.resolvedAgentLoopEntries
  *                       [--system <text>] [--system-file <path>]
  *                       [--max-tokens N] [--temperature F]
  *
- * Only entries/groups exposed via the "Available Models in Agent Loop" section
+ * Only entries/groups exposed via the "Agent Models" list (or the Image slot)
  * in Settings > Models are visible (see ProviderRepository.resolvedAgentLoopEntries).
  */
 class ModelUseOffloadHandler(
@@ -178,8 +178,7 @@ class ModelUseOffloadHandler(
         }
 
         internal const val TAG = "ModelUseOffload"
-        internal const val NO_MODELS_HINT =
-            "No models available. Go to Settings > Models to add models that the agent can use."
+        internal const val NO_MODELS_HINT = com.openminis.app.offload.ModelUseManager.NO_MODELS_HINT
 
         /** Appended to non-empty list/search results so the agent knows how to invoke a model.
          *  Three forms are supported by `run --model`:

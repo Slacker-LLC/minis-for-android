@@ -12,6 +12,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -442,6 +443,22 @@ class ProviderRepository(internal val context: Context) {
 
 
     internal val refreshesInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    private val _pruneNotices = MutableStateFlow<List<PruneNotice>>(emptyList())
+
+    /**
+     * Slot / Agent-list members that a model refresh removed because the provider stopped
+     * listing them. In memory only: shown on the Models settings page until dismissed.
+     */
+    val pruneNotices: StateFlow<List<PruneNotice>> = _pruneNotices.asStateFlow()
+
+    internal fun publishPruneNotices(notices: List<PruneNotice>) {
+        _pruneNotices.update { (it + notices).distinct() }
+    }
+
+    fun dismissPruneNotices() {
+        _pruneNotices.value = emptyList()
+    }
     internal val lastStaleAttemptAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
 

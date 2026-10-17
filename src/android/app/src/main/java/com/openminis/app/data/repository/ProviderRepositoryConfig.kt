@@ -948,6 +948,22 @@ fun ProviderRepository.isEntryProviderEnabled(entryId: String): Boolean {
     return instance.isEnabled
 }
 
+/** What losing [pruned] would take out of the user's slots and Agent list, one notice per model. */
+internal fun ProviderConfig.pruneNoticesFor(existing: List<ModelEntry>, pruned: Set<String>): List<PruneNotice> =
+    existing.filter { it.id in pruned }.mapNotNull { entry ->
+        val fromSlots = ModelSlot.values().filter { entry.id in slots.entries(it) }
+        val fromAgentList = entry.id in agentLoopModelEntryIds
+        if (fromSlots.isEmpty() && !fromAgentList) null
+        else PruneNotice(entry.model.displayName, fromSlots, fromAgentList)
+    }
+
+/** A model that a refresh dropped from the user's slots and/or Agent models list. */
+data class PruneNotice(
+    val modelName: String,
+    val slots: List<ModelSlot>,
+    val agentList: Boolean,
+)
+
 fun ProviderRepository.replaceEntries(instanceId: String, models: List<LLMModel>) = synchronized(configLock) {
     ensureConfigLoaded()
     // Hot path for concurrent autoRefreshModels coroutines (one per
@@ -1035,11 +1051,14 @@ fun ProviderRepository.replaceEntries(instanceId: String, models: List<LLMModel>
     // Prune stale slot member references
     val survivingEntryIds = config.modelEntries.map { it.id }.toSet()
     val prunedEntryIds = existingEntryIds - survivingEntryIds
+    val pruneNotices = mutableListOf<PruneNotice>()
     if (prunedEntryIds.isNotEmpty()) {
         val suspiciousShrink = existing.size >= 4 && models.size * 2 < existing.size
         if (suspiciousShrink) {
             android.util.Log.w("ProviderRepo", "[ModelList] replaceEntries SUSPICIOUS SHRINK before=${existing.size} after=${models.size} — slot references PRESERVED as stale")
         } else {
+            // Say what is about to disappear from the user's setup before it does.
+            pruneNotices.addAll(config.pruneNoticesFor(existing, prunedEntryIds))
             config.slots = config.slots.copy(
                 main = config.slots.main.filterNot { it in prunedEntryIds },
                 light = config.slots.light.filterNot { it in prunedEntryIds },
@@ -1063,6 +1082,7 @@ fun ProviderRepository.replaceEntries(instanceId: String, models: List<LLMModel>
     }
 
     saveConfig(config)
+    if (pruneNotices.isNotEmpty()) publishPruneNotices(pruneNotices)
     // Stamp so staleness checks know this instance just refreshed.
     markInstanceFetched(instanceId)
 }
@@ -1075,7 +1095,32 @@ fun ProviderRepository.setSlotEntries(slot: ModelSlot, entryIds: List<String>): 
     val normalized = entryIds.distinct()
     if (config.slots.entries(slot) == normalized) return@synchronized
     config.slots = config.slots.withEntries(slot, normalized)
+    if (slot == ModelSlot.image) config.addImageSlotMembersToAgentList()
     saveConfig(config)
+}
+
+/**
+ * The agent reaches an image model through `minis-model-use`, which only
+ * resolves entries on the Agent models list. A model picked for the Image slot
+ * therefore has to be on that list too; doing it here spares the user a second,
+ * easy-to-miss step. Only entries that exist are added; returns whether the
+ * list changed.
+ */
+internal fun ProviderConfig.addImageSlotMembersToAgentList(): Boolean {
+    val known = modelEntries.mapTo(HashSet()) { it.id }
+    val missing = slots.image.filter { it in known && it !in agentLoopModelEntryIds }.distinct()
+    if (missing.isEmpty()) return false
+    agentLoopModelEntryIds.addAll(missing)
+    return true
+}
+
+/** Repairs a config where an Image-slot model was never added to the Agent list; idempotent. */
+fun ProviderRepository.syncImageSlotToAgentList(): Boolean = synchronized(configLock) {
+    ensureConfigLoaded()
+    val config = workingCopy()
+    if (!config.addImageSlotMembersToAgentList()) return@synchronized false
+    saveConfig(config)
+    true
 }
 
 /** Reorders existing members without silently adding/removing slot entries. */

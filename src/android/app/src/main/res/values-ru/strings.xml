@@ -730,7 +730,7 @@
     <string name="add_provider_auto_append_v1_quoted">Автодобавление \"/v1\"</string>
     <string name="provider_detail_https_api_example_placeholder">https://api.example.com</string>
     <string name="provider_detail_models_count_header">Модели (%1$d)</string>
-    <string name="provider_detail_delete_provider_confirm">Вы уверены, что хотите удалить \"%1$s\"? Это действие необратимо.</string>
+    <string name="provider_detail_delete_provider_confirm">Удалить \"%1$s\"? Это нельзя отменить. Его модели также будут удалены из слотов моделей и списка моделей агента.</string>
     <string name="provider_detail_delete_model_confirm">Вы уверены, что хотите удалить \"%1$s\"? Это действие необратимо.</string>
     <string name="provider_list_models_count">Моделей: %1$d</string>
     <string name="settings_section_notifications">Уведомления</string>
@@ -1466,7 +1466,7 @@
     <string name="system_enhance_root_hidden">su не виден этому приложению; установлен %1$s — разрешите это приложение в нём (или отключите скрытие su)</string>
     <string name="settings_section_system">Система и разрешения</string>
     <string name="settings_auto_compact">Автосжатие контекста</string>
-    <string name="settings_auto_compact_subtitle">Сжимать историю при достижении порога токенов</string>
+    <string name="settings_auto_compact_subtitle">Когда чат приближается к лимиту контекста: вкл — сжимать автоматически, выкл — сначала спрашивать. Сжатие посреди задачи выполняется всегда. Используется текущая модель чата, нужно окно контекста от 64K.</string>
     <string name="settings_pet">Настольный питомец</string>
     <string name="settings_pet_subtitle">Импорт пакета pet.json + spritesheet.webp</string>
     <string name="settings_assistant_role">Ассистент по умолчанию</string>
@@ -1824,6 +1824,18 @@
     <string name="settings_models_title">Модели</string>
     <string name="model_slots_header">Слоты моделей</string>
     <string name="model_slots_footer">Выбирайте совместимые модели и задавайте их порядок в каждом фиксированном слоте задачи.</string>
+    <string name="model_slot_main_desc">Модель по умолчанию для чата и задач агента. При сбое её заменяет резервная.</string>
+    <string name="model_slot_light_desc">Более дешёвая модель для заголовков чатов и субагентов. Если не задана, используется основная.</string>
+    <string name="model_slot_vision_desc">Описывает изображения для моделей, которые их не видят (read_image).</string>
+    <string name="model_slot_voice_input_desc">Распознавание речи для голосового ввода и звонков.</string>
+    <string name="model_slot_voice_output_desc">Голос, которым озвучиваются ответы и ведутся звонки.</string>
+    <string name="model_slot_image_desc">Генерация изображений для агента. Выбор здесь также добавляет модель в список моделей агента.</string>
+    <string name="model_prune_notice">«%1$s» больше нет в списке провайдера, модель удалена из: %2$s.</string>
+    <string name="model_prune_notice_dismiss">Понятно</string>
+    <string name="compact_busy_streaming">Нельзя сжимать, пока идёт ответ. Сначала остановите ответ.</string>
+    <string name="compact_already_running">Сжатие уже выполняется. Дождитесь его завершения.</string>
+    <string name="chat_context_near_limit">Контекст близок к лимиту модели (%1$d / %2$d токенов). Начните новый чат или используйте /compact.</string>
+    <string name="chat_context_filling">Контекст заполняется (%1$d / %2$d токенов) — сжимаю, чтобы продолжить.</string>
     <string name="model_slot_main">Основная</string>
     <string name="model_slot_light">Лёгкая</string>
     <string name="model_slot_vision">Зрение</string>
@@ -1834,7 +1846,7 @@
     <string name="model_slot_fallback_title">Резерв при ошибках</string>
     <string name="model_slot_fallback_always">При любой ошибке</string>
     <string name="model_slot_fallback_default">При ограничении частоты и ошибках сервера</string>
-    <string name="agent_loop_models_slots_footer">Ассистент может выбирать только модели, добавленные здесь.</string>
+    <string name="agent_loop_models_slots_footer">Ассистент может выбирать только добавленные здесь модели. Вызовы этих моделей оплачиваются у соответствующих провайдеров.</string>
     <string name="agent_loop_models_slots_subtitle">Их могут использовать субагенты и minis-model-use</string>
     <string name="model_slot_selected_models">Выбранные модели</string>
     <string name="model_slot_order_footer">Модели проверяются в этом порядке. Стрелками можно изменить приоритет.</string>

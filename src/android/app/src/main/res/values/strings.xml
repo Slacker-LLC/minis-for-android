@@ -1005,7 +1005,7 @@
     <string name="add_provider_auto_append_v1_quoted">Auto Append \"/v1\"</string>
     <string name="provider_detail_https_api_example_placeholder">https://api.example.com</string>
     <string name="provider_detail_models_count_header">Models (%1$d)</string>
-    <string name="provider_detail_delete_provider_confirm">Are you sure you want to delete \"%1$s\"? This cannot be undone.</string>
+    <string name="provider_detail_delete_provider_confirm">Delete \"%1$s\"? This cannot be undone. Its models are also removed from the model slots and the Agent Models list.</string>
     <string name="provider_detail_delete_model_confirm">Are you sure you want to delete \"%1$s\"? This action cannot be undone.</string>
     <!-- [T-disabled-provider-via-group-android] Badge shown on the group
          summary row when every member belongs to a currently-disabled
@@ -1573,7 +1573,7 @@
     <string name="system_enhance_root_hidden">su is not visible to this app; %1$s is installed - allow this app there (or turn off su hiding)</string>
     <string name="settings_section_system">System &amp; permissions</string>
     <string name="settings_auto_compact">Auto-compact context</string>
-    <string name="settings_auto_compact_subtitle">Compact history when the token threshold is reached</string>
+    <string name="settings_auto_compact_subtitle">When a chat nears the context limit: on = compact automatically, off = ask first. Compaction in the middle of a task always happens. Uses the chat\'s current model and needs a context window of 64K or more.</string>
     <string name="settings_pet">Desktop pet</string>
     <string name="settings_pet_subtitle">Import a pet.json + spritesheet.webp pack</string>
     <string name="settings_assistant_role">Default digital assistant</string>
@@ -1915,6 +1915,18 @@
     <string name="settings_models_title">Models</string>
     <string name="model_slots_header">Model slots</string>
     <string name="model_slots_footer">Choose and order compatible model entries for each fixed task slot.</string>
+    <string name="model_slot_main_desc">Default model for chat and agent tasks. Backups take over if it fails.</string>
+    <string name="model_slot_light_desc">Cheaper model for chat titles and sub-agents. Falls back to Main when empty.</string>
+    <string name="model_slot_vision_desc">Describes images for models that can\'t see them (read_image).</string>
+    <string name="model_slot_voice_input_desc">Speech recognition for voice input and calls.</string>
+    <string name="model_slot_voice_output_desc">Voice that reads replies aloud and speaks in calls.</string>
+    <string name="model_slot_image_desc">Image generation for the agent. Picking one here also adds it to Agent Models.</string>
+    <string name="model_prune_notice">“%1$s” is no longer listed by its provider and was removed from: %2$s.</string>
+    <string name="model_prune_notice_dismiss">Got it</string>
+    <string name="compact_busy_streaming">Can\'t compact while a reply is in progress. Stop the response first.</string>
+    <string name="compact_already_running">A compaction is already running. Please wait for it to finish.</string>
+    <string name="chat_context_near_limit">Context is near the model\'s limit (%1$d / %2$d tokens). Start a new chat or use /compact to continue reliably.</string>
+    <string name="chat_context_filling">Context is filling up (%1$d / %2$d tokens) — compacting to continue.</string>
     <string name="model_slot_main">Main</string>
     <string name="model_slot_light">Light</string>
     <string name="model_slot_vision">Vision</string>
@@ -1925,7 +1937,7 @@
     <string name="model_slot_fallback_title">Fallback on errors</string>
     <string name="model_slot_fallback_always">On any error</string>
     <string name="model_slot_fallback_default">On rate limits and server errors</string>
-    <string name="agent_loop_models_slots_footer">The assistant can only pick models you add here.</string>
+    <string name="agent_loop_models_slots_footer">The assistant can only pick models you add here. Calls to these models are billed by their providers.</string>
     <string name="agent_loop_models_slots_subtitle">Sub agents and minis-model-use can use these</string>
     <string name="model_slot_selected_models">Selected models</string>
     <string name="model_slot_order_footer">Entries are tried in this order. Move entries to change priority.</string>

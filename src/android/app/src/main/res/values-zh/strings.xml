@@ -818,7 +818,7 @@
     <string name="add_provider_auto_append_v1_quoted">自动追加 \"/v1\"</string>
     <string name="provider_detail_https_api_example_placeholder">https://api.example.com</string>
     <string name="provider_detail_models_count_header">模型 (%1$d)</string>
-    <string name="provider_detail_delete_provider_confirm">确定要删除 \"%1$s\" 吗？此操作无法撤销。</string>
+    <string name="provider_detail_delete_provider_confirm">确定要删除\"%1$s\"吗？此操作无法撤销，其模型也会同时从模型槽位和「Agent 可调用的模型」中移除。</string>
     <string name="provider_detail_delete_model_confirm">确定要删除 \"%1$s\" 吗？此操作无法撤销。</string>
     <string name="provider_list_models_count">%1$d 个模型</string>
 
@@ -1436,7 +1436,7 @@
     <string name="system_enhance_root_hidden">su 对本应用不可见；本机装有 %1$s——请在它的应用列表里允许本应用（或关闭 su 隐藏）</string>
     <string name="settings_section_system">系统与权限</string>
     <string name="settings_auto_compact">自动压缩上下文</string>
-    <string name="settings_auto_compact_subtitle">Token 达到阈值时自动压缩历史记录</string>
+    <string name="settings_auto_compact_subtitle">对话接近上下文上限时：开启＝自动压缩，关闭＝先询问。任务进行中的压缩始终会执行。使用当前对话的模型，且上下文窗口需不小于 64K。</string>
     <string name="settings_pet">桌面宠物</string>
     <string name="settings_pet_subtitle">导入通用 pet.json + spritesheet.webp 宠物包</string>
     <string name="settings_assistant_role">默认数字助手</string>
@@ -1829,6 +1829,18 @@
     <string name="settings_models_title">模型</string>
     <string name="model_slots_header">模型槽位</string>
     <string name="model_slots_footer">为每个固定任务槽位选择兼容模型并设置顺序。</string>
+    <string name="model_slot_main_desc">聊天和 Agent 任务默认使用的模型；失败时由备用模型接替。</string>
+    <string name="model_slot_light_desc">用于对话标题和子 Agent 的低成本模型；留空时回退到主模型。</string>
+    <string name="model_slot_vision_desc">让看不懂图片的模型借它识图（read_image）。</string>
+    <string name="model_slot_voice_input_desc">语音输入与通话时的语音识别。</string>
+    <string name="model_slot_voice_output_desc">朗读回复与通话时使用的声音。</string>
+    <string name="model_slot_image_desc">供 Agent 生成图片；在这里选择后会自动加入「Agent 可调用的模型」。</string>
+    <string name="model_prune_notice">“%1$s”已不在服务商的模型列表中，已从以下位置移除：%2$s。</string>
+    <string name="model_prune_notice_dismiss">知道了</string>
+    <string name="compact_busy_streaming">回复进行中无法压缩，请先停止当前回复。</string>
+    <string name="compact_already_running">正在压缩，请等待完成。</string>
+    <string name="chat_context_near_limit">上下文已接近模型上限（%1$d / %2$d tokens）。请新建对话或使用 /compact 以保证稳定。</string>
+    <string name="chat_context_filling">上下文即将占满（%1$d / %2$d tokens）——正在压缩以继续。</string>
     <string name="model_slot_main">主模型</string>
     <string name="model_slot_light">轻量模型</string>
     <string name="model_slot_vision">视觉模型</string>
@@ -1839,7 +1851,7 @@
     <string name="model_slot_fallback_title">错误时回退</string>
     <string name="model_slot_fallback_always">任何错误时</string>
     <string name="model_slot_fallback_default">限流和服务器错误时</string>
-    <string name="agent_loop_models_slots_footer">助手只能从这里添加的模型中选择。</string>
+    <string name="agent_loop_models_slots_footer">助手只能从这里添加的模型中选择；调用这些模型产生的费用由对应服务商计收。</string>
     <string name="agent_loop_models_slots_subtitle">子代理和 minis-model-use 可以使用这些模型</string>
     <string name="model_slot_selected_models">已选模型</string>
     <string name="model_slot_order_footer">模型会按此顺序尝试。使用箭头调整优先级。</string>

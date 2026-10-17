@@ -548,7 +548,7 @@
     <string name="add_provider_auto_append_v1_quoted">Ajouter automatiquement \"/v1\"</string>
     <string name="provider_detail_https_api_example_placeholder">https://api.example.com</string>
     <string name="provider_detail_models_count_header">Modèles (%1$d)</string>
-    <string name="provider_detail_delete_provider_confirm">Êtes-vous sûr de vouloir supprimer \"%1$s\" ? Cette action est irréversible.</string>
+    <string name="provider_detail_delete_provider_confirm">Supprimer \"%1$s\" ? Cette action est irréversible. Ses modèles sont aussi retirés des emplacements de modèles et de la liste des modèles de l\'agent.</string>
     <string name="provider_detail_delete_model_confirm">Êtes-vous sûr de vouloir supprimer \"%1$s\" ? Cette action est irréversible.</string>
     <string name="provider_list_models_count">%1$d modèles</string>
 
@@ -1219,7 +1219,7 @@
     <string name="system_enhance_root_hidden">su n\'est pas visible pour cette application ; %1$s est installé – autorise cette application dans sa liste (ou désactive le masquage de su)</string>
     <string name="settings_section_system">Système et autorisations</string>
     <string name="settings_auto_compact">Compresser le contexte automatiquement</string>
-    <string name="settings_auto_compact_subtitle">Compresser l\'historique au seuil de jetons</string>
+    <string name="settings_auto_compact_subtitle">Quand un chat approche de la limite de contexte : activé = compactage automatique, désactivé = demander d\'abord. Le compactage en cours de tâche a toujours lieu. Utilise le modèle actuel du chat et nécessite une fenêtre de contexte d\'au moins 64K.</string>
     <string name="settings_pet">Compagnon de bureau</string>
     <string name="settings_pet_subtitle">Importer un pack pet.json + spritesheet.webp</string>
     <string name="settings_assistant_role">Assistant numérique par défaut</string>
@@ -1562,6 +1562,18 @@
     <string name="settings_models_title">Modèles</string>
     <string name="model_slots_header">Emplacements de modèles</string>
     <string name="model_slots_footer">Choisissez et ordonnez les modèles compatibles pour chaque emplacement de tâche fixe.</string>
+    <string name="model_slot_main_desc">Modèle par défaut pour le chat et les tâches de l\'agent. Les modèles de secours prennent le relais en cas d\'échec.</string>
+    <string name="model_slot_light_desc">Modèle moins coûteux pour les titres de conversation et les sous-agents. Repli sur le modèle principal si vide.</string>
+    <string name="model_slot_vision_desc">Décrit les images pour les modèles qui ne peuvent pas les voir (read_image).</string>
+    <string name="model_slot_voice_input_desc">Reconnaissance vocale pour la saisie vocale et les appels.</string>
+    <string name="model_slot_voice_output_desc">Voix qui lit les réponses à voix haute et parle pendant les appels.</string>
+    <string name="model_slot_image_desc">Génération d\'images pour l\'agent. Le choisir ici l\'ajoute aussi aux modèles de l\'agent.</string>
+    <string name="model_prune_notice">« %1$s » n\'est plus proposé par son fournisseur et a été retiré de : %2$s.</string>
+    <string name="model_prune_notice_dismiss">Compris</string>
+    <string name="compact_busy_streaming">Impossible de compacter pendant une réponse. Arrêtez d\'abord la réponse.</string>
+    <string name="compact_already_running">Un compactage est déjà en cours. Veuillez patienter.</string>
+    <string name="chat_context_near_limit">Le contexte approche de la limite du modèle (%1$d / %2$d jetons). Démarrez un nouveau chat ou utilisez /compact pour continuer en toute fiabilité.</string>
+    <string name="chat_context_filling">Le contexte se remplit (%1$d / %2$d jetons) — compactage pour continuer.</string>
     <string name="model_slot_main">Principal</string>
     <string name="model_slot_light">Léger</string>
     <string name="model_slot_vision">Vision</string>
@@ -1572,7 +1584,7 @@
     <string name="model_slot_fallback_title">Repli en cas d’erreur</string>
     <string name="model_slot_fallback_always">À chaque erreur</string>
     <string name="model_slot_fallback_default">Sur limitation de débit et erreurs serveur</string>
-    <string name="agent_loop_models_slots_footer">L’assistant ne peut choisir que les modèles ajoutés ici.</string>
+    <string name="agent_loop_models_slots_footer">L\'assistant ne peut choisir que les modèles ajoutés ici. Les appels à ces modèles sont facturés par leurs fournisseurs.</string>
     <string name="agent_loop_models_slots_subtitle">Les sous-agents et minis-model-use peuvent les utiliser</string>
     <string name="model_slot_selected_models">Modèles sélectionnés</string>
     <string name="model_slot_order_footer">Les entrées sont essayées dans cet ordre. Déplacez-les pour changer la priorité.</string>

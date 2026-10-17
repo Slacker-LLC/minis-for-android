@@ -166,7 +166,7 @@ internal inline fun AgentSession.compactAllImpl(
     if (_isStreaming.value && !allowDuringProcessing) {
         AppLogger.info(TAG, "[Compact] aborted: stream in progress")
         appendSystemInfo(
-            text = "Cannot compact while a turn is in progress. Stop the current response first.",
+            text = context.getString(R.string.compact_busy_streaming),
             iconKind = "compact",
         )
         return
@@ -174,7 +174,7 @@ internal inline fun AgentSession.compactAllImpl(
     if (_isCompacting.value) {
         AppLogger.info(TAG, "[Compact] aborted: another compact already in flight")
         appendSystemInfo(
-            text = "A compact is already in progress. Please wait for it to finish.",
+            text = context.getString(R.string.compact_already_running),
             iconKind = "compact",
         )
         return
@@ -475,7 +475,7 @@ internal fun AgentSession.checkContextBeforeSend(): PreSendContextAction {
         // than blocking the user out of their own chat.
         ContextPolicy.CheckResult.EXHAUSTED -> {
             appendSystemInfo(
-                text = "Context is near the model's limit ($tokens / $window tokens). Start a new chat or /compact to continue reliably.",
+                text = context.getString(R.string.chat_context_near_limit, tokens, window),
                 iconKind = "compact",
             )
             PreSendContextAction.PROCEED
@@ -558,7 +558,7 @@ internal suspend fun AgentSession.inLoopContextCheck(compactionsSoFar: Int): InL
                     "(autoCompactPref=${com.openminis.app.data.AutoCompactPrefs.isEnabled()}, not a gate here)",
             )
             appendSystemInfo(
-                text = "Context is filling up ($tokens / $window tokens) — compacting to continue.",
+                text = context.getString(R.string.chat_context_filling, tokens, window),
                 iconKind = "compact",
             )
             val ok = awaitCompaction()
