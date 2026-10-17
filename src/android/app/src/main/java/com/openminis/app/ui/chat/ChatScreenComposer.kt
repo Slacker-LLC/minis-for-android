@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AppShortcut
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
@@ -947,10 +948,71 @@ internal fun ChatComposer(
                     expanded = showAttachMenu,
                     onDismissRequest = { showAttachMenu = false },
                     shape = RoundedCornerShape(14.dp),
-                    minWidth = 160.dp,
+                    minWidth = 220.dp,
                     tonalElevation = 0.dp,
                     containerColor = if (ChatColors.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White,
                 ) {
+                    // 模型与思考强度：从输入框挪进「＋」，输入框只留一行干净的输入。
+                    val chipModelRaw = modelName.ifEmpty { stringResource(R.string.model_slot_main) }
+                    val chipModel = if (chipModelRaw.contains("/")) chipModelRaw.substringAfterLast("/") else chipModelRaw
+                    val composerThinking by viewModel.thinkingLevel.collectAsState()
+                    val canThink = viewModel.currentModelSupportsReasoning
+                    val composerEntryId by viewModel.activeEntryId.collectAsState()
+                    val composerConfig by providerRepository.config.collectAsState()
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = chipModel,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = ChatColors.primaryText,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.widthIn(max = 190.dp),
+                                )
+                                // A dot when the active provider's balance / subscription is running low or out.
+                                com.openminis.app.ui.settings.QuotaDot(
+                                    instanceId = composerConfig.modelEntries.firstOrNull { it.id == composerEntryId }?.providerInstanceId,
+                                    providerRepository = providerRepository,
+                                    modifier = Modifier.padding(start = 6.dp),
+                                )
+                            }
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = stringResource(R.string.settings_models_title),
+                                tint = ChatColors.secondaryText,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        },
+                        trailingIcon = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                        modifier = Modifier.heightIn(min = 40.dp),
+                        onClick = { showAttachMenu = false; showModelPicker = true },
+                    )
+                    if (canThink) {
+                        val levels = listOf(ThinkingLevel.OFF) + viewModel.availableThinkingLevels
+                        levels.forEach { level ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = stringResource(R.string.chat_thinking_chip, thinkingLevelLabel(level)),
+                                        fontSize = 13.5.sp,
+                                        color = ChatColors.primaryText,
+                                    )
+                                },
+                                trailingIcon = {
+                                    if (level == composerThinking || (level == ThinkingLevel.OFF && !composerThinking.isEnabled)) {
+                                        Icon(Icons.Default.Check, contentDescription = null)
+                                    }
+                                },
+                                modifier = Modifier.heightIn(min = 36.dp),
+                                onClick = { showAttachMenu = false; viewModel.setThinkingLevel(level) },
+                            )
+                        }
+                    }
+                    MinisMenuDivider()
                     // 拍照
                     DropdownMenuItem(
                         text = {
@@ -1046,97 +1108,7 @@ internal fun ChatComposer(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val editingId by viewModel.editingMessageId.collectAsState()
-                Box(
-                    modifier = Modifier.weight(1f, fill = false),
-                ) {
-                    // One chip for what answers and how hard it thinks: "model · level". Tap opens a
-                    // small menu — the model (full picker) and the thinking levels.
-                        val chipModelRaw = modelName.ifEmpty { stringResource(R.string.model_slot_main) }
-                        val chipModel = if (chipModelRaw.contains("/")) chipModelRaw.substringAfterLast("/") else chipModelRaw
-                        val composerThinking by viewModel.thinkingLevel.collectAsState()
-                        val canThink = viewModel.currentModelSupportsReasoning
-                        var chipMenu by remember { mutableStateOf(false) }
-                        Box {
-                            Surface(
-                                shape = RoundedCornerShape(18.dp),
-                                // Plain text on the card, no pill: "mimo-v2.5 · 高 v".
-                                color = Color.Transparent,
-                                modifier = Modifier
-                                    .height(44.dp)
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .clickable {
-                                        showAttachMenu = false
-                                        if (viewModel.showSlashMenu.value) {
-                                            viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
-                                        }
-                                        chipMenu = true
-                                    },
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(start = 12.dp, end = 8.dp),
-                                ) {
-                                    Text(
-                                        text = chipModel,
-                                        fontSize = 15.sp,
-                                        color = ChatColors.primaryText,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.widthIn(max = 190.dp),
-                                    )
-                                    // A dot when the active provider's balance / subscription is running low or out.
-                                    val composerEntryId by viewModel.activeEntryId.collectAsState()
-                                    val composerConfig by providerRepository.config.collectAsState()
-                                    com.openminis.app.ui.settings.QuotaDot(
-                                        instanceId = composerConfig.modelEntries.firstOrNull { it.id == composerEntryId }?.providerInstanceId,
-                                        providerRepository = providerRepository,
-                                        modifier = Modifier.padding(start = 6.dp),
-                                    )
-                                    if (canThink && composerThinking.isEnabled) {
-                                        Text(
-                                            text = " · " + thinkingLevelLabel(composerThinking),
-                                            fontSize = 15.sp,
-                                            color = ChatColors.primaryText,
-                                            maxLines = 1,
-                                        )
-                                    }
-                                    Icon(
-                                        Icons.Default.KeyboardArrowDown,
-                                        contentDescription = stringResource(R.string.settings_models_title),
-                                        tint = ChatColors.secondaryText,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                }
-                            }
-                            MinisMenu(
-                                expanded = chipMenu,
-                                onDismissRequest = { chipMenu = false },
-                                shape = RoundedCornerShape(14.dp),
-                                tonalElevation = 0.dp,
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text(chipModelRaw, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    trailingIcon = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                                    onClick = { chipMenu = false; showModelPicker = true },
-                                )
-                                if (canThink) {
-                                    MinisMenuDivider()
-                                    val levels = listOf(ThinkingLevel.OFF) + viewModel.availableThinkingLevels
-                                    levels.forEach { level ->
-                                        DropdownMenuItem(
-                                            text = { Text(thinkingLevelLabel(level)) },
-                                            trailingIcon = {
-                                                if (level == composerThinking || (level == ThinkingLevel.OFF && !composerThinking.isEnabled)) {
-                                                    Icon(Icons.Default.Check, contentDescription = null)
-                                                }
-                                            },
-                                            onClick = { chipMenu = false; viewModel.setThinkingLevel(level) },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                }
+                Spacer(modifier = Modifier.weight(1f))
 
             // T187: Exit Edit Mode pill, only while editingMessageId
             // is non-null. Tap clears the edit flag + composer text
