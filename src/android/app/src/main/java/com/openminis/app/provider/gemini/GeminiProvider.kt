@@ -12,6 +12,7 @@ import com.openminis.app.data.model.LLMResponse
 import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
+import com.openminis.app.provider.ImageBudget
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.ProviderErrorCatalog
 import com.openminis.app.provider.antigravity.AntigravityTransport
@@ -290,6 +291,15 @@ class GeminiProvider(
                                 responseObj.put("response", responseContent)
                                 parts.put(JSONObject().put("functionResponse", responseObj))
                             }
+                            // functionResponse carries only the `result` string, so a tool
+                            // result's pixels (read_image) would be dropped. Gemini accepts
+                            // heterogeneous parts in one turn: send them right after as inlineData.
+                            toolResultInlineImage(part.imageData, part.imageMimeType)?.let { (bytes, mime) ->
+                                parts.put(JSONObject().put("inlineData", JSONObject().apply {
+                                    put("mimeType", mime)
+                                    put("data", Base64.encodeToString(bytes, Base64.NO_WRAP))
+                                }))
+                            }
                         }
                         is AgentContentPart.ImageData -> {
                             parts.put(JSONObject().put("inlineData", JSONObject().apply {
@@ -524,4 +534,15 @@ class GeminiProvider(
         if (error is java.io.IOException) return LLMError.NetworkError(error)
         return LLMError.Unknown(error)
     }
+}
+
+/**
+ * Bytes and mime type to attach after a tool result's `functionResponse`, or null when the result has
+ * no image. Re-encoded under the per-image budget; a re-encode is always JPEG.
+ */
+internal fun toolResultInlineImage(imageData: ByteArray?, imageMimeType: String?): Pair<ByteArray, String>? {
+    if (imageData == null || imageData.isEmpty()) return null
+    val safe = ImageBudget.compressUnderBudget(imageData)
+    val mime = if (safe === imageData) imageMimeType ?: "image/jpeg" else "image/jpeg"
+    return safe to mime
 }

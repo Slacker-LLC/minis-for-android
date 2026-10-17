@@ -18,6 +18,7 @@ import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.SessionOverrides
 import com.openminis.app.data.model.ThinkingLevel
+import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.provider.LLMFailureClassifier
@@ -1309,10 +1310,8 @@ private fun AgentSession.applyRepeatGuardLocked(
  * model to call read_image — closing the loop with executeReadImageTool.
  */
 internal fun AgentSession.visionPlaceholderFor(path: String?): String? {
-    val nativeVision = currentModel?.let {
-        it.inputModalities?.map { m -> m.lowercase() }?.contains("image") == true
-    } == true
-    if (nativeVision) return null
+    // hasImageInput normalizes "image_input" (OpenAI/OpenRouter suffix form) as well as bare "image".
+    if (currentModel?.hasImageInput == true) return null
     if (!com.openminis.app.tools.VisionGroupResolver.isConfigured(providerRepository, context)) return null
     return com.openminis.app.tools.VisionGroupResolver.noVisionImagePlaceholder(path)
 }
