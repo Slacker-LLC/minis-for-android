@@ -17,24 +17,29 @@ object FileEditTool {
     fun definition(): AgentToolDefinition {
         val editItem = AgentToolParam(
             type = "object",
-            description = "One targeted replacement. Every old_text is matched against the original file, not incrementally.",
+            description = "One replacement. The call matches each old_text against the original file, not against the result of earlier edits.",
             properties = mapOf(
-                "old_text" to AgentToolParam("string", "Exact text to replace. It must identify one unique, non-overlapping region of the original file."),
-                "new_text" to AgentToolParam("string", "Replacement text. Use an empty string to delete the matched block."),
+                "old_text" to AgentToolParam("string", "The exact text to replace. It must match one unique region of the original file, and the regions must not overlap."),
+                "new_text" to AgentToolParam("string", "The replacement text. Use an empty string to delete the matched text."),
             ),
             requiredProperties = listOf("old_text", "new_text"),
         )
         return AgentToolDefinition(
             name = NAME,
-            description = "Edit one existing text file with one or more atomic targeted replacements. ALWAYS file_read the relevant region first. All edits are matched against the same original snapshot; overlapping edits are rejected. Matching is exact first, then a conservative fuzzy fallback for Unicode punctuation/special spaces/trailing whitespace. Original BOM and CRLF/LF style are preserved. Prefer this over file_write for modifying existing files.",
+            description = "Edit one existing text file with one or more atomic replacements. " +
+            "Always read the relevant region with file_read first. " +
+            "Use file_edit, not file_write, to change an existing file.\n\n" +
+            "The call matches all edits against the same original text and rejects overlapping edits. " +
+            "It matches the exact text first. Then it uses a careful fuzzy match for Unicode punctuation, special spaces, and trailing whitespace. " +
+            "It keeps the original BOM and the CRLF or LF style.",
             parameters = mapOf(
-                "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user. Use the same language as the user."),
-                "path" to AgentToolParam("string", "Absolute Linux path to the file to edit (e.g. /var/minis/workspace/app/src/Main.kt)"),
-                "edits" to AgentToolParam("array", "One or more non-overlapping targeted replacements. If nearby changes touch the same logical block, merge them into one edit.", items = editItem),
+                "tool_title" to ToolText.TOOL_TITLE,
+                "path" to AgentToolParam("string", "The absolute Linux path of the file to edit. Example: /var/minis/workspace/app/src/Main.kt."),
+                "edits" to AgentToolParam("array", "One or more replacements that do not overlap. If changes are near each other in the same block, merge them into one edit.", items = editItem),
                 // Legacy fields remain accepted at runtime so old tool traces / clients do not break.
-                "old_string" to AgentToolParam("string", "Legacy single-edit field. Prefer edits[].old_text."),
-                "new_string" to AgentToolParam("string", "Legacy single-edit field. Prefer edits[].new_text."),
-                "replace_all" to AgentToolParam("boolean", "Legacy compatibility only. When true with old_string/new_string, replaces all exact occurrences."),
+                "old_string" to AgentToolParam("string", "Legacy field for a single edit. Use edits[].old_text instead."),
+                "new_string" to AgentToolParam("string", "Legacy field for a single edit. Use edits[].new_text instead."),
+                "replace_all" to AgentToolParam("boolean", "Legacy field. If true with old_string and new_string, replace all exact matches."),
             ),
             required = listOf("tool_title", "path", "edits"),
             propertyOrdering = listOf("tool_title", "path", "edits", "old_string", "new_string", "replace_all"),
