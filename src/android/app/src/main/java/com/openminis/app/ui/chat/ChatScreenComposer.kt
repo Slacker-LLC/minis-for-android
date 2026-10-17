@@ -1131,7 +1131,7 @@ internal fun ChatComposer(
             modifier = Modifier
                 .padding(bottom = 2.dp)
                 .size(46.dp)
-                .background(ChatColors.sendButton, CircleShape)
+                .background(ChatColors.primaryText, CircleShape)
                 .clip(CircleShape)
                 .clickable {
                     when {
@@ -1157,7 +1157,7 @@ internal fun ChatComposer(
                         else -> R.string.send
                     },
                 ),
-                tint = MaterialTheme.colorScheme.onPrimary,
+                tint = ChatColors.inputBg,
                 modifier = Modifier.size(22.dp),
             )
         }

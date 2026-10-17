@@ -706,8 +706,8 @@ private fun CallInputBar(
                 onClick = if (sending) onSend else onEnd,
                 modifier = Modifier.size(52.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = ChatColors.sendButton,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    containerColor = ChatColors.primaryText,
+                    contentColor = ChatColors.inputBg,
                 ),
             ) {
                 Icon(
