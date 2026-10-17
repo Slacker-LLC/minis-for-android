@@ -40,6 +40,7 @@ object ProviderConfigMetaKeys {
     const val SLOT_VISION = "slots.vision"
     const val SLOT_VOICE_INPUT = "slots.voiceInput"
     const val SLOT_VOICE_OUTPUT = "slots.voiceOutput"
+    const val SLOT_IMAGE = "slots.image"
     const val FALLBACK_TRIGGER = "slots.fallbackTrigger"
     const val LEGACY_GROUPS_MIGRATED_V1 = "groups_migrated_v1"
     const val DEFAULT_PRIMARY_GROUP_ID = "default_primary_group_id"
@@ -167,6 +168,7 @@ fun ProviderConfig.toSnapshot(
         ModelSlot.vision to ProviderConfigMetaKeys.SLOT_VISION,
         ModelSlot.voiceInput to ProviderConfigMetaKeys.SLOT_VOICE_INPUT,
         ModelSlot.voiceOutput to ProviderConfigMetaKeys.SLOT_VOICE_OUTPUT,
+        ModelSlot.image to ProviderConfigMetaKeys.SLOT_IMAGE,
     )
     slotKeys.forEach { (slot, key) ->
         metaRows.add(
@@ -250,6 +252,7 @@ fun ProviderConfigSnapshot.toProviderConfig(jsonForBlobs: Json): ProviderConfig 
         vision = slotEntries(ProviderConfigMetaKeys.SLOT_VISION),
         voiceInput = slotEntries(ProviderConfigMetaKeys.SLOT_VOICE_INPUT),
         voiceOutput = slotEntries(ProviderConfigMetaKeys.SLOT_VOICE_OUTPUT),
+        image = slotEntries(ProviderConfigMetaKeys.SLOT_IMAGE),
     )
     val fallbackTrigger = metaMap[ProviderConfigMetaKeys.FALLBACK_TRIGGER]
         ?.let { runCatching { FallbackStrategy.valueOf(it) }.getOrNull() }
@@ -266,3 +269,23 @@ fun ProviderConfigSnapshot.toProviderConfig(jsonForBlobs: Json): ProviderConfig 
 
 /** Composite key shape used as ModelEntry id in DB and forward in JSON mirror. */
 fun compositeEntryKey(instanceId: String, modelId: String): String = "$instanceId/$modelId"
+
+/**
+ * Builds before the image slot was added to the Room mapping never wrote a
+ * `slots.image` row, while the SharedPreferences JSON mirror did carry the slot.
+ * When the hashes matched, the cold-start load took the DB config and the image
+ * slot was lost. For a snapshot that has no `slots.image` row at all, take the
+ * slot from the [mirror] (only ids that still exist in this config). A snapshot
+ * that has the row, even an empty one, is authoritative and returned unchanged.
+ */
+fun ProviderConfig.withImageSlotBackfilledFrom(
+    snapshot: ProviderConfigSnapshot,
+    mirror: ProviderConfig?,
+): ProviderConfig {
+    if (snapshot.meta.any { it.key == ProviderConfigMetaKeys.SLOT_IMAGE }) return this
+    if (slots.image.isNotEmpty() || mirror == null) return this
+    val known = modelEntries.mapTo(HashSet()) { it.id }
+    val restored = mirror.slots.image.filter { it in known }
+    if (restored.isEmpty()) return this
+    return copy(slots = slots.copy(image = restored))
+}

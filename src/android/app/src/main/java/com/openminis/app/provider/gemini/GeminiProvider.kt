@@ -500,13 +500,8 @@ class GeminiProvider(
         }
     }
 
-    private fun extractUsage(json: JSONObject): LLMUsage? {
-        val usage = json.optJSONObject("usageMetadata") ?: return null
-        return LLMUsage(
-            inputTokens = usage.optInt("promptTokenCount", 0),
-            outputTokens = usage.optInt("candidatesTokenCount", 0),
-        )
-    }
+    private fun extractUsage(json: JSONObject): LLMUsage? =
+        json.optJSONObject("usageMetadata")?.let { parseGeminiUsageMetadata(it) }
 
     private fun mapHttpError(statusCode: Int, body: String): LLMError {
         val message = "${if (cloud != null) "Antigravity" else "Gemini"} API error $statusCode: ${body.take(300)}"
@@ -524,4 +519,22 @@ class GeminiProvider(
         if (error is java.io.IOException) return LLMError.NetworkError(error)
         return LLMError.Unknown(error)
     }
+}
+
+/**
+ * Map Gemini `usageMetadata` onto [LLMUsage] (ai.google.dev/api/generate-content, UsageMetadata):
+ * `promptTokenCount` already includes `cachedContentTokenCount`, and thinking tokens are
+ * reported separately in `thoughtsTokenCount` (not in `candidatesTokenCount`) but are billed
+ * as output. Input is reported as the fresh part and the cached part as cache-read, so
+ * input + cache equals the prompt size, the same convention the OpenAI parsers use.
+ */
+internal fun parseGeminiUsageMetadata(usage: JSONObject): LLMUsage {
+    val prompt = usage.optInt("promptTokenCount", 0)
+    val cached = usage.optInt("cachedContentTokenCount", 0).takeIf { it in 1..prompt }
+    return LLMUsage(
+        inputTokens = if (cached != null) prompt - cached else prompt,
+        outputTokens = usage.optInt("candidatesTokenCount", 0) + usage.optInt("thoughtsTokenCount", 0),
+        cacheReadInputTokens = cached,
+        latestContextTokens = prompt,
+    )
 }
