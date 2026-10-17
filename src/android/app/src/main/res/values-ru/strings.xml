@@ -1437,6 +1437,14 @@
 
     <string name="modeldetail_hosted_web_search">Веб-поиск на стороне провайдера</string>
     <string name="modeldetail_hosted_web_search_sub">Разрешает модели вызывать поиск провайдера. Источники возвращаются как цитаты; это расходует квоту провайдера, и поддерживает это только Responses API.</string>
+    <string name="modeldetail_tool_deferral">Отложенная загрузка инструментов</string>
+    <string name="modeldetail_tool_deferral_this_model">Эта модель</string>
+    <string name="modeldetail_tool_deferral_auto">Авто</string>
+    <string name="modeldetail_tool_deferral_on">Вкл.</string>
+    <string name="modeldetail_tool_deferral_off">Выкл.</string>
+    <string name="modeldetail_tool_deferral_global">Отложенная загрузка для всех моделей</string>
+    <string name="modeldetail_tool_deferral_global_sub">Действует для каждой модели в режиме «Авто».</string>
+    <string name="modeldetail_tool_deferral_footer">Вкл.: в каждом запросе только определения частых инструментов, остальные подгружаются по требованию. Выкл.: в каждом запросе полный список инструментов — для модели, которая перестаёт вызывать инструменты, если их сначала нужно загрузить. «Авто» следует переключателю ниже.</string>
 
     <string name="hosted_tool_web_search">Веб-поиск</string>
     <string name="hosted_tool_file_search">Поиск файлов</string>

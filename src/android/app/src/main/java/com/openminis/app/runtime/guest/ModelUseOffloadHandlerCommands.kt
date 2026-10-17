@@ -384,6 +384,13 @@ internal fun ModelUseOffloadHandler.cmdRun(args: OffloadArgs, request: NativeOff
     // --output has a media extension, else fall back to text. Mirrors iOS
     // ModelUseOffloadBridge.performRun (non-streaming branch).
     val sessionId = request.sessionId
+    if (ModelUseMediaPolicy.mediaRequired(outputPath, outputExt, outputs) && response.mediaAttachments.isEmpty()) {
+        Log.w(
+            TAG,
+            "[ModelUseNoMedia] model=${entry.model.id} endpoint=chat output=$outputPath textLen=${response.text.length}",
+        )
+        return ModelUseMediaPolicy.noMediaResult(entry.model.id, "chat", response.text, outputPath)
+    }
     val mediaFiles = JSONArray()
     val ts = System.currentTimeMillis() / 1000
     val modelSlug = entry.model.id.replace("/", "_")

@@ -1292,6 +1292,14 @@
 
     <string name="modeldetail_hosted_web_search">Serverseitige Websuche</string>
     <string name="modeldetail_hosted_web_search_sub">Erlaubt dem Modell die Suche des Anbieters selbst zu nutzen. Quellen kommen als Zitate zurück; das verbraucht das Kontingent des Anbieters, und nur die Responses-API kennt sie.</string>
+    <string name="modeldetail_tool_deferral">Werkzeuge nachladen</string>
+    <string name="modeldetail_tool_deferral_this_model">Dieses Modell</string>
+    <string name="modeldetail_tool_deferral_auto">Automatisch</string>
+    <string name="modeldetail_tool_deferral_on">An</string>
+    <string name="modeldetail_tool_deferral_off">Aus</string>
+    <string name="modeldetail_tool_deferral_global">Nachladen für alle Modelle</string>
+    <string name="modeldetail_tool_deferral_global_sub">Gilt für jedes Modell auf „Automatisch“.</string>
+    <string name="modeldetail_tool_deferral_footer">An: Jede Anfrage enthält nur die gängigen Werkzeugdefinitionen, der Rest wird bei Bedarf geladen. Aus: Jede Anfrage enthält die volle Werkzeugliste, sinnvoll für ein Modell, das keine Werkzeuge mehr aufruft, wenn es sie erst laden muss. Automatisch folgt dem Schalter darunter.</string>
 
     <string name="hosted_tool_web_search">Websuche</string>
     <string name="hosted_tool_file_search">Dateisuche</string>

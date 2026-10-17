@@ -28,6 +28,13 @@ internal interface ToolRoundHost {
 
     fun preflight(name: String, args: JSONObject, tools: List<AgentToolDefinition>): String?
 
+    /**
+     * A call named a tool that was not offered this turn. When it is a deferred tool of this session's pool
+     * (see ToolDeferral), loads it for the next request and returns the message to give the model in place of
+     * the plain refusal; null for anything the pool does not hold. The call itself is refused either way.
+     */
+    fun loadDeferred(name: String): String? = null
+
     suspend fun executeTool(
         name: String,
         argsJson: String,
@@ -125,17 +132,23 @@ internal class ToolRound(
                 canonical in turnToolNames || turnTools.any { it.matchesName(canonical) }
             } == true
         if (!isTurnTool) {
+            // Chat-only never loads anything: no tool is offered and none may become offered.
+            val deferredNotice = if (host.chatOnly) null else host.loadDeferred(name)
             val blockedMessage = if (host.chatOnly) {
                 "Error: Tools are disabled in chat-only mode."
             } else {
-                "Error: Tool '$name' is not available."
+                deferredNotice ?: "Error: Tool '$name' is not available."
             }
             AppLogger.warning(
                 "ToolPreflight",
                 "BLOCKED tool=$name id=$id chatOnly=${host.chatOnly} session=${host.sessionId}",
             )
             val blockIdx = allToolBlocks.indexOfFirst { it.id == id }
-            val failContent = if (host.chatOnly) "Disabled in chat-only mode" else "Tool not available"
+            val failContent = when {
+                host.chatOnly -> "Disabled in chat-only mode"
+                deferredNotice != null -> "Tool was not loaded; now loaded, retrying"
+                else -> "Tool not available"
+            }
             if (blockIdx >= 0) {
                 val elapsed = System.currentTimeMillis() - allToolBlocks[blockIdx].startTimeMs
                 allToolBlocks[blockIdx] = allToolBlocks[blockIdx].copy(

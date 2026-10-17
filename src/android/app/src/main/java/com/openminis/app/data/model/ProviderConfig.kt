@@ -363,6 +363,8 @@ data class ModelOverrides(
     val maxThinkingLevel: ThinkingLevel? = null,
     /** [T-eta-hosted-web-search] Per-entry opt-in for the provider's own web search. */
     val hostedWebSearch: Boolean? = null,
+    /** Deferred tool loading for this model: null auto, true on, false off (see [LLMModel.toolDeferral]). */
+    val toolDeferral: Boolean? = null,
     /** Session default copied when a chat newly binds to this entry. */
     val defaultThinkingLevel: ThinkingLevel? = null,
     /** Active context cap; null retains the prior uncapped behavior. */
@@ -379,6 +381,7 @@ data class ModelOverrides(
             && outputModalities == null
             && maxThinkingLevel == null
             && hostedWebSearch == null
+            && toolDeferral == null
             && defaultThinkingLevel == null
             && contextLimitTokens == null
             && lastContextLimitTokens == null
@@ -407,6 +410,7 @@ data class ModelEntry(
             inputModalities = overrides.inputModalities ?: baseModel.inputModalities,
             outputModalities = overrides.outputModalities ?: baseModel.outputModalities,
             hostedWebSearch = overrides.hostedWebSearch ?: baseModel.hostedWebSearch,
+            toolDeferral = overrides.toolDeferral ?: baseModel.toolDeferral,
         )
 
     /** True when this entry carries user intent beyond API-reported defaults. */

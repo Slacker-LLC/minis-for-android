@@ -362,6 +362,13 @@ class LinuxFileEditHandler : ToolHandler {
         com.openminis.app.tools.FileEditTool.execute(argsJson, sessionId, context)
 }
 
+/** Upper bound for the `delay` argument, so a typo cannot park a turn for hours. */
+internal const val MAX_SHELL_DELAY_SEC = 600
+
+/** Milliseconds to wait before a shell command starts: `delay` seconds, clamped to 0..[MAX_SHELL_DELAY_SEC]. */
+internal fun shellDelayMs(args: JSONObject): Long =
+    args.optInt("delay", 0).coerceIn(0, MAX_SHELL_DELAY_SEC) * 1_000L
+
 class LinuxShellHandler : ToolHandler {
     override val definition: AgentToolDefinition =
         com.openminis.app.tools.AgentTools.shellExecuteDefinition(name = "linux.shell")
@@ -405,6 +412,10 @@ class LinuxShellHandler : ToolHandler {
             }
             return ToolExecutionResult("Error: 'command' is required", false)
         }
+        // `delay` waits in the agent's own coroutine, not in the shell, so other jobs keep the shell
+        // and cancelling the turn ends the wait. The tool timeout only starts once it is over.
+        val delayMs = shellDelayMs(args)
+        if (delayMs > 0) kotlinx.coroutines.delay(delayMs)
         if (args.optBoolean("background", false)) {
             // A scheduled read-only run may not leave anything running behind it.
             if (readOnly) {

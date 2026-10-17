@@ -17,6 +17,12 @@ data class LLMModel(
      * tools.
      */
     val hostedWebSearch: Boolean = false,
+    /**
+     * The user's choice for deferred tool loading on this model: true on, false off, null auto (the
+     * model-rules entry for the family, else the global switch). Set from [ModelOverrides]; a provider
+     * catalog never sets it. See [com.openminis.app.tools.ToolDeferral.enabledFor].
+     */
+    val toolDeferral: Boolean? = null,
     val interleavedReasoningField: String? = null,
     // [T-reasoning-effort-data-driven] Effort tiers this model accepts, from the
     // models.dev `reasoning_options` entry of type `effort` (e.g. ["high","max"]

@@ -570,6 +570,10 @@ internal suspend fun AgentSession.buildSystemPrompt(): String? {
             append("\n\n")
             append(presetPrompt)
         }
+        deferredToolsPromptFragment()?.let {
+            append("\n\n")
+            append(it)
+        }
         if (skillFragment != null) {
             append("\n\n")
             append(skillFragment)

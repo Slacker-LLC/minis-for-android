@@ -1190,6 +1190,14 @@
 
     <string name="modeldetail_hosted_web_search">Recherche web côté serveur</string>
     <string name="modeldetail_hosted_web_search_sub">Autorise le modèle à utiliser la recherche du fournisseur. Les sources reviennent sous forme de citations ; cela consomme le quota du fournisseur, et seule l\'API Responses la connaît.</string>
+    <string name="modeldetail_tool_deferral">Chargement différé des outils</string>
+    <string name="modeldetail_tool_deferral_this_model">Ce modèle</string>
+    <string name="modeldetail_tool_deferral_auto">Auto</string>
+    <string name="modeldetail_tool_deferral_on">Activé</string>
+    <string name="modeldetail_tool_deferral_off">Désactivé</string>
+    <string name="modeldetail_tool_deferral_global">Chargement différé pour tous les modèles</string>
+    <string name="modeldetail_tool_deferral_global_sub">S’applique à chaque modèle réglé sur Auto.</string>
+    <string name="modeldetail_tool_deferral_footer">Activé : chaque requête ne contient que les définitions d’outils courantes, le reste est chargé à la demande. Désactivé : chaque requête contient la liste complète des outils, utile pour un modèle qui cesse d’appeler des outils quand il doit d’abord les charger. Auto suit l’interrupteur ci-dessous.</string>
 
     <string name="hosted_tool_web_search">Recherche web</string>
     <string name="hosted_tool_file_search">Recherche de fichiers</string>

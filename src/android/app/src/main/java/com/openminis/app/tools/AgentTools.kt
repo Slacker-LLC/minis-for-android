@@ -117,10 +117,12 @@ object AgentTools {
     fun catalogDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "find_tools",
         description = "Find names, descriptions and parameter schemas of tools exposed by the current session configuration. " +
-            "Query by name or description; use include_schema=true for exact arguments. This does not enable tools or alter the current model batch. " +
+            "Query by name or description; use include_schema=true for exact arguments. " +
+            "Tools listed as deferred in the system prompt are not sent with every request: a query that matches them loads them (at most 6 per call, " +
+            "exact name first), and a loaded tool is callable from your next step. A listing with no query loads nothing. " +
             "Registration is not device availability: check android_capabilities and actual operation results for backend conditions.",
         parameters = mapOf(
-            "query" to AgentToolParam("string", "Optional words matched against tool names and descriptions"),
+            "query" to AgentToolParam("string", "Words matched against tool names and descriptions; a tool name loads that tool if it is deferred"),
             "include_schema" to AgentToolParam("boolean", "Include the complete parameter schema (default false)"),
             "offset" to AgentToolParam("integer", "Result offset, default 0"),
             "limit" to AgentToolParam("integer", "Results per page, default 20, range 1..100"),
@@ -146,7 +148,7 @@ object AgentTools {
             "command" to AgentToolParam("string", "The shell command to execute. Supports multi-line commands directly — no special escaping needed. Keep under 1000 chars; for longer scripts, write to a file with file_write first, then run it."),
             "timeout" to AgentToolParam("integer", "Timeout in seconds (default: 900). Use a larger value for long-running commands like package installs."),
             "yield_time_ms" to AgentToolParam("integer", "How long this call waits for the command before handing back what it has printed (default 30000, range 1000..60000). A command that is still running then continues as a job; this is not a timeout."),
-            "delay" to AgentToolParam("integer", "Delay in seconds before execution begins. The tool blocks the agent flow during this wait WITHOUT occupying the shell, so other concurrent tasks can use it. Use this instead of sleep commands to avoid resource contention."),
+            "delay" to AgentToolParam("integer", "Delay in seconds (max 600) before execution begins. The tool blocks the agent flow during this wait WITHOUT occupying the shell, so other concurrent tasks can use it. Use this instead of sleep commands to avoid resource contention."),
             "background" to AgentToolParam("boolean", "Run the command as an independent background job instead of in the persistent shell (default false). Returns immediately with a job_id; read it later with job_output. The job does not see this shell's cd/export state and has no stdin. With background, `timeout` is the job's own deadline (default 2 hours, max 24 hours)."),
         ),
         required = listOf("tool_title", "command"),

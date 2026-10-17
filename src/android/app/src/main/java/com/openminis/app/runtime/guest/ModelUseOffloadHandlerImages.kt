@@ -194,6 +194,12 @@ internal fun ModelUseOffloadHandler.writeImageResult(
 ): NativeOffloadResult {
     val mediaFiles = JSONArray()
     val firstMedia = response.mediaAttachments.firstOrNull()
+    // The image endpoint exists to return an image; an empty list (content filter, quota, provider
+    // quirk) is a failure, never a success with a warning attached.
+    if (firstMedia == null) {
+        Log.w(TAG, "[ModelUseNoMedia] model=${entry.model.id} endpoint=$endpointUsed output=$outputPath textLen=${response.text.length}")
+        return ModelUseMediaPolicy.noMediaResult(entry.model.id, endpointUsed, response.text, outputPath)
+    }
     val ts = System.currentTimeMillis() / 1000
     val modelSlug = entry.model.id.replace("/", "_")
     if (outputPath != null) {
@@ -245,7 +251,6 @@ internal fun ModelUseOffloadHandler.writeImageResult(
         put("image_endpoint", endpointUsed)
         if (outputPath != null) put("output_file", outputPath)
         if (mediaFiles.length() > 0) put("media_files", mediaFiles)
-        if (firstMedia == null) put("warning", "Image endpoint returned no image data.")
     }
     return NativeOffloadResult(0, body.toString(2) + "\n")
 }
@@ -338,14 +343,11 @@ internal fun ModelUseOffloadHandler.imageParamHint(entry: ModelEntry): String {
     }
 }
 
-internal fun ModelUseOffloadHandler.isImageExt(ext: String): Boolean =
-    ext in setOf("png", "jpg", "jpeg", "webp", "gif", "heic")
+internal fun ModelUseOffloadHandler.isImageExt(ext: String): Boolean = ModelUseMediaPolicy.isImageExt(ext)
 
-internal fun ModelUseOffloadHandler.isAudioExt(ext: String): Boolean =
-    ext in setOf("wav", "mp3", "m4a", "aac", "ogg", "flac")
+internal fun ModelUseOffloadHandler.isAudioExt(ext: String): Boolean = ModelUseMediaPolicy.isAudioExt(ext)
 
-internal fun ModelUseOffloadHandler.isVideoExt(ext: String): Boolean =
-    ext in setOf("mp4", "mov", "webm", "mkv")
+internal fun ModelUseOffloadHandler.isVideoExt(ext: String): Boolean = ModelUseMediaPolicy.isVideoExt(ext)
 
 internal fun ModelUseOffloadHandler.mimeToExt(mime: String): String = when {
     mime.contains("png") -> "png"

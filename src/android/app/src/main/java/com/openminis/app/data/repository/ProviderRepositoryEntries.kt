@@ -671,6 +671,7 @@ fun ProviderRepository.exportInstanceJSON(instanceId: String): String? {
                     entry.overrides.hostedWebSearch?.let {
                         o.put("hostedWebSearch", it)
                     }
+                    entry.overrides.toolDeferral?.let { o.put("toolDeferral", it) }
                     entry.overrides.inputModalities?.let {
                         o.put("inputModalities", JSONArray(it))
                     }
@@ -894,6 +895,7 @@ fun ProviderRepository.importInstanceJSON(jsonStr: String): String? {
                     maxOutputTokens = if (overridesObj.has("maxOutputTokens")) overridesObj.optInt("maxOutputTokens").takeIf { it > 0 } else null,
                     contextWindow = if (overridesObj.has("contextWindow")) overridesObj.optInt("contextWindow").takeIf { it > 0 } else null,
                     supportsReasoning = if (overridesObj.has("supportsReasoning")) overridesObj.optBoolean("supportsReasoning") else null,
+                    toolDeferral = if (overridesObj.has("toolDeferral") && !overridesObj.isNull("toolDeferral")) overridesObj.optBoolean("toolDeferral") else null,
                     inputModalities = ovIn,
                     outputModalities = ovOut,
                 )

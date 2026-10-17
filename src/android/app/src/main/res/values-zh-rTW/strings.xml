@@ -844,6 +844,14 @@
 
     <string name="modeldetail_hosted_web_search">伺服端聯網搜尋</string>
     <string name="modeldetail_hosted_web_search_sub">允許模型呼叫服務商自己的聯網搜尋。來源以引用形式回傳；會消耗服務商配額，且只有 Responses API 支援。</string>
+    <string name="modeldetail_tool_deferral">工具延遲載入</string>
+    <string name="modeldetail_tool_deferral_this_model">此模型</string>
+    <string name="modeldetail_tool_deferral_auto">自動</string>
+    <string name="modeldetail_tool_deferral_on">開</string>
+    <string name="modeldetail_tool_deferral_off">關</string>
+    <string name="modeldetail_tool_deferral_global">所有模型的延遲載入</string>
+    <string name="modeldetail_tool_deferral_global_sub">對設為「自動」的模型生效。</string>
+    <string name="modeldetail_tool_deferral_footer">開：每次請求只帶常用工具的定義，其餘依需載入，請求更小。關：每次請求帶完整工具清單，適合一遇到「先載入再呼叫」就不再呼叫工具的模型。自動則跟隨下方的全域開關。</string>
 
     <string name="hosted_tool_web_search">聯網搜尋</string>
     <string name="hosted_tool_file_search">檔案搜尋</string>
