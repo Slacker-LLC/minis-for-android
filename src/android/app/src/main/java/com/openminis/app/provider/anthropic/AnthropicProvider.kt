@@ -13,6 +13,7 @@ import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.ImageBudget
 import com.openminis.app.provider.LLMProvider
+import com.openminis.app.provider.ProviderErrorCatalog
 import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.safeOptString
 import kotlinx.coroutines.Dispatchers
@@ -1061,17 +1062,10 @@ class AnthropicProvider(
     }
 
     private fun mapHttpError(statusCode: Int, body: String): LLMError {
-        if (statusCode == 401 || statusCode == 403) return LLMError.InvalidApiKey()
-        if (statusCode == 429) return LLMError.RateLimited()
-
-        val message = try {
-            val json = JSONObject(body)
-            val error = json.optJSONObject("error")
-            val errorType = error?.safeOptString("type", "") ?: "error"
-            val errorMessage = error?.safeOptString("message", "") ?: body
-            "[$errorType] $errorMessage"
-        } catch (_: Exception) {
-            "HTTP $statusCode: ${body.take(500)}"
+        val message = ProviderErrorCatalog.describe(statusCode, body)
+        if (statusCode == 401 || statusCode == 403) return LLMError.InvalidApiKey(message)
+        if (statusCode == 429) {
+            return if (ProviderErrorCatalog.isAccountCap(body)) LLMError.ProviderError(message) else LLMError.RateLimited()
         }
 
         val transientCodes = setOf(500, 502, 503, 504, 529)

@@ -28,9 +28,13 @@ internal class ChatMessageMapper(
     fun toLLMMessage(entity: MessageEntity, parsedParts: Result<org.json.JSONArray>? = null): LLMMessage =
         entity.mapToLlm(parsedParts)
 
-    private companion object {
+    internal companion object {
         private const val TAG = "ChatMessageMapper"
         private const val LEGACY_CANCELLED_MARKER = "[cancelled by user]"
+
+        /** A user row with nothing to show: no text, no picture, no file or pasted block. Such rows are internal (tool results, bare reminders). */
+        fun isHiddenUserRow(role: String, text: String, imageCount: Int, attachmentCount: Int): Boolean =
+            role == "user" && text.isBlank() && imageCount == 0 && attachmentCount == 0
     }
 
     /**
@@ -238,8 +242,9 @@ internal class ChatMessageMapper(
             // Skip user messages with no visible content (toolResult-only internal messages,
             // or messages that were entirely a system-reminder). A user message that is
             // *only* an image attachment (no caption) still has visible content and must
-            // not be skipped — restoredImageUris carries it.
-            if (entity.role == "user" && text.isBlank() && restoredImageUris.isEmpty()) return@mapNotNull null
+            // not be skipped — restoredImageUris carries it. The same goes for a message that is only a
+            // file or a pasted block (a `[Pasted#N]` marker alone): restoredAttachmentUris carries it.
+            if (isHiddenUserRow(entity.role, text, restoredImageUris.size, restoredAttachmentUris.size)) return@mapNotNull null
             // Skip assistant messages that became empty after stripping system-reminders
             // and have no tool / thinking blocks to fall back on — would otherwise
             // render as a phantom blank assistant bubble.

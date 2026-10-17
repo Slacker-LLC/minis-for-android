@@ -1989,6 +1989,14 @@
     <string name="llm_err_rejected">Der Anbieter hat die Anfrage abgelehnt (%1$s).</string>
     <string name="llm_err_decoding">Die Antwort des Anbieters konnte nicht gelesen werden. Versuche es erneut.</string>
     <string name="llm_err_detail">Nachricht des Anbieters: %1$s</string>
+    <string name="llm_err_balance">Der Anbieter meldet, dass das Guthaben dieses Kontos aufgebraucht ist. Konto aufladen oder ein anderes Modell bzw. einen anderen Anbieter wählen.</string>
+    <string name="llm_err_plan_limit">Ein Nutzungslimit oder Tarif dieses Kontos ist aufgebraucht, abgelaufen oder enthält dieses Modell nicht. Warte auf das Zurücksetzen, wechsle den Tarif oder nimm ein anderes Modell bzw. einen anderen Anbieter.</string>
+    <string name="llm_err_content_policy">Der Sicherheitsfilter des Anbieters hat diesen Inhalt abgelehnt. Formuliere die Anfrage um oder entferne den sensiblen Teil und versuche es erneut.</string>
+    <string name="llm_err_overloaded">Der Anbieter ist gerade überlastet. Warte einen Moment und versuche es erneut, oder wähle ein anderes Modell bzw. einen anderen Anbieter.</string>
+    <string name="llm_err_region">Der Anbieter bedient dein Land bzw. deine Region nicht. Nimm einen anderen Anbieter oder einen von ihm unterstützten Netzwerkstandort.</string>
+    <string name="llm_err_bad_header">Der API-Schlüssel enthält einen Zeilenumbruch oder ein anderes unsichtbares Zeichen, deshalb wurde die Anfrage nicht gesendet. Öffne Einstellungen → Anbieter und füge den Schlüssel erneut in einer Zeile ein.</string>
+    <string name="llm_err_internal">In der App ist ein unerwarteter Fehler aufgetreten. Versuche es erneut; tritt er weiter auf, melde ihn mit den Details unten.</string>
+    <string name="llm_err_detail_app">Details: %1$s</string>
     <string name="compact_failed">Komprimierung fehlgeschlagen: %1$s</string>
     <string name="chat_no_provider">Kein Modellanbieter eingerichtet. Füge unter Einstellungen → Anbieter einen hinzu.</string>
     <string name="chat_provider_rejected">Die Anbieterkonfiguration wurde abgelehnt.</string>

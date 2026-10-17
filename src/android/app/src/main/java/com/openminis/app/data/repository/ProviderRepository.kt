@@ -26,7 +26,9 @@ internal fun normalizeStoredCredential(value: String): String {
     if (normalized.startsWith("Bearer ", ignoreCase = true)) {
         normalized = normalized.substring("Bearer ".length).trim()
     }
-    return normalized
+    // trim() only reaches the ends. A key pasted across two lines still has the break inside, and OkHttp then refuses
+    // the whole Authorization header ("Unexpected char 0x0a"). No credential contains whitespace or control characters.
+    return normalized.filterNot { it.isWhitespace() || it.isISOControl() }
 }
 
 // Modality bit layout — must match src/ios/Providers/LLMTypes.swift

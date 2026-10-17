@@ -50,6 +50,17 @@ class ChatMessageMapperTest {
     }
 
     @Test
+    fun `a user row that is only a pasted block or file is still a message`() {
+        // Uri is a stub in JVM tests, so the restoration itself cannot run here; the rule that keeps the row can.
+        assertFalse(ChatMessageMapper.isHiddenUserRow("user", "", imageCount = 0, attachmentCount = 1))
+        assertFalse(ChatMessageMapper.isHiddenUserRow("user", "", imageCount = 1, attachmentCount = 0))
+        assertFalse(ChatMessageMapper.isHiddenUserRow("user", "hi", imageCount = 0, attachmentCount = 0))
+        assertTrue(ChatMessageMapper.isHiddenUserRow("user", "  ", imageCount = 0, attachmentCount = 0))
+        // Only user rows are hidden by this rule.
+        assertFalse(ChatMessageMapper.isHiddenUserRow("assistant", "", imageCount = 0, attachmentCount = 0))
+    }
+
+    @Test
     fun `a user row that is only a tool result is not a visible message`() {
         val out = ui(
             row("a", "assistant", JSONArray().put(toolUse("t1", "shell")), 0),

@@ -2126,6 +2126,14 @@
     <string name="llm_err_rejected">服務商拒絕了這次請求（%1$s）。</string>
     <string name="llm_err_decoding">無法讀取服務商的回覆，請重試。</string>
     <string name="llm_err_detail">服務商原文：%1$s</string>
+    <string name="llm_err_balance">服務商提示這個帳號的餘額或額度已用完。請儲值，或換一個模型或服務商。</string>
+    <string name="llm_err_plan_limit">這個帳號的用量限額或方案已用完、已過期，或不包含這個模型。請等額度重置、升級方案，或換一個模型或服務商。</string>
+    <string name="llm_err_content_policy">服務商的內容安全過濾拒絕了這段內容。請換種說法或移除敏感部分後重試。</string>
+    <string name="llm_err_overloaded">服務商現在負載過高。請稍候片刻再試，或換一個模型或服務商。</string>
+    <string name="llm_err_region">服務商不支援你所在的國家或地區。請換一個服務商，或使用它支援的網路位置。</string>
+    <string name="llm_err_bad_header">API 金鑰裡含有換行或其他看不見的字元，請求沒有送出。到「設定 → 服務商」把金鑰重新貼成一行。</string>
+    <string name="llm_err_internal">應用程式內部出現了意外錯誤。請重試；反覆出現的話，請附上下面的詳情回報。</string>
+    <string name="llm_err_detail_app">詳情：%1$s</string>
     <string name="compact_failed">壓縮對話失敗：%1$s</string>
     <string name="chat_no_provider">尚未設定模型服務商。請到「設定 → 服務商」新增。</string>
     <string name="chat_provider_rejected">服務商設定被拒絕。</string>

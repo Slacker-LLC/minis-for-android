@@ -340,6 +340,22 @@ class AnthropicProviderTest {
         throw AssertionError("Expected ProviderError")
     }
 
+    @Test
+    fun `a 402 billing error keeps its type and message`() = runBlocking {
+        server.enqueue(
+            MockResponse().setResponseCode(402).setBody(
+                """{"type":"error","error":{"type":"billing_error","message":"Your credit balance is too low"}}""",
+            ),
+        )
+        try {
+            provider.sendMessage(listOf(LLMMessage(LLMMessage.Role.USER, "test")), null, 100)
+        } catch (e: LLMError.ProviderError) {
+            assertEquals("[402] billing_error: Your credit balance is too low", e.detail)
+            return@runBlocking
+        }
+        throw AssertionError("Expected ProviderError")
+    }
+
     // -- Claude version parsing (temperature rejection / thinking) --
 
     // [T-anthropic-temp-claude5-android] Single-segment ids (claude-fable-5)

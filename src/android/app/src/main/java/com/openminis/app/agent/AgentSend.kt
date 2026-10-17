@@ -93,7 +93,7 @@ private fun AgentSession.enqueuePromptWithAttachments(
             if (clearComposer) _attachments.value = _attachments.value.filterNot { it in pendingAttachments }
             if (!_isStreaming.value) startNextQueuedRequest()
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (error: Exception) { accepted?.completeExceptionally(error); setInlineError(error.message ?: "request_commit_failed") }
+        catch (error: Exception) { accepted?.completeExceptionally(error); setInlineError(error) }
         finally { requestCommitMutex.unlock() }
     }
     preparation.invokeOnCompletion { cause ->
@@ -453,7 +453,7 @@ internal fun AgentSession.sendMessage(
             throw e
         } catch (e: Exception) {
             acceptedTurn.record(AgentTurnOutcome.Failed(e.message ?: "message_setup_failed"))
-            setInlineError(e.message ?: "message_setup_failed")
+            setInlineError(e)
         }
     }
 }

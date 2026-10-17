@@ -10,6 +10,7 @@ import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.provider.HostedWebSearchPolicy
 import com.openminis.app.provider.LLMProvider
+import com.openminis.app.provider.ProviderErrorCatalog
 import com.openminis.app.provider.safeOptString
 import com.openminis.app.provider.thinking.ThinkingRuleResolver
 import com.openminis.app.util.Sha256
@@ -678,16 +679,12 @@ internal fun OpenAIProvider.parseResponsesAPIUsage(usage: JSONObject): LLMUsage 
 }
 
 internal fun OpenAIProvider.mapHttpError(statusCode: Int, body: String): LLMError {
-    if (statusCode == 401 || statusCode == 403) return LLMError.InvalidApiKey()
-    if (statusCode == 429) return LLMError.RateLimited()
-
-    val message = try {
-        val json = JSONObject(body)
-        val error = json.optJSONObject("error")
-        val errorMessage = error?.safeOptString("message", "") ?: body
-        "[$statusCode] $errorMessage"
-    } catch (_: Exception) {
-        "HTTP $statusCode: ${body.take(500)}"
+    // The body is kept: a 403 can be a region block rather than a bad key, and a 429 can be an empty balance
+    // (insufficient_quota, Zhipu 1113) that no retry will clear.
+    val message = ProviderErrorCatalog.describe(statusCode, body)
+    if (statusCode == 401 || statusCode == 403) return LLMError.InvalidApiKey(message)
+    if (statusCode == 429) {
+        return if (ProviderErrorCatalog.isAccountCap(body)) LLMError.ProviderError(message) else LLMError.RateLimited()
     }
 
     val transientCodes = setOf(500, 502, 503, 504, 529)
