@@ -19,9 +19,18 @@ import org.junit.Test
 
 /** The per-call gates of a tool round, tested with a fake conversation: what is refused, and what is allowed to run. */
 class ToolRoundTest {
-    private class FakeHost(override var chatOnly: Boolean = false, private val preflightError: String? = null) : ToolRoundHost {
+    private class FakeHost(
+        override var chatOnly: Boolean = false,
+        private val preflightError: String? = null,
+        private val deferredNotice: String? = null,
+    ) : ToolRoundHost {
         override val sessionId = "s"
         val executed = mutableListOf<String>()
+        val loadRequests = mutableListOf<String>()
+        override fun loadDeferred(name: String): String? {
+            loadRequests += name
+            return deferredNotice
+        }
         val events = mutableListOf<String>()
         var result = ToolExecutionResult(output = "done", success = true)
 
@@ -70,6 +79,44 @@ class ToolRoundTest {
         assertTrue(part.isError)
         assertEquals("Error: Tool 'rm_everything' is not available.", part.content)
         assertEquals(ToolBlockStatus.FAILED, blocks.single().toolStatus)
+    }
+
+    @Test
+    fun `a call to a deferred tool is not run, the host loads it and the model is told to call again`() = runBlocking {
+        val host = FakeHost(deferredNotice = "Error: Tool 'terminal' is deferred and was not loaded, so this call did not run.")
+        val blocks = mutableListOf(block("c1", "terminal"))
+        var executing = false
+        val r = round(host, blocks, onExecuting = { executing = true })
+        r.run(listOf(call("c1", "terminal")), "")
+
+        assertEquals(listOf("terminal"), host.loadRequests)
+        assertTrue(host.executed.isEmpty())
+        assertFalse("a deferred call has no side effect", executing)
+        val part = r.resultParts.single() as AgentContentPart.ToolResult
+        assertTrue(part.isError)
+        assertEquals("Error: Tool 'terminal' is deferred and was not loaded, so this call did not run.", part.content)
+        assertEquals(ToolBlockStatus.FAILED, blocks.single().toolStatus)
+    }
+
+    @Test
+    fun `a host that has nothing to load keeps the plain not-available refusal`() = runBlocking {
+        val host = FakeHost(deferredNotice = null)
+        val blocks = mutableListOf(block("c1", "rm_everything"))
+        val r = round(host, blocks)
+        r.run(listOf(call("c1", "rm_everything")), "")
+        assertEquals(listOf("rm_everything"), host.loadRequests)
+        assertEquals("Error: Tool 'rm_everything' is not available.", (r.resultParts.single() as AgentContentPart.ToolResult).content)
+    }
+
+    @Test
+    fun `in chat-only mode nothing is loaded even if the host would`() = runBlocking {
+        val host = FakeHost(chatOnly = true, deferredNotice = "should never be shown")
+        val blocks = mutableListOf(block("c1", "terminal"))
+        val r = round(host, blocks, offered = emptySet())
+        r.run(listOf(call("c1", "terminal")), "")
+        assertTrue("chat-only must not load a tool", host.loadRequests.isEmpty())
+        assertTrue(host.executed.isEmpty())
+        assertEquals("Error: Tools are disabled in chat-only mode.", (r.resultParts.single() as AgentContentPart.ToolResult).content)
     }
 
     @Test

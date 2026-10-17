@@ -105,6 +105,39 @@ class ModelRulesParserTest {
     }
 
     @Test
+    fun `toolDeferral is a boolean family setting, first match wins, anything else drops only that rule`() {
+        val warnings = mutableListOf<String>()
+        val rules = """
+          [
+            {"id":"opt-out","match":{"idPrefix":["vendor/flash"]},"set":{"toolDeferral":false}},
+            {"id":"opt-in","match":{"idPrefix":["vendor/"]},"set":{"toolDeferral":true}},
+            {"id":"not-a-boolean","match":{"idExact":["other/model"]},"set":{"toolDeferral":"off"}},
+            {"id":"a-number","match":{"idExact":["other/number"]},"set":{"toolDeferral":0}}
+          ]
+        """.trimIndent()
+        val document = requireNotNull(ModelRulesParser.parse(envelope(rules), warnings::add))
+        assertEquals(listOf("opt-out", "opt-in"), document.rules.map { it.id })
+        assertEquals(2, warnings.size)
+        assertEquals(false, document.capabilitiesFor("vendor/flash-lite").toolDeferral)
+        assertEquals(true, document.capabilitiesFor("vendor/pro").toolDeferral)
+        // A malformed rule, a model no rule names, and an empty catalog all read as "no rule" (auto).
+        assertNull(document.capabilitiesFor("other/model").toolDeferral)
+        assertNull(document.capabilitiesFor("other/number").toolDeferral)
+        assertNull(document.capabilitiesFor("unrelated").toolDeferral)
+        assertNull(com.openminis.app.provider.rules.ModelRulesDocument.EMPTY.capabilitiesFor("vendor/flash-lite").toolDeferral)
+    }
+
+    @Test
+    fun `no bundled rule switches deferred tool loading off for any model without device evidence`() {
+        val withSetting = ModelRulesTestFixtures.bundledDocument().rules.filter { it.set.toolDeferral != null }.map { it.id }
+        assertTrue(
+            "model-rules.json sets toolDeferral for $withSetting; opting a family out needs a device A/B first " +
+                "(update this test together with the evidence)",
+            withSetting.isEmpty(),
+        )
+    }
+
+    @Test
     fun `invalid remote document cannot be accepted and non HTTPS URLs are rejected`() {
         val existing = ModelRulesTestFixtures.bundledDocument()
         val invalid = ModelRulesParser.parse(envelope(version = 99))

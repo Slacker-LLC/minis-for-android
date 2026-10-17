@@ -665,13 +665,16 @@ class AgentSession(
     @Volatile var chatOnlyForNextTurn = false
 
     /**
-     * All agent tool definitions, recomputed on each read so the memory
+     * Every tool this session can expose, recomputed on each read so the memory
      * toggle gate (see [_memoryEnabled]) takes effect immediately when
      * the user flips /memory mid-session without forcing a VM rebuild.
      * The cost is negligible — [AgentTools.makeAgentTools] just builds a
      * fixed list of definition objects, no I/O.
+     *
+     * This is the pool deferred loading draws from ([ToolDeferral]); what a
+     * request actually carries is [agentTools].
      */
-    internal val agentTools: List<AgentToolDefinition>
+    internal val agentToolPool: List<AgentToolDefinition>
         get() = AgentTools.makeAgentTools(
             // [T-android-vision-group / GH#182] The main model's own vision
             // capability. When false but a Vision Group is configured, read_image
@@ -701,6 +704,48 @@ class AgentSession(
             // refuses calls as well; see MCPToolHandler).
             com.openminis.app.mcp.client.MCPProvider.offeredInSession(it, activeSessionId)
         }
+
+    /** Deferred tools this session has loaded; only ever grows (see [ToolDeferral]). */
+    private val loadedDeferredTools: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    /** Per model: the user's choice for [currentModel], else its model-rules entry, else the global switch. */
+    private fun deferralEnabled(): Boolean {
+        val model = currentModel
+        return com.openminis.app.tools.ToolDeferral.enabledFor(
+            modelChoice = model?.toolDeferral,
+            familyDefault = model?.let {
+                runCatching { com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(it.id).toolDeferral }.getOrNull()
+            },
+            global = com.openminis.app.tools.ToolDeferralPrefs.isEnabled(context),
+        )
+    }
+
+    /** What the next model request carries: the resident tools plus the deferred ones loaded so far. */
+    internal val agentTools: List<AgentToolDefinition>
+        get() = com.openminis.app.tools.ToolDeferral.offered(
+            agentToolPool,
+            loadedDeferredTools + conversation.calledToolNames,
+            deferralEnabled(),
+        )
+
+    /**
+     * Loads the deferred pool tools named in [names] for the next request and returns the names actually
+     * loaded. Anything the pool does not hold (withheld by chat-only, MCP session switches, the sub agent
+     * child rule, a vision gate) or that is already resident loads nothing.
+     */
+    internal fun loadDeferredTools(names: Collection<String>): List<String> {
+        if (chatOnlyForNextTurn || !deferralEnabled()) return emptyList()
+        val pool = agentToolPool
+        return names.mapNotNull { com.openminis.app.tools.ToolDeferral.findDeferred(pool, it)?.name }
+            .distinct()
+            .also { loadedDeferredTools.addAll(it) }
+    }
+
+    /** The system prompt's list of deferred tools; null when nothing is deferred or tools are off this turn. */
+    internal fun deferredToolsPromptFragment(): String? {
+        if (chatOnlyForNextTurn) return null
+        return com.openminis.app.tools.ToolDeferral.indexFor(agentToolPool, deferralEnabled())
+    }
 
     /**
      * Per-session loop detector. Reset alongside [agentHistory] whenever the
@@ -745,6 +790,10 @@ class AgentSession(
 
         override fun preflight(name: String, args: JSONObject, tools: List<AgentToolDefinition>): String? =
             preflightValidateToolCall(name, args, tools)
+
+        override fun loadDeferred(name: String): String? =
+            if (loadDeferredTools(listOf(name)).isEmpty()) null
+            else com.openminis.app.tools.ToolDeferral.loadedOnDemandMessage(name)
 
         override suspend fun executeTool(
             name: String,

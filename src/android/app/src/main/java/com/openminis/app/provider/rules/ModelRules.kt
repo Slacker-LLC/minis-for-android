@@ -54,6 +54,12 @@ internal data class ModelRuleSet(
     val rejectsTemperature: Boolean? = null,
     val adaptiveThinking: Boolean? = null,
     val requiresThoughtSignature: Boolean? = null,
+    /**
+     * Whether deferred tool loading suits this model family: false opts the family out (full tool list,
+     * no deferred index), true or absent leaves it on. A user's per-model choice and the global switch
+     * still apply, see [com.openminis.app.tools.ToolDeferral.enabledFor].
+     */
+    val toolDeferral: Boolean? = null,
 )
 
 internal data class ModelRule(val id: String, val match: RuleMatch, val set: ModelRuleSet)
@@ -93,6 +99,7 @@ internal data class ModelRulesDocument(
             rejectsTemperature = first { it.rejectsTemperature },
             adaptiveThinking = first { it.adaptiveThinking },
             requiresThoughtSignature = first { it.requiresThoughtSignature },
+            toolDeferral = first { it.toolDeferral },
         )
     }
 
@@ -121,7 +128,7 @@ internal object ModelRulesParser {
     private val setKeys = setOf(
         "maxThinkingLevel", "reasoningEffortValues", "supportsReasoning", "contextWindow",
         "maxOutputTokens", "inputModalities", "outputModalities", "rejectsTemperature",
-        "adaptiveThinking", "requiresThoughtSignature",
+        "adaptiveThinking", "requiresThoughtSignature", "toolDeferral",
     )
     private val filterKeys = setOf("includePrefixes", "excludeSuffixes", "excludeContains")
     private val supportedProviderCatalogs = setOf("anthropic", "gemini", "openAI", "openRouter", "xAI", "kimi", "codexOAuth")
@@ -223,10 +230,12 @@ internal object ModelRulesParser {
         val rejectsTemperature = optionalBoolean("rejectsTemperature")
         val adaptiveThinking = optionalBoolean("adaptiveThinking")
         val requiresThoughtSignature = optionalBoolean("requiresThoughtSignature")
+        val toolDeferral = optionalBoolean("toolDeferral")
         if (("supportsReasoning" in setObject && supportsReasoning == null) ||
             ("rejectsTemperature" in setObject && rejectsTemperature == null) ||
             ("adaptiveThinking" in setObject && adaptiveThinking == null) ||
-            ("requiresThoughtSignature" in setObject && requiresThoughtSignature == null)
+            ("requiresThoughtSignature" in setObject && requiresThoughtSignature == null) ||
+            ("toolDeferral" in setObject && toolDeferral == null)
         ) return reject("expected boolean")
         return ModelRule(
             id,
@@ -242,6 +251,7 @@ internal object ModelRulesParser {
                 rejectsTemperature = rejectsTemperature,
                 adaptiveThinking = adaptiveThinking,
                 requiresThoughtSignature = requiresThoughtSignature,
+                toolDeferral = toolDeferral,
             ),
         )
     }

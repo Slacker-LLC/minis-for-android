@@ -1407,6 +1407,14 @@
 
     <string name="modeldetail_hosted_web_search">服务端联网搜索</string>
     <string name="modeldetail_hosted_web_search_sub">允许模型调用服务商自己的联网搜索。来源以引用形式返回；会消耗服务商配额，且只有 Responses API 支持。</string>
+    <string name="modeldetail_tool_deferral">工具延迟加载</string>
+    <string name="modeldetail_tool_deferral_this_model">此模型</string>
+    <string name="modeldetail_tool_deferral_auto">自动</string>
+    <string name="modeldetail_tool_deferral_on">开</string>
+    <string name="modeldetail_tool_deferral_off">关</string>
+    <string name="modeldetail_tool_deferral_global">所有模型的延迟加载</string>
+    <string name="modeldetail_tool_deferral_global_sub">对设为“自动”的模型生效。</string>
+    <string name="modeldetail_tool_deferral_footer">开：每次请求只带常用工具的定义，其余按需加载，请求更小。关：每次请求带完整工具列表，适合一遇到“先加载再调用”就不再调用工具的模型。自动则跟随下方的全局开关。</string>
 
     <string name="hosted_tool_web_search">联网搜索</string>
     <string name="hosted_tool_file_search">文件搜索</string>

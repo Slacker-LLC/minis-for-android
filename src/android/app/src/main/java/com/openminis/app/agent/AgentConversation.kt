@@ -25,10 +25,19 @@ internal class AgentConversation {
         _compactSummary.value = marker?.summary
     }
 
+    /**
+     * Names of the tools the replaced/restored history called. A deferred tool the session already used is
+     * offered again after a restart without the model loading it a second time (see ToolDeferral).
+     */
+    @Volatile var calledToolNames: Set<String> = emptySet()
+        private set
+
     /** Editing/rewinding invalidates the loop window, while preserving the existing compact marker. */
     fun replaceHistory(messages: List<LLMMessage>) {
         history.clear()
         history.addAll(messages)
+        calledToolNames = messages.flatMap { it.contentParts }
+            .filterIsInstance<AgentContentPart.ToolUse>().mapTo(HashSet()) { it.name }
         toolLoopDetector.reset()
     }
 

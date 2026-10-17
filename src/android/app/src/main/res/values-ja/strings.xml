@@ -1297,6 +1297,14 @@
 
     <string name="modeldetail_hosted_web_search">サーバー側ウェブ検索</string>
     <string name="modeldetail_hosted_web_search_sub">モデルがプロバイダー自身の検索を呼び出せるようにします。出典は引用として返り、プロバイダーの枠を消費します。対応するのは Responses API のみです。</string>
+    <string name="modeldetail_tool_deferral">ツールの遅延読み込み</string>
+    <string name="modeldetail_tool_deferral_this_model">このモデル</string>
+    <string name="modeldetail_tool_deferral_auto">自動</string>
+    <string name="modeldetail_tool_deferral_on">オン</string>
+    <string name="modeldetail_tool_deferral_off">オフ</string>
+    <string name="modeldetail_tool_deferral_global">全モデルの遅延読み込み</string>
+    <string name="modeldetail_tool_deferral_global_sub">「自動」のモデルに適用されます。</string>
+    <string name="modeldetail_tool_deferral_footer">オン：各リクエストには一般的なツール定義だけを付け、残りは必要なときに読み込みます。オフ：毎回すべてのツールを付けます。先に読み込む手順が入るとツールを呼ばなくなるモデル向けです。自動は下のスイッチに従います。</string>
 
     <string name="hosted_tool_web_search">ウェブ検索</string>
     <string name="hosted_tool_file_search">ファイル検索</string>

@@ -117,10 +117,12 @@ object AgentTools {
     fun catalogDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "find_tools",
         description = "Find names, descriptions and parameter schemas of tools exposed by the current session configuration. " +
-            "Query by name or description; use include_schema=true for exact arguments. This does not enable tools or alter the current model batch. " +
+            "Query by name or description; use include_schema=true for exact arguments. " +
+            "Tools listed as deferred in the system prompt are not sent with every request: a query that matches them loads them (at most 6 per call, " +
+            "exact name first), and a loaded tool is callable from your next step. A listing with no query loads nothing. " +
             "Registration is not device availability: check android_capabilities and actual operation results for backend conditions.",
         parameters = mapOf(
-            "query" to AgentToolParam("string", "Optional words matched against tool names and descriptions"),
+            "query" to AgentToolParam("string", "Words matched against tool names and descriptions; a tool name loads that tool if it is deferred"),
             "include_schema" to AgentToolParam("boolean", "Include the complete parameter schema (default false)"),
             "offset" to AgentToolParam("integer", "Result offset, default 0"),
             "limit" to AgentToolParam("integer", "Results per page, default 20, range 1..100"),

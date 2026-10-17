@@ -1544,6 +1544,14 @@
 
     <string name="modeldetail_hosted_web_search">Server-side web search</string>
     <string name="modeldetail_hosted_web_search_sub">Let the model call the search the provider runs itself. Sources come back as citations; this spends the provider\'s quota, and only the Responses API has it.</string>
+    <string name="modeldetail_tool_deferral">Deferred tool loading</string>
+    <string name="modeldetail_tool_deferral_this_model">This model</string>
+    <string name="modeldetail_tool_deferral_auto">Auto</string>
+    <string name="modeldetail_tool_deferral_on">On</string>
+    <string name="modeldetail_tool_deferral_off">Off</string>
+    <string name="modeldetail_tool_deferral_global">Deferred tools for all models</string>
+    <string name="modeldetail_tool_deferral_global_sub">Applies to every model set to Auto.</string>
+    <string name="modeldetail_tool_deferral_footer">On: each request carries only the common tool definitions and the rest are loaded on demand, which keeps requests small. Off: every request carries the full tool list, which suits a model that stops calling tools once it has to load one first. Auto follows the switch below.</string>
 
     <string name="hosted_tool_web_search">Web search</string>
     <string name="hosted_tool_file_search">File search</string>
