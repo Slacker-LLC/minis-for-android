@@ -36,4 +36,11 @@ class UbuntuMountPolicyTest {
         assertTrue("a device without devpts keeps working", command.contains("|| true"))
         assertFalse(command.contains("--rbind"))
     }
+
+    @Test
+    fun `existing mount point directories are not recreated on every launch`() {
+        val commands = UbuntuMountPolicy.setupCommands()
+        assertTrue(commands.any { it.contains("[ -d \"\$ROOTFS/\$mountpoint\" ] || mkdir -p") })
+        assertFalse(commands.any { it.startsWith("mkdir -p") })
+    }
 }

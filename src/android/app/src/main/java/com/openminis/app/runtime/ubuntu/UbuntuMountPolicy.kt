@@ -18,7 +18,7 @@ internal object UbuntuMountPolicy {
             "if [ -L \"\$target\" ]; then exit 72; fi; " +
             "if [ -e \"\$target\" ] && [ ! -d \"\$target\" ]; then exit 72; fi; " +
             "done",
-        "mkdir -p \"\$ROOTFS/dev\" \"\$ROOTFS/proc\" \"\$ROOTFS/sys\"",
+        "for mountpoint in dev proc sys; do [ -d \"\$ROOTFS/\$mountpoint\" ] || mkdir -p \"\$ROOTFS/\$mountpoint\"; done",
         "for mountpoint in dev proc sys; do " +
             "target=\"\$ROOTFS/\$mountpoint\"; " +
             "[ -d \"\$target\" ] && [ ! -L \"\$target\" ] || exit 73; " +

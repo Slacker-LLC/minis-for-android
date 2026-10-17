@@ -86,6 +86,12 @@ internal class RootPersistentShell(private val sessionId: String) {
 
     suspend fun ensureStarted() {
         if (isAlive) return
+        commandLock.withLock { startIfNeeded() }
+    }
+
+    /** Starts the shell when it is not running. The caller holds [commandLock]: the readiness probe is a command. */
+    private suspend fun startIfNeeded() {
+        if (isAlive) return
         check(!closed.get()) { "direct Ubuntu shell is stopped" }
         try {
             withContext(Dispatchers.IO) {
@@ -94,6 +100,7 @@ internal class RootPersistentShell(private val sessionId: String) {
                 stopInternal()
                 check(!closed.get()) { "direct Ubuntu shell is stopped" }
 
+                val launchBeganMs = System.currentTimeMillis()
                 val prepared = UbuntuRuntime.prepareLaunch(sessionId, interactive = false)
                 check(!closed.get()) { "direct Ubuntu shell was stopped during startup" }
                 val spawned = ProcessBuilder(prepared.argv)
@@ -113,24 +120,26 @@ internal class RootPersistentShell(private val sessionId: String) {
                 }
                 writer = BufferedWriter(OutputStreamWriter(spawned.outputStream, StandardCharsets.UTF_8))
                 startReader(spawned)
-                // Give su/unshare/chroot a short window to fail synchronously. A
-                // healthy persistent shell stays alive indefinitely.
-                Thread.sleep(180)
+                // The shell is up when it answers a no-op. This replaces a fixed 180 ms sleep that waited for
+                // su/unshare/chroot to fail: a failed launch ends the process, which the reader reports at
+                // once, and a healthy one is released the moment bash is ready instead of 180 ms later.
+                val ready = probeReady()
                 if (closed.get()) {
                     stopInternal()
                     error("direct Ubuntu shell was stopped during startup")
                 }
-                if (!spawned.isAlive) {
+                if (ready == null || ready.exitCode != 0 || !spawned.isAlive) {
                     val exit = runCatching { spawned.exitValue() }.getOrNull()
                     stopInternal()
                     val signal = exit?.let(ShellExitClassifier::signalName)
                     error(
-                        "direct Ubuntu shell exited during startup" +
+                        (if (ready == null) "direct Ubuntu shell did not become ready" else "direct Ubuntu shell exited during startup") +
                             exit?.let {
                                 " (exit=$it" + signal?.let { name -> ", signal=$name" }.orEmpty() + ")"
                             }.orEmpty(),
                     )
                 }
+                Log.i(TAG, "[$sessionId] shell ready in ${System.currentTimeMillis() - launchBeganMs}ms")
             }
         } catch (failure: Throwable) {
             // Cancellation can be delivered when withContext returns even after
@@ -165,7 +174,24 @@ internal class RootPersistentShell(private val sessionId: String) {
         timeoutMs: Long,
         lineCallback: ((String) -> Unit)? = null,
     ): CommandResult = commandLock.withLock {
-        ensureStarted()
+        startIfNeeded()
+        try {
+            runLocked(command, timeoutMs, lineCallback) ?: run {
+                stop()
+                CommandResult("command timed out after ${timeoutMs}ms", 124)
+            }
+        } catch (cancelled: CancellationException) {
+            stop()
+            throw cancelled
+        }
+    }
+
+    /** Writes [command] and waits for its marker. Null means [timeoutMs] passed first. The caller holds [commandLock]. */
+    private suspend fun runLocked(
+        command: String,
+        timeoutMs: Long,
+        lineCallback: ((String) -> Unit)?,
+    ): CommandResult? {
         val currentWriter = writer ?: error("Ubuntu shell stdin is unavailable")
         check(pending == null) { "only one command may run in a persistent shell" }
         val marker = UUID.randomUUID().toString().replace("-", "")
@@ -179,23 +205,17 @@ internal class RootPersistentShell(private val sessionId: String) {
         pending = state
         try {
             withContext(Dispatchers.IO) {
-                currentWriter.write(command)
-                if (!command.endsWith('\n')) currentWriter.newLine()
-                currentWriter.write("__minis_ec=\$?; printf '\\n__MINIS_DONE_${marker}_EXIT_%s__\\n' \"\$__minis_ec\"")
-                currentWriter.newLine()
+                currentWriter.write(wrapCommand(command, marker))
                 currentWriter.flush()
             }
-            val result = withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { completion.await() }
-            if (result != null) return@withLock result
-            stop()
-            CommandResult("command timed out after ${timeoutMs}ms", 124)
-        } catch (cancelled: CancellationException) {
-            stop()
-            throw cancelled
+            return withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { completion.await() }
         } finally {
             if (pending === state) pending = null
         }
     }
+
+    /** The first command of a new shell: a no-op that is only answered once the whole launch chain has worked. */
+    private suspend fun probeReady(): CommandResult? = runLocked(":", STARTUP_TIMEOUT_MS, null)
 
     fun stop() {
         closed.set(true)
@@ -325,6 +345,20 @@ internal class RootPersistentShell(private val sessionId: String) {
 
     companion object {
         private const val TAG = "RootPersistentShell"
+        /** Root approval dialogs and a cold rootfs are slow; a launch that really failed ends the process and is reported at once. */
+        private const val STARTUP_TIMEOUT_MS = 120_000L
+
+        /**
+         * The one line written to the shell for [command]: it runs through `eval` with stdin on /dev/null, then
+         * prints the completion marker. The command is a quoted argument, so nothing in it can be read as the
+         * marker line, and a program that reads stdin (a CLI that waits for piped input, `cat`, `read`) gets end
+         * of file instead of swallowing the lines after it, which is what used to leave a call hanging until its
+         * timeout. `eval` runs in the shell itself, so cwd, exports, functions and `cd` still persist.
+         */
+        internal fun wrapCommand(command: String, marker: String): String =
+            "eval -- ${shellQuote(command)} </dev/null; __minis_ec=\$?; " +
+                "printf '\\n__MINIS_DONE_${marker}_EXIT_%s__\\n' \"\$__minis_ec\"\n"
+
         internal const val MAX_CAPTURE_CHARS = 100_000
         internal const val MAX_LINE_CHARS = 100_000
         private const val MAX_DEATH_CAPTURE_CHARS = 8_192
