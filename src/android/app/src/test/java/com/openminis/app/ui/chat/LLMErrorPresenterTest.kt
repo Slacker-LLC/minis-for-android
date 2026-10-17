@@ -82,4 +82,33 @@ class LLMErrorPresenterTest {
         assertEquals(Kind.SERVER, kind(LLMError.ProviderError("[500] No tool output found for function call x")))
         assertEquals(Kind.REJECTED, kind(LLMError.ProviderError("[422] image input is not supported")))
     }
+
+    @Test
+    fun anOutOfBalanceAccountIsToldApartOnA400Or402() {
+        assertEquals(Kind.BAD_BALANCE, bad("You have insufficient balance, please top up."))
+        assertEquals(Kind.BAD_BALANCE, bad("insufficient_quota: you exceeded your current plan"))
+        assertEquals(Kind.BAD_BALANCE, kind(LLMError.ProviderError("[402] Payment required")))
+        // "insufficient" alone is about something else (permissions, scope), so it stays the general 400.
+        assertEquals(Kind.BAD_REQUEST, bad("insufficient permissions for this model"))
+        // Under another status the same words keep that status's meaning.
+        assertEquals(Kind.SERVER, kind(LLMError.ProviderError("[500] insufficient balance upstream")))
+    }
+
+    @Test
+    fun aHeaderValueWithALineBreakIsTheKeyNotTheProvider() {
+        val message = "Unexpected char 0x0a at 58 in Authorization value"
+        assertEquals(Kind.BAD_HEADER, kind(IllegalArgumentException(message)))
+        assertEquals(Kind.BAD_HEADER, kind(LLMError.Unknown(IllegalArgumentException(message))))
+        // Another IllegalArgumentException is not a header problem.
+        assertNull(kind(IllegalArgumentException("empty_prompt")))
+    }
+
+    @Test
+    fun aFrameworkExceptionIsInternalButTheAppsOwnFailuresAreLeftAlone() {
+        assertEquals(Kind.INTERNAL, kind(NoSuchElementException("List is empty.")))
+        assertEquals(Kind.INTERNAL, kind(IndexOutOfBoundsException("Index 3 out of bounds for length 0")))
+        assertEquals(Kind.INTERNAL, kind(LLMError.Unknown(NoSuchElementException("List is empty."))))
+        assertEquals("List is empty.", LLMErrorPresenter.classify(NoSuchElementException("List is empty."))?.detail)
+        assertNull(kind(IllegalStateException("session_closed")))
+    }
 }

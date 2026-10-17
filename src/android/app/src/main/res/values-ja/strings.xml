@@ -1986,6 +1986,10 @@
     <string name="llm_err_rejected">プロバイダーがリクエストを拒否しました（%1$s）。</string>
     <string name="llm_err_decoding">プロバイダーの応答を読み取れませんでした。再試行してください。</string>
     <string name="llm_err_detail">プロバイダーのメッセージ：%1$s</string>
+    <string name="llm_err_400_balance">プロバイダーから、このアカウントの残高またはクォータが不足していると返されました（400）。チャージするか、別のモデルやプロバイダーに切り替えてください。</string>
+    <string name="llm_err_bad_header">APIキーに改行などの見えない文字が含まれていたため、リクエストは送信されませんでした。「設定 → プロバイダー」でキーを1行で貼り付け直してください。</string>
+    <string name="llm_err_internal">アプリ内部で予期しないエラーが発生しました。もう一度お試しください。繰り返す場合は、下の詳細を添えて報告してください。</string>
+    <string name="llm_err_detail_app">詳細：%1$s</string>
     <string name="compact_failed">会話の圧縮に失敗しました：%1$s</string>
     <string name="chat_no_provider">モデルプロバイダーが未設定です。「設定 → プロバイダー」で追加してください。</string>
     <string name="chat_provider_rejected">プロバイダーの設定が拒否されました。</string>

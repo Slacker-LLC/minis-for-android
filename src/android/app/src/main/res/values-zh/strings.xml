@@ -2150,6 +2150,10 @@
     <string name="llm_err_rejected">服务商拒绝了这次请求（%1$s）。</string>
     <string name="llm_err_decoding">无法读取服务商的回复，请重试。</string>
     <string name="llm_err_detail">服务商原文：%1$s</string>
+    <string name="llm_err_400_balance">服务商提示这个账号的余额或额度不足（400）。请充值，或换一个模型或服务商。</string>
+    <string name="llm_err_bad_header">API 密钥里含有换行或其他看不见的字符，请求没有发出。到「设置 → 服务商」把密钥重新粘贴成一行。</string>
+    <string name="llm_err_internal">应用内部出现了意外错误。请重试；反复出现的话，带上下面的详情反馈。</string>
+    <string name="llm_err_detail_app">详情：%1$s</string>
     <string name="compact_failed">压缩对话失败：%1$s</string>
     <string name="chat_no_provider">还没有配置模型服务商。请到「设置 → 服务商」添加。</string>
     <string name="chat_provider_rejected">服务商配置被拒绝。</string>

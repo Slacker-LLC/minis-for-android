@@ -1887,6 +1887,10 @@
     <string name="llm_err_rejected">Le fournisseur a rejeté la requête (%1$s).</string>
     <string name="llm_err_decoding">La réponse du fournisseur est illisible. Réessayez.</string>
     <string name="llm_err_detail">Message du fournisseur : %1$s</string>
+    <string name="llm_err_400_balance">Le fournisseur indique que le solde ou le quota de ce compte est épuisé (400). Rechargez le compte ou choisissez un autre modèle ou fournisseur.</string>
+    <string name="llm_err_bad_header">La clé API contient un saut de ligne ou un autre caractère invisible, la requête n’a donc pas été envoyée. Ouvrez Réglages → Fournisseurs et collez à nouveau la clé sur une seule ligne.</string>
+    <string name="llm_err_internal">Une erreur inattendue s’est produite dans l’application. Réessayez ; si elle persiste, signalez-la avec les détails ci-dessous.</string>
+    <string name="llm_err_detail_app">Détails : %1$s</string>
     <string name="compact_failed">Échec de la compaction : %1$s</string>
     <string name="chat_no_provider">Aucun fournisseur de modèle configuré. Ajoutez-en un dans Réglages → Fournisseurs.</string>
     <string name="chat_provider_rejected">La configuration du fournisseur a été refusée.</string>

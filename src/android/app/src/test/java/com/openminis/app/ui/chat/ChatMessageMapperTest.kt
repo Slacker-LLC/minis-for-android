@@ -50,6 +50,24 @@ class ChatMessageMapperTest {
     }
 
     @Test
+    fun `a user row that is only a pasted block or file is still a message`() {
+        val dir = java.nio.file.Files.createTempDirectory("media").toFile()
+        try {
+            File(dir, "Pasted#3.txt").writeText("pasted body")
+            val ref = JSONObject().put("type", "mediaRef").put(
+                "value",
+                JSONObject().put("id", "m1").put("relativePath", "Pasted#3.txt").put("mimeType", "text/plain").put("originalFileName", "Pasted#3"),
+            )
+            val rows = listOf(row("u", "user", JSONArray().put(ref), 0))
+            val out = ChatMessageMapper(dir) { null }.toChatMessages(rows, parsed(rows))
+            assertEquals(listOf("u"), out.map { it.id })
+            assertEquals(listOf("Pasted#3"), out.single().attachmentNames)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `a user row that is only a tool result is not a visible message`() {
         val out = ui(
             row("a", "assistant", JSONArray().put(toolUse("t1", "shell")), 0),

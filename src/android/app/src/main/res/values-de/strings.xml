@@ -1989,6 +1989,10 @@
     <string name="llm_err_rejected">Der Anbieter hat die Anfrage abgelehnt (%1$s).</string>
     <string name="llm_err_decoding">Die Antwort des Anbieters konnte nicht gelesen werden. Versuche es erneut.</string>
     <string name="llm_err_detail">Nachricht des Anbieters: %1$s</string>
+    <string name="llm_err_400_balance">Der Anbieter meldet, dass Guthaben oder Kontingent dieses Kontos aufgebraucht ist (400). Konto aufladen oder ein anderes Modell bzw. einen anderen Anbieter wählen.</string>
+    <string name="llm_err_bad_header">Der API-Schlüssel enthält einen Zeilenumbruch oder ein anderes unsichtbares Zeichen, deshalb wurde die Anfrage nicht gesendet. Öffne Einstellungen → Anbieter und füge den Schlüssel erneut in einer Zeile ein.</string>
+    <string name="llm_err_internal">In der App ist ein unerwarteter Fehler aufgetreten. Versuche es erneut; tritt er weiter auf, melde ihn mit den Details unten.</string>
+    <string name="llm_err_detail_app">Details: %1$s</string>
     <string name="compact_failed">Komprimierung fehlgeschlagen: %1$s</string>
     <string name="chat_no_provider">Kein Modellanbieter eingerichtet. Füge unter Einstellungen → Anbieter einen hinzu.</string>
     <string name="chat_provider_rejected">Die Anbieterkonfiguration wurde abgelehnt.</string>

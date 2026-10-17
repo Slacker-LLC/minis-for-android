@@ -238,8 +238,9 @@ internal class ChatMessageMapper(
             // Skip user messages with no visible content (toolResult-only internal messages,
             // or messages that were entirely a system-reminder). A user message that is
             // *only* an image attachment (no caption) still has visible content and must
-            // not be skipped — restoredImageUris carries it.
-            if (entity.role == "user" && text.isBlank() && restoredImageUris.isEmpty()) return@mapNotNull null
+            // not be skipped — restoredImageUris carries it. The same goes for a message that is only a
+            // file or a pasted block (a `[Pasted#N]` marker alone): restoredAttachmentUris carries it.
+            if (entity.role == "user" && text.isBlank() && restoredImageUris.isEmpty() && restoredAttachmentUris.isEmpty()) return@mapNotNull null
             // Skip assistant messages that became empty after stripping system-reminders
             // and have no tool / thinking blocks to fall back on — would otherwise
             // render as a phantom blank assistant bubble.
