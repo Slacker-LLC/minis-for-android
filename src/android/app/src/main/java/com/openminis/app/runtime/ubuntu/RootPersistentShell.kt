@@ -1,6 +1,6 @@
 package com.openminis.app.runtime.ubuntu
 
-import android.util.Log
+import com.openminis.app.logging.AppLogger
 import com.openminis.app.util.shellQuote
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -139,7 +139,7 @@ internal class RootPersistentShell(private val sessionId: String) {
                             }.orEmpty(),
                     )
                 }
-                Log.i(TAG, "[$sessionId] shell ready in ${System.currentTimeMillis() - launchBeganMs}ms")
+                AppLogger.info(TAG, "[$sessionId] shell ready in ${System.currentTimeMillis() - launchBeganMs}ms")
             }
         } catch (failure: Throwable) {
             // Cancellation can be delivered when withContext returns even after
@@ -176,9 +176,10 @@ internal class RootPersistentShell(private val sessionId: String) {
     ): CommandResult = commandLock.withLock {
         startIfNeeded()
         try {
-            runLocked(command, timeoutMs, lineCallback) ?: run {
+            var partial = ""
+            runLocked(command, timeoutMs, lineCallback) { partial = it } ?: run {
                 stop()
-                CommandResult("command timed out after ${timeoutMs}ms", 124)
+                CommandResult(timedOutOutput(timeoutMs, partial), 124)
             }
         } catch (cancelled: CancellationException) {
             stop()
@@ -191,6 +192,7 @@ internal class RootPersistentShell(private val sessionId: String) {
         command: String,
         timeoutMs: Long,
         lineCallback: ((String) -> Unit)?,
+        onTimeout: ((partialOutput: String) -> Unit)? = null,
     ): CommandResult? {
         val currentWriter = writer ?: error("Ubuntu shell stdin is unavailable")
         check(pending == null) { "only one command may run in a persistent shell" }
@@ -209,6 +211,10 @@ internal class RootPersistentShell(private val sessionId: String) {
                 currentWriter.flush()
             }
             return withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { completion.await() }
+                ?: run {
+                    onTimeout?.invoke(state.output.value())
+                    null
+                }
         } finally {
             if (pending === state) pending = null
         }
@@ -270,7 +276,7 @@ internal class RootPersistentShell(private val sessionId: String) {
                 }
             } catch (error: Exception) {
                 readerError = error.message ?: error::class.java.simpleName
-                Log.d(TAG, "[$sessionId] reader ended: $readerError")
+                AppLogger.debug(TAG, "[$sessionId] reader ended: $readerError")
             } finally {
                 val exit = runCatching { spawned.exitValue() }.getOrNull() ?: 1
                 val diagnostics = ShellExitDiagnostics(
@@ -287,7 +293,8 @@ internal class RootPersistentShell(private val sessionId: String) {
                 // head/tail remains available to the owning coordinator for a
                 // later diagnostic without dumping guest output into Logcat.
                 if (unexpectedExit) {
-                    Log.w(
+                    // The file log, not Logcat: the file log is what a user can send, and Logcat has rolled over by then.
+                    AppLogger.warning(
                         TAG,
                         "[$sessionId] Ubuntu shell exited unexpectedly " +
                             "exit=${diagnostics.exitCode} " +
@@ -358,6 +365,16 @@ internal class RootPersistentShell(private val sessionId: String) {
         internal fun wrapCommand(command: String, marker: String): String =
             "eval -- ${shellQuote(command)} </dev/null; __minis_ec=\$?; " +
                 "printf '\\n__MINIS_DONE_${marker}_EXIT_%s__\\n' \"\$__minis_ec\"\n"
+
+        /**
+         * What a timed-out call returns: the fixed first line callers match on, then whatever the command had
+         * printed. Without it a command that ran for minutes and then stalled reports nothing it had learned.
+         */
+        internal fun timedOutOutput(timeoutMs: Long, partial: String): String {
+            val head = "command timed out after ${timeoutMs}ms"
+            val text = partial.trimEnd('\n')
+            return if (text.isBlank()) head else "$head\n[output before the timeout]\n$text"
+        }
 
         internal const val MAX_CAPTURE_CHARS = 100_000
         internal const val MAX_LINE_CHARS = 100_000
