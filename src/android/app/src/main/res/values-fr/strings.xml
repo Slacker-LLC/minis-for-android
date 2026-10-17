@@ -1887,7 +1887,11 @@
     <string name="llm_err_rejected">Le fournisseur a rejeté la requête (%1$s).</string>
     <string name="llm_err_decoding">La réponse du fournisseur est illisible. Réessayez.</string>
     <string name="llm_err_detail">Message du fournisseur : %1$s</string>
-    <string name="llm_err_400_balance">Le fournisseur indique que le solde ou le quota de ce compte est épuisé (400). Rechargez le compte ou choisissez un autre modèle ou fournisseur.</string>
+    <string name="llm_err_balance">Le fournisseur indique que le solde de ce compte est épuisé. Rechargez le compte ou choisissez un autre modèle ou fournisseur.</string>
+    <string name="llm_err_plan_limit">Une limite d’usage ou un forfait de ce compte est épuisé, expiré, ou n’inclut pas ce modèle. Attendez la réinitialisation, changez de forfait ou choisissez un autre modèle ou fournisseur.</string>
+    <string name="llm_err_content_policy">Le filtre de sécurité du fournisseur a refusé ce contenu. Reformulez la demande ou retirez la partie sensible, puis réessayez.</string>
+    <string name="llm_err_overloaded">Le fournisseur est surchargé en ce moment. Patientez un instant et réessayez, ou choisissez un autre modèle ou fournisseur.</string>
+    <string name="llm_err_region">Le fournisseur ne dessert pas votre pays ou région. Utilisez un autre fournisseur ou un emplacement réseau qu’il prend en charge.</string>
     <string name="llm_err_bad_header">La clé API contient un saut de ligne ou un autre caractère invisible, la requête n’a donc pas été envoyée. Ouvrez Réglages → Fournisseurs et collez à nouveau la clé sur une seule ligne.</string>
     <string name="llm_err_internal">Une erreur inattendue s’est produite dans l’application. Réessayez ; si elle persiste, signalez-la avec les détails ci-dessous.</string>
     <string name="llm_err_detail_app">Détails : %1$s</string>

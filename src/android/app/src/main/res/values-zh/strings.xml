@@ -2150,7 +2150,11 @@
     <string name="llm_err_rejected">服务商拒绝了这次请求（%1$s）。</string>
     <string name="llm_err_decoding">无法读取服务商的回复，请重试。</string>
     <string name="llm_err_detail">服务商原文：%1$s</string>
-    <string name="llm_err_400_balance">服务商提示这个账号的余额或额度不足（400）。请充值，或换一个模型或服务商。</string>
+    <string name="llm_err_balance">服务商提示这个账号的余额或额度已用完。请充值，或换一个模型或服务商。</string>
+    <string name="llm_err_plan_limit">这个账号的用量限额或套餐已用完、已过期，或不包含这个模型。请等额度重置、升级套餐，或换一个模型或服务商。</string>
+    <string name="llm_err_content_policy">服务商的内容安全过滤拒绝了这段内容。请换种说法或去掉敏感部分后重试。</string>
+    <string name="llm_err_overloaded">服务商现在负载过高。请稍等片刻再试，或换一个模型或服务商。</string>
+    <string name="llm_err_region">服务商不支持你所在的国家或地区。请换一个服务商，或使用它支持的网络位置。</string>
     <string name="llm_err_bad_header">API 密钥里含有换行或其他看不见的字符，请求没有发出。到「设置 → 服务商」把密钥重新粘贴成一行。</string>
     <string name="llm_err_internal">应用内部出现了意外错误。请重试；反复出现的话，带上下面的详情反馈。</string>
     <string name="llm_err_detail_app">详情：%1$s</string>

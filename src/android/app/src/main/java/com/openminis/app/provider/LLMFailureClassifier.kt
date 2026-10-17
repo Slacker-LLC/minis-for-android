@@ -116,6 +116,8 @@ object LLMFailureClassifier {
     /** Upstream permanentCodes: quota and billing failures never retry. */
     private val PERMANENT_CODES = setOf(
         "insufficient_quota", "quota_exceeded", "billing_error", "usage_limit_reached",
+        // Vendor codes from their error references (see ProviderErrorCatalog): retrying an empty account never helps.
+        "exceeded_current_quota_error", "arrearage", "creditlimitexceeded", "gousagelimiterror", "freeusagelimiterror",
     )
 
     /** Upstream transientCodes. */
@@ -140,6 +142,7 @@ object LLMFailureClassifier {
     /** Upstream isPermanent body fragments. */
     private val PERMANENT_TEXT = listOf(
         "insufficient_quota", "quota exceeded", "out of budget", "billing", "usage limit",
+        "insufficient balance", "insufficient credits", "no resource package", "limit exhausted", "package has expired",
     )
 
     /**

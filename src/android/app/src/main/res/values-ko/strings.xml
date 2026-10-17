@@ -1978,7 +1978,11 @@
     <string name="llm_err_rejected">제공업체가 요청을 거부했습니다(%1$s).</string>
     <string name="llm_err_decoding">제공업체의 응답을 읽을 수 없습니다. 다시 시도하세요.</string>
     <string name="llm_err_detail">제공업체 원문: %1$s</string>
-    <string name="llm_err_400_balance">제공업체가 이 계정의 잔액 또는 할당량이 부족하다고 응답했습니다(400). 충전하거나 다른 모델 또는 제공업체로 바꾸세요.</string>
+    <string name="llm_err_balance">제공업체가 이 계정의 잔액이 부족하다고 응답했습니다. 충전하거나 다른 모델 또는 제공업체로 바꾸세요.</string>
+    <string name="llm_err_plan_limit">이 계정의 사용량 한도 또는 요금제가 소진되었거나 만료되었거나 이 모델을 포함하지 않습니다. 초기화를 기다리거나 요금제를 바꾸거나 다른 모델 또는 제공업체로 바꾸세요.</string>
+    <string name="llm_err_content_policy">제공업체의 안전 필터가 이 내용을 거부했습니다. 표현을 바꾸거나 민감한 부분을 빼고 다시 시도하세요.</string>
+    <string name="llm_err_overloaded">제공업체가 지금 과부하 상태입니다. 잠시 후 다시 시도하거나 다른 모델 또는 제공업체로 바꾸세요.</string>
+    <string name="llm_err_region">제공업체가 사용자의 국가 또는 지역을 지원하지 않습니다. 다른 제공업체를 쓰거나 지원되는 네트워크 위치를 이용하세요.</string>
     <string name="llm_err_bad_header">API 키에 줄바꿈 등 보이지 않는 문자가 들어 있어 요청이 전송되지 않았습니다. 설정 → 제공업체에서 키를 한 줄로 다시 붙여넣으세요.</string>
     <string name="llm_err_internal">앱 내부에서 예기치 않은 오류가 발생했습니다. 다시 시도하세요. 계속되면 아래 상세 내용과 함께 제보해 주세요.</string>
     <string name="llm_err_detail_app">상세 내용: %1$s</string>

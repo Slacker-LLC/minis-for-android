@@ -111,4 +111,36 @@ class LLMErrorPresenterTest {
         assertEquals("List is empty.", LLMErrorPresenter.classify(NoSuchElementException("List is empty."))?.detail)
         assertNull(kind(IllegalStateException("session_closed")))
     }
+
+    @Test
+    fun accountLevelFailuresAreReadFromTheVendorsCodeNotTheStatus() {
+        // Zhipu's overdue account is a 429, which alone would read as a rate limit.
+        assertEquals(
+            Kind.BAD_BALANCE,
+            kind(LLMError.ProviderError("[429] 1113: Insufficient balance or no resource package. Please recharge.")),
+        )
+        assertEquals(Kind.BAD_BALANCE, kind(LLMError.ProviderError("[400] Arrearage: Access denied, please make sure your account is in good standing.")))
+        assertEquals(Kind.BAD_BALANCE, kind(LLMError.ProviderError("[402] billing_error: Your credit balance is too low")))
+        assertEquals(Kind.PLAN_LIMIT, kind(LLMError.ProviderError("[429] 1308: Usage limit reached for 5 hours. Your limit will reset at 2026-10-01")))
+        assertEquals(Kind.PLAN_LIMIT, kind(LLMError.ProviderError("[429] GoUsageLimitError: Go usage limit exceeded")))
+        assertEquals(Kind.CONTENT_POLICY, kind(LLMError.ProviderError("[400] content_filter: The request was rejected because it was considered high risk")))
+        // A 403 is a region block, not a bad key, when the body says so.
+        assertEquals(Kind.REGION, kind(LLMError.InvalidApiKey("[403] unsupported_country_region_territory: Country, region, or territory not supported")))
+        assertEquals(Kind.AUTH, kind(LLMError.InvalidApiKey("[403] Forbidden")))
+        assertEquals(Kind.AUTH, kind(LLMError.InvalidApiKey()))
+        // An overloaded provider is "try later" whether it came as a typed transient error or a status.
+        assertEquals(Kind.OVERLOADED, kind(LLMError.TransientError("[529] overloaded_error: Overloaded")))
+        assertEquals(Kind.OVERLOADED, kind(LLMError.ProviderError("[503] server_is_overloaded: Our servers are currently overloaded")))
+        assertEquals(Kind.SERVER, kind(LLMError.TransientError("[502] Bad Gateway")))
+    }
+
+    @Test
+    fun theVendorsCodeDoesNotOverrideWhatTheStatusAlreadySays() {
+        // A bad key stays a bad key even if its text happens to mention a policy.
+        assertEquals(Kind.AUTH, kind(LLMError.ProviderError("[401] invalid key; see usage policy")))
+        // A plain throttle is still a throttle.
+        assertEquals(Kind.RATE_LIMIT, kind(LLMError.ProviderError("[429] rate_limit_exceeded: Rate limit reached")))
+        // A 5xx is the provider's failure whatever else its text mentions.
+        assertEquals(Kind.SERVER, kind(LLMError.ProviderError("[500] content_filter upstream error")))
+    }
 }

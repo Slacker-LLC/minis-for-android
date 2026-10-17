@@ -370,6 +370,38 @@ class OpenAIProviderTest {
         throw AssertionError("Expected ProviderError")
     }
 
+    @Test
+    fun `a 429 that is an empty balance keeps the body and is not a plain rate limit`() = runBlocking {
+        server.enqueue(
+            MockResponse().setResponseCode(429).setBody(
+                """{"error":{"code":"1113","message":"Insufficient balance or no resource package. Please recharge."}}""",
+            ),
+        )
+        try {
+            provider.sendMessage(listOf(LLMMessage(LLMMessage.Role.USER, "test")), null, 100)
+        } catch (e: LLMError.ProviderError) {
+            assertTrue(e.detail, e.detail.startsWith("[429] 1113: Insufficient balance"))
+            return@runBlocking
+        }
+        throw AssertionError("Expected ProviderError")
+    }
+
+    @Test
+    fun `a 403 keeps the body so a region block is not read as a bad key`() = runBlocking {
+        server.enqueue(
+            MockResponse().setResponseCode(403).setBody(
+                """{"error":{"code":"unsupported_country_region_territory","message":"Country, region, or territory not supported"}}""",
+            ),
+        )
+        try {
+            provider.sendMessage(listOf(LLMMessage(LLMMessage.Role.USER, "test")), null, 100)
+        } catch (e: LLMError.InvalidApiKey) {
+            assertTrue(e.detail, e.detail.contains("unsupported_country_region_territory"))
+            return@runBlocking
+        }
+        throw AssertionError("Expected InvalidApiKey")
+    }
+
     // -- Provider metadata --
 
     @Test

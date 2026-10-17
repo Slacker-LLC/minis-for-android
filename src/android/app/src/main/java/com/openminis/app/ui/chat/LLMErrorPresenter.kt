@@ -5,6 +5,8 @@ import com.openminis.app.agent.*
 import android.content.Context
 import com.openminis.app.R
 import com.openminis.app.data.model.LLMError
+import com.openminis.app.provider.ProviderErrorCatalog
+import com.openminis.app.provider.ProviderErrorCatalog.Category
 
 /**
  * What the chat shows when a model request fails: a plain-language reason and the next step, then the provider's
@@ -20,8 +22,21 @@ internal object LLMErrorPresenter {
         // A 400 whose body says what was wrong. Only these five are told apart; anything else stays BAD_REQUEST.
         BAD_TOOL_PAIRING, BAD_CONTEXT, BAD_IMAGE, BAD_MODEL, BAD_THINKING,
 
-        // The provider says the account is out of balance or quota (400 or 402).
+        // Account-level failures, read from the provider's own code/message (see ProviderErrorCatalog), whatever the status.
+        // Out of balance (400/402/429 depending on the vendor).
         BAD_BALANCE,
+
+        // A plan, free-tier or usage window is used up, expired, or does not include the model.
+        PLAN_LIMIT,
+
+        // The provider's safety layer refused the content.
+        CONTENT_POLICY,
+
+        // The provider has no capacity right now (Anthropic 529, OpenAI server_is_overloaded, ...).
+        OVERLOADED,
+
+        // The account's country or region is not served.
+        REGION,
 
         // Not the provider's fault: the key holds a line break or other invisible character, so the request was never sent.
         BAD_HEADER,
@@ -62,8 +77,6 @@ internal object LLMErrorPresenter {
         "no tool call found", // the reverse: an output with no call
         "function response parts", // Gemini: number of function response parts must equal function call parts
     )
-    private val BALANCE_NOUNS = listOf("balance", "credit", "fund", "quota")
-
     /** OkHttp refuses a header value holding a control character: "Unexpected char 0x0a at 58 in Authorization value". */
     private val HEADER_CHAR = Regex("""Unexpected char 0x[0-9a-fA-F]+ at \d+ in .+ value""")
 
@@ -101,7 +114,7 @@ internal object LLMErrorPresenter {
         val d = detail.lowercase().replace("`", "").replace("'", "").replace("\"", "")
         return when {
             TOOL_PAIRING.any { it in d } -> Kind.BAD_TOOL_PAIRING
-            isOutOfBalance(d) -> Kind.BAD_BALANCE
+            ProviderErrorCatalog.categoryOf(d) == Category.BALANCE -> Kind.BAD_BALANCE
             CONTEXT.any { it in d } -> Kind.BAD_CONTEXT
             "image" in d && listOf("not support", "unsupported", "invalid image", "does not accept", "cannot be", "vision", "multimodal").any { it in d } -> Kind.BAD_IMAGE
             "model" in d && listOf("not found", "does not exist", "invalid model", "unknown model", "model_not_found", "not supported").any { it in d } -> Kind.BAD_MODEL
@@ -111,21 +124,44 @@ internal object LLMErrorPresenter {
         }
     }
 
-    /** "You have insufficient balance", "insufficient_quota", "Insufficient credits": the account, not the request. */
-    private fun isOutOfBalance(lowercased: String) =
-        "insufficient" in lowercased && BALANCE_NOUNS.any { it in lowercased }
+    private fun Category.toKind() = when (this) {
+        Category.BALANCE -> Kind.BAD_BALANCE
+        Category.PLAN_LIMIT -> Kind.PLAN_LIMIT
+        Category.CONTENT_POLICY -> Kind.CONTENT_POLICY
+        Category.OVERLOADED -> Kind.OVERLOADED
+        Category.REGION -> Kind.REGION
+    }
 
     internal fun classify(e: Throwable): Reason? {
         val llm = e as? LLMError ?: return classifyOther(e)
         return when (llm) {
-            is LLMError.InvalidApiKey -> Reason(Kind.AUTH, null, llm.detail)
+            is LLMError.InvalidApiKey -> {
+                // A 403 is not always a bad key: it can be a region block or an empty account.
+                val kind = ProviderErrorCatalog.categoryOf(llm.detail)
+                    ?.takeIf { it == Category.REGION || it == Category.BALANCE || it == Category.PLAN_LIMIT }
+                    ?.toKind() ?: Kind.AUTH
+                Reason(kind, statusOf(llm.detail), llm.detail)
+            }
             is LLMError.RateLimited -> Reason(Kind.RATE_LIMIT, 429, "")
             is LLMError.NetworkError -> Reason(Kind.NETWORK, null, llm.cause?.message.orEmpty())
             is LLMError.DecodingError -> Reason(Kind.DECODING, null, llm.cause?.message.orEmpty())
-            is LLMError.TransientError -> Reason(Kind.SERVER, statusOf(llm.detail), llm.detail)
+            is LLMError.TransientError -> {
+                val kind = when (ProviderErrorCatalog.categoryOf(llm.detail)) {
+                    Category.OVERLOADED -> Kind.OVERLOADED
+                    Category.BALANCE -> Kind.BAD_BALANCE
+                    Category.PLAN_LIMIT -> Kind.PLAN_LIMIT
+                    else -> Kind.SERVER
+                }
+                Reason(kind, statusOf(llm.detail), llm.detail)
+            }
             is LLMError.ProviderError -> {
                 val status = statusOf(llm.detail)
-                val kind = when (status) {
+                // The vendor's own code/message wins over the status: Zhipu's overdue account is a 429, DashScope's a 400.
+                // A 5xx is the provider's own failure whatever its text mentions; only "overloaded" is read from it.
+                val category = ProviderErrorCatalog.categoryOf(llm.detail)?.takeUnless {
+                    status == 401 || (status != null && status in 500..599 && it != Category.OVERLOADED)
+                }
+                val kind = if (category != null) category.toKind() else when (status) {
                     400 -> refine400(llm.detail)
                     402 -> Kind.BAD_BALANCE
                     401, 403 -> Kind.AUTH
@@ -158,7 +194,11 @@ internal object LLMErrorPresenter {
             Kind.BAD_IMAGE -> context.getString(R.string.llm_err_400_image)
             Kind.BAD_MODEL -> context.getString(R.string.llm_err_400_model)
             Kind.BAD_THINKING -> context.getString(R.string.llm_err_400_thinking)
-            Kind.BAD_BALANCE -> context.getString(R.string.llm_err_400_balance)
+            Kind.BAD_BALANCE -> context.getString(R.string.llm_err_balance)
+            Kind.PLAN_LIMIT -> context.getString(R.string.llm_err_plan_limit)
+            Kind.CONTENT_POLICY -> context.getString(R.string.llm_err_content_policy)
+            Kind.OVERLOADED -> context.getString(R.string.llm_err_overloaded)
+            Kind.REGION -> context.getString(R.string.llm_err_region)
             Kind.BAD_HEADER -> context.getString(R.string.llm_err_bad_header)
             Kind.INTERNAL -> context.getString(R.string.llm_err_internal)
             Kind.NOT_FOUND -> context.getString(R.string.llm_err_not_found)

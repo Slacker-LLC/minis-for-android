@@ -13,6 +13,7 @@ import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.LLMProvider
+import com.openminis.app.provider.ProviderErrorCatalog
 import com.openminis.app.provider.antigravity.AntigravityTransport
 import com.openminis.app.provider.antigravity.AntigravityWire
 import com.openminis.app.provider.safeOptString
@@ -508,9 +509,11 @@ class GeminiProvider(
     }
 
     private fun mapHttpError(statusCode: Int, body: String): LLMError {
-        if (statusCode == 401 || statusCode == 403) return LLMError.InvalidApiKey()
-        if (statusCode == 429) return LLMError.RateLimited()
-        val message = "${if (cloud != null) "Antigravity" else "Gemini"} API error $statusCode: ${body.take(200)}"
+        val message = "${if (cloud != null) "Antigravity" else "Gemini"} API error $statusCode: ${body.take(300)}"
+        if (statusCode == 401 || statusCode == 403) return LLMError.InvalidApiKey(message)
+        if (statusCode == 429) {
+            return if (ProviderErrorCatalog.isAccountCap(body)) LLMError.ProviderError(message) else LLMError.RateLimited()
+        }
         val transientCodes = setOf(500, 502, 503, 504, 529)
         if (statusCode in transientCodes) return LLMError.TransientError(message)
         return LLMError.ProviderError(message)
