@@ -1,6 +1,7 @@
 package com.openminis.app.ui.chat
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
@@ -35,6 +36,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -92,11 +95,17 @@ internal fun WorkProcessRowView(
     }
     var expanded by rememberSaveable(process.id) { mutableStateOf(summary.isRunning) }
     var userToggled by rememberSaveable(process.id) { mutableStateOf(false) }
+    // An automatic fold snaps shut: it happens while the next step is already opening below it, and two
+    // height animations at once moved the whole list. A fold the user asked for still animates.
+    var animateFold by remember(process.id) { mutableStateOf(true) }
 
     // Auto-expand while the run is live; fold back when it ends. Skipped once
     // the user picked a state themselves (Eta's `manuallyExpanded` gate).
     LaunchedEffect(process.id, summary.isRunning) {
-        if (!userToggled) expanded = summary.isRunning
+        if (!userToggled) {
+            if (expanded && !summary.isRunning) animateFold = false
+            expanded = summary.isRunning
+        }
     }
 
     val statusText = workStatusText(summary)
@@ -109,6 +118,7 @@ internal fun WorkProcessRowView(
                 .clip(RoundedCornerShape(8.dp))
                 .clickable {
                     userToggled = true
+                    animateFold = true
                     expanded = !expanded
                 }
                 .heightIn(min = 30.dp)
@@ -146,14 +156,34 @@ internal fun WorkProcessRowView(
                     stiffness = Spring.StiffnessMediumLow,
                 ),
             ),
-            exit = fadeOut() + shrinkVertically(
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-            ),
+            exit = if (animateFold) {
+                fadeOut() + shrinkVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow,
+                    ),
+                )
+            } else {
+                ExitTransition.None
+            },
         ) {
             val panelScroll = androidx.compose.foundation.rememberScrollState()
+            // A running panel keeps its newest step in view: the panel is capped in height and scrolls inside
+            // itself, so without this the steps that arrive after the cap sit below the fold until the user
+            // swipes. A swipe up lets go of the bottom, and reaching the bottom again takes it back.
+            var followBottom by remember { mutableStateOf(true) }
+            val running by rememberUpdatedState(summary.isRunning)
+            val slackPx = with(androidx.compose.ui.platform.LocalDensity.current) { PANEL_FOLLOW_SLACK.toPx() }.toInt()
+            LaunchedEffect(panelScroll) {
+                snapshotFlow { panelScroll.isScrollInProgress }.collect { scrolling ->
+                    if (!scrolling) followBottom = isPanelAtBottom(panelScroll.value, panelScroll.maxValue, slackPx)
+                }
+            }
+            LaunchedEffect(panelScroll) {
+                snapshotFlow { panelScroll.maxValue }.collect { max ->
+                    if (shouldFollowPanelBottom(running, followBottom, panelScroll.value, max)) panelScroll.scrollTo(max)
+                }
+            }
             Column(modifier = Modifier.padding(start = 4.dp, top = 2.dp)) {
               // A long run scrolls inside a bounded panel, so the header (and the fold button under it) is never
               // a long scroll away; a short run just lays out in full.
@@ -256,6 +286,16 @@ internal fun WorkProcessRowView(
 
 /** Tallest the opened steps panel gets before it scrolls on its own. */
 private val WORK_PANEL_MAX_HEIGHT = 440.dp
+
+/** How far from the end still counts as "at the bottom" for a panel that follows its newest step. */
+private val PANEL_FOLLOW_SLACK = 24.dp
+
+/** Whether a panel scrolled to [value] of [max] is at its bottom, give or take [slackPx]. */
+internal fun isPanelAtBottom(value: Int, max: Int, slackPx: Int): Boolean = value >= max - slackPx
+
+/** A running panel that was left at its bottom follows the content growing; one the user scrolled up is left alone. */
+internal fun shouldFollowPanelBottom(running: Boolean, followBottom: Boolean, value: Int, max: Int): Boolean =
+    running && followBottom && value < max
 
 /**
  * One step of thinking or narration as a single line, the way a tool step is: a plain-text preview
