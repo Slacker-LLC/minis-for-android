@@ -2412,6 +2412,7 @@
     <string name="vscreen_display_busy">The virtual display is currently in use by another session.</string>
     <string name="voice_call_settings_speed">Speaking speed</string>
     <string name="voice_call_settings_earpiece">Use earpiece</string>
+    <string name="voice_call_settings_new_chat">Start a new chat for each call</string>
     <string name="chat_settings_return_key">Return key</string>
     <string name="chat_settings_launch">On launch</string>
     <string name="chat_settings_group_input">Input</string>

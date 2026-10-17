@@ -190,8 +190,12 @@ fun AppNavigation(
             // lands before ChatScreen's first compose).
             is DeepLinkAction.NewVoiceChat -> {
                 try {
+                    com.openminis.app.speech.VoiceOutputState.init(context)
                     val restored = com.openminis.app.data.AssistantHomePrefs.resolveVoiceSession(context)
-                    val target = restored ?: "__new__${java.util.UUID.randomUUID()}"
+                    val target = com.openminis.app.voicecall.VoiceEntryTarget.forDeepLink(
+                        com.openminis.app.speech.VoiceOutputState.callNewChat.value,
+                        restored,
+                    ) { "__new__${java.util.UUID.randomUUID()}" }
                     DeepLinkCoordinator.setPendingChatAction(
                         DeepLinkCoordinator.ChatAction.START_VOICE,
                         sessionId = target,

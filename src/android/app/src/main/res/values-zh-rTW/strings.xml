@@ -2279,6 +2279,7 @@
     <string name="work_task_clear_selection">解除所選任務</string>
     <string name="voice_call_settings_speed">朗讀語速</string>
     <string name="voice_call_settings_earpiece">使用聽筒播放</string>
+    <string name="voice_call_settings_new_chat">每次通話新開對話</string>
     <string name="chat_settings_return_key">Enter 鍵</string>
     <string name="chat_settings_launch">啟動時顯示</string>
     <string name="chat_settings_group_input">輸入</string>

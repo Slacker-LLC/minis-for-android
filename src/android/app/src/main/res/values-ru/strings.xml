@@ -2329,6 +2329,7 @@
     <string name="vscreen_display_busy">Виртуальный экран сейчас используется другой сессией.</string>
     <string name="voice_call_settings_speed">Скорость речи</string>
     <string name="voice_call_settings_earpiece">Воспроизводить через динамик для разговора</string>
+    <string name="voice_call_settings_new_chat">Новый чат для каждого звонка</string>
     <string name="chat_settings_return_key">Клавиша Enter</string>
     <string name="chat_settings_launch">При запуске</string>
     <string name="chat_settings_group_input">Ввод</string>

@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Speed
@@ -77,6 +78,7 @@ fun VoiceCallSettingsScreen(
 ) {
     val speed by VoiceOutputState.speed.collectAsState()
     val earpiece by VoiceOutputState.callEarpiece.collectAsState()
+    val newChat by VoiceOutputState.callNewChat.collectAsState()
     val locale by SpeechRecognitionManager.locale.collectAsState()
     var picker by remember { mutableStateOf<VoicePicker?>(null) }
 
@@ -103,6 +105,12 @@ fun VoiceCallSettingsScreen(
                 icon = Icons.Outlined.RecordVoiceOver,
                 title = stringResource(R.string.tts_capsule_picker_title),
                 onClick = { picker = VoicePicker.OUTPUT },
+            )
+            SettingsSwitchRow(
+                icon = Icons.Outlined.ChatBubbleOutline,
+                title = stringResource(R.string.voice_call_settings_new_chat),
+                checked = newChat,
+                onCheckedChange = { VoiceOutputState.setCallNewChat(it) },
             )
             SettingsSwitchRow(
                 icon = Icons.Outlined.Hearing,
