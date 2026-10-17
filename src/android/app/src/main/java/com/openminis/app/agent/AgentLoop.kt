@@ -249,6 +249,9 @@ private suspend fun AgentSession.executeAgentLoop(
     // we surface a real error instead of a silent blank bubble. Mirrors iOS
     // AIAgentSession.didInjectEmptyToolReminderThisRun.
     var didInjectEmptyToolReminder = false
+    // Consecutive "announced an action but made no tool call" nudges since the
+    // last tool round; bounded by UnfulfilledIntentNudge.MAX_CONSECUTIVE.
+    var unfulfilledIntentNudges = 0
     // [C6-android-model-failure-discipline] Side-effect facts of this agent
     // round, recorded where they happen so the retry gate can refuse to
     // re-issue a request after the round has produced effects. Eta tracks
@@ -994,6 +997,38 @@ private suspend fun AgentSession.executeAgentLoop(
             if (!finishedCleanly) {
                 loopOutcome = AgentTurnOutcome.NeedsAttention("model_finish_reason:${stream.turnFinishReason}")
             }
+            // A clean stop whose text only announces the next action ("现在实际执行：")
+            // leaves the task half done. Give the model a bounded second chance.
+            if (loopOutcome == AgentTurnOutcome.Completed &&
+                UnfulfilledIntentNudge.shouldNudge(
+                    text = turnText,
+                    finishReason = stream.turnFinishReason,
+                    priorIsToolResult = agentHistory.size >= 2 &&
+                        agentHistory[agentHistory.size - 2].contentParts.let { parts ->
+                            parts.isNotEmpty() && parts.all { it is AgentContentPart.ToolResult }
+                        },
+                    hasTools = turnTools.isNotEmpty(),
+                    turn = turn,
+                    turnCap = MAX_AGENT_TURNS,
+                    nudgesUsed = unfulfilledIntentNudges,
+                    promptQueued = _promptQueue.value.isNotEmpty(),
+                )) {
+                unfulfilledIntentNudges++
+                AppLogger.warning(
+                    TAG_STREAM,
+                    "unfulfilled-intent nudge $unfulfilledIntentNudges/${UnfulfilledIntentNudge.MAX_CONSECUTIVE}: " +
+                        "turn=$turn ended with an announcement and no tool call, retrying " +
+                        "model=${provider.model.id} textLen=${turnText.length}",
+                )
+                agentHistory.add(
+                    LLMMessage(role = LLMMessage.Role.USER, content = UnfulfilledIntentNudge.REMINDER),
+                )
+                withContext(Dispatchers.Main) {
+                    updateAssistantMessage(assistantId, accumulatedText, true, allToolBlocks,
+                        isAwaitingModelResponse = true)
+                }
+                continue
+            }
             // Auto-title after first exchange
             if (turn == 0) titleGenerator.generateIfNeeded()
             // Explicit tasks continue in this same loop, with a durable CAS budget.
@@ -1030,6 +1065,7 @@ private suspend fun AgentSession.executeAgentLoop(
             break
         }
         AppLogger.info(TAG_STREAM, "runAgentLoop turn=$turn dispatching ${stream.toolCalls.size} tool call(s), continuing")
+        unfulfilledIntentNudges = 0
 
         // [T-android-session-last-message-live-tool-call] Push a live
         // preview to the session list NOW, before the (possibly long-
