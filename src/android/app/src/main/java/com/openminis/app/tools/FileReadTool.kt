@@ -13,14 +13,15 @@ object FileReadTool {
 
     fun definition(): AgentToolDefinition = AgentToolDefinition(
         name = NAME,
-        description = "Read a file from the Linux filesystem. Faster than shell_execute for reading files — no shell overhead. Returns file content with metadata. Rejects binary files.",
+        description = "Read a file from the Linux filesystem. A binary file is rejected. " +
+            "This is faster than shell_execute, because it has no shell overhead. The result has the file content and metadata.",
         parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Read Python script contents', 'Check system configuration file'). Use the same language as the user."),
-            "path" to AgentToolParam("string", "Absolute Linux path to read (e.g. /var/minis/workspace/data.csv)"),
-            "offset" to AgentToolParam("integer", "1-based line number to start reading from (default: 1). Ignored when direction is 'tail'. If a previous read was truncated, its header ends with next_offset=N — pass that as offset to continue from where it stopped."),
-            "lines" to AgentToolParam("integer", "Maximum number of lines to return (default: all lines up to max_length)"),
-            "max_length" to AgentToolParam("integer", "Maximum character length of returned content (default: 15000)"),
-            "direction" to AgentToolParam("string", "Read direction: 'head' (from start, default) or 'tail' (from end of file)"),
+            "tool_title" to ToolText.TOOL_TITLE,
+            "path" to AgentToolParam("string", "The absolute Linux path to read. Example: /var/minis/workspace/data.csv."),
+            "offset" to AgentToolParam("integer", "The line number to start from, counted from 1. The default is 1. It is ignored when direction is tail. If a read was truncated, its header ends with next_offset=N. Pass N as offset to continue."),
+            "lines" to AgentToolParam("integer", "The maximum number of lines to return. The default is all lines, up to max_length."),
+            "max_length" to AgentToolParam("integer", "The maximum number of characters to return. The default is 15000."),
+            "direction" to AgentToolParam("string", "Use head to read from the start of the file (default). Use tail to read from the end."),
         ),
         required = listOf("tool_title", "path"),
         propertyOrdering = listOf("tool_title", "path", "offset", "lines", "direction", "max_length"),

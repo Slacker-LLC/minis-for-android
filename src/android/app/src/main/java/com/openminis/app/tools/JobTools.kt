@@ -48,17 +48,19 @@ object JobTools {
 
     fun jobOutputDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = NAME_OUTPUT,
-        description = "Read the output of a background job. Returns the accumulated output so far, always ending " +
-            "with a '[status: <STATUS>]' trailer (RUNNING/COMPLETED/KILLED/FAILED, with the reason when there is one) " +
-            "and '[next_offset: N]'. Pass offset=N back to read only what was written since; without offset you get " +
-            "everything still kept. With wait=true, blocks until the job reaches a terminal status or timeout_ms elapses; " +
-            "a timed-out wait returns the current output with [status: RUNNING] and leaves the job alive.",
+        description = "Read the output of a background job. The result is the output so far. " +
+            "It always ends with a [status: STATUS] line and a [next_offset: N] line. " +
+            "STATUS is RUNNING, COMPLETED, KILLED, or FAILED, with the reason if there is one.\n\n" +
+            "To read only the new output, pass offset=N from the previous call. " +
+            "Without offset, you get all the output that the app still keeps. " +
+            "With wait=true, the call blocks until the job ends or timeout_ms passes. " +
+            "After a timeout, the call returns the current output with [status: RUNNING] and the job stays alive.",
         parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user. Use the same language as the user."),
-            "job_id" to AgentToolParam("string", "The id of the background job to read output from."),
-            "wait" to AgentToolParam("boolean", "Block until the job reaches a terminal status (default false)."),
-            "timeout_ms" to AgentToolParam("integer", "Maximum time to wait in milliseconds when wait=true (default 30000)."),
-            "offset" to AgentToolParam("integer", "Output position to read from: the next_offset of the previous call. Omit to read everything still kept."),
+            "tool_title" to ToolText.TOOL_TITLE,
+            "job_id" to AgentToolParam("string", "The ID of the background job."),
+            "wait" to AgentToolParam("boolean", "If true, wait until the job ends. The default is false."),
+            "timeout_ms" to AgentToolParam("integer", "The maximum wait time in milliseconds when wait=true. The default is 30000."),
+            "offset" to AgentToolParam("integer", "The output position to read from, which is the next_offset of the previous call. Omit it to read all the output that the app still keeps."),
         ),
         required = listOf("tool_title", "job_id"),
         propertyOrdering = listOf("tool_title", "job_id", "wait", "timeout_ms", "offset"),
@@ -69,9 +71,9 @@ object JobTools {
 
     fun jobListDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = NAME_LIST,
-        description = "List all background jobs, newest first, one per line formatted as '<id> [<kind>] <STATUS> \u2014 <label>'.",
+        description = "List all background jobs, newest first. Each line is '<id> [<kind>] <STATUS> \u2014 <label>'.",
         parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user. Use the same language as the user."),
+            "tool_title" to ToolText.TOOL_TITLE,
         ),
         required = listOf("tool_title"),
         propertyOrdering = listOf("tool_title"),
@@ -80,13 +82,12 @@ object JobTools {
 
     fun jobKillDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = NAME_KILL,
-        description = "Request cancellation of a running background job: marks it KILLED and records the reason. " +
-            "Returns 'cancellation-requested' when the job was still running, or 'already-finished' when it had " +
-            "already reached a terminal status.",
+        description = "Request the cancellation of a running background job. The call marks the job KILLED and records the reason. " +
+            "It returns 'cancellation-requested' if the job was running, or 'already-finished' if the job had ended.",
         parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user. Use the same language as the user."),
-            "job_id" to AgentToolParam("string", "The id of the job to cancel."),
-            "reason" to AgentToolParam("string", "Optional short reason, recorded in the job detail."),
+            "tool_title" to ToolText.TOOL_TITLE,
+            "job_id" to AgentToolParam("string", "The ID of the job to cancel."),
+            "reason" to AgentToolParam("string", "An optional short reason. The app records it in the job detail."),
         ),
         required = listOf("tool_title", "job_id"),
         propertyOrdering = listOf("tool_title", "job_id", "reason"),
@@ -95,16 +96,16 @@ object JobTools {
 
     fun jobInputDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = NAME_INPUT,
-        description = "Send text to the standard input of a running background shell job (one started with " +
-            "shell_execute background=true), the way typing into it would: a program that reads a line gets it and " +
-            "waits for the next. Nothing is added to the text, so end a line with \\n. Set eof=true to close its " +
-            "input afterwards (or alone, with no input) for programs that read until end-of-file. Read what the job " +
-            "answered with job_output.",
+        description = "Send text to the stdin of a running background shell job. " +
+            "A background shell job is a job that you started with shell_execute and background=true. " +
+            "The job gets the text as typed input. The call adds nothing to the text, so end a line with \\n.\n\n" +
+            "To close the stdin after the text, set eof=true. You can also set eof=true alone, with no input. " +
+            "Use it for a program that reads until the end of the file. Read the answer of the job with job_output.",
         parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user. Use the same language as the user."),
-            "job_id" to AgentToolParam("string", "The id of the job to send input to."),
-            "input" to AgentToolParam("string", "Text to send, sent as it is."),
-            "eof" to AgentToolParam("boolean", "Close the job's input after sending (default false)."),
+            "tool_title" to ToolText.TOOL_TITLE,
+            "job_id" to AgentToolParam("string", "The ID of the job that gets the input."),
+            "input" to AgentToolParam("string", "The text to send. The app sends it as it is."),
+            "eof" to AgentToolParam("boolean", "If true, close the stdin of the job after the text. The default is false."),
         ),
         required = listOf("tool_title", "job_id"),
         propertyOrdering = listOf("tool_title", "job_id", "input", "eof"),

@@ -376,11 +376,11 @@ abstract class AndroidSystemHandler : ToolHandler {
 class AndroidWebSearchHandler : AndroidSystemHandler() {
     override val definition = AgentToolDefinition(
         name = "android.web.search",
-        description = "Search the public web and return titles, URLs, and snippets.",
+        description = "Search the public web. The result has titles, URLs, and snippets.",
         parameters = mapOf(
-            "query" to AgentToolParam("string", "Search query"),
-            "count" to AgentToolParam("integer", "Max results (default 10, max 20)"),
-            "freshness" to AgentToolParam("string", "Optional day/week/month/year filter", listOf("day", "week", "month", "year")),
+            "query" to AgentToolParam("string", "The search query."),
+            "count" to AgentToolParam("integer", "The maximum number of results. The default is 10 and the maximum is 20."),
+            "freshness" to AgentToolParam("string", "An optional filter on the age of the results.", listOf("day", "week", "month", "year")),
         ),
         required = listOf("query"),
     )
@@ -391,11 +391,11 @@ class AndroidWebSearchHandler : AndroidSystemHandler() {
 class AndroidUrlFetchHandler : AndroidSystemHandler() {
     override val definition = AgentToolDefinition(
         name = "android.web.fetch",
-        description = "Fetch a public HTTPS URL and return readable text. Private/local destinations are blocked.",
+        description = "Fetch a public HTTPS URL and return readable text. The tool blocks private and local destinations.",
         parameters = mapOf(
-            "url" to AgentToolParam("string", "HTTPS URL"),
-            "max_length" to AgentToolParam("integer", "Max returned chars (default 20000, max 100000)"),
-            "extract_mode" to AgentToolParam("string", "text (default), markdown, or raw", listOf("text", "markdown", "raw")),
+            "url" to AgentToolParam("string", "The HTTPS URL to fetch."),
+            "max_length" to AgentToolParam("integer", "The maximum number of characters to return. The default is 20000 and the maximum is 100000."),
+            "extract_mode" to AgentToolParam("string", "The output format. The default is text.", listOf("text", "markdown", "raw")),
         ),
         required = listOf("url"),
     )

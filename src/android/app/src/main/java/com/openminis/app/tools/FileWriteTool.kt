@@ -14,13 +14,14 @@ object FileWriteTool {
 
     fun definition(): AgentToolDefinition = AgentToolDefinition(
         name = NAME,
-        description = "Write content to a file on the Linux filesystem. Faster than shell_execute for writing files. Creates the file if it doesn't exist. Use append mode to add to existing files.",
+        description = "Write content to a file on the Linux filesystem. " +
+            "This is faster than shell_execute. The call creates the file if it does not exist. To add to an existing file, set append=true.",
         parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Create Python statistics script', 'Write configuration file'). Use the same language as the user."),
-            "path" to AgentToolParam("string", "Absolute Linux path to write (e.g. /root/test.txt)"),
-            "content" to AgentToolParam("string", "The text content to write to the file"),
-            "append" to AgentToolParam("boolean", "If true, append to existing file instead of overwriting (default: false)"),
-            "create_dirs" to AgentToolParam("boolean", "If true, create parent directories if they don't exist (default: false)"),
+            "tool_title" to ToolText.TOOL_TITLE,
+            "path" to AgentToolParam("string", "The absolute Linux path to write. Example: /root/test.txt."),
+            "content" to AgentToolParam("string", "The text to write to the file."),
+            "append" to AgentToolParam("boolean", "If true, add the content to the end of the existing file. The default is false, which overwrites the file."),
+            "create_dirs" to AgentToolParam("boolean", "If true, create the parent directories that do not exist. The default is false."),
         ),
         required = listOf("tool_title", "path", "content"),
         propertyOrdering = listOf("tool_title", "path", "content", "append", "create_dirs"),

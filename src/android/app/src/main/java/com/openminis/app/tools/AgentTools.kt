@@ -116,16 +116,18 @@ object AgentTools {
 
     fun catalogDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "find_tools",
-        description = "Find names, descriptions and parameter schemas of tools exposed by the current session configuration. " +
-            "Query by name or description; use include_schema=true for exact arguments. " +
-            "Tools listed as deferred in the system prompt are not sent with every request: a query that matches them loads them (at most 6 per call, " +
-            "exact name first), and a loaded tool is callable from your next step. A listing with no query loads nothing. " +
-            "Registration is not device availability: check android_capabilities and actual operation results for backend conditions.",
+        description = "Find the names, descriptions, and parameter schemas of the tools in this session. " +
+            "Search by name or description. Set include_schema=true to get the exact arguments.\n\n" +
+            "The system prompt lists the deferred tools. A deferred tool is not sent with each request. " +
+            "A query that matches a deferred tool loads it, with a maximum of 6 tools per call and exact names first. " +
+            "You can call a loaded tool from your next step. A listing with no query loads nothing.\n\n" +
+            "A registered tool can still be unavailable on the device. " +
+            "Check android_capabilities and the result of each operation.",
         parameters = mapOf(
-            "query" to AgentToolParam("string", "Words matched against tool names and descriptions; a tool name loads that tool if it is deferred"),
-            "include_schema" to AgentToolParam("boolean", "Include the complete parameter schema (default false)"),
-            "offset" to AgentToolParam("integer", "Result offset, default 0"),
-            "limit" to AgentToolParam("integer", "Results per page, default 20, range 1..100"),
+            "query" to AgentToolParam("string", "Words to match against tool names and descriptions. A tool name loads that tool if it is deferred."),
+            "include_schema" to AgentToolParam("boolean", "If true, include the complete parameter schema. The default is false."),
+            "offset" to AgentToolParam("integer", "The result offset. The default is 0."),
+            "limit" to AgentToolParam("integer", "The number of results per page, from 1 to 100. The default is 20."),
         ),
     )
 
@@ -135,18 +137,22 @@ object AgentTools {
     // reuses the same schema under its canonical linux.shell name.
     fun shellExecuteDefinition(name: String = "shell_execute"): AgentToolDefinition = AgentToolDefinition(
         name = name,
-        description = "Execute a command in the on-device Ubuntu 24.04 environment. " +
-            "Root launches the chroot, but commands run privilege-dropped as the Android app UID with Linux capabilities cleared. " +
-            "Workspace is the session-scoped /workspace backed by app-private storage. " +
-            "Commands run in a persistent Bash shell with stdout and stderr merged, one at a time; cd/export carry over to the next command. Default timeout is 15 minutes. " +
-            "For anything long-running (a build, a server, a download) or to run several things in parallel, set background=true: the command then runs as its own job, " +
-            "independent of this shell and of other jobs, the call returns at once with a job_id, and job_output / job_list / job_kill read its output, wait for it or stop it; job_input types into its stdin (for a program that asks questions).",
+        description = "Run a command in the Ubuntu 24.04 environment on the device. " +
+            "The command runs as the Android app user, with no Linux capabilities. Root only starts the chroot. " +
+            "The workspace of the session is /workspace, in app-private storage.\n\n" +
+            "The command runs in a persistent Bash shell, one command at a time, with stdout and stderr merged. " +
+            "The shell keeps cd and export for the next command. The default timeout is 15 minutes.\n\n" +
+            "For a long task, such as a build, a server, or a download, set background=true. " +
+            "The command then runs as a separate job and the call returns a job_id at once. " +
+            "To run several commands in parallel, start each one as a job. " +
+            "Use job_output, job_list, and job_kill to read, list, or stop jobs. " +
+            "Use job_input to send text to the stdin of a job.",
         parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Install Python data analysis packages', 'List files in home directory'). Use the same language as the user."),
-            "command" to AgentToolParam("string", "The shell command to execute. Supports multi-line commands directly — no special escaping needed. Keep under 1000 chars; for longer scripts, write to a file with file_write first, then run it."),
-            "timeout" to AgentToolParam("integer", "Timeout in seconds (default: 900). Use a larger value for long-running commands like package installs."),
-            "delay" to AgentToolParam("integer", "Delay in seconds (max 600) before execution begins. The tool blocks the agent flow during this wait WITHOUT occupying the shell, so other concurrent tasks can use it. Use this instead of sleep commands to avoid resource contention."),
-            "background" to AgentToolParam("boolean", "Run the command as an independent background job instead of in the persistent shell (default false). Returns immediately with a job_id; read it later with job_output. The job does not see this shell's cd/export state and has no stdin. With background, `timeout` is the job's own deadline (default 2 hours, max 24 hours)."),
+            "tool_title" to ToolText.TOOL_TITLE,
+            "command" to AgentToolParam("string", "The shell command to run. A multi-line command is allowed and needs no escaping. Keep it under 1000 characters. For a longer script, write it to a file with file_write, then run the file."),
+            "timeout" to AgentToolParam("integer", "The timeout in seconds. The default is 900. Use a larger value for a long task, such as a package install."),
+            "delay" to AgentToolParam("integer", "The seconds to wait before the command starts, from 0 to 600. The wait does not use the shell, so other tasks can use it. Use delay instead of a sleep command."),
+            "background" to AgentToolParam("boolean", "If true, run the command as a separate background job and not in the persistent shell. The default is false. The job does not see the cd and export state of the shell. With background=true, timeout is the deadline of the job. Its default is 2 hours and its maximum is 24 hours."),
         ),
         required = listOf("tool_title", "command"),
         propertyOrdering = listOf("tool_title", "command", "timeout", "delay", "background"),
@@ -156,50 +162,45 @@ object AgentTools {
     fun browserUseDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "browser_use",
         description = "Control a web browser with up to 3 tabs. " +
-            "Do NOT use this tool for minis:// action URLs (open_terminal, views, settings) — those are app deep links, use Markdown links in chat instead. " +
-            "The browser supports both web URLs and minis:// resource URLs. Use minis:// URLs to preview session files (e.g. navigate to minis://workspace/index.html). " +
-            "Sub-resources (JS, CSS, images, fonts) referenced via minis:// absolute paths or relative paths within HTML pages resolve correctly. " +
-            "Use navigate to open URLs, screenshot to see the page (returns an image), " +
-            "click/type to interact with elements, get_text/get_readable to extract page text in windows " +
-            "(each read prints next_offset while more text remains — pass it back as offset to keep reading the same page), " +
-            "scroll to navigate long pages, scroll_and_collect to scroll through infinite-scroll/virtual-rendered pages (like Twitter/X timelines) and accumulate unique content items across scroll positions in a single call, " +
-            "find_elements to discover interactive elements (omit selector to list them; each row carries a verified unique selector for the follow-up click), " +
-            "get_page_info for page metadata, get_backbone to get a structural overview of the page DOM as a simplified tree, " +
-            "fetch to download files/resources using the page's session (returns metadata and a minis:// URL), " +
-            "new_tab to open an additional tab, close_tab to close a tab, and list_tabs to see all open tabs. " +
-            "Use set_viewport with viewport_width + viewport_height to override the viewport for the current session (e.g. before screenshotting a 1920×1080 HTML composition that would otherwise be cropped to the phone viewport); pass reset=true to drop the session override and fall back to the global browser setting. " +
-            "Use get_cookies to retrieve cookies for the current page URL / current site root domain only (including HttpOnly cookies). get_cookies supports optional 'keywords' (filter by cookie name) and 'fuzzy' (true=contains match, false=exact match, default true). It returns only a summary and an offload env file path — raw cookie values are NOT included in the tool response. To reuse cookies in shell commands: `. /var/minis/offloads/env_cookies_xxx.sh && command`. You may define alias variables when needed. " +
-            "Use set_cookies to write cookies into the current page's cookie store via the native cookie store (so even HttpOnly cookies, which JS cannot set, land). Pass a 'cookies' array of objects, each with name + value (required) and optional domain (defaults to the current page host), path (defaults to '/'), secure, http_only, and expires (Unix timestamp in seconds; omit for a session cookie). " +
-            "Use wait_for_dom_stable to wait until the page DOM stops changing (useful after navigation or interactions that trigger async data loading — polls every 0.5s, resolves when mutation rate gradient is stable for 3+ intervals, default timeout 10s). " +
-            "Use wait_for_selector to wait for one specific element to become visible (the precise form: poll every 250ms up to timeout_ms, default 5s) — prefer it when the next call clicks or reads a known selector. " +
-            "Use go_back / go_forward to move through this tab's own history (refused with a reason when there is nothing to move to) and reload to refresh the current page. " +
-            "Use tab_id to target a specific tab (defaults to the most recently used tab).",
+            "Do not use this tool for minis:// action URLs, such as open_terminal, views, and settings. " +
+            "Those URLs are app deep links, so write them as Markdown links in your reply.\n\n" +
+            "The browser opens web URLs and minis:// resource URLs. " +
+            "Use a minis:// URL to preview a session file, for example minis://workspace/index.html. " +
+            "The sub-resources of a page, such as JS, CSS, images, and fonts, load from minis:// absolute paths and from relative paths.\n\n" +
+            "The get_text and get_readable actions return text in windows. " +
+            "While more text remains, the result shows next_offset. Pass it back as offset to keep reading the same page.\n\n" +
+            "The get_cookies action reads the cookies of the current site only, including HttpOnly cookies. " +
+            "It returns a summary and the path of an offload env file. It does not return raw cookie values. " +
+            "To use the cookies in a shell command, run: . /var/minis/offloads/env_cookies_xxx.sh && command. " +
+            "The set_cookies action writes through the native cookie store, so HttpOnly cookies work.\n\n" +
+            "Use wait_for_selector when the next call clicks or reads a known selector. " +
+            "Use wait_for_dom_stable after a page change that loads data later.",
         parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Open Wikipedia homepage', 'Take screenshot of current page'). Use the same language as the user."),
-            "action" to AgentToolParam("string", "The browser action to perform", enumValues = BrowserAction.allValues),
-            "url" to AgentToolParam("string", "URL to navigate to (for navigate action) or resource to download (for fetch action)"),
-            "selector" to AgentToolParam("string", "CSS selector for targeting elements (click, type, get_text, scroll, hover, find_elements). For scroll: specify a scrollable container to scroll (e.g. 'div.timeline'); if omitted, auto-detects the best scrollable element."),
-            "text" to AgentToolParam("string", "Text to type (for type action)"),
-            "coordinate_x" to AgentToolParam("integer", "X coordinate for click (alternative to selector)"),
-            "coordinate_y" to AgentToolParam("integer", "Y coordinate for click (alternative to selector)"),
-            "direction" to AgentToolParam("string", "Scroll direction", enumValues = listOf("up", "down")),
-            "amount" to AgentToolParam("integer", "Scroll amount in pixels (default: 500)"),
-            "script" to AgentToolParam("string", "JavaScript code to execute (for execute_js action). Either a single expression, whose value comes back (e.g. `document.title`, `JSON.stringify([...document.links])`), or a script body with `await` and top-level `return` (e.g. `var r = await fetch(url); return await r.json()`). A body without `return` answers `undefined`."),
-            "user_agent" to AgentToolParam("string", "User agent profile to switch to", enumValues = listOf("desktop_chrome", "mobile_chrome")),
-            "max_depth" to AgentToolParam("integer", "Maximum tree depth for get_backbone (default: 5)"),
-            "scroll_count" to AgentToolParam("integer", "Number of scroll steps for scroll_and_collect (default: 10, max: 20). Each step scrolls by 'amount' pixels and waits for new content."),
-            "item_selector" to AgentToolParam("string", "CSS selector for individual content items in scroll_and_collect (e.g. 'article', '[data-testid=\"tweet\"]'). If omitted, auto-detects repeated elements."),
-            "tab_id" to AgentToolParam("integer", "Target tab ID (optional, defaults to most recently used tab). Use list_tabs to see available tabs."),
-            "keywords" to AgentToolParam("string", "Filter cookies by name (for get_cookies). A space-separated string or array of strings. With fuzzy=true (default), ALL keywords must appear in the cookie name (case-insensitive). With fuzzy=false, cookie name must exactly equal any one of the provided keywords (case-insensitive). Omit to return all cookies for the current site."),
-            "fuzzy" to AgentToolParam("boolean", "Whether keyword matching is fuzzy (contains-all) or exact-any (for get_cookies, default: true)."),
-            "cookies" to AgentToolParam("string", "For set_cookies: a JSON array of cookie objects to write. Pass it as a JSON array (a JSON-encoded string of the array is also accepted). Each object: {\"name\": str (required), \"value\": str (required), \"domain\": str (optional, defaults to current page host), \"path\": str (optional, defaults to \"/\"), \"secure\": bool (optional), \"http_only\": bool (optional — sets an HttpOnly cookie that JS cannot read/set), \"expires\": int (optional, Unix timestamp in seconds; omit for a session cookie)}. Field-name variants from common cookie exports are accepted: httpOnly (=http_only), expirationDate (=expires), sameSite, and case/camel variants — so you can paste cookies verbatim from browser extensions (EditThisCookie / Cookie-Editor) or Playwright/Puppeteer storage."),
-            "timeout" to AgentToolParam("integer", "Milliseconds for wait_for_dom_stable (default 10000, clamped to 1000–60000). The action polls every 0.2s and resolves when DOM mutation rate stabilizes."),
-            "timeout_ms" to AgentToolParam("integer", "Milliseconds for wait_for_selector (default 5000, clamped to 500–30000); polled every 0.25s until the selector matches a visible element."),
-            "submit" to AgentToolParam("boolean", "type: after the text lands, submit the field's form (or press Enter in the field when it has none). Default false."),
-            "read_image" to AgentToolParam("boolean", "Whether a captured screenshot is attached for the model to look at (default true). False keeps the metadata for the model and the image on disk for the user."),
-            "viewport_width" to AgentToolParam("integer", "Viewport width in CSS pixels for set_viewport (e.g. 1920). Required together with viewport_height unless reset=true."),
-            "viewport_height" to AgentToolParam("integer", "Viewport height in CSS pixels for set_viewport (e.g. 1080). Required together with viewport_width unless reset=true."),
-            "reset" to AgentToolParam("boolean", "For set_viewport: when true, clear the session-level viewport override and fall back to the global browser setting."),
+            "tool_title" to ToolText.TOOL_TITLE,
+            "action" to AgentToolParam("string", "The browser action to run. To read a page, use get_readable or get_text. To see it, use screenshot. To find a selector, use find_elements. To read an infinite-scroll page, use scroll_and_collect.", enumValues = BrowserAction.allValues),
+            "url" to AgentToolParam("string", "The URL to open (navigate) or the resource to download (fetch). A fetch uses the session of the page and returns metadata and a minis:// URL."),
+            "selector" to AgentToolParam("string", "A CSS selector for the target element (click, type, get_text, scroll, hover, find_elements). For scroll, give a scrollable container, such as div.timeline. Without it, the app finds the best scrollable element. For find_elements, omit it to list the interactive elements. Each row has a unique selector for the next click."),
+            "text" to AgentToolParam("string", "The text to type (type)."),
+            "coordinate_x" to AgentToolParam("integer", "The X coordinate of a click. Use it instead of selector."),
+            "coordinate_y" to AgentToolParam("integer", "The Y coordinate of a click. Use it instead of selector."),
+            "direction" to AgentToolParam("string", "The scroll direction.", enumValues = listOf("up", "down")),
+            "amount" to AgentToolParam("integer", "The scroll distance in pixels. The default is 500."),
+            "script" to AgentToolParam("string", "The JavaScript to run (execute_js). Send one expression, for example document.title, and its value comes back. Or send a script body with await and a top-level return, for example: var r = await fetch(url); return await r.json(). A body without return gives undefined."),
+            "user_agent" to AgentToolParam("string", "The user agent profile to switch to (set_user_agent).", enumValues = listOf("desktop_chrome", "mobile_chrome")),
+            "max_depth" to AgentToolParam("integer", "The maximum tree depth for get_backbone. The default is 5."),
+            "scroll_count" to AgentToolParam("integer", "The number of scroll steps for scroll_and_collect. The default is 10 and the maximum is 20. Each step scrolls by amount pixels and waits for new content."),
+            "item_selector" to AgentToolParam("string", "A CSS selector for the content items in scroll_and_collect, for example article. Without it, the app finds repeated elements."),
+            "tab_id" to AgentToolParam("integer", "The ID of the target tab. The default is the most recently used tab. Use list_tabs to see the tabs."),
+            "keywords" to AgentToolParam("string", "The cookie-name filter for get_cookies: a space-separated string or an array of strings. The match ignores case. Without it, the result has all cookies of the current site."),
+            "fuzzy" to AgentToolParam("boolean", "The match mode of keywords for get_cookies. If true (default), the cookie name must contain all keywords. If false, it must equal one of them."),
+            "cookies" to AgentToolParam("string", "The cookies to write (set_cookies): a JSON array of objects. A JSON-encoded string of the array is also accepted. Each object has name and value (required). It can also have domain (default: the host of the current page), path (default: /), secure, http_only, and expires. Set expires to a Unix timestamp in seconds. Without expires, the cookie is a session cookie.\n\nThe names of common cookie exports are also accepted, such as httpOnly, expirationDate, and sameSite. You can paste cookies from browser extensions, Playwright, or Puppeteer."),
+            "timeout" to AgentToolParam("integer", "The milliseconds for wait_for_dom_stable. The default is 10000. The range is 1000 to 60000. The action ends when the DOM stops changing."),
+            "timeout_ms" to AgentToolParam("integer", "The milliseconds for wait_for_selector. The default is 5000. The range is 500 to 30000. The action ends when the selector matches a visible element."),
+            "submit" to AgentToolParam("boolean", "For type: after the text is in the field, submit the form of the field. If the field has no form, press Enter. The default is false."),
+            "read_image" to AgentToolParam("boolean", "If true (default), attach a captured screenshot to the result for you to see. If false, you get the metadata only and the image stays on disk for the user."),
+            "viewport_width" to AgentToolParam("integer", "The viewport width in CSS pixels for set_viewport, for example 1920. Required with viewport_height unless reset=true. A screenshot is cropped to the phone viewport, so set a larger viewport before you capture a wide page."),
+            "viewport_height" to AgentToolParam("integer", "The viewport height in CSS pixels for set_viewport, for example 1080. Required with viewport_width unless reset=true."),
+            "reset" to AgentToolParam("boolean", "For set_viewport: if true, clear the viewport override of this session and use the global browser setting."),
         ),
         required = listOf("tool_title", "action"),
         propertyOrdering = listOf("tool_title", "action", "tab_id", "url", "selector", "text", "coordinate_x", "coordinate_y", "direction", "amount", "scroll_count", "item_selector", "script", "user_agent", "max_depth", "keywords", "fuzzy", "cookies", "timeout", "viewport_width", "viewport_height", "reset"),
@@ -207,15 +208,15 @@ object AgentTools {
 
     fun memoryWriteDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "memory_write",
-        description = "Write a memory entry to today's daily log (YYYY-MM-DD.md). Memories persist across all sessions. " +
-            "Each entry is prepended with a timestamp. " +
-            "Save: user preferences, recurring patterns, key facts, project conventions, reusable knowledge. " +
-            "Avoid saving passwords, API keys, tokens, or secrets unless the user explicitly confirms after being warned. " +
-            "Keep entries concise and general-purpose. GLOBAL.md is read-only (user-maintained via Settings).",
+        description = "Write a memory entry to the daily log of today (YYYY-MM-DD.md). " +
+            "Memories persist across all sessions. The app adds a timestamp to each entry.\n\n" +
+            "Do not save passwords, API keys, tokens, or secrets unless the user explicitly confirms after you warn the user. " +
+            "Save user preferences, recurring patterns, key facts, project conventions, and reusable knowledge. " +
+            "Keep each entry short and general. GLOBAL.md is read-only, because the user maintains it in Settings.",
         parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Save user preference for Python', 'Note today's project context'). Use the same language as the user."),
-            "content" to AgentToolParam("string", "The memory content to write. Use concise Markdown with a short heading (## Topic) and context about what was done/learned."),
-            "kind" to AgentToolParam("string", "Background record type, defaults to task_fact; neither type is a current instruction.", enumValues = listOf("task_fact", "user_preference")),
+            "tool_title" to ToolText.TOOL_TITLE,
+            "content" to AgentToolParam("string", "The memory text. Use short Markdown with a short heading (## Topic) and the context of what you did or learned."),
+            "kind" to AgentToolParam("string", "The type of the background record. The default is task_fact. Neither type is a current instruction.", enumValues = listOf("task_fact", "user_preference")),
         ),
         required = listOf("tool_title", "content"),
         propertyOrdering = listOf("tool_title", "content", "kind"),
@@ -223,12 +224,13 @@ object AgentTools {
 
     fun memoryGetDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "memory_get",
-        description = "Retrieve memories from persistent storage. Supports keyword-based fuzzy search across memory files. " +
-            "Returns matching lines with surrounding context. Use this to recall previous knowledge, user preferences, or past notes.",
+        description = "Search the persistent memory by keyword, with fuzzy matching across the memory files. " +
+            "The result has the matching lines with their surrounding lines. " +
+            "Use it to recall earlier knowledge, user preferences, or past notes.",
         parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Recall user preferences', 'Search past notes'). Use the same language as the user."),
-            "scope" to AgentToolParam("string", "Memory scope to search: 'daily' for daily logs only, 'all' for daily logs + GLOBAL.md.", enumValues = listOf("daily", "all")),
-            "keywords" to AgentToolParam("string", "Space-separated keywords for fuzzy matching (e.g. 'python preference' or 'API key setup'). All keywords must appear in a line or its surrounding context for a match. Leave empty to return full memory files."),
+            "tool_title" to ToolText.TOOL_TITLE,
+            "scope" to AgentToolParam("string", "Use daily to search the daily logs only. Use all to search the daily logs and GLOBAL.md.", enumValues = listOf("daily", "all")),
+            "keywords" to AgentToolParam("string", "Space-separated keywords, for example: python preference. A match needs all keywords in a line or in its surrounding lines. Leave it empty to return the full memory files."),
         ),
         required = listOf("tool_title"),
         propertyOrdering = listOf("tool_title", "scope", "keywords"),
@@ -236,36 +238,40 @@ object AgentTools {
 
     private fun askUserQuestionDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = AskUserQuestionTool.NAME,
-        description = "Pause and ask the user a concise question when you need confirmation, a choice, or missing " +
-            "information to continue. The user answers through the web UI and the answer comes back as a structured " +
-            "tool result. Use sparingly: one question at a time, only when you truly cannot proceed with a " +
-            "reasonable assumption. Never use it for rhetorical questions or things you can decide yourself.",
+        description = "Pause and ask the user a short question. " +
+            "Use it when you need a confirmation, a choice, or missing information to continue. " +
+            "The answer comes back as a structured tool result.\n\n" +
+            "Do not use it for a rhetorical question or for a decision that you can make yourself. " +
+            "Ask one question at a time, and only if you cannot continue with a reasonable assumption.",
         parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of the question, shown to the user."),
-            "question" to AgentToolParam("string", "The question to ask the user, in the user's language."),
+            "tool_title" to ToolText.TOOL_TITLE,
+            "question" to AgentToolParam("string", "The question to ask, in the language of the user."),
             "options" to AgentToolParam(
                 type = "array",
-                description = "Optional answer choices. Each item: {label, value, recommended?}. Omit for free-form questions.",
+                description = "The optional answer choices. Omit it for a free-form question.",
                 items = AgentToolParam(
                     type = "object",
                     description = "One answer choice.",
                     properties = mapOf(
-                        "label" to AgentToolParam("string", "Human-readable label shown to the user."),
-                        "value" to AgentToolParam("string", "Stable machine-readable value returned to you."),
-                        "recommended" to AgentToolParam("boolean", "Optional hint shown to the user."),
+                        "label" to AgentToolParam("string", "The label that the user sees."),
+                        "value" to AgentToolParam("string", "The stable value that comes back to you."),
+                        "recommended" to AgentToolParam("boolean", "An optional hint for the user."),
                     ),
                     requiredProperties = listOf("label", "value"),
                 ),
             ),
-            "multiple" to AgentToolParam("boolean", "Allow multiple selections (default false)."),
-            "allowCustom" to AgentToolParam("boolean", "Allow a free-form custom answer (default true)."),
-            "timeoutMinutes" to AgentToolParam("integer", "How long to wait for the user (1-30, default 10)."),
+            "multiple" to AgentToolParam("boolean", "If true, the user can select more than one choice. The default is false."),
+            "allowCustom" to AgentToolParam("boolean", "If true, the user can type a custom answer. The default is true."),
+            "timeoutMinutes" to AgentToolParam("integer", "How long to wait for the user, from 1 to 30 minutes. The default is 10."),
         ),
         required = listOf("tool_title", "question"),
         propertyOrdering = listOf("tool_title", "question", "options", "multiple", "allowCustom", "timeoutMinutes"),
     )
 
-    /** Legacy model names project the same schema as the canonical handler. */
+    /**
+     * Legacy model names project the same schema as the canonical handler. Each action has its own
+     * description ([ToolText.GOAL_ACTIONS]); the parameter descriptions are shared with the handler.
+     */
     private fun goalDefinition(action: String): AgentToolDefinition {
         val schema = com.openminis.app.tools.runtime.AgentGoalHandler().definition
         val params = schema.parameters.filterKeys { key ->
@@ -278,6 +284,7 @@ object AgentTools {
         }
         return schema.copy(
             name = action,
+            description = checkNotNull(ToolText.GOAL_ACTIONS[action]) { "no goal action $action" },
             parameters = params,
             required = when (action) {
                 "create_goal" -> listOf("tool_title", "goal")
@@ -296,21 +303,21 @@ object AgentTools {
 
     private fun todoWriteDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "todo_write",
-        description = "Replace the session's todo list in one atomic call. Send the COMPLETE list every time — " +
-            "there are no partial updates. Use for multi-step work so the user can track progress in the web UI. " +
-            "Status values: pending / in_progress / completed / skipped.",
+        description = "Replace the todo list of the session in one atomic call. " +
+            "Send the complete list every time, because there are no partial updates. " +
+            "Use it for multi-step work, so that the user can see the progress.",
         parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "Short summary of the list change, shown to the user."),
+            "tool_title" to ToolText.TOOL_TITLE,
             "todos" to AgentToolParam(
                 type = "array",
-                description = "Full todo list. Each item: {title, status?, id?}.",
+                description = "The complete todo list.",
                 items = AgentToolParam(
                     type = "object",
                     description = "One todo item.",
                     properties = mapOf(
-                        "title" to AgentToolParam("string", "Task description."),
-                        "status" to AgentToolParam("string", "pending / in_progress / completed / skipped."),
-                        "id" to AgentToolParam("string", "Stable item id (keep existing ids when updating)."),
+                        "title" to AgentToolParam("string", "The text of the todo."),
+                        "status" to AgentToolParam("string", "One of pending, in_progress, completed, or skipped."),
+                        "id" to AgentToolParam("string", "A stable item ID. Keep the existing IDs when you update the list."),
                     ),
                     requiredProperties = listOf("title"),
                 ),
