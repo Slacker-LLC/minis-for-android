@@ -295,6 +295,7 @@ object ExecutionCoordinator {
         lastInjectedKeys.remove(sessionId)
         // A background job belongs to its session and ends with it.
         ShellJobs.killSession(sessionId)
+        ShellYield.stopSession(sessionId, "session ended")
         // So do its terminals.
         com.openminis.app.runtime.terminal.AgentTerminals.existing()?.closeSession(sessionId)
     }
@@ -304,6 +305,8 @@ object ExecutionCoordinator {
         synchronized(sessionStateLock) {
             sessionStates[sessionId]?.generation?.incrementAndGet()
         }
+        // A command handed back to the agent still running is this shell's command: Stop ends it too.
+        ShellYield.stopSession(sessionId, "stopped")
         shells.remove(sessionId)?.stop()
         lastInjectedKeys.remove(sessionId)
     }
@@ -312,6 +315,7 @@ object ExecutionCoordinator {
     fun stopCurrentCommand() {
         stopGeneration.incrementAndGet()
         ShellJobs.killAll()
+        ShellYield.stopAll("runtime stopped")
         synchronized(sessionStateLock) {
             sessionStates.values.forEach { it.generation.incrementAndGet() }
         }

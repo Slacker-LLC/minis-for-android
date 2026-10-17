@@ -138,18 +138,21 @@ object AgentTools {
         description = "Execute a command in the on-device Ubuntu 24.04 environment. " +
             "Root launches the chroot, but commands run privilege-dropped as the Android app UID with Linux capabilities cleared. " +
             "Workspace is the session-scoped /workspace backed by app-private storage. " +
-            "Commands run in a persistent Bash shell with stdout and stderr merged, one at a time; cd/export carry over to the next command. Default timeout is 15 minutes. " +
+            "Commands run in a persistent Bash shell with stdout and stderr merged, one at a time; cd/export carry over to the next command. " +
+            "If a command has not finished after yield_time_ms (default 30 s), the call returns what it printed so far with a job_id and the command keeps running: " +
+            "poll it with job_output (wait: true), stop it with job_kill. The shell takes no other foreground command until it ends. Overall timeout is 15 minutes by default. " +
             "For anything long-running (a build, a server, a download) or to run several things in parallel, set background=true: the command then runs as its own job, " +
             "independent of this shell and of other jobs, the call returns at once with a job_id, and job_output / job_list / job_kill read its output, wait for it or stop it; job_input types into its stdin (for a program that asks questions).",
         parameters = mapOf(
             "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Install Python data analysis packages', 'List files in home directory'). Use the same language as the user."),
             "command" to AgentToolParam("string", "The shell command to execute. Supports multi-line commands directly — no special escaping needed. Keep under 1000 chars; for longer scripts, write to a file with file_write first, then run it."),
             "timeout" to AgentToolParam("integer", "Timeout in seconds (default: 900). Use a larger value for long-running commands like package installs."),
+            "yield_time_ms" to AgentToolParam("integer", "How long this call waits for the command before handing back what it has printed (default 30000, range 1000..60000). A command that is still running then continues as a job; this is not a timeout."),
             "delay" to AgentToolParam("integer", "Delay in seconds (max 600) before execution begins. The tool blocks the agent flow during this wait WITHOUT occupying the shell, so other concurrent tasks can use it. Use this instead of sleep commands to avoid resource contention."),
             "background" to AgentToolParam("boolean", "Run the command as an independent background job instead of in the persistent shell (default false). Returns immediately with a job_id; read it later with job_output. The job does not see this shell's cd/export state and has no stdin. With background, `timeout` is the job's own deadline (default 2 hours, max 24 hours)."),
         ),
         required = listOf("tool_title", "command"),
-        propertyOrdering = listOf("tool_title", "command", "timeout", "delay", "background"),
+        propertyOrdering = listOf("tool_title", "command", "timeout", "yield_time_ms", "delay", "background"),
     )
 
     // Aligned with iOS AIChatViewModel.swift browser_use definition

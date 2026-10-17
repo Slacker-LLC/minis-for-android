@@ -428,11 +428,56 @@ class LinuxShellHandler : ToolHandler {
         val commandToExecute = if (readOnly) {
             com.openminis.app.scheduled.ScheduledReadOnlyPolicy.hardenGitInvocation(command)
         } else command
-        val result = com.openminis.app.runtime.ExecutionCoordinator.execute(
-            sessionId = sessionId,
-            command = commandToExecute,
-            timeout = timeoutMs,
-        )
+        val title = args.optString("tool_title", "linux.shell")
+        val result = if (readOnly) {
+            // A scheduled read-only run may not leave anything running behind it, so it never hands a command back.
+            com.openminis.app.runtime.ExecutionCoordinator.execute(
+                sessionId = sessionId,
+                command = commandToExecute,
+                timeout = timeoutMs,
+            )
+        } else {
+            val shellBusyWith = com.openminis.app.runtime.ShellYield.busyJob(sessionId)
+            if (shellBusyWith != null) {
+                return ToolExecutionResult(
+                    output = com.openminis.app.runtime.ShellYield.busyMessage(shellBusyWith),
+                    success = false,
+                    toolTitle = title,
+                    failureKind = ToolFailureKind.EXECUTION_FAILED,
+                    executionStarted = false,
+                )
+            }
+            val yieldMs = com.openminis.app.runtime.ShellYield.clampYield(
+                if (args.has("yield_time_ms")) args.optLong("yield_time_ms") else null,
+            )
+            val identity = kotlin.coroutines.coroutineContext[ToolExecutor.ExecutionIdentity]
+            val outcome = com.openminis.app.runtime.ShellYield.run(
+                sessionId = sessionId,
+                command = commandToExecute,
+                timeoutMs = timeoutMs,
+                yieldMs = yieldMs,
+                runId = identity?.model?.runId,
+                taskId = identity?.model?.taskId,
+                executionIntentId = identity?.intentId,
+            ) { onLine ->
+                com.openminis.app.runtime.ExecutionCoordinator.execute(
+                    sessionId = sessionId,
+                    command = commandToExecute,
+                    timeout = timeoutMs,
+                    lineCallback = { line -> onLine(com.openminis.app.runtime.ExecutionCoordinator.shellOutputForModel(line)) },
+                )
+            }
+            when (outcome) {
+                is com.openminis.app.runtime.ShellYield.Outcome.Finished -> outcome.result
+                is com.openminis.app.runtime.ShellYield.Outcome.Yielded -> return ToolExecutionResult(
+                    output = com.openminis.app.runtime.ShellYield.reply(outcome.jobId, yieldMs),
+                    success = true,
+                    toolTitle = title,
+                    // Still running: whether it takes effect is not known yet, as for a background job.
+                    failureKind = ToolFailureKind.OUTCOME_UNKNOWN,
+                )
+            }
+        }
         val failureKind = result.toToolFailureKind()
         return ToolExecutionResult(
             output = result.output,
