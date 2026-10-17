@@ -1596,6 +1596,7 @@
     <string name="chat_quick_recap_sub">최근에 한 작업</string>
     <string name="chat_quick_recap_prompt">최근 대화에서 무엇을 했는지 요약해 줘.</string>
     <string name="chat_thinking_chip">생각 · %1$s</string>
+    <string name="chat_thinking_off_chip">끔</string>
     <string name="files_hub_used_by">Minis 사용량</string>
     <string name="files_section_sandbox">샌드박스 내 폴더</string>
     <string name="files_shared_title">공유</string>
@@ -2054,11 +2055,7 @@
     <string name="voice_call_retry">다시 시도</string>
     <string name="voice_call_interrupt">중단하고 말하기</string>
     <string name="voice_call_submit">지금 보내기</string>
-    <string name="voice_call_back">채팅 보기</string>
     <string name="voice_call_end">음성 대화 종료</string>
-    <string name="voice_call_input_hint">메시지 입력…</string>
-    <string name="voice_call_send">보내기</string>
-    <string name="voice_call_show_orb">음성 화면으로</string>
     <string name="voice_call_approval_question">“%1$s”을(를) 허용할까요? “허용”, “이번 세션 허용”, “거부” 중 하나로 말씀해 주세요.</string>
     <string name="voice_call_approval_unclear">잘 못 들었어요. “허용”, “이번 세션 허용”, “거부” 중 하나로 말씀해 주세요.</string>
     <string name="voice_call_working">잠시만요, 처리하고 있어요.</string>
@@ -2077,8 +2074,9 @@
     <string name="voice_call_model">현재 채팅 모델</string>
     <string name="voice_call_toast_retry">잘 못 들었어요. 다시 들을게요…</string>
     <string name="voice_call_toast_idle">계신가요? 소리가 없으면 곧 통화를 끊을게요.</string>
-    <string name="voice_call_chat_empty">아직 대화가 없어요. 나눈 대화가 여기에 표시됩니다.</string>
     <string name="voice_call_leave_to_chat">채팅으로 돌아가기</string>
+    <string name="voice_call_back">채팅 보기</string>
+    <string name="voice_call_show_orb">음성 화면으로</string>
     <string name="voice_call_ended_idle">한동안 아무도 말하지 않아 통화를 종료했어요.</string>
     <string name="voice_call_ended_connection">실시간 음성 서비스에 연결하지 못했어요: %1$s</string>
     <string name="voice_call_follow_up">지시 추가</string>
@@ -2190,7 +2188,5 @@
     <string name="voice_call_notif_title">음성 통화 중</string>
     <string name="voice_call_notif_live">마이크 켜짐</string>
     <string name="voice_call_notif_muted">마이크 일시정지됨</string>
-    <string name="voice_call_attach">사진 추가</string>
-    <string name="voice_call_attach_remove">사진 제거</string>
     <string name="chat_plan_exit">종료</string>
 </resources>

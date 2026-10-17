@@ -8,6 +8,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -52,7 +54,9 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
@@ -252,24 +256,37 @@ internal fun ChatComposer(
                         onClick = { showAttachMenu = false; showModelPicker = true },
                     )
                     if (canThink) {
+                        // 思考强度排成一行，一眼看全；档位多时可以横着滑。
                         val levels = listOf(ThinkingLevel.OFF) + viewModel.availableThinkingLevels
-                        levels.forEach { level ->
-                            DropdownMenuItem(
-                                text = {
+                        Text(
+                            text = stringResource(R.string.thinking_level_sheet_title),
+                            fontSize = 11.5.sp,
+                            color = ChatColors.secondaryText,
+                            modifier = Modifier.padding(start = 16.dp, top = 6.dp, bottom = 4.dp),
+                        )
+                        Row(
+                            modifier = Modifier
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            levels.forEach { level ->
+                                val selected = level == composerThinking || (level == ThinkingLevel.OFF && !composerThinking.isEnabled)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(if (selected) ChatColors.primaryText else ChatColors.inputBg)
+                                        .border(0.5.dp, ChatColors.separator, RoundedCornerShape(16.dp))
+                                        .clickable { showAttachMenu = false; viewModel.setThinkingLevel(level) }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                ) {
                                     Text(
-                                        text = stringResource(R.string.chat_thinking_chip, thinkingLevelLabel(level)),
-                                        fontSize = 13.5.sp,
-                                        color = ChatColors.primaryText,
+                                        text = if (level == ThinkingLevel.OFF) stringResource(R.string.chat_thinking_off_chip) else thinkingLevelLabel(level),
+                                        fontSize = 12.5.sp,
+                                        color = if (selected) ChatColors.inputBg else ChatColors.primaryText,
                                     )
-                                },
-                                trailingIcon = {
-                                    if (level == composerThinking || (level == ThinkingLevel.OFF && !composerThinking.isEnabled)) {
-                                        Icon(Icons.Default.Check, contentDescription = null)
-                                    }
-                                },
-                                modifier = Modifier.heightIn(min = 36.dp),
-                                onClick = { showAttachMenu = false; viewModel.setThinkingLevel(level) },
-                            )
+                                }
+                            }
                         }
                     }
                     MinisMenuDivider()
@@ -1125,8 +1142,35 @@ internal fun ChatComposer(
         Spacer(modifier = Modifier.width(8.dp))
         // 深色圆钮的三个状态：生成中且没有内容 → 停止；空 → 语音通话；有字或附件 → 发送（生成中则排队）。
         val actionHasContent = inputText.isNotBlank() || attachments.isNotEmpty()
-        val actionStop = isStreaming && !actionHasContent
-        val actionVoice = !isStreaming && !actionHasContent
+        // 通话中：空 → 结束通话（球旁的静音钮在它左边）；有字 → 发给通话。
+        val voiceCall = com.openminis.app.voicecall.LocalVoiceCall.current
+        val inCall = voiceCall?.active == true
+        val actionEnd = inCall && !actionHasContent
+        val actionStop = !inCall && isStreaming && !actionHasContent
+        val actionVoice = !inCall && !isStreaming && !actionHasContent
+        if (voiceCall != null && voiceCall.active) {
+            Box(
+                modifier = Modifier
+                    .padding(bottom = 2.dp)
+                    .size(46.dp)
+                    .background(
+                        if (voiceCall.muted) MaterialTheme.colorScheme.errorContainer else ChatColors.inputBg,
+                        CircleShape,
+                    )
+                    .border(0.5.dp, ChatColors.separator, CircleShape)
+                    .clip(CircleShape)
+                    .clickable { voiceCall.actions.toggleMute() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (voiceCall.muted) Icons.Filled.MicOff else Icons.Filled.Mic,
+                    contentDescription = stringResource(if (voiceCall.muted) R.string.voice_call_unmute else R.string.voice_call_mute),
+                    tint = if (voiceCall.muted) MaterialTheme.colorScheme.onErrorContainer else ChatColors.primaryText,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+        }
         Box(
             modifier = Modifier
                 .padding(bottom = 2.dp)
@@ -1135,6 +1179,7 @@ internal fun ChatComposer(
                 .clip(CircleShape)
                 .clickable {
                     when {
+                        actionEnd -> voiceCall?.actions?.end?.invoke()
                         actionStop -> viewModel.cancelStream()
                         actionVoice -> com.openminis.app.deeplink.DeepLinkCoordinator.setPendingChatAction(
                             com.openminis.app.deeplink.DeepLinkCoordinator.ChatAction.START_VOICE,
@@ -1146,12 +1191,14 @@ internal fun ChatComposer(
         ) {
             Icon(
                 when {
+                    actionEnd -> Icons.Default.Close
                     actionStop -> Icons.Default.Stop
                     actionVoice -> Icons.Filled.GraphicEq
                     else -> Icons.Default.ArrowUpward
                 },
                 contentDescription = stringResource(
                     when {
+                        actionEnd -> R.string.voice_call_end
                         actionStop -> R.string.common_stop
                         actionVoice -> R.string.voice_call_title
                         else -> R.string.send

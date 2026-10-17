@@ -1858,6 +1858,7 @@
     <string name="chat_quick_recap_sub">What you worked on lately</string>
     <string name="chat_quick_recap_prompt">Summarize what we worked on in my recent conversations.</string>
     <string name="chat_thinking_chip">Thinking · %1$s</string>
+    <string name="chat_thinking_off_chip">Off</string>
     <string name="files_hub_used_by">Minis usage</string>
     <string name="files_section_sandbox">Directories in the sandbox</string>
     <string name="files_shared_title">Shared</string>
@@ -2313,11 +2314,7 @@
     <string name="voice_call_retry">Retry</string>
     <string name="voice_call_interrupt">Interrupt and speak</string>
     <string name="voice_call_submit">Send now</string>
-    <string name="voice_call_back">View chat</string>
     <string name="voice_call_end">End voice</string>
-    <string name="voice_call_input_hint">Type a message…</string>
-    <string name="voice_call_send">Send</string>
-    <string name="voice_call_show_orb">Back to voice</string>
     <string name="voice_call_approval_question">Allow “%1$s”? Say allow, allow for this session, or deny.</string>
     <string name="voice_call_approval_unclear">Sorry, I didn\'t get that. Say allow, allow for this session, or deny.</string>
     <string name="voice_call_working">One moment, I\'m working on it.</string>
@@ -2336,8 +2333,9 @@
     <string name="voice_call_model">Current chat model</string>
     <string name="voice_call_toast_retry">Didn\'t catch that, trying again…</string>
     <string name="voice_call_toast_idle">Still there? I\'ll hang up soon if I hear nothing.</string>
-    <string name="voice_call_chat_empty">Nothing said yet. What you and the assistant say shows up here.</string>
     <string name="voice_call_leave_to_chat">Back to chat</string>
+    <string name="voice_call_back">View chat</string>
+    <string name="voice_call_show_orb">Back to voice</string>
     <string name="voice_call_ended_idle">Nobody spoke for a while, so the call was ended.</string>
     <string name="voice_call_ended_connection">Could not reach the realtime voice service: %1$s</string>
     <string name="voice_call_follow_up">Add instructions</string>
@@ -2448,6 +2446,4 @@
     <string name="voice_call_notif_title">Voice call in progress</string>
     <string name="voice_call_notif_live">Microphone on</string>
     <string name="voice_call_notif_muted">Microphone muted</string>
-    <string name="voice_call_attach">Add photos</string>
-    <string name="voice_call_attach_remove">Remove photo</string>
 </resources>
