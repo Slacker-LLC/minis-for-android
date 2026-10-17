@@ -682,7 +682,7 @@
     <string name="add_provider_auto_append_v1_quoted">\"/v1\" を自動的に付加</string>
     <string name="provider_detail_https_api_example_placeholder">https://api.example.com</string>
     <string name="provider_detail_models_count_header">モデル (%1$d)</string>
-    <string name="provider_detail_delete_provider_confirm">\"%1$s\" を削除してもよろしいですか?この操作は元に戻せません。</string>
+    <string name="provider_detail_delete_provider_confirm">「%1$s」を削除しますか？この操作は元に戻せません。このモデルはモデルスロットとエージェント用モデルの一覧からも削除されます。</string>
     <string name="provider_detail_delete_model_confirm">\"%1$s\" を削除してもよろしいですか?この操作は元に戻せません。</string>
     <string name="provider_list_models_count">%1$d モデル</string>
 
@@ -1326,7 +1326,7 @@
     <string name="system_enhance_root_hidden">su がこのアプリから見えません。%1$s が入っています——そのアプリ一覧で本アプリを許可してください（su の隠蔽をオフにしても可）</string>
     <string name="settings_section_system">システムと権限</string>
     <string name="settings_auto_compact">コンテキストの自動圧縮</string>
-    <string name="settings_auto_compact_subtitle">トークン閾値に達したら履歴を圧縮します</string>
+    <string name="settings_auto_compact_subtitle">会話がコンテキスト上限に近づいたとき：オン＝自動で圧縮、オフ＝先に確認。タスク実行中の圧縮は常に行われます。チャットで現在使用中のモデルを使い、64K以上のコンテキストウィンドウが必要です。</string>
     <string name="settings_pet">デスクトップペット</string>
     <string name="settings_pet_subtitle">汎用 pet.json + spritesheet.webp パックを読み込む</string>
     <string name="settings_assistant_role">既定のデジタルアシスタント</string>
@@ -1661,6 +1661,18 @@
     <string name="settings_models_title">モデル</string>
     <string name="model_slots_header">モデルスロット</string>
     <string name="model_slots_footer">各タスクの固定スロットに、互換性のあるモデルを選んで順序を設定します。</string>
+    <string name="model_slot_main_desc">チャットとエージェントのタスクで既定で使うモデル。失敗時はバックアップが引き継ぎます。</string>
+    <string name="model_slot_light_desc">チャットのタイトルとサブエージェント向けの低コストなモデル。空の場合はメインを使います。</string>
+    <string name="model_slot_vision_desc">画像を見られないモデルの代わりに画像を説明します（read_image）。</string>
+    <string name="model_slot_voice_input_desc">音声入力と通話での音声認識。</string>
+    <string name="model_slot_voice_output_desc">返信の読み上げと通話で使う声。</string>
+    <string name="model_slot_image_desc">エージェントによる画像生成用。ここで選ぶとエージェント用モデルにも自動で追加されます。</string>
+    <string name="model_prune_notice">「%1$s」はプロバイダーの一覧から外れたため、次から削除しました：%2$s。</string>
+    <string name="model_prune_notice_dismiss">了解</string>
+    <string name="compact_busy_streaming">返信中は圧縮できません。先に応答を停止してください。</string>
+    <string name="compact_already_running">圧縮はすでに実行中です。完了までお待ちください。</string>
+    <string name="chat_context_near_limit">コンテキストがモデルの上限に近づいています（%1$d / %2$d トークン）。新しいチャットを始めるか /compact を使ってください。</string>
+    <string name="chat_context_filling">コンテキストがいっぱいになってきました（%1$d / %2$d トークン）— 続行のため圧縮します。</string>
     <string name="model_slot_main">メイン</string>
     <string name="model_slot_light">軽量</string>
     <string name="model_slot_vision">画像</string>
@@ -1671,7 +1683,7 @@
     <string name="model_slot_fallback_title">エラー時のフォールバック</string>
     <string name="model_slot_fallback_always">すべてのエラー</string>
     <string name="model_slot_fallback_default">レート制限とサーバーエラー</string>
-    <string name="agent_loop_models_slots_footer">アシスタントが選べるのは、ここに追加したモデルだけです。</string>
+    <string name="agent_loop_models_slots_footer">アシスタントはここに追加したモデルからのみ選べます。これらのモデルの呼び出し料金は各プロバイダーから請求されます。</string>
     <string name="agent_loop_models_slots_subtitle">サブエージェントと minis-model-use が使えるモデル</string>
     <string name="model_slot_selected_models">選択済みモデル</string>
     <string name="model_slot_order_footer">この順序でモデルを試します。矢印で優先順位を変更できます。</string>

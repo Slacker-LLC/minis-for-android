@@ -682,7 +682,7 @@
     <string name="add_provider_auto_append_v1_quoted">\"/v1\" automatisch anhängen</string>
     <string name="provider_detail_https_api_example_placeholder">https://api.example.com</string>
     <string name="provider_detail_models_count_header">Modelle (%1$d)</string>
-    <string name="provider_detail_delete_provider_confirm">Möchtest du \"%1$s\" wirklich löschen? Dies kann nicht rückgängig gemacht werden.</string>
+    <string name="provider_detail_delete_provider_confirm">\"%1$s\" löschen? Das kann nicht rückgängig gemacht werden. Die Modelle werden auch aus den Modell-Slots und der Liste der Agent-Modelle entfernt.</string>
     <string name="provider_detail_delete_model_confirm">Möchtest du \"%1$s\" wirklich löschen? Dies kann nicht rückgängig gemacht werden.</string>
     <string name="provider_list_models_count">%1$d Modelle</string>
 
@@ -1321,7 +1321,7 @@
     <string name="system_enhance_root_hidden">su ist für diese App nicht sichtbar; %1$s ist installiert – erlaube diese App dort (oder schalte das Verstecken von su ab)</string>
     <string name="settings_section_system">System &amp; Berechtigungen</string>
     <string name="settings_auto_compact">Kontext automatisch komprimieren</string>
-    <string name="settings_auto_compact_subtitle">Verlauf komprimieren, wenn der Token-Schwellwert erreicht ist</string>
+    <string name="settings_auto_compact_subtitle">Nähert sich ein Chat dem Kontextlimit: an = automatisch kompaktieren, aus = vorher fragen. Kompaktierung mitten in einer Aufgabe findet immer statt. Verwendet das aktuelle Modell des Chats und braucht ein Kontextfenster ab 64K.</string>
     <string name="settings_pet">Desktop-Haustier</string>
     <string name="settings_pet_subtitle">Ein pet.json + spritesheet.webp-Paket importieren</string>
     <string name="settings_assistant_role">Standard-Assistent</string>
@@ -1664,6 +1664,18 @@
     <string name="settings_models_title">Modelle</string>
     <string name="model_slots_header">Modell-Slots</string>
     <string name="model_slots_footer">Wähle kompatible Modelle aus und ordne sie für jeden festen Aufgaben-Slot.</string>
+    <string name="model_slot_main_desc">Standardmodell für Chat und Agent-Aufgaben. Bei einem Fehler übernimmt ein Ersatzmodell.</string>
+    <string name="model_slot_light_desc">Günstigeres Modell für Chat-Titel und Sub-Agents. Ohne Eintrag wird das Hauptmodell verwendet.</string>
+    <string name="model_slot_vision_desc">Beschreibt Bilder für Modelle, die keine Bilder sehen können (read_image).</string>
+    <string name="model_slot_voice_input_desc">Spracherkennung für Spracheingabe und Anrufe.</string>
+    <string name="model_slot_voice_output_desc">Stimme, die Antworten vorliest und in Anrufen spricht.</string>
+    <string name="model_slot_image_desc">Bilderzeugung für den Agent. Die Auswahl hier fügt das Modell auch zu den Agent-Modellen hinzu.</string>
+    <string name="model_prune_notice">„%1$s“ wird vom Anbieter nicht mehr gelistet und wurde entfernt aus: %2$s.</string>
+    <string name="model_prune_notice_dismiss">Verstanden</string>
+    <string name="compact_busy_streaming">Kompaktieren ist während einer laufenden Antwort nicht möglich. Stoppe zuerst die Antwort.</string>
+    <string name="compact_already_running">Es läuft bereits eine Kompaktierung. Bitte warte, bis sie fertig ist.</string>
+    <string name="chat_context_near_limit">Der Kontext ist nahe am Limit des Modells (%1$d / %2$d Tokens). Starte einen neuen Chat oder nutze /compact, um zuverlässig weiterzumachen.</string>
+    <string name="chat_context_filling">Der Kontext füllt sich (%1$d / %2$d Tokens) — es wird kompaktiert, um fortzufahren.</string>
     <string name="model_slot_main">Hauptmodell</string>
     <string name="model_slot_light">Leicht</string>
     <string name="model_slot_vision">Bild</string>
@@ -1674,7 +1686,7 @@
     <string name="model_slot_fallback_title">Fallback bei Fehlern</string>
     <string name="model_slot_fallback_always">Bei jedem Fehler</string>
     <string name="model_slot_fallback_default">Bei Rate-Limits und Serverfehlern</string>
-    <string name="agent_loop_models_slots_footer">Der Assistent kann nur Modelle wählen, die du hier hinzufügst.</string>
+    <string name="agent_loop_models_slots_footer">Der Assistent kann nur Modelle wählen, die du hier hinzufügst. Aufrufe dieser Modelle werden von den jeweiligen Anbietern abgerechnet.</string>
     <string name="agent_loop_models_slots_subtitle">Subagenten und minis-model-use können diese nutzen</string>
     <string name="model_slot_selected_models">Ausgewählte Modelle</string>
     <string name="model_slot_order_footer">Modelle werden in dieser Reihenfolge versucht. Ändere die Priorität mit den Pfeilen.</string>

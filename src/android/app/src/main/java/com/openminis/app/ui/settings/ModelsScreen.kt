@@ -5,10 +5,13 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,6 +28,7 @@ import com.openminis.app.ui.components.PickerModalityFilter
 import com.openminis.app.ui.components.UnifiedModelPickerSheet
 import com.openminis.app.data.repository.setFallbackTrigger
 import com.openminis.app.data.repository.setSlotEntries
+import com.openminis.app.data.repository.syncImageSlotToAgentList
 
 @Composable
 fun ModelsScreen(
@@ -35,14 +39,48 @@ fun ModelsScreen(
 ) {
     val config by providerRepository.config.collectAsState()
     var pickerSlot by remember { mutableStateOf<ModelSlot?>(null) }
+    val pruneNotices by providerRepository.pruneNotices.collectAsState()
+    // An Image-slot model has to be on the Agent models list too; repair configs from before
+    // the slot did that on its own.
+    LaunchedEffect(Unit) { providerRepository.syncImageSlotToAgentList() }
     SettingsScaffold(
         title = stringResource(R.string.settings_models_title),
         onBack = onBack, backLabel = stringResource(R.string.settings_cat_models),
     ) {
+        if (pruneNotices.isNotEmpty()) {
+            val agentListName = stringResource(R.string.agent_loop_models_title)
+            val slotNames = ModelSlot.values().associateWith { modelSlotTitle(it) }
+            SettingsSection(footer = null) {
+                pruneNotices.forEach { notice ->
+                    val places = (notice.slots.map { slotNames.getValue(it) } +
+                        listOfNotNull(agentListName.takeIf { notice.agentList })).joinToString(", ")
+                    SettingsRow(
+                        title = stringResource(R.string.model_prune_notice, notice.modelName, places),
+                        icon = Icons.Outlined.Info,
+                        iconColor = MaterialTheme.colorScheme.error,
+                        showChevron = false,
+                    )
+                }
+                SettingsRow(
+                    title = stringResource(R.string.model_prune_notice_dismiss),
+                    onClick = { providerRepository.dismissPruneNotices() },
+                    showChevron = false,
+                    showDivider = false,
+                )
+            }
+        }
         SettingsSection(
             header = stringResource(R.string.model_slots_header),
             footer = stringResource(R.string.model_slots_footer),
         ) {
+            val slotPurposes = mapOf(
+                ModelSlot.main to R.string.model_slot_main_desc,
+                ModelSlot.light to R.string.model_slot_light_desc,
+                ModelSlot.vision to R.string.model_slot_vision_desc,
+                ModelSlot.voiceInput to R.string.model_slot_voice_input_desc,
+                ModelSlot.voiceOutput to R.string.model_slot_voice_output_desc,
+                ModelSlot.image to R.string.model_slot_image_desc,
+            )
             val slots = listOf(
                 ModelSlot.main to (R.string.model_slot_main to Icons.Outlined.AutoAwesome),
                 ModelSlot.light to (R.string.model_slot_light to Icons.Outlined.LightMode),
@@ -66,7 +104,7 @@ fun ModelsScreen(
                 }
                 SettingsRow(
                     title = stringResource(display.first),
-                    subtitle = subtitle,
+                    subtitle = subtitle + "\n" + stringResource(slotPurposes.getValue(slot)),
                     icon = display.second,
                     onClick = { pickerSlot = slot },
                     showDivider = index < slots.lastIndex,

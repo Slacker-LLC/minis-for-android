@@ -444,6 +444,9 @@ internal fun ModelUseOffloadHandler.cmdRun(args: OffloadArgs, request: NativeOff
             put("usage", JSONObject().apply {
                 put("input_tokens", u.inputTokens)
                 put("output_tokens", u.outputTokens)
+                // Cached tokens are billed differently; report them when the provider did.
+                u.cacheReadInputTokens?.takeIf { it > 0 }?.let { put("cache_read_input_tokens", it) }
+                u.cacheCreationInputTokens?.takeIf { it > 0 }?.let { put("cache_creation_input_tokens", it) }
             })
         }
         if (outputPath != null) put("output_file", outputPath)

@@ -9,7 +9,7 @@ import org.json.JSONObject
  * Provides model listing and search capabilities for the model_use tool.
  * Only surfaces the Agent-Loop-visible subset (mirrors iOS
  * ProviderConfigStore.resolvedAgentLoopEntries). Models not exposed in
- * Settings > Models > "Agent models" are hidden.
+ * Settings > Models > "Agent Models" (or picked for the Image slot) are hidden.
  *
  * Output shape mirrors iOS `ModelUseOffloadBridge.entryDict` so the agent
  * sees the same fields on both platforms — most importantly `modalities`,
@@ -17,8 +17,9 @@ import org.json.JSONObject
  */
 object ModelUseManager {
 
-    private const val NO_MODELS_HINT =
-        "No models available. Go to Settings > Models > Agent models to expose models to the agent."
+    /** Shared with the `minis-model-use` command handler so every empty-list reply says the same thing. */
+    const val NO_MODELS_HINT =
+        "No models available. Go to Settings > Models > Agent Models to expose models to the agent."
 
     /**
      * List the agent-loop-visible models, optionally filtered by a free-text
