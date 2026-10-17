@@ -193,6 +193,10 @@ class AnthropicProvider(
         var currentToolId: String? = null
         var currentToolName: String? = null
         val toolInputBuffer = StringBuilder()
+        // message_start carries the input/cache counts; message_delta carries the final
+        // output count (and, on newer API versions, cumulative input fields). Fold them
+        // together so a delta that omits the input side cannot zero what start reported.
+        var runningUsage: LLMUsage? = null
 
         try {
             var line: String?
@@ -215,7 +219,8 @@ class AnthropicProvider(
                     "message_start" -> {
                         send(LLMStreamChunk.Started)
                         event.optJSONObject("message")?.optJSONObject("usage")?.let { usage ->
-                            send(LLMStreamChunk.Usage(parseUsage(usage)))
+                            runningUsage = mergeUsage(usage, runningUsage)
+                            send(LLMStreamChunk.Usage(runningUsage!!))
                         }
                     }
                     "content_block_start" -> {
@@ -291,7 +296,8 @@ class AnthropicProvider(
                     }
                     "message_delta" -> {
                         event.optJSONObject("usage")?.let { usage ->
-                            send(LLMStreamChunk.Usage(parseUsage(usage)))
+                            runningUsage = mergeUsage(usage, runningUsage)
+                            send(LLMStreamChunk.Usage(runningUsage!!))
                         }
                         val stopReason = event.optJSONObject("delta")
                             ?.safeOptString("stop_reason", "")?.ifEmpty { null }
@@ -870,6 +876,32 @@ class AnthropicProvider(
         fun supportsThinking(modelId: String): Boolean =
             com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(modelId).supportsReasoning == true
 
+        /**
+         * Fold one `usage` object into the running totals of a request.
+         *
+         * Anthropic's `input_tokens` counts only the tokens after the last cache breakpoint
+         * (platform.claude.com prompt-caching: total input = cache_read + cache_creation +
+         * input_tokens), so the context size is the sum of the three, not `input_tokens`.
+         * Input-side fields are taken from [json] only when it reports a positive value
+         * (a stream's `message_delta` may omit them or send 0), otherwise the earlier value
+         * stands; the output count is taken whenever present.
+         */
+        internal fun mergeUsage(json: JSONObject, prior: LLMUsage?): LLMUsage {
+            fun side(key: String, previous: Int?): Int? =
+                json.optInt(key, 0).takeIf { it > 0 } ?: previous
+            val input = side("input_tokens", prior?.inputTokens) ?: 0
+            val cacheCreation = side("cache_creation_input_tokens", prior?.cacheCreationInputTokens)
+            val cacheRead = side("cache_read_input_tokens", prior?.cacheReadInputTokens)
+            val output = if (json.has("output_tokens")) json.optInt("output_tokens", 0) else prior?.outputTokens ?: 0
+            return LLMUsage(
+                inputTokens = input,
+                outputTokens = output,
+                cacheCreationInputTokens = cacheCreation,
+                cacheReadInputTokens = cacheRead,
+                latestContextTokens = input + (cacheCreation ?: 0) + (cacheRead ?: 0),
+            )
+        }
+
         /** Calculate thinking budget tokens based on level (legacy <=4.5 protocol). */
         fun thinkingBudget(maxTokens: Int, level: ThinkingLevel): Int {
             val cap = when (level) {
@@ -1050,16 +1082,7 @@ class AnthropicProvider(
         return LLMResponse(text, stopReason, usage)
     }
 
-    private fun parseUsage(json: JSONObject): LLMUsage {
-        val inputTokens = json.optInt("input_tokens", 0)
-        return LLMUsage(
-            inputTokens = inputTokens,
-            outputTokens = json.optInt("output_tokens", 0),
-            cacheCreationInputTokens = json.optInt("cache_creation_input_tokens").takeIf { it > 0 },
-            cacheReadInputTokens = json.optInt("cache_read_input_tokens").takeIf { it > 0 },
-            latestContextTokens = inputTokens,
-        )
-    }
+    private fun parseUsage(json: JSONObject): LLMUsage = mergeUsage(json, null)
 
     private fun mapHttpError(statusCode: Int, body: String): LLMError {
         val message = ProviderErrorCatalog.describe(statusCode, body)

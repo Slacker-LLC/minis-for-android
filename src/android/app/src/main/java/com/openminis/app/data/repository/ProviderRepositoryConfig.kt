@@ -8,6 +8,7 @@ import com.openminis.app.data.db.SessionModelBindingMigration
 import com.openminis.app.data.db.compositeEntryKey
 import com.openminis.app.data.db.toProviderConfig
 import com.openminis.app.data.db.toSnapshot
+import com.openminis.app.data.db.withImageSlotBackfilledFrom
 import com.openminis.app.data.migration.LegacyBindingRecord
 import com.openminis.app.data.migration.LegacyGroupMigrator
 import com.openminis.app.data.migration.LegacyGroupStateParser
@@ -138,6 +139,18 @@ internal suspend fun ProviderRepository.loadConfigSuspending(): ProviderConfig {
 
     if (dbConfig != null) {
         val liveHash = rawJson?.let(::hashJsonMirror)
+        val migrated = dbSnapshot?.meta?.any {
+            it.key == ProviderConfigMetaKeys.LEGACY_GROUPS_MIGRATED_V1 && it.value == "true"
+        } == true
+        if (migrated && dbSnapshot != null && dbSnapshot.meta.none { it.key == ProviderConfigMetaKeys.SLOT_IMAGE }) {
+            // The DB predates the image slot row: recover it from the mirror and write it back.
+            val mirror = rawJson?.let { runCatching { json.decodeFromString<ProviderConfig>(it) }.getOrNull() }
+            val restored = dbConfig.withImageSlotBackfilledFrom(dbSnapshot, mirror)
+            if (restored !== dbConfig) {
+                android.util.Log.i("ProviderRepo", "[ProviderStore] image slot backfilled from JSON mirror")
+                return runCatching { persistToDbAndMirror(restored) }.getOrDefault(restored)
+            }
+        }
         val migrationComplete = dbSnapshot?.meta?.firstOrNull {
             it.key == ProviderConfigMetaKeys.LEGACY_GROUPS_MIGRATED_V1
         }?.value == "true"
