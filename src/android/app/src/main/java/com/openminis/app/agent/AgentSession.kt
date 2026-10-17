@@ -21,6 +21,7 @@ import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
+import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.R
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.MemoryRepository
@@ -684,9 +685,7 @@ class AgentSession(
             // threading the real flag lets a text-only model without a Vision
             // Group correctly LOSE the tool (iOS parity), while a configured
             // Vision Group keeps it.
-            supportsImageInput = currentModel?.let {
-                it.inputModalities?.map { m -> m.lowercase() }?.contains("image") == true
-            } == true,
+            supportsImageInput = currentModel?.hasImageInput == true,
             visionGroupConfigured = com.openminis.app.tools.VisionGroupResolver.isConfigured(
                 providerRepository, context,
             ),
