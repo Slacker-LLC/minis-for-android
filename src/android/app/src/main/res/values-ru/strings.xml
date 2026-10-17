@@ -1851,6 +1851,9 @@
     <string name="agent_loop_search_placeholder">Поиск моделей</string>
     <string name="agent_loop_search_clear">Очистить поиск</string>
     <string name="model_entry_default_thinking">Уровень рассуждения по умолчанию</string>
+    <string name="model_entry_max_thinking">Максимальный уровень рассуждения</string>
+    <string name="model_entry_max_thinking_auto">Авто (%1$s)</string>
+    <string name="modeldetail_thinking_rule_unknown">Этой модели нет во встроенных правилах рассуждения, поэтому приложение считает потолком «Высокий» и может вообще не отправлять параметр рассуждения. Если рассуждение не действует, задайте максимальный уровень здесь.</string>
     <string name="model_entry_thinking_default">Использовать значение провайдера</string>
     <string name="model_entry_thinking_off">Выкл.</string>
     <string name="model_entry_thinking_low">Низкий</string>

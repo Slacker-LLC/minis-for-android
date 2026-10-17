@@ -1688,6 +1688,9 @@
     <string name="agent_loop_search_placeholder">モデルを検索</string>
     <string name="agent_loop_search_clear">検索をクリア</string>
     <string name="model_entry_default_thinking">既定の思考レベル</string>
+    <string name="model_entry_max_thinking">最大の思考レベル</string>
+    <string name="model_entry_max_thinking_auto">自動（%1$s）</string>
+    <string name="modeldetail_thinking_rule_unknown">このモデルは内蔵の思考ルールにないため、上限を「高」と仮定し、思考パラメータを一切送らない場合があります。思考が効かないときは、ここで最大レベルを指定してください。</string>
     <string name="model_entry_thinking_default">プロバイダーの既定値を使用</string>
     <string name="model_entry_thinking_off">オフ</string>
     <string name="model_entry_thinking_low">低</string>

@@ -44,6 +44,12 @@ data class LLMModel(
     // Mirrors iOS ModelModality flags. When null, treat as text-in/text-out only.
     val inputModalities: List<String>? = null,
     val outputModalities: List<String>? = null,
+    /**
+     * The user's own ceiling for this model's thinking level, copied from
+     * `ModelOverrides.maxThinkingLevel` by [ModelEntry.model]. Lets every provider's
+     * `clampThinkingLevel` honor the entry override without knowing about entries.
+     */
+    val thinkingCeilingOverride: ThinkingLevel? = null,
 ) {
     val isGpt6Astra: Boolean get() = id.substringAfterLast('/').equals("gpt-6-astra", ignoreCase = true)
 

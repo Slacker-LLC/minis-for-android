@@ -15,6 +15,7 @@ object ThinkingLevelCatalog {
 /**
  * "How high can this model's thinking go?" Resolution order is intentionally stable:
  *   1. supportsReasoning == false → OFF.
+ *   1b. The user's per-entry ceiling ([LLMModel.thinkingCeilingOverride]).
  *   2. A model-declared reasoningEffortValues set.
  *   3. The first matching model rule.
  *   4. HIGH for an unknown model, a broadly accepted reasoning tier.
@@ -22,6 +23,7 @@ object ThinkingLevelCatalog {
 val LLMModel.catalogMaxThinkingLevel: ThinkingLevel
     get() {
         if (supportsReasoning == false) return ThinkingLevel.OFF
+        thinkingCeilingOverride?.let { return it }
         selectableThinkingLevels.lastOrNull()?.let { return it }
         return ThinkingLevelCatalog.declaredMaxLevel(id) ?: ThinkingLevel.HIGH
     }
@@ -44,4 +46,4 @@ val LLMModel.selectableThinkingLevels: List<ThinkingLevel>
 
 /** Entry overrides remain higher priority than either the built-in model or catalog rule. */
 val ModelEntry.effectiveMaxThinkingLevel: ThinkingLevel
-    get() = overrides.maxThinkingLevel ?: model.catalogMaxThinkingLevel
+    get() = model.catalogMaxThinkingLevel

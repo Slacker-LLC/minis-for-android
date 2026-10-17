@@ -32,6 +32,9 @@ import androidx.compose.ui.res.stringResource
 import com.openminis.app.data.model.ModelOverrides
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.data.model.normalizeModalityName
+import com.openminis.app.provider.ThinkingLevelCatalog
+import com.openminis.app.provider.catalogMaxThinkingLevel
+import com.openminis.app.provider.selectableThinkingLevels
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.components.RowLabel
 import com.openminis.app.ui.components.SectionTextField
@@ -80,6 +83,8 @@ fun ModelEntryDetailScreen(
     }
     var defaultThinkingLevel by remember { mutableStateOf(overrides.defaultThinkingLevel) }
     var thinkingMenuExpanded by remember { mutableStateOf(false) }
+    var maxThinkingLevel by remember { mutableStateOf(overrides.maxThinkingLevel) }
+    var maxThinkingMenuExpanded by remember { mutableStateOf(false) }
     var contextLimitTokens by remember { mutableStateOf(overrides.contextLimitTokens) }
     var lastContextLimitTokens by remember { mutableStateOf(overrides.lastContextLimitTokens) }
     // [T-eta-hosted-web-search] The provider's own web search; off unless the entry asked for it.
@@ -161,7 +166,12 @@ fun ModelEntryDetailScreen(
                         // supportsReasoning: persist only when user diverged from base.
                         supportsReasoning = thinkingEnabled.takeIf { it != (baseModel.supportsReasoning ?: false) },
                         hostedWebSearch = hostedWebSearch.takeIf { it != baseModel.hostedWebSearch },
-                        defaultThinkingLevel = defaultThinkingLevel,
+                        maxThinkingLevel = maxThinkingLevel,
+                        defaultThinkingLevel = defaultThinkingLevel?.let { d ->
+                            // Never persist a default above the ceiling the user just set.
+                            val cap = maxThinkingLevel
+                            if (cap != null && d.rank > cap.rank) cap else d
+                        },
                         contextLimitTokens = contextLimitTokens,
                         lastContextLimitTokens = lastContextLimitTokens,
                         // Modality lists: persist only when user-edited set differs
@@ -265,9 +275,62 @@ fun ModelEntryDetailScreen(
         }
 
         // ── Entry defaults ──────────────────────────────────────────────
+        // Ceiling the catalog would pick with no user override; also the cap for the menus below.
+        val autoMaxThinking = baseModel
+            .copy(supportsReasoning = thinkingEnabled)
+            .catalogMaxThinkingLevel
+        val shownMaxThinking = if (!thinkingEnabled) ThinkingLevel.OFF else maxThinkingLevel ?: autoMaxThinking
+        val thinkingRuleUnknown = thinkingEnabled && maxThinkingLevel == null &&
+            baseModel.selectableThinkingLevels.isEmpty() &&
+            ThinkingLevelCatalog.declaredMaxLevel(baseModel.id) == null
         SettingsSection(
             header = stringResource(R.string.model_entry_default_thinking),
+            footer = if (thinkingRuleUnknown) stringResource(R.string.modeldetail_thinking_rule_unknown) else null,
         ) {
+            Box {
+                SettingsRow(
+                    title = stringResource(R.string.model_entry_max_thinking),
+                    subtitle = if (maxThinkingLevel == null) {
+                        stringResource(
+                            R.string.model_entry_max_thinking_auto,
+                            stringResource(thinkingLevelLabel(shownMaxThinking)),
+                        )
+                    } else {
+                        stringResource(thinkingLevelLabel(maxThinkingLevel))
+                    },
+                    onClick = { maxThinkingMenuExpanded = true },
+                )
+                DropdownMenu(
+                    expanded = maxThinkingMenuExpanded,
+                    onDismissRequest = { maxThinkingMenuExpanded = false },
+                ) {
+                    val choices = listOf<ThinkingLevel?>(null) +
+                        ThinkingLevel.entries.filter { it != ThinkingLevel.OFF }
+                    choices.forEach { level ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    if (level == null) {
+                                        stringResource(
+                                            R.string.model_entry_max_thinking_auto,
+                                            stringResource(thinkingLevelLabel(autoMaxThinking)),
+                                        )
+                                    } else {
+                                        stringResource(thinkingLevelLabel(level))
+                                    },
+                                )
+                            },
+                            onClick = {
+                                maxThinkingLevel = level
+                                if (level != null && (defaultThinkingLevel?.rank ?: 0) > level.rank) {
+                                    defaultThinkingLevel = level
+                                }
+                                maxThinkingMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
             Box {
                 SettingsRow(
                     title = stringResource(R.string.model_entry_default_thinking),
@@ -279,7 +342,8 @@ fun ModelEntryDetailScreen(
                     expanded = thinkingMenuExpanded,
                     onDismissRequest = { thinkingMenuExpanded = false },
                 ) {
-                    val choices = listOf<ThinkingLevel?>(null) + ThinkingLevel.entries
+                    val choices = listOf<ThinkingLevel?>(null) +
+                        ThinkingLevel.entries.filter { it.rank <= shownMaxThinking.rank }
                     choices.forEach { level ->
                         DropdownMenuItem(
                             text = { Text(stringResource(thinkingLevelLabel(level))) },

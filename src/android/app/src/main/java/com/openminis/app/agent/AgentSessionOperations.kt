@@ -18,6 +18,7 @@ import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.ProviderFactory
+import com.openminis.app.provider.effectiveMaxThinkingLevel
 import com.openminis.app.runtime.ExecutionCoordinator
 import com.openminis.app.service.SessionActivityTracker
 import com.openminis.app.tools.FileReadTool
@@ -886,7 +887,11 @@ internal fun AgentSession.restoreFromBinding(bindingJson: String?): Boolean {
  */
 internal fun AgentSession.applyEntrySessionDefaults(entryId: String) {
     val entry = providerRepository.config.value.modelEntries.find { it.id == entryId } ?: return
-    val level = entry.overrides.defaultThinkingLevel ?: return
+    // A default saved before the ceiling was lowered must not exceed it now.
+    val cap = entry.effectiveMaxThinkingLevel
+    val level = entry.overrides.defaultThinkingLevel
+        ?.let { if (it.rank > cap.rank) cap else it }
+        ?: return
     if (_thinkingLevel.value == level) return
     _thinkingLevel.value = level
     if (hasNoRow) {

@@ -407,6 +407,7 @@ data class ModelEntry(
             inputModalities = overrides.inputModalities ?: baseModel.inputModalities,
             outputModalities = overrides.outputModalities ?: baseModel.outputModalities,
             hostedWebSearch = overrides.hostedWebSearch ?: baseModel.hostedWebSearch,
+            thinkingCeilingOverride = overrides.maxThinkingLevel,
         )
 
     /** True when this entry carries user intent beyond API-reported defaults. */

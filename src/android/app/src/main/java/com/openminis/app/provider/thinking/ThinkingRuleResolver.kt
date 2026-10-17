@@ -206,6 +206,17 @@ object ThinkingRuleResolver {
                 label = "openai-native",
             ),
         )
+        // gpt-6 and newer: its own row (not "gpt-*", which would sweep in gpt-4/gpt-4o,
+        // non-reasoning models that must not receive reasoning_effort). Mirrors upstream
+        // ThinkingRuleResolver.kt:243-257.
+        add(
+            ThinkingRule(
+                kind = ThinkingRule.Kind.OFFICIAL_VENDOR,
+                scope = ThinkingRule.Scope.ModelPattern("gpt-6*"),
+                wireFormat = ThinkingWireFormat.ReasoningEffort(ctx.offEffort),
+                label = "openai-native",
+            ),
+        )
 
         // Qwen / DashScope — dual-send + strict budget inequality (25165700, a5a0de20).
         // The old branch was `lid.contains("qwen") || isDashScope` with NO unified guard,
@@ -344,7 +355,9 @@ object ThinkingRuleResolver {
             }
 
             is ThinkingWireFormat.ReasoningEffort -> {
-                val isOpenAINative = lid.startsWith("o") || lid.startsWith("gpt-5")
+                val isOpenAINative = lid.startsWith("o") ||
+                    lid.startsWith("gpt-5") ||
+                    lid.startsWith("gpt-6")
                 if (!ctx.level.isEnabled) {
                     // OFF is a separate dispatch on Android, reproduced verbatim from the
                     // pre-refactor chain. Order matters: OpenAI-native ids send the tier

@@ -1832,6 +1832,9 @@
     <string name="agent_loop_search_placeholder">搜尋模型</string>
     <string name="agent_loop_search_clear">清除搜尋</string>
     <string name="model_entry_default_thinking">預設思考強度</string>
+    <string name="model_entry_max_thinking">最高思考檔位</string>
+    <string name="model_entry_max_thinking_auto">自動（%1$s）</string>
+    <string name="modeldetail_thinking_rule_unknown">內建思考規則裡沒有這個模型，應用程式以「高」作為上限，可能完全不送出思考參數。如果思考沒有效果，請在這裡手動指定最高檔位。</string>
     <string name="model_entry_thinking_default">使用服務供應商預設值</string>
     <string name="model_entry_thinking_off">關閉</string>
     <string name="model_entry_thinking_low">低</string>

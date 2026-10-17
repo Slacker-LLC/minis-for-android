@@ -1680,6 +1680,9 @@
     <string name="agent_loop_search_placeholder">모델 검색</string>
     <string name="agent_loop_search_clear">검색 지우기</string>
     <string name="model_entry_default_thinking">기본 사고 수준</string>
+    <string name="model_entry_max_thinking">최대 사고 수준</string>
+    <string name="model_entry_max_thinking_auto">자동(%1$s)</string>
+    <string name="modeldetail_thinking_rule_unknown">이 모델은 내장 사고 규칙에 없어 상한을 ‘높음’으로 가정하며 사고 매개변수를 전혀 보내지 않을 수 있습니다. 사고가 적용되지 않으면 여기서 최대 수준을 직접 지정하세요.</string>
     <string name="model_entry_thinking_default">공급자 기본값 사용</string>
     <string name="model_entry_thinking_off">끄기</string>
     <string name="model_entry_thinking_low">낮음</string>

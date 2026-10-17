@@ -990,10 +990,11 @@ class AgentSession(
             val activeModel = _activeEntryId.value
                 ?.let { id -> providerRepository.config.value.modelEntries.find { it.id == id }?.model }
                 ?: currentModel
+            val ceiling = currentModelMaxThinkingLevel
             val declared = activeModel?.selectableThinkingLevels.orEmpty()
+                .filter { it.rank <= ceiling.rank }
             if (declared.isNotEmpty()) return declared
 
-            val ceiling = currentModelMaxThinkingLevel
             return ThinkingLevel.entries.filter { it != ThinkingLevel.OFF && it.rank <= ceiling.rank }
         }
 

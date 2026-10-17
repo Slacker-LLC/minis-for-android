@@ -1942,6 +1942,9 @@
     <string name="agent_loop_search_placeholder">Search models</string>
     <string name="agent_loop_search_clear">Clear search</string>
     <string name="model_entry_default_thinking">Default thinking level</string>
+    <string name="model_entry_max_thinking">Highest thinking level</string>
+    <string name="model_entry_max_thinking_auto">Auto (%1$s)</string>
+    <string name="modeldetail_thinking_rule_unknown">This model isn\'t in the built-in thinking rules, so the app assumes High as the ceiling and may send no thinking parameter at all. If thinking has no effect, set the highest level here.</string>
     <string name="model_entry_thinking_default">Use provider default</string>
     <string name="model_entry_thinking_off">Off</string>
     <string name="model_entry_thinking_low">Low</string>

@@ -1691,6 +1691,9 @@
     <string name="agent_loop_search_placeholder">Modelle suchen</string>
     <string name="agent_loop_search_clear">Suche löschen</string>
     <string name="model_entry_default_thinking">Standard-Denkstufe</string>
+    <string name="model_entry_max_thinking">Höchste Denkstufe</string>
+    <string name="model_entry_max_thinking_auto">Automatisch (%1$s)</string>
+    <string name="modeldetail_thinking_rule_unknown">Dieses Modell ist nicht in den integrierten Denkregeln enthalten; die App nimmt „Hoch“ als Obergrenze an und sendet eventuell gar keinen Denkparameter. Wirkt das Denken nicht, lege die höchste Stufe hier manuell fest.</string>
     <string name="model_entry_thinking_default">Anbieterstandard verwenden</string>
     <string name="model_entry_thinking_off">Aus</string>
     <string name="model_entry_thinking_low">Niedrig</string>
