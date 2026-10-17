@@ -297,6 +297,8 @@
     <string name="modeldetail_identity_footer_builtin">內建模型。顯示名稱會覆蓋供應商提供的預設值。</string>
     <string name="modeldetail_section_capabilities">能力</string>
     <string name="modeldetail_context_window">上下文視窗</string>
+    <string name="modeldetail_context_window_unknown">服務商沒有提供上下文視窗，依模型名稱估算為 %1$d tokens。自動壓縮的門檻由它推出，知道真實視窗的話請在此填寫。</string>
+    <string name="modeldetail_thinking_unconfirmed">服務商沒有說明此模型是否支援思考。開啟後，聊天裡才會出現思考選擇。</string>
     <string name="modeldetail_thinking">思考</string>
     <string name="modeldetail_provider_default">供應商預設</string>
     <string name="modeldetail_max_tokens_exceeds_warning">超過供應商回報的上限（%1$d）。值已保存，但可能導致請求失敗。</string>

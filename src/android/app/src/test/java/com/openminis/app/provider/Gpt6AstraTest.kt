@@ -4,7 +4,6 @@ import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ThinkingLevel
-import com.openminis.app.data.model.inferContextWindowTokens
 import com.openminis.app.provider.openai.OpenAIModelsApi
 import com.openminis.app.provider.openai.OpenAIProvider
 import kotlinx.coroutines.runBlocking
@@ -122,13 +121,12 @@ class Gpt6AstraTest {
         for (id in listOf("gpt-6-astra", "openai/gpt-6-astra")) {
             val model = LLMModel(id, id, "Custom")
             assertEquals(1_050_000, model.contextWindowTokens)
-            assertEquals(1_050_000, inferContextWindowTokens(model))
             assertEquals(ThinkingLevel.MAX, model.catalogMaxThinkingLevel)
         }
         val unrelated = LLMModel("gpt-6-astra-unrelated", "Fixture", "Custom")
         assertNull(com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(unrelated.id).contextWindow)
         assertEquals(ThinkingLevel.HIGH, unrelated.catalogMaxThinkingLevel)
-        assertEquals(50_000, inferContextWindowTokens(LLMModel("gpt-6-astra", "Astra", "OpenAI", contextWindow = 50_000)))
+        assertEquals(50_000, LLMModel("gpt-6-astra", "Astra", "OpenAI", contextWindow = 50_000).contextWindowTokens)
     }
 
     @Test

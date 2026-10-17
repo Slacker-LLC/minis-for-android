@@ -662,6 +662,8 @@
     <string name="modeldetail_identity_footer_builtin">내장 모델입니다. 표시 이름은 제공업체 기본값을 재정의합니다.</string>
     <string name="modeldetail_section_capabilities">능력</string>
     <string name="modeldetail_context_window">컨텍스트 창</string>
+    <string name="modeldetail_context_window_unknown">제공업체가 알려주지 않아 모델 이름으로 %1$d 토큰으로 추정합니다. 자동 압축 기준이 이 값에서 정해지므로, 실제 윈도우를 알면 직접 입력하세요.</string>
+    <string name="modeldetail_thinking_unconfirmed">제공업체가 이 모델의 사고 지원 여부를 알려주지 않습니다. 켜면 채팅에서 사고 선택기가 나타납니다.</string>
     <string name="modeldetail_thinking">사고</string>
     <string name="modeldetail_provider_default">제공업체 기본값</string>
     <string name="modeldetail_max_tokens_exceeds_warning">제공업체가 보고한 한도 (%1$d)를 초과합니다. 값은 저장되지만 오류가 발생할 수 있습니다.</string>
